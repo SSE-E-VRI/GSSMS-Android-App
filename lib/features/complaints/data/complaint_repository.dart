@@ -5,8 +5,12 @@ abstract class IComplaintRepository {
   Future<List<Complaint>> fetchComplaints({
     String? status,
     String? severity,
+    int? zoneId,
+    int? divisionId,
     int? depotId,
     int? stationId,
+    String? dateFrom,
+    String? dateTo,
   });
 
   Future<Complaint> fetchComplaintById(int id);
@@ -29,14 +33,22 @@ class ComplaintRepository implements IComplaintRepository {
   Future<List<Complaint>> fetchComplaints({
     String? status,
     String? severity,
+    int? zoneId,
+    int? divisionId,
     int? depotId,
     int? stationId,
+    String? dateFrom,
+    String? dateTo,
   }) async {
     return _apiService.getComplaints(
       status: status,
       severity: severity,
+      zoneId: zoneId,
+      divisionId: divisionId,
       depotId: depotId,
       stationId: stationId,
+      dateFrom: dateFrom,
+      dateTo: dateTo,
     );
   }
 

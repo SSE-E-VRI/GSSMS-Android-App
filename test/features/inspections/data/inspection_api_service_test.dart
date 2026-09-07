@@ -33,12 +33,18 @@ void main() {
       dio.httpClientAdapter = MockAdapter((options) async {
         expect(options.path, '/api/v1/inspections/');
         expect(options.queryParameters['status'], 'PENDING');
+        expect(options.queryParameters['start_date'], '2026-09-01');
+        expect(options.queryParameters['end_date'], '2026-09-07');
         return _json([
           {'id': 10, 'title': 'Monthly Check', 'status': 'PENDING', 'priority': 'MEDIUM'}
         ], 200);
       });
 
-      final inspections = await apiService.getInspections(status: 'PENDING');
+      final inspections = await apiService.getInspections(
+        status: 'PENDING',
+        dateFrom: '2026-09-01',
+        dateTo: '2026-09-07',
+      );
       expect(inspections.length, 1);
       expect(inspections[0].id, 10);
       expect(inspections[0].status, InspectionStatus.pending);

@@ -3,8 +3,12 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gssms_mobile/core/network/dio_client.dart';
 import 'package:gssms_mobile/core/sync/sync_manager.dart';
+import 'package:gssms_mobile/core/widgets/date_range_filter_bar.dart';
+import 'package:gssms_mobile/core/widgets/org_scope_filter_bar.dart';
 import 'package:gssms_mobile/features/work_orders/data/work_order_api_service.dart';
 import 'package:gssms_mobile/features/work_orders/data/work_order_repository.dart';
+import 'package:gssms_mobile/features/work_orders/domain/models/maintenance_record.dart';
+import 'package:gssms_mobile/features/work_orders/domain/models/technician.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/work_order.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/work_order_action.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/work_order_audit.dart';
@@ -36,25 +40,40 @@ class WorkOrderListController extends Notifier<WorkOrderListState> {
 
   IWorkOrderRepository get _repository => ref.read(workOrderRepositoryProvider);
 
+  /// The last successfully loaded filters, whether the current state is
+  /// still that loaded state or an error that carried them forward — so a
+  /// retry/filter-change issued after a failure doesn't silently reset them.
+  WorkOrderListLoaded? _resolvePrevious() {
+    final s = state;
+    if (s is WorkOrderListLoaded) return s;
+    if (s is WorkOrderListError) return s.previousLoaded;
+    return null;
+  }
+
   Future<void> fetchWorkOrders({bool forceRefresh = false}) async {
-    final current = state;
-    if (current is! WorkOrderListLoaded || forceRefresh) {
+    final previous = _resolvePrevious();
+    if (previous == null || forceRefresh) {
       state = const WorkOrderListLoading();
     }
 
     try {
-      final orders = await _repository.fetchWorkOrders();
+      final scope = previous?.orgScope ?? OrgScopeSelection.empty;
+      final orders = await _repository.fetchWorkOrders(
+        dateFrom: formatApiDate(previous?.dateFrom),
+        dateTo: formatApiDate(previous?.dateTo),
+        zoneId: scope.zoneId,
+        divisionId: scope.divisionId,
+        depotId: scope.depotId,
+        stationId: scope.stationId,
+      );
       // Carry the active filter and search term across the refresh. Rebuilding
       // the state from scratch would clear them while the search field on screen
       // still shows the query, leaving the list contradicting the visible filter.
-      final previous = state is WorkOrderListLoaded
-          ? state as WorkOrderListLoaded
-          : (current is WorkOrderListLoaded ? current : null);
       state = previous != null
           ? previous.copyWith(workOrders: orders)
           : WorkOrderListLoaded(workOrders: orders);
     } catch (e) {
-      state = WorkOrderListError(e.toString());
+      state = WorkOrderListError(e.toString(), previousLoaded: previous);
     }
   }
 
@@ -72,6 +91,59 @@ class WorkOrderListController extends Notifier<WorkOrderListState> {
     if (state is WorkOrderListLoaded) {
       final current = state as WorkOrderListLoaded;
       state = current.copyWith(searchQuery: query);
+    }
+  }
+
+  /// Server-side date filter. Unlike status chips this is not applied in memory:
+  /// the list can be unbounded, so the range is sent as `date_from`/`date_to`.
+  Future<void> setDateRange(DateTime? from, DateTime? to) async {
+    final previous = _resolvePrevious();
+    final scope = previous?.orgScope ?? OrgScopeSelection.empty;
+    try {
+      final orders = await _repository.fetchWorkOrders(
+        dateFrom: formatApiDate(from),
+        dateTo: formatApiDate(to),
+        zoneId: scope.zoneId,
+        divisionId: scope.divisionId,
+        depotId: scope.depotId,
+        stationId: scope.stationId,
+      );
+      state = WorkOrderListLoaded(
+        workOrders: orders,
+        selectedStatusFilter: previous?.selectedStatusFilter,
+        searchQuery: previous?.searchQuery ?? '',
+        dateFrom: from,
+        dateTo: to,
+        orgScope: scope,
+      );
+    } catch (e) {
+      state = WorkOrderListError(e.toString(), previousLoaded: previous);
+    }
+  }
+
+  /// Server-side Zone/Division/Depot/Station filter, same reasoning as
+  /// [setDateRange] — not an in-memory filter, sent as query params.
+  Future<void> setOrgScope(OrgScopeSelection scope) async {
+    final previous = _resolvePrevious();
+    try {
+      final orders = await _repository.fetchWorkOrders(
+        dateFrom: formatApiDate(previous?.dateFrom),
+        dateTo: formatApiDate(previous?.dateTo),
+        zoneId: scope.zoneId,
+        divisionId: scope.divisionId,
+        depotId: scope.depotId,
+        stationId: scope.stationId,
+      );
+      state = WorkOrderListLoaded(
+        workOrders: orders,
+        selectedStatusFilter: previous?.selectedStatusFilter,
+        searchQuery: previous?.searchQuery ?? '',
+        dateFrom: previous?.dateFrom,
+        dateTo: previous?.dateTo,
+        orgScope: scope,
+      );
+    } catch (e) {
+      state = WorkOrderListError(e.toString(), previousLoaded: previous);
     }
   }
 }
@@ -133,10 +205,73 @@ class WorkOrderDetailController extends FamilyNotifier<WorkOrderDetailState, int
       // Also refresh list
       unawaited(ref.read(workOrderListControllerProvider.notifier).fetchWorkOrders(forceRefresh: true));
       return recordId;
+    } on StartExecutionQueuedOffline catch (e) {
+      // Queued for later, not a failure — stay on the detail view (there is
+      // no real record id yet to navigate anywhere with) and surface it as
+      // an informational message rather than a full error screen.
+      state = current.copyWith(isTransitioning: false, actionMessage: e.toString());
+      return null;
     } catch (e) {
       state = current.copyWith(isTransitioning: false, actionMessage: null);
-      state = WorkOrderDetailError('Failed to start execution: $e');
+      state = WorkOrderDetailError('Failed to start execution: ${_readableError(e)}');
       return null;
+    }
+  }
+
+  Future<List<Technician>> fetchAssignableTechnicians() {
+    return _repository.fetchAssignableTechnicians();
+  }
+
+  /// PATCH `assigned_to` then transition to ASSIGNED — same order as the web client.
+  Future<bool> assignAndActivate(int technicianId) async {
+    final current = state;
+    if (current is! WorkOrderDetailLoaded) return false;
+
+    state = current.copyWith(
+      isTransitioning: true,
+      actionMessage: 'Assigning technician...',
+    );
+    try {
+      await _repository.assignTechnician(arg, technicianId);
+      final updatedWo = await _repository.transitionStatus(
+        arg,
+        status: 'ASSIGNED',
+      );
+      state = WorkOrderDetailLoaded(workOrder: updatedWo);
+      unawaited(loadActionsAndAudit());
+      unawaited(
+        ref.read(workOrderListControllerProvider.notifier).fetchWorkOrders(
+              forceRefresh: true,
+            ),
+      );
+      return true;
+    } catch (e) {
+      state = current.copyWith(isTransitioning: false, actionMessage: null);
+      state = WorkOrderDetailError('Failed to assign technician: ${_readableError(e)}');
+      return false;
+    }
+  }
+
+  /// Dedicated verify action so the server records `verified_by`.
+  Future<bool> verifyWorkOrder({String? remarks}) async {
+    final current = state;
+    if (current is! WorkOrderDetailLoaded) return false;
+
+    state = current.copyWith(isTransitioning: true, actionMessage: 'Verifying...');
+    try {
+      final updatedWo = await _repository.verifyWorkOrder(arg, remarks: remarks);
+      state = WorkOrderDetailLoaded(workOrder: updatedWo);
+      unawaited(loadActionsAndAudit());
+      unawaited(
+        ref.read(workOrderListControllerProvider.notifier).fetchWorkOrders(
+              forceRefresh: true,
+            ),
+      );
+      return true;
+    } catch (e) {
+      state = current.copyWith(isTransitioning: false, actionMessage: null);
+      state = WorkOrderDetailError('Verification failed: ${_readableError(e)}');
+      return false;
     }
   }
 
@@ -166,10 +301,12 @@ class WorkOrderDetailController extends FamilyNotifier<WorkOrderDetailState, int
       return true;
     } catch (e) {
       state = current.copyWith(isTransitioning: false, actionMessage: null);
-      state = WorkOrderDetailError('Status transition failed: $e');
+      state = WorkOrderDetailError('Status transition failed: ${_readableError(e)}');
       return false;
     }
   }
+
+  String _readableError(Object error) => workOrderReadableError(error);
 }
 
 // --- Checklist Controller ---
@@ -225,12 +362,19 @@ class ChecklistController extends FamilyNotifier<ChecklistState, int> {
 
     // An action taken is only valid for the status it hangs off; sending a
     // stale one is rejected by the backend, so drop it when it no longer
-    // belongs to the selected status.
-    final line = current.record.lines.firstWhere(
-      (l) => l.id == lineId,
-      orElse: () => current.record.lines.first,
-    );
-    final validActionIds = statusOptionId == null
+    // belongs to the selected status. Falling back to some other line here
+    // (lines.first) would validate against the wrong line's status options —
+    // if lineId genuinely isn't in this record (a race with a reload), skip
+    // validation instead of guessing, so an actually-valid actionOptionId
+    // isn't stripped (or a stale one wrongly kept) based on unrelated data.
+    MaintenanceRecordLine? line;
+    for (final l in current.record.lines) {
+      if (l.id == lineId) {
+        line = l;
+        break;
+      }
+    }
+    final validActionIds = (statusOptionId == null || line == null)
         ? const <int>[]
         : line.statusOptions
             .where((o) => o.id == statusOptionId)
@@ -254,7 +398,15 @@ class ChecklistController extends FamilyNotifier<ChecklistState, int> {
     try {
       await _repository.submitChecklistLine(arg, payload);
 
-      final updatedLines = current.record.lines.map((l) {
+      // Re-read state now, not the pre-await `current`: another line's save
+      // (an immediate one, or a debounced one on a different card) may have
+      // completed while this request was in flight. Applying this update on
+      // top of the stale snapshot would silently discard that other line's
+      // already-server-confirmed change.
+      final latest = state;
+      if (latest is! ChecklistLoaded) return true;
+
+      final updatedLines = latest.record.lines.map((l) {
         if (l.id == lineId) {
           return l.copyWith(
             recordedValue: value,
@@ -268,13 +420,15 @@ class ChecklistController extends FamilyNotifier<ChecklistState, int> {
         return l;
       }).toList();
 
-      state = current.copyWith(
-        record: current.record.copyWith(lines: updatedLines),
+      state = latest.copyWith(
+        record: latest.record.copyWith(lines: updatedLines),
         successMessage: 'Saved',
       );
       return true;
     } catch (e) {
-      state = current.copyWith(errorMessage: 'Failed to save observation: $e');
+      final latest = state;
+      if (latest is! ChecklistLoaded) return false;
+      state = latest.copyWith(errorMessage: 'Failed to save observation: $e');
       return false;
     }
   }
@@ -331,21 +485,25 @@ class ChecklistController extends FamilyNotifier<ChecklistState, int> {
     }
   }
 
-  /// Surfaces the server's own validation message (incomplete checklist, no
-  /// group checked out, ...) instead of a raw exception dump.
-  String _readableError(Object error) {
-    if (error is DioException) {
-      final data = error.response?.data;
-      if (data is Map) {
-        final detail = data['detail'] ?? data['error'];
-        if (detail != null) return detail.toString();
+  String _readableError(Object error) => workOrderReadableError(error);
+}
+
+/// Surfaces the server's own validation message instead of a raw exception dump.
+String workOrderReadableError(Object error) {
+  if (error is DioException) {
+    final data = error.response?.data;
+    if (data is Map) {
+      final detail = data['detail'] ?? data['error'];
+      if (detail != null) return detail.toString();
+      if (data.values.isNotEmpty) {
         final first = data.values.first;
         if (first is List && first.isNotEmpty) return first.first.toString();
         if (first != null) return first.toString();
       }
-      if (data is List && data.isNotEmpty) return data.first.toString();
-      if (data is String && data.isNotEmpty) return data;
     }
-    return error.toString();
+    if (data is List && data.isNotEmpty) return data.first.toString();
+    if (data is String && data.isNotEmpty) return data;
   }
+  return error.toString();
 }
+

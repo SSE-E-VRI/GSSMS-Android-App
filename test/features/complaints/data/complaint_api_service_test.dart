@@ -46,6 +46,8 @@ void main() {
       dio.httpClientAdapter = MockAdapter((options) async {
         expect(options.path, '/api/v1/complaints/');
         expect(options.queryParameters['status'], 'OPEN');
+        expect(options.queryParameters['start_date'], '2026-09-01');
+        expect(options.queryParameters['end_date'], '2026-09-07');
         return _json([
           {
             'id': 10,
@@ -56,7 +58,11 @@ void main() {
         ], 200);
       });
 
-      final complaints = await apiService.getComplaints(status: 'OPEN');
+      final complaints = await apiService.getComplaints(
+        status: 'OPEN',
+        dateFrom: '2026-09-01',
+        dateTo: '2026-09-07',
+      );
       expect(complaints.length, 1);
       expect(complaints[0].id, 10);
       expect(complaints[0].status, ComplaintStatus.open);

@@ -3,6 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gssms_mobile/core/sync/widgets/sync_status_badge.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
+import 'package:gssms_mobile/core/widgets/date_range_filter_bar.dart';
+import 'package:gssms_mobile/core/widgets/org_scope_filter_bar.dart';
+import 'package:gssms_mobile/features/auth/domain/models/user_session.dart';
+import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
+import 'package:gssms_mobile/features/auth/presentation/controllers/auth_state.dart';
 import 'package:gssms_mobile/features/complaints/domain/models/complaint.dart';
 import 'package:gssms_mobile/features/complaints/presentation/controllers/complaint_controllers.dart';
 import 'package:gssms_mobile/features/complaints/presentation/screens/complaint_create_screen.dart';
@@ -35,6 +40,8 @@ class _ComplaintListScreenState extends ConsumerState<ComplaintListScreen> {
   @override
   Widget build(BuildContext context) {
     final listState = ref.watch(complaintListControllerProvider);
+    final authState = ref.watch(authControllerProvider);
+    final session = authState is Authenticated ? authState.session : null;
 
     return Scaffold(
       appBar: AppBar(
@@ -56,6 +63,8 @@ class _ComplaintListScreenState extends ConsumerState<ComplaintListScreen> {
       body: Column(
         children: [
           _buildSearchBar(),
+          if (session != null) _buildOrgScope(listState, session),
+          _buildDateRange(listState),
           _buildFilterChips(listState),
           Expanded(child: _buildListBody(listState)),
         ],
@@ -114,6 +123,30 @@ class _ComplaintListScreenState extends ConsumerState<ComplaintListScreen> {
           ref.read(complaintListControllerProvider.notifier).setSearchQuery(val);
         },
       ),
+    );
+  }
+
+  Widget _buildOrgScope(ComplaintListState state, UserSession session) {
+    final loaded = state is ComplaintListLoaded ? state : null;
+    return OrgScopeFilterBar(
+      scope: session.scope,
+      selection: loaded?.orgScope ?? OrgScopeSelection.empty,
+      // ComplaintViewSet.get_queryset has no station-level filter.
+      enableStation: false,
+      onChanged: (selection) {
+        ref.read(complaintListControllerProvider.notifier).setOrgScope(selection);
+      },
+    );
+  }
+
+  Widget _buildDateRange(ComplaintListState state) {
+    final loaded = state is ComplaintListLoaded ? state : null;
+    return DateRangeFilterBar(
+      from: loaded?.dateFrom,
+      to: loaded?.dateTo,
+      onChanged: (from, to) {
+        ref.read(complaintListControllerProvider.notifier).setDateRange(from, to);
+      },
     );
   }
 

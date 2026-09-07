@@ -3,6 +3,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gssms_mobile/core/sync/widgets/sync_status_badge.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
+import 'package:gssms_mobile/core/widgets/date_range_filter_bar.dart';
+import 'package:gssms_mobile/core/widgets/org_scope_filter_bar.dart';
+import 'package:gssms_mobile/features/auth/domain/models/user_session.dart';
+import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
+import 'package:gssms_mobile/features/auth/presentation/controllers/auth_state.dart';
 import 'package:gssms_mobile/features/inspections/domain/models/inspection.dart';
 import 'package:gssms_mobile/features/inspections/presentation/controllers/inspection_controllers.dart';
 import 'package:gssms_mobile/features/inspections/presentation/screens/inspection_create_screen.dart';
@@ -35,6 +40,8 @@ class _InspectionListScreenState extends ConsumerState<InspectionListScreen> {
   @override
   Widget build(BuildContext context) {
     final listState = ref.watch(inspectionListControllerProvider);
+    final authState = ref.watch(authControllerProvider);
+    final session = authState is Authenticated ? authState.session : null;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Field Inspections'),
@@ -47,6 +54,8 @@ class _InspectionListScreenState extends ConsumerState<InspectionListScreen> {
       body: Column(
         children: [
           _buildSearchBar(),
+          if (session != null) _buildOrgScope(listState, session),
+          _buildDateRange(listState),
           _buildFilterChips(listState),
           Expanded(child: _buildListBody(listState)),
         ],
@@ -86,6 +95,30 @@ class _InspectionListScreenState extends ConsumerState<InspectionListScreen> {
         ),
         onChanged: (val) => ref.read(inspectionListControllerProvider.notifier).setSearchQuery(val),
       ),
+    );
+  }
+
+  Widget _buildOrgScope(InspectionListState state, UserSession session) {
+    final loaded = state is InspectionListLoaded ? state : null;
+    return OrgScopeFilterBar(
+      scope: session.scope,
+      selection: loaded?.orgScope ?? OrgScopeSelection.empty,
+      // InspectionViewSet.get_queryset has no station-level filter.
+      enableStation: false,
+      onChanged: (selection) {
+        ref.read(inspectionListControllerProvider.notifier).setOrgScope(selection);
+      },
+    );
+  }
+
+  Widget _buildDateRange(InspectionListState state) {
+    final loaded = state is InspectionListLoaded ? state : null;
+    return DateRangeFilterBar(
+      from: loaded?.dateFrom,
+      to: loaded?.dateTo,
+      onChanged: (from, to) {
+        ref.read(inspectionListControllerProvider.notifier).setDateRange(from, to);
+      },
     );
   }
 

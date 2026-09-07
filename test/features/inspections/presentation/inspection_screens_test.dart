@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gssms_mobile/core/theme/app_theme.dart';
 import 'package:gssms_mobile/features/inspections/data/inspection_repository.dart';
 import 'package:gssms_mobile/features/inspections/domain/models/inspection.dart';
 import 'package:gssms_mobile/features/inspections/presentation/controllers/inspection_controllers.dart';
@@ -36,13 +37,17 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [inspectionRepositoryProvider.overrideWithValue(mockRepo)],
-          child: const MaterialApp(home: InspectionListScreen()),
+          child: MaterialApp(
+            theme: AppTheme.lightTheme,
+            home: const InspectionListScreen(),
+          ),
         ),
       );
 
       await tester.pumpAndSettle();
 
       expect(find.text('Field Inspections'), findsOneWidget);
+      expect(find.byKey(const Key('date_range_from')), findsOneWidget);
       expect(find.text('EB Bunk Monthly Check'), findsOneWidget);
       expect(find.text('INSP-001'), findsOneWidget);
       expect(find.text('High'), findsOneWidget);

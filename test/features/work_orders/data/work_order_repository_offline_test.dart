@@ -93,5 +93,80 @@ void main() {
 
       verify(() => mockSyncManager.enqueueCommand(any())).called(1);
     });
+
+    // Regression: the single cache key only ever holds the last *unfiltered*
+    // fetch. Offline-falling-back to it for a filtered request would show
+    // stale, wrongly-scoped data with no indication the filters never
+    // actually applied.
+    test('fetchWorkOrders does NOT fall back to cache when filters are active', () async {
+      await cacheService.cacheWorkOrders(testOrders);
+
+      when(() => mockApiService.getWorkOrders(depotId: 9)).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/api/v1/work-orders/'),
+          type: DioExceptionType.connectionError,
+        ),
+      );
+
+      await expectLater(
+        repository.fetchWorkOrders(depotId: 9),
+        throwsA(isA<DioException>()),
+      );
+    });
+
+    // Regression: startExecution used to return workOrderId as a fake
+    // record id when queued offline, sending the caller to
+    // ChecklistScreen(recordId: workOrderId) against the wrong entity.
+    test('startExecution throws StartExecutionQueuedOffline instead of a fake record id', () async {
+      when(() => mockApiService.startExecution(101)).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/api/v1/staff-workorders/101/execute/'),
+          type: DioExceptionType.connectionError,
+        ),
+      );
+      when(() => mockSyncManager.enqueueCommand(any())).thenAnswer((_) async {});
+
+      await expectLater(
+        repository.startExecution(101),
+        throwsA(isA<StartExecutionQueuedOffline>()),
+      );
+      verify(() => mockSyncManager.enqueueCommand(any())).called(1);
+    });
+
+    // Regression: the optimistic offline cache update copyWith'd `remarks`
+    // (the transition note) into `description`, overwriting the real one.
+    test('transitionStatus offline cache update does not overwrite description', () async {
+      const original = WorkOrder(
+        id: 101,
+        status: WorkOrderStatus.techCompleted,
+        type: WorkOrderType.preventive,
+        title: 'Monthly Transformer Inspection',
+        description: 'Real work order description',
+      );
+      await cacheService.cacheWorkOrderDetail(original);
+
+      when(() => mockApiService.changeStatus(
+            101,
+            status: 'REWORK_REQUIRED',
+            remarks: 'Oil level was not topped up',
+            checklist: any(named: 'checklist'),
+            evidence: any(named: 'evidence'),
+          )).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/'),
+          type: DioExceptionType.connectionError,
+        ),
+      );
+      when(() => mockSyncManager.enqueueCommand(any())).thenAnswer((_) async {});
+
+      final updated = await repository.transitionStatus(
+        101,
+        status: 'REWORK_REQUIRED',
+        remarks: 'Oil level was not topped up',
+      );
+
+      expect(updated.description, 'Real work order description');
+      expect(updated.status, WorkOrderStatus.reworkRequired);
+    });
   });
 }

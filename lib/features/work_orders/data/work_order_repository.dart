@@ -4,9 +4,25 @@ import 'package:gssms_mobile/core/sync/outbox_command.dart';
 import 'package:gssms_mobile/core/sync/sync_manager.dart';
 import 'package:gssms_mobile/features/work_orders/data/work_order_api_service.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/maintenance_record.dart';
+import 'package:gssms_mobile/features/work_orders/domain/models/technician.dart';
+import 'package:gssms_mobile/features/work_orders/domain/models/verification_workspace.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/work_order.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/work_order_action.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/work_order_audit.dart';
+
+/// Thrown by [WorkOrderRepository.startExecution] when the device is offline:
+/// the request is queued for the server to actually create the maintenance
+/// record once connectivity returns, so there is no real record id to give
+/// the caller yet. Callers should show a "queued, will start once online"
+/// message and skip navigating anywhere, rather than treat this as a
+/// generic failure or invent a placeholder id.
+class StartExecutionQueuedOffline implements Exception {
+  const StartExecutionQueuedOffline();
+
+  @override
+  String toString() =>
+      'Execution start has been queued and will begin automatically once the connection is restored.';
+}
 
 abstract class IWorkOrderRepository {
   Future<List<WorkOrder>> fetchWorkOrders({
@@ -14,11 +30,19 @@ abstract class IWorkOrderRepository {
     String? type,
     String? dateFrom,
     String? dateTo,
+    int? zoneId,
+    int? divisionId,
+    int? depotId,
+    int? stationId,
   });
 
   Future<WorkOrder> fetchWorkOrderById(int id);
   Future<WorkOrderActionSet> fetchAllowedActions(int workOrderId);
   Future<WorkOrderAudit> fetchAudit(int workOrderId);
+  Future<List<Technician>> fetchAssignableTechnicians();
+  Future<WorkOrder> assignTechnician(int workOrderId, int technicianId);
+  Future<WorkOrder> verifyWorkOrder(int workOrderId, {String? remarks});
+  Future<VerificationWorkspace> fetchVerificationWorkspace(int workOrderId);
   Future<int> startExecution(int workOrderId);
   Future<WorkOrder> transitionStatus(
     int workOrderId, {
@@ -74,18 +98,40 @@ class WorkOrderRepository implements IWorkOrderRepository {
     String? type,
     String? dateFrom,
     String? dateTo,
+    int? zoneId,
+    int? divisionId,
+    int? depotId,
+    int? stationId,
   }) async {
+    // Only the unfiltered list is cached/restored — caching per filter
+    // combination isn't worth the key-space, but that means the cache must
+    // never be offered as a substitute for a *filtered* request below: it
+    // would silently show whatever the last unfiltered (or differently
+    // filtered) fetch was, with no indication the requested filters never
+    // actually applied.
+    final hasFilters = status != null ||
+        type != null ||
+        dateFrom != null ||
+        dateTo != null ||
+        zoneId != null ||
+        divisionId != null ||
+        depotId != null ||
+        stationId != null;
     try {
       final orders = await _apiService.getWorkOrders(
         status: status,
         type: type,
         dateFrom: dateFrom,
         dateTo: dateTo,
+        zoneId: zoneId,
+        divisionId: divisionId,
+        depotId: depotId,
+        stationId: stationId,
       );
-      await _cacheService.cacheWorkOrders(orders);
+      if (!hasFilters) await _cacheService.cacheWorkOrders(orders);
       return orders;
     } catch (e) {
-      if (_isNetworkException(e)) {
+      if (_isNetworkException(e) && !hasFilters) {
         final cached = await _cacheService.getCachedWorkOrders();
         if (cached.isNotEmpty) return cached;
       }
@@ -122,13 +168,44 @@ class WorkOrderRepository implements IWorkOrderRepository {
   }
 
   @override
+  Future<List<Technician>> fetchAssignableTechnicians() {
+    return _apiService.getAssignableTechnicians();
+  }
+
+  @override
+  Future<WorkOrder> assignTechnician(int workOrderId, int technicianId) async {
+    final order = await _apiService.assignTechnician(workOrderId, technicianId);
+    await _cacheService.cacheWorkOrderDetail(order);
+    return order;
+  }
+
+  @override
+  Future<WorkOrder> verifyWorkOrder(int workOrderId, {String? remarks}) async {
+    final order = await _apiService.verifyWorkOrder(workOrderId, remarks: remarks);
+    await _cacheService.cacheWorkOrderDetail(order);
+    return order;
+  }
+
+  @override
+  Future<VerificationWorkspace> fetchVerificationWorkspace(int workOrderId) {
+    return _apiService.getVerificationWorkspace(workOrderId);
+  }
+
+  @override
   Future<int> startExecution(int workOrderId) async {
     try {
       final recordId = await _apiService.startExecution(workOrderId);
       return recordId;
     } catch (e) {
       if (_isNetworkException(e) && _syncManager != null) {
-        // Enqueue offline start execution mutation
+        // Queue the mutation so execution starts server-side once back
+        // online, but do NOT hand back a fabricated record id — the server
+        // hasn't created the MaintenanceRecord yet, so a work-order id
+        // pretending to be one would send the caller to ChecklistScreen
+        // against the wrong entity (`/records/{workOrderId}/`, not a real
+        // record). Throw a distinct, recognizable exception instead so the
+        // caller can tell "queued for later" apart from a genuine failure
+        // and skip navigation rather than guess an id.
         final cmd = OutboxCommand(
           idempotencyKey: 'start_exec_${workOrderId}_${DateTime.now().millisecondsSinceEpoch}',
           type: OutboxCommandType.startExecution,
@@ -137,7 +214,7 @@ class WorkOrderRepository implements IWorkOrderRepository {
           createdAt: DateTime.now(),
         );
         await _syncManager.enqueueCommand(cmd);
-        return workOrderId; // Fallback to work order ID as temporary record ID
+        throw const StartExecutionQueuedOffline();
       }
       rethrow;
     }
@@ -177,12 +254,13 @@ class WorkOrderRepository implements IWorkOrderRepository {
         );
         await _syncManager.enqueueCommand(cmd);
 
-        // Optimistic update in cache
+        // Optimistic update in cache. `remarks` is the transition note, not
+        // the work order's description — copyWith'ing it into `description`
+        // overwrote the real description with e.g. a rework reason.
         final cached = await _cacheService.getCachedWorkOrderDetail(workOrderId);
         if (cached != null) {
           final updated = cached.copyWith(
             status: WorkOrderStatus.fromString(status),
-            description: remarks,
             reportCompletedAt:
                 status == 'TECH_COMPLETED' ? DateTime.now() : null,
           );

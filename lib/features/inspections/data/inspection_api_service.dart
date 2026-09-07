@@ -15,14 +15,28 @@ class InspectionApiService {
   Future<List<Inspection>> getInspections({
     String? status,
     String? priority,
+    int? zoneId,
+    int? divisionId,
     int? depotId,
     int? stationId,
+    String? dateFrom,
+    String? dateTo,
   }) async {
     final query = <String, dynamic>{};
     if (status != null && status.isNotEmpty) query['status'] = status;
     if (priority != null && priority.isNotEmpty) query['priority'] = priority;
-    if (depotId != null) query['depot'] = depotId;
+    // depot/division/zone are mutually exclusive server-side
+    // (InspectionViewSet.get_queryset), no `_id` suffix.
+    if (depotId != null) {
+      query['depot'] = depotId;
+    } else if (divisionId != null) {
+      query['division'] = divisionId;
+    } else if (zoneId != null) {
+      query['zone'] = zoneId;
+    }
     if (stationId != null) query['station'] = stationId;
+    if (dateFrom != null && dateFrom.isNotEmpty) query['start_date'] = dateFrom;
+    if (dateTo != null && dateTo.isNotEmpty) query['end_date'] = dateTo;
 
     final response = await _dio.get('/api/v1/inspections/', queryParameters: query);
     final dynamic data = response.data;

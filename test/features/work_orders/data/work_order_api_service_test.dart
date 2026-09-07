@@ -47,6 +47,8 @@ void main() {
         expect(options.path, '/api/v1/maintenance/work-orders/');
         expect(options.queryParameters['status'], 'ASSIGNED');
         expect(options.queryParameters['type'], 'PREVENTIVE');
+        expect(options.queryParameters['date_from'], '2026-09-01');
+        expect(options.queryParameters['date_to'], '2026-09-07');
 
         return _json([
           {
@@ -58,7 +60,12 @@ void main() {
         ], 200);
       });
 
-      final orders = await apiService.getWorkOrders(status: 'ASSIGNED', type: 'PREVENTIVE');
+      final orders = await apiService.getWorkOrders(
+        status: 'ASSIGNED',
+        type: 'PREVENTIVE',
+        dateFrom: '2026-09-01',
+        dateTo: '2026-09-07',
+      );
       expect(orders.length, 1);
       expect(orders[0].id, 101);
       expect(orders[0].status, WorkOrderStatus.assigned);
@@ -95,6 +102,77 @@ void main() {
         remarks: 'Starting execution',
       );
       expect(updated.status, WorkOrderStatus.inProgress);
+    });
+
+    test('assignTechnician PATCHes assigned_to on the work order', () async {
+      dio.httpClientAdapter = MockAdapter((options) async {
+        expect(options.path, '/api/v1/maintenance/work-orders/101/');
+        expect(options.method, 'PATCH');
+        expect(options.data['assigned_to'], 4);
+        return _json({
+          'id': 101,
+          'status': 'NEW',
+          'type': 'PREVENTIVE',
+          'assigned_to': 4,
+          'assigned_to_name': 'tech_ramesh',
+        }, 200);
+      });
+
+      final updated = await apiService.assignTechnician(101, 4);
+      expect(updated.assignedToId, 4);
+    });
+
+    test('getAssignableTechnicians GETs /api/v1/users/?role=MAINTENANCE_STAFF', () async {
+      dio.httpClientAdapter = MockAdapter((options) async {
+        expect(options.path, '/api/v1/users/');
+        expect(options.queryParameters['role'], 'MAINTENANCE_STAFF');
+        return _json({
+          'results': [
+            {'id': 4, 'username': 'tech_ramesh', 'first_name': 'Ramesh'},
+          ],
+        }, 200);
+      });
+
+      final techs = await apiService.getAssignableTechnicians();
+      expect(techs.single.id, 4);
+      expect(techs.single.name, 'Ramesh');
+    });
+
+    test('verifyWorkOrder POSTs /work-orders/{id}/verify/', () async {
+      dio.httpClientAdapter = MockAdapter((options) async {
+        expect(options.path, '/api/v1/maintenance/work-orders/101/verify/');
+        expect(options.method, 'POST');
+        expect(options.data['remarks'], 'Looks good');
+        return _json({
+          'id': 101,
+          'status': 'VERIFIED',
+          'type': 'PREVENTIVE',
+          'verified_by_name': 'incharge_kumar',
+        }, 200);
+      });
+
+      final updated = await apiService.verifyWorkOrder(101, remarks: 'Looks good');
+      expect(updated.status, WorkOrderStatus.verified);
+      expect(updated.verifiedByName, 'incharge_kumar');
+    });
+
+    test('getVerificationWorkspace GETs verification-workspace', () async {
+      dio.httpClientAdapter = MockAdapter((options) async {
+        expect(
+          options.path,
+          '/api/v1/maintenance/work-orders/101/verification-workspace/',
+        );
+        return _json({
+          'can_verify': true,
+          'disabled_reasons': <String>[],
+          'deficiencies': <dynamic>[],
+          'record': {'id': 55, 'work_order': 101, 'lines': <dynamic>[]},
+        }, 200);
+      });
+
+      final workspace = await apiService.getVerificationWorkspace(101);
+      expect(workspace.canVerify, isTrue);
+      expect(workspace.record?.id, 55);
     });
 
     test('submitLine calls POST /api/v1/maintenance/records/{id}/submit_line/', () async {

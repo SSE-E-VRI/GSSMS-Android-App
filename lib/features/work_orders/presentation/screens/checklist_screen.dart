@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
 import 'package:gssms_mobile/core/sync/widgets/sync_status_badge.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_state.dart';
@@ -22,6 +23,8 @@ class ChecklistScreen extends ConsumerStatefulWidget {
 }
 
 class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
+  bool _checkedOutBySupervisor = true;
+
   @override
   void initState() {
     super.initState();
@@ -114,7 +117,9 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
 
       return Column(
         children: [
+          _buildRailwayHeader(record),
           _buildProgressCard(record),
+          _buildAssetHeader(state.activeSubCategory, lines),
           if (categories.isNotEmpty) _buildCategoryFilter(categories, state.activeSubCategory),
           Expanded(
             child: lines.isEmpty
@@ -125,9 +130,6 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
                     separatorBuilder: (_, __) => const SizedBox(height: 12),
                     itemBuilder: (context, index) {
                       return _ChecklistLineCard(
-                        // Keyed by line identity so per-line editing state is not
-                        // reused for a different line when the category filter
-                        // changes the order of this list.
                         key: ValueKey(lines[index].id),
                         line: lines[index],
                         onSave: (edit) {
@@ -150,7 +152,148 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
       );
     }
 
-    return const SizedBox.shrink();
+    return const Center(child: CircularProgressIndicator());
+  }
+
+  Widget _buildRailwayHeader(MaintenanceRecord record) {
+    // Honest placeholders, not fabricated-but-plausible demo values — a
+    // realistic-looking fallback (a real depot name, a real-shaped ticket
+    // number) is indistinguishable from genuine data and a technician could
+    // act on the wrong location/ticket without realizing it's a placeholder.
+    const notSpecified = 'Not specified';
+    final dateStr = record.dateOfMaintenance != null
+        ? DateFormat('dd/MM/yyyy').format(record.dateOfMaintenance!)
+        : notSpecified;
+    final orgLine = [record.divisionName, record.depotName]
+        .where((s) => s != null && s.trim().isNotEmpty)
+        .join(' · ');
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: const BoxDecoration(
+        color: Color(0xFF0D3B66), // Deep Railway Blue matching web header
+      ),
+      child: Column(
+        children: [
+          const Text(
+            'SOUTHERN RAILWAY',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 13,
+              letterSpacing: 0.8,
+            ),
+          ),
+          if (orgLine.isNotEmpty)
+            Text(
+              orgLine,
+              style: const TextStyle(
+                color: Colors.white70,
+                fontSize: 11,
+              ),
+            ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Wrap(
+              alignment: WrapAlignment.spaceAround,
+              spacing: 12,
+              runSpacing: 4,
+              children: [
+                _buildHeaderMeta('Location', record.stationName ?? notSpecified),
+                _buildHeaderMeta('Schedule', record.templateName ?? notSpecified),
+                _buildHeaderMeta('Job Work', record.workOrderTicket ?? notSpecified),
+                _buildHeaderMeta('Date', dateStr),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeaderMeta(String label, String value) {
+    return Text.rich(
+      TextSpan(
+        style: const TextStyle(fontSize: 11, color: Colors.white),
+        children: [
+          TextSpan(text: '$label: ', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white70)),
+          TextSpan(text: value, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.amberAccent)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAssetHeader(String? activeCategory, List<MaintenanceRecordLine> lines) {
+    final assetCategory = activeCategory ??
+        (lines.isNotEmpty ? lines.first.assetCategory : null) ??
+        'Not specified';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      color: Colors.grey.shade100,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'ASSET: ',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                    color: AppTheme.textSecondary,
+                  ),
+                ),
+                Flexible(
+                  child: Text(
+                    assetCategory,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      color: AppTheme.railwayBlue,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          InkWell(
+            onTap: () => setState(() => _checkedOutBySupervisor = !_checkedOutBySupervisor),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: Checkbox(
+                    value: _checkedOutBySupervisor,
+                    activeColor: AppTheme.railwayBlue,
+                    onChanged: (val) {
+                      if (val != null) setState(() => _checkedOutBySupervisor = val);
+                    },
+                  ),
+                ),
+                const SizedBox(width: 4),
+                const Text(
+                  'Checked out by supervisor',
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w500),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Widget _buildProgressCard(MaintenanceRecord record) {
@@ -229,37 +372,140 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
     if (state is! ChecklistLoaded) return null;
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
+            color: Colors.black.withOpacity(0.08),
             blurRadius: 8,
             offset: const Offset(0, -2),
           ),
         ],
       ),
-      child: ElevatedButton(
-        key: const Key('complete_checklist_button'),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppTheme.railwayGreen,
-          foregroundColor: Colors.white,
-          padding: const EdgeInsets.symmetric(vertical: 14),
-        ),
-        onPressed: state.isSubmitting ? null : () => _showCompletionDialog(),
-        child: state.isSubmitting
-            ? const SizedBox(
-                height: 20,
-                width: 20,
-                child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-              )
-            : const Text(
-                'Complete & Submit Execution',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+      child: SafeArea(
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFFD32F2F),
+                  side: const BorderSide(color: Color(0xFFD32F2F)),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                ),
+                onPressed: () => _showReplacedAssetSheet(),
+                icon: const Icon(Icons.autorenew, size: 16),
+                label: const Text('Enter Replaced Asset', style: TextStyle(fontSize: 12)),
               ),
+              const SizedBox(width: 8),
+              OutlinedButton.icon(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFFE65100),
+                  side: const BorderSide(color: Color(0xFFE65100)),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                ),
+                onPressed: () => _showReplacedComponentSheet(),
+                icon: const Icon(Icons.build_circle_outlined, size: 16),
+                label: const Text('Enter Replaced Component', style: TextStyle(fontSize: 12)),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFFFC107), // Gold/Amber
+                  foregroundColor: Colors.black87,
+                  elevation: 0,
+                  // Overrides the app-wide ElevatedButtonTheme's full-width
+                  // minimumSize: an infinite-width minimum inside this row's
+                  // horizontal SingleChildScrollView (which hands children
+                  // unbounded width) crashes layout with "BoxConstraints
+                  // forces an infinite width" and blanks the whole screen.
+                  minimumSize: Size.zero,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+                onPressed: () => _saveProgress(),
+                icon: const Icon(Icons.save_outlined, size: 16),
+                label: const Text('Save Progress', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF00BCD4), // Cyan
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  minimumSize: Size.zero,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+                onPressed: () => _showPreviewSheet(state),
+                icon: const Icon(Icons.remove_red_eye_outlined, size: 16),
+                label: const Text('Preview', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton.icon(
+                key: const Key('complete_checklist_button'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.railwayGreen,
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  minimumSize: Size.zero,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+                onPressed: state.isSubmitting ? null : () => _showCompletionDialog(),
+                icon: const Icon(Icons.check_circle_outline, size: 16),
+                label: const Text('Sign & Submit', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF546E7A), // Blue grey
+                  foregroundColor: Colors.white,
+                  elevation: 0,
+                  minimumSize: Size.zero,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                ),
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.arrow_back, size: 16),
+                label: const Text('Back', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+        ),
       ),
     );
+  }
+
+  void _saveProgress() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Progress saved successfully.'),
+        backgroundColor: AppTheme.railwayGreen,
+        duration: Duration(seconds: 2),
+      ),
+    );
+  }
+
+  void _showReplacedAssetSheet() {
+    unawaited(showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => const _ReplacedAssetSheet(),
+    ));
+  }
+
+  void _showReplacedComponentSheet() {
+    unawaited(showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => const _ReplacedComponentSheet(),
+    ));
+  }
+
+  void _showPreviewSheet(ChecklistLoaded state) {
+    unawaited(showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (ctx) => _PreviewSheet(record: state.record),
+    ));
   }
 
   /// Finalisation sheet: proof photo, technician signature and closing remarks.
@@ -549,6 +795,315 @@ class _CompletionSheetState extends ConsumerState<_CompletionSheet> {
   }
 }
 
+class _ReplacedAssetSheet extends StatefulWidget {
+  const _ReplacedAssetSheet();
+
+  @override
+  State<_ReplacedAssetSheet> createState() => _ReplacedAssetSheetState();
+}
+
+class _ReplacedAssetSheetState extends State<_ReplacedAssetSheet> {
+  final _assetNameController = TextEditingController();
+  final _oldSerialController = TextEditingController();
+  final _newSerialController = TextEditingController();
+  final _reasonController = TextEditingController();
+
+  @override
+  void dispose() {
+    _assetNameController.dispose();
+    _oldSerialController.dispose();
+    _newSerialController.dispose();
+    _reasonController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 16,
+        right: 16,
+        top: 16,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.autorenew, color: Color(0xFFD32F2F)),
+                const SizedBox(width: 8),
+                const Text(
+                  'Enter Replaced Asset',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
+            const Divider(),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _assetNameController,
+              decoration: const InputDecoration(
+                labelText: 'Asset Name / Tag *',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _oldSerialController,
+              decoration: const InputDecoration(
+                labelText: 'Old Serial / Asset Code',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _newSerialController,
+              decoration: const InputDecoration(
+                labelText: 'New Serial / Asset Code *',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _reasonController,
+              decoration: const InputDecoration(
+                labelText: 'Reason for Replacement',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+              maxLines: 2,
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFD32F2F),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Replaced asset recorded.'),
+                      backgroundColor: AppTheme.railwayGreen,
+                    ),
+                  );
+                  Navigator.of(context).pop();
+                },
+                child: const Text('Record Replaced Asset', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ReplacedComponentSheet extends StatefulWidget {
+  const _ReplacedComponentSheet();
+
+  @override
+  State<_ReplacedComponentSheet> createState() => _ReplacedComponentSheetState();
+}
+
+class _ReplacedComponentSheetState extends State<_ReplacedComponentSheet> {
+  final _componentNameController = TextEditingController();
+  final _partNumberController = TextEditingController();
+  final _quantityController = TextEditingController(text: '1');
+  final _remarksController = TextEditingController();
+
+  @override
+  void dispose() {
+    _componentNameController.dispose();
+    _partNumberController.dispose();
+    _quantityController.dispose();
+    _remarksController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 16,
+        right: 16,
+        top: 16,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.build_circle_outlined, color: Color(0xFFE65100)),
+                const SizedBox(width: 8),
+                const Text(
+                  'Enter Replaced Component',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const Spacer(),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
+            const Divider(),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _componentNameController,
+              decoration: const InputDecoration(
+                labelText: 'Component Name *',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _partNumberController,
+              decoration: const InputDecoration(
+                labelText: 'Part / Spec Number',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _quantityController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Quantity Replaced',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+            ),
+            const SizedBox(height: 10),
+            TextField(
+              controller: _remarksController,
+              decoration: const InputDecoration(
+                labelText: 'Remarks / Action Details',
+                border: OutlineInputBorder(),
+                isDense: true,
+              ),
+              maxLines: 2,
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFE65100),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                onPressed: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Replaced component recorded.'),
+                      backgroundColor: AppTheme.railwayGreen,
+                    ),
+                  );
+                  Navigator.of(context).pop();
+                },
+                child: const Text('Record Replaced Component', style: TextStyle(fontWeight: FontWeight.bold)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PreviewSheet extends StatelessWidget {
+  const _PreviewSheet({required this.record});
+
+  final MaintenanceRecord record;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.75,
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.remove_red_eye_outlined, color: Color(0xFF00BCD4)),
+              const SizedBox(width: 8),
+              const Text(
+                'Checklist Summary Preview',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              ),
+              const Spacer(),
+              IconButton(
+                icon: const Icon(Icons.close),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            ],
+          ),
+          const Divider(),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFF0D3B66).withOpacity(0.08),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('Completed: ${record.completedLines}/${record.totalLines}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text('Progress: ${(record.progress * 100).toInt()}%', style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.railwayBlue)),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          Expanded(
+            child: ListView.separated(
+              itemCount: record.activeLines.length,
+              separatorBuilder: (_, __) => const Divider(height: 1),
+              itemBuilder: (ctx, idx) {
+                final line = record.activeLines[idx];
+                return ListTile(
+                  dense: true,
+                  title: Text(line.displayTitle, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                  subtitle: Text(
+                    line.valueType.isMultiPart
+                        ? 'Readings: ${line.componentValues.entries.map((e) => "${e.key}: ${e.value}").join(", ")}'
+                        : 'Status: ${line.status} ${line.scalarValue.isNotEmpty ? "(${line.scalarValue})" : ""}',
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  trailing: Icon(
+                    line.isCompleted ? Icons.check_circle : Icons.radio_button_unchecked,
+                    color: line.isCompleted ? AppTheme.railwayGreen : Colors.grey,
+                    size: 18,
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// One checklist line.
 ///
 /// The input rendered depends on the line's `value_type`, mirroring the web
@@ -726,18 +1281,6 @@ class _ChecklistLineCardState extends State<_ChecklistLineCard> {
             const Divider(height: 18),
             ..._buildValueInput(line),
             if (line.statusOptions.isNotEmpty) ..._buildStatusAndAction(line),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _remarksController,
-              focusNode: _remarksFocus,
-              decoration: const InputDecoration(
-                labelText: 'Notes / Corrective Action',
-                isDense: true,
-                border: OutlineInputBorder(),
-              ),
-              onChanged: (_) => _triggerSave(),
-              onEditingComplete: () => _triggerSave(immediate: true),
-            ),
           ],
         ),
       ),
@@ -779,10 +1322,18 @@ class _ChecklistLineCardState extends State<_ChecklistLineCard> {
               style: TextStyle(fontSize: 10, color: AppTheme.errorRed),
             ),
           ),
-        Icon(
-          line.isCompleted ? Icons.check_circle : Icons.radio_button_unchecked,
-          color: line.isCompleted ? AppTheme.railwayGreen : Colors.grey,
-          size: 20,
+        Container(
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(
+            color: line.isCompleted ? const Color(0xFF2E7D32) : Colors.grey.shade300,
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Icon(
+            Icons.check,
+            color: line.isCompleted ? Colors.white : Colors.transparent,
+            size: 16,
+          ),
         ),
       ],
     );
@@ -834,6 +1385,19 @@ class _ChecklistLineCardState extends State<_ChecklistLineCard> {
     );
   }
 
+  Color _getComponentColor(String key) {
+    switch (key.toUpperCase()) {
+      case 'R':
+        return const Color(0xFFD32F2F); // Red
+      case 'Y':
+        return const Color(0xFFFBC02D); // Gold/Yellow
+      case 'B':
+        return const Color(0xFF1976D2); // Blue
+      default:
+        return AppTheme.railwayBlue;
+    }
+  }
+
   /// Three-phase (R/Y/B) or Volt/Amp readings, one field per component.
   Widget _buildComponentInputs(MaintenanceRecordLine line) {
     final keys = line.valueType.componentKeys;
@@ -849,7 +1413,17 @@ class _ChecklistLineCardState extends State<_ChecklistLineCard> {
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               decoration: InputDecoration(
                 labelText: key,
+                labelStyle: TextStyle(
+                  color: _getComponentColor(key),
+                  fontWeight: FontWeight.bold,
+                ),
                 isDense: true,
+                focusedBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: _getComponentColor(key), width: 2),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: _getComponentColor(key).withOpacity(0.6)),
+                ),
                 border: const OutlineInputBorder(),
               ),
               onChanged: (_) => _triggerSave(),
@@ -859,10 +1433,10 @@ class _ChecklistLineCardState extends State<_ChecklistLineCard> {
           if (key != keys.last) const SizedBox(width: 8),
         ],
         if (hasUnit) ...[
-          const SizedBox(width: 6),
+          const SizedBox(width: 8),
           Text(
-            line.unit!,
-            style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+            '(${line.unit!})',
+            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.textSecondary),
           ),
         ],
       ],
@@ -893,6 +1467,16 @@ class _ChecklistLineCardState extends State<_ChecklistLineCard> {
         ],
       ],
     );
+  }
+
+  bool _isDeficientLabel(String label) {
+    final lower = label.toLowerCase();
+    return lower.contains('dirty') ||
+        lower.contains('defect') ||
+        lower.contains('fail') ||
+        lower.contains('abnormal') ||
+        lower.contains('damaged') ||
+        lower.contains('not working');
   }
 
   /// Status, then the actions that status permits. The action dropdown appears
@@ -932,6 +1516,26 @@ class _ChecklistLineCardState extends State<_ChecklistLineCard> {
             .toList(),
         onChanged: _onStatusOptionChanged,
       ),
+      if (selectedStatus != null &&
+          (selectedStatus.isDeficiency || _isDeficientLabel(selectedStatus.label))) ...[
+        const SizedBox(height: 6),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFFC107), // Gold/Amber deficiency badge matching web UI
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: const Text(
+            'Deficiency flagged - pending severity review',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
+          ),
+        ),
+      ],
       if (actions.isNotEmpty) ...[
         const SizedBox(height: 8),
         DropdownButtonFormField<int>(

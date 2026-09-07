@@ -5,9 +5,12 @@ import '../../../assets/presentation/screens/asset_list_screen.dart';
 import '../../../auth/domain/models/user_session.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../../../complaints/presentation/screens/complaint_list_screen.dart';
+import '../../../dashboard/presentation/screens/dashboard_screen.dart';
 import '../../../energy/presentation/screens/energy_placeholder_screen.dart';
 import '../../../inspections/presentation/screens/inspection_list_screen.dart';
+import '../../../maintenance/presentation/screens/maintenance_screen.dart';
 import '../../../notifications/presentation/screens/notifications_screen.dart';
+import '../../../reports/presentation/screens/reports_screen.dart';
 import '../../../work_orders/presentation/screens/work_order_list_screen.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -239,13 +242,52 @@ class HomeScreen extends ConsumerWidget {
   Widget _buildModulesGrid(BuildContext context) {
     final modules = <Widget>[];
 
-    // Maintenance / Work Orders module (gated strictly by server permission)
+    // Dashboard module
+    if (session.hasPermission('maintenance.view')) {
+      modules.add(_buildModuleCard(
+        key: const Key('module_dashboard'),
+        title: 'Dashboard',
+        subtitle: 'Org-wide status & attention overview',
+        icon: Icons.dashboard_outlined,
+        emoji: '📊',
+        color: AppTheme.railwayBlue,
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => const DashboardScreen(),
+            ),
+          );
+        },
+      ));
+    }
+
+    // Maintenance Management module
+    if (session.hasPermission('maintenance.view')) {
+      modules.add(_buildModuleCard(
+        key: const Key('module_maintenance'),
+        title: 'Maintenance',
+        subtitle: 'Compliance & job work management',
+        icon: Icons.build_circle_outlined,
+        emoji: '🧰',
+        color: Colors.purple,
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => const MaintenanceScreen(),
+            ),
+          );
+        },
+      ));
+    }
+
+    // Work Orders module (gated strictly by server permission)
     if (session.hasPermission('maintenance.view')) {
       modules.add(_buildModuleCard(
         key: const Key('module_work_orders'),
         title: 'Work Orders',
         subtitle: 'Assigned maintenance & checklists',
         icon: Icons.assignment_outlined,
+        emoji: '🛠️',
         color: AppTheme.primaryBlue,
         onTap: () {
           Navigator.of(context).push(
@@ -264,6 +306,7 @@ class HomeScreen extends ConsumerWidget {
         title: 'Complaints',
         subtitle: 'Log and track field complaints',
         icon: Icons.report_problem_outlined,
+        emoji: '🚨',
         color: AppTheme.accentOrange,
         onTap: () {
           Navigator.of(context).push(
@@ -282,6 +325,7 @@ class HomeScreen extends ConsumerWidget {
         title: 'Inspections',
         subtitle: 'Field inspections & requests',
         icon: Icons.fact_check_outlined,
+        emoji: '🔍',
         color: Colors.teal,
         onTap: () {
           Navigator.of(context).push(
@@ -300,11 +344,35 @@ class HomeScreen extends ConsumerWidget {
         title: 'Assets',
         subtitle: 'Search equipment & scan barcodes',
         icon: Icons.qr_code_scanner_outlined,
+        emoji: '📦',
         color: Colors.teal,
         onTap: () {
           Navigator.of(context).push(
             MaterialPageRoute(
               builder: (_) => const AssetListScreen(),
+            ),
+          );
+        },
+      ));
+    }
+
+    // Reports module. The register_report endpoint's read gate
+    // (MaintenanceRecordPermission.has_permission, safe methods) accepts
+    // EITHER maintenance.view OR reports.view — matching only the first would
+    // hide this tile from a reports-only auditor/HQ role the server would
+    // actually let in.
+    if (session.hasPermission('maintenance.view') || session.hasPermission('reports.view')) {
+      modules.add(_buildModuleCard(
+        key: const Key('module_reports'),
+        title: 'Reports & Audit',
+        subtitle: 'Maintenance register & audit trail',
+        icon: Icons.description_outlined,
+        emoji: '📄',
+        color: Colors.deepOrange,
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => const ReportsScreen(),
             ),
           );
         },
@@ -318,6 +386,7 @@ class HomeScreen extends ConsumerWidget {
         title: 'Energy & Solar',
         subtitle: 'Grid readings and solar logs — coming soon',
         icon: Icons.solar_power_outlined,
+        emoji: '⚡',
         color: Colors.indigo,
         onTap: () {
           Navigator.of(context).push(
@@ -367,6 +436,7 @@ class HomeScreen extends ConsumerWidget {
     required IconData icon,
     required Color color,
     required VoidCallback onTap,
+    String? emoji,
   }) {
     return Card(
       key: key,
@@ -380,10 +450,28 @@ class HomeScreen extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              CircleAvatar(
-                backgroundColor: color.withOpacity(0.12),
-                radius: 20,
-                child: Icon(icon, color: color, size: 22),
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  CircleAvatar(
+                    backgroundColor: color.withOpacity(0.12),
+                    radius: 20,
+                    child: Icon(icon, color: color, size: 22),
+                  ),
+                  if (emoji != null)
+                    Positioned(
+                      right: -4,
+                      bottom: -4,
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                        ),
+                        child: Text(emoji, style: const TextStyle(fontSize: 13, height: 1)),
+                      ),
+                    ),
+                ],
               ),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

@@ -1,5 +1,8 @@
 import 'package:dio/dio.dart';
+import 'package:gssms_mobile/core/utils/json_parsing.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/maintenance_record.dart';
+import 'package:gssms_mobile/features/work_orders/domain/models/technician.dart';
+import 'package:gssms_mobile/features/work_orders/domain/models/verification_workspace.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/work_order.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/work_order_action.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/work_order_audit.dart';
@@ -37,6 +40,8 @@ class WorkOrderApiService {
     String? type,
     String? dateFrom,
     String? dateTo,
+    int? zoneId,
+    int? divisionId,
     int? depotId,
     int? stationId,
     bool assignedToMe = false,
@@ -46,6 +51,11 @@ class WorkOrderApiService {
     if (type != null && type.isNotEmpty) queryParams['type'] = type;
     if (dateFrom != null && dateFrom.isNotEmpty) queryParams['date_from'] = dateFrom;
     if (dateTo != null && dateTo.isNotEmpty) queryParams['date_to'] = dateTo;
+    // depot_id/division_id/zone_id are mutually exclusive server-side (most
+    // specific wins — WorkOrderViewSet.get_queryset), so sending all three
+    // that are set is harmless; the server picks the narrowest.
+    if (zoneId != null) queryParams['zone_id'] = zoneId;
+    if (divisionId != null) queryParams['division_id'] = divisionId;
     if (depotId != null) queryParams['depot_id'] = depotId;
     if (stationId != null) queryParams['station_id'] = stationId;
 
@@ -77,12 +87,66 @@ class WorkOrderApiService {
     return WorkOrderAudit.fromJson(response.data as Map<String, dynamic>);
   }
 
+  /// Depot-scoped maintenance staff the caller may assign (server filters by role).
+  Future<List<Technician>> getAssignableTechnicians() async {
+    final response = await _dio.get(
+      '/api/v1/users/',
+      queryParameters: const {'role': 'MAINTENANCE_STAFF'},
+    );
+    return _asList(response.data)
+        .whereType<Map<String, dynamic>>()
+        .map(Technician.fromJson)
+        .where((t) => t.id > 0)
+        .toList();
+  }
+
+  /// Sets `assigned_to` on the work order. Must succeed before NEW → ASSIGNED.
+  Future<WorkOrder> assignTechnician(int workOrderId, int technicianId) async {
+    final response = await _dio.patch(
+      '$_workOrders/$workOrderId/',
+      data: {'assigned_to': technicianId},
+    );
+    final data = response.data;
+    if (data is Map<String, dynamic> && data['id'] != null) {
+      return WorkOrder.fromJson(data);
+    }
+    return getWorkOrder(workOrderId);
+  }
+
+  /// Supervisor verify. The generic change-status path does not write `verified_by`.
+  Future<WorkOrder> verifyWorkOrder(
+    int workOrderId, {
+    String? remarks,
+  }) async {
+    final payload = <String, dynamic>{};
+    if (remarks != null && remarks.isNotEmpty) payload['remarks'] = remarks;
+
+    final response = await _dio.post(
+      '$_workOrders/$workOrderId/verify/',
+      data: payload,
+    );
+    final data = response.data;
+    if (data is Map<String, dynamic> && data['id'] != null) {
+      return WorkOrder.fromJson(data);
+    }
+    return getWorkOrder(workOrderId);
+  }
+
+  Future<VerificationWorkspace> getVerificationWorkspace(int workOrderId) async {
+    final response =
+        await _dio.get('$_workOrders/$workOrderId/verification-workspace/');
+    return VerificationWorkspace.fromJson(
+      response.data as Map<String, dynamic>,
+    );
+  }
+
   /// Starts execution and returns the maintenance record id to open.
   Future<int> startExecution(int workOrderId) async {
     final response = await _dio.post('$_staffWorkOrders/$workOrderId/execute/');
     final data = response.data;
-    if (data is Map && data['record_id'] != null) {
-      return data['record_id'] as int;
+    if (data is Map) {
+      final recordId = asJsonInt(data['record_id']);
+      if (recordId != null) return recordId;
     }
     throw Exception('Failed to obtain maintenance record id from execute endpoint.');
   }

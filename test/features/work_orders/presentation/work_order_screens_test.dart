@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gssms_mobile/core/theme/app_theme.dart';
 import 'package:gssms_mobile/features/work_orders/data/work_order_repository.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/maintenance_record.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/work_order.dart';
@@ -55,8 +56,9 @@ void main() {
           overrides: [
             workOrderRepositoryProvider.overrideWithValue(mockRepo),
           ],
-          child: const MaterialApp(
-            home: WorkOrderListScreen(),
+          child: MaterialApp(
+            theme: AppTheme.lightTheme,
+            home: const WorkOrderListScreen(),
           ),
         ),
       );
@@ -64,6 +66,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Work Orders'), findsOneWidget);
+      expect(find.byKey(const Key('date_range_from')), findsOneWidget);
+      expect(find.byKey(const Key('date_range_to')), findsOneWidget);
       expect(find.byKey(const Key('filter_chip_assigned')), findsOneWidget);
       expect(find.text('WO #101'), findsOneWidget);
       expect(find.text('Monthly Transformer Inspection'), findsOneWidget);

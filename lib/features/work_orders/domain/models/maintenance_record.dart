@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:equatable/equatable.dart';
+import 'package:gssms_mobile/core/utils/json_parsing.dart';
 
 /// How a checklist line captures its reading.
 ///
@@ -407,6 +408,8 @@ class MaintenanceRecord extends Equatable {
     this.scheduleId,
     this.templateName,
     this.stationName,
+    this.depotName,
+    this.divisionName,
     this.technicianName,
     this.dateOfMaintenance,
     this.lines = const [],
@@ -420,6 +423,8 @@ class MaintenanceRecord extends Equatable {
   final int? scheduleId;
   final String? templateName;
   final String? stationName;
+  final String? depotName;
+  final String? divisionName;
   final String? technicianName;
   final DateTime? dateOfMaintenance;
   final List<MaintenanceRecordLine> lines;
@@ -449,6 +454,8 @@ class MaintenanceRecord extends Equatable {
       templateName: schedule?['template_name'] as String? ??
           schedule?['maintenance_master_name'] as String?,
       stationName: schedule?['station_name'] as String?,
+      depotName: asJsonString(schedule?['depot_name']),
+      divisionName: asJsonString(schedule?['division_name']),
       technicianName: json['technician_name'] as String?,
       dateOfMaintenance: _asDate(json['date_of_maintenance']),
       lines: rawLines
@@ -473,6 +480,8 @@ class MaintenanceRecord extends Equatable {
           'work_order_ticket': workOrderTicket,
           'template_name': templateName,
           'station_name': stationName,
+          'depot_name': depotName,
+          'division_name': divisionName,
         },
         'lines': lines.map((l) => l.toCacheJson()).toList(),
       };
@@ -485,6 +494,8 @@ class MaintenanceRecord extends Equatable {
       scheduleId: scheduleId,
       templateName: templateName,
       stationName: stationName,
+      depotName: depotName,
+      divisionName: divisionName,
       technicianName: technicianName,
       dateOfMaintenance: dateOfMaintenance,
       lines: lines ?? this.lines,
@@ -501,6 +512,8 @@ class MaintenanceRecord extends Equatable {
         scheduleId,
         templateName,
         stationName,
+        depotName,
+        divisionName,
         technicianName,
         dateOfMaintenance,
         lines,

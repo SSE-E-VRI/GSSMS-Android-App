@@ -2,7 +2,16 @@ import 'package:gssms_mobile/features/inspections/data/inspection_api_service.da
 import 'package:gssms_mobile/features/inspections/domain/models/inspection.dart';
 
 abstract class IInspectionRepository {
-  Future<List<Inspection>> fetchInspections({String? status, String? priority, int? depotId, int? stationId});
+  Future<List<Inspection>> fetchInspections({
+    String? status,
+    String? priority,
+    int? zoneId,
+    int? divisionId,
+    int? depotId,
+    int? stationId,
+    String? dateFrom,
+    String? dateTo,
+  });
   Future<Inspection> fetchInspectionById(int id);
   Future<Inspection> createInspection({
     required String title,
@@ -21,8 +30,26 @@ class InspectionRepository implements IInspectionRepository {
   final InspectionApiService _apiService;
 
   @override
-  Future<List<Inspection>> fetchInspections({String? status, String? priority, int? depotId, int? stationId}) {
-    return _apiService.getInspections(status: status, priority: priority, depotId: depotId, stationId: stationId);
+  Future<List<Inspection>> fetchInspections({
+    String? status,
+    String? priority,
+    int? zoneId,
+    int? divisionId,
+    int? depotId,
+    int? stationId,
+    String? dateFrom,
+    String? dateTo,
+  }) {
+    return _apiService.getInspections(
+      status: status,
+      priority: priority,
+      zoneId: zoneId,
+      divisionId: divisionId,
+      depotId: depotId,
+      stationId: stationId,
+      dateFrom: dateFrom,
+      dateTo: dateTo,
+    );
   }
 
   @override

@@ -4,12 +4,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_state.dart';
+import 'package:gssms_mobile/features/work_orders/domain/models/technician.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/work_order.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/work_order_action.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/work_order_audit.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_order_controllers.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_order_state.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/screens/checklist_screen.dart';
+import 'package:gssms_mobile/features/work_orders/presentation/screens/verification_workspace_screen.dart';
 import 'package:intl/intl.dart';
 
 class WorkOrderDetailScreen extends ConsumerStatefulWidget {
@@ -501,7 +503,7 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
             ),
             onPressed: state.isTransitioning
                 ? null
-                : () => _showTransitionDialog(action),
+                : () => _onAllowedAction(action),
             child: Text(action.label, textAlign: TextAlign.center),
           ),
         ),
@@ -542,13 +544,112 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
     final recordId = await ref
         .read(workOrderDetailControllerProvider(widget.workOrderId).notifier)
         .startExecution();
-    if (recordId != null && mounted) {
+    if (!mounted) return;
+    if (recordId != null) {
       unawaited(Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => ChecklistScreen(recordId: recordId),
         ),
       ));
+      return;
     }
+    // Offline-queued (not a hard failure) leaves an informational message on
+    // the reloaded WorkOrderDetailLoaded state instead of a WorkOrderDetailError.
+    final current = ref.read(workOrderDetailControllerProvider(widget.workOrderId));
+    if (current is WorkOrderDetailLoaded && current.actionMessage != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(current.actionMessage!)),
+      );
+    }
+  }
+
+  void _onAllowedAction(WorkOrderAction action) {
+    switch (action.targetStatus.toUpperCase()) {
+      case 'ASSIGNED':
+        _showAssignTechnicianDialog();
+        return;
+      case 'VERIFIED':
+        unawaited(Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) =>
+                VerificationWorkspaceScreen(workOrderId: widget.workOrderId),
+          ),
+        ));
+        return;
+      default:
+        _showTransitionDialog(action);
+    }
+  }
+
+  Future<void> _showAssignTechnicianDialog() async {
+    final controller =
+        ref.read(workOrderDetailControllerProvider(widget.workOrderId).notifier);
+
+    List<Technician>? technicians;
+    String? loadError;
+    try {
+      technicians = await controller.fetchAssignableTechnicians();
+    } catch (e) {
+      loadError = workOrderReadableError(e);
+    }
+    if (!mounted) return;
+
+    int? selectedId;
+    final errorMessage = loadError;
+
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setState) => AlertDialog(
+          title: const Text('Assign technician'),
+          content: errorMessage != null
+              ? Text(
+                  key: const Key('assign_technician_error'),
+                  errorMessage,
+                )
+              : (technicians == null || technicians.isEmpty)
+                  ? const Text(
+                      key: Key('assign_technician_empty'),
+                      'No maintenance staff available to assign.',
+                    )
+                  : DropdownButtonFormField<int>(
+                      key: const Key('assign_technician_dropdown'),
+                      decoration: const InputDecoration(
+                        labelText: 'Technician',
+                      ),
+                      value: selectedId,
+                      items: technicians
+                          .map(
+                            (t) => DropdownMenuItem(
+                              value: t.id,
+                              child: Text(t.name),
+                            ),
+                          )
+                          .toList(),
+                      onChanged: (id) => setState(() => selectedId = id),
+                    ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              key: const Key('assign_technician_confirm'),
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size(88, 48),
+              ),
+              onPressed: selectedId == null
+                  ? null
+                  : () {
+                      Navigator.of(ctx).pop();
+                      unawaited(controller.assignAndActivate(selectedId!));
+                    },
+              child: const Text('Assign'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   /// Confirmation for a server-offered transition. Remarks are mandatory when

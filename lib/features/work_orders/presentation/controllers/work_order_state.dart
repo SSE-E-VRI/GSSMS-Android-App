@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:gssms_mobile/core/widgets/org_scope_filter_bar.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/maintenance_record.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/work_order.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/work_order_action.dart';
@@ -21,11 +22,17 @@ class WorkOrderListLoaded extends WorkOrderListState {
     required this.workOrders,
     this.selectedStatusFilter,
     this.searchQuery = '',
+    this.dateFrom,
+    this.dateTo,
+    this.orgScope = OrgScopeSelection.empty,
   });
 
   final List<WorkOrder> workOrders;
   final WorkOrderStatus? selectedStatusFilter;
   final String searchQuery;
+  final DateTime? dateFrom;
+  final DateTime? dateTo;
+  final OrgScopeSelection orgScope;
 
   List<WorkOrder> get filteredOrders {
     var result = workOrders;
@@ -50,25 +57,39 @@ class WorkOrderListLoaded extends WorkOrderListState {
     WorkOrderStatus? selectedStatusFilter,
     bool clearStatusFilter = false,
     String? searchQuery,
+    DateTime? dateFrom,
+    DateTime? dateTo,
+    bool clearDateRange = false,
+    OrgScopeSelection? orgScope,
   }) {
     return WorkOrderListLoaded(
       workOrders: workOrders ?? this.workOrders,
       selectedStatusFilter: clearStatusFilter ? null : (selectedStatusFilter ?? this.selectedStatusFilter),
       searchQuery: searchQuery ?? this.searchQuery,
+      dateFrom: clearDateRange ? null : (dateFrom ?? this.dateFrom),
+      dateTo: clearDateRange ? null : (dateTo ?? this.dateTo),
+      orgScope: orgScope ?? this.orgScope,
     );
   }
 
   @override
-  List<Object?> get props => [workOrders, selectedStatusFilter, searchQuery];
+  List<Object?> get props =>
+      [workOrders, selectedStatusFilter, searchQuery, dateFrom, dateTo, orgScope];
 }
 
 class WorkOrderListError extends WorkOrderListState {
-  const WorkOrderListError(this.message);
+  const WorkOrderListError(this.message, {this.previousLoaded});
 
   final String message;
 
+  /// The last successfully loaded state's filters, carried through the
+  /// error so a retry or filter change issued from here doesn't silently
+  /// reset date range / org scope / status filter / search back to
+  /// defaults — the user never asked to clear them, the request just failed.
+  final WorkOrderListLoaded? previousLoaded;
+
   @override
-  List<Object?> get props => [message];
+  List<Object?> get props => [message, previousLoaded];
 }
 
 // --- Work Order Detail State ---

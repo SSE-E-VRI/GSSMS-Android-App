@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gssms_mobile/core/theme/app_theme.dart';
 import 'package:gssms_mobile/features/complaints/data/complaint_repository.dart';
 import 'package:gssms_mobile/features/complaints/domain/models/complaint.dart';
 import 'package:gssms_mobile/features/complaints/presentation/controllers/complaint_controllers.dart';
@@ -38,8 +39,9 @@ void main() {
           overrides: [
             complaintRepositoryProvider.overrideWithValue(mockRepo),
           ],
-          child: const MaterialApp(
-            home: ComplaintListScreen(),
+          child: MaterialApp(
+            theme: AppTheme.lightTheme,
+            home: const ComplaintListScreen(),
           ),
         ),
       );
@@ -47,6 +49,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Complaints & Issues'), findsOneWidget);
+      expect(find.byKey(const Key('date_range_from')), findsOneWidget);
       expect(find.text('Transformer Leakage'), findsOneWidget);
       expect(find.text('CMP-001'), findsOneWidget);
       expect(find.text('High'), findsOneWidget);

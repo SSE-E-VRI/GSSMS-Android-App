@@ -181,8 +181,20 @@ class LocalCacheService implements ILocalCacheService {
     if (raw == null || raw.isEmpty) return [];
 
     try {
-      final decoded = jsonDecode(raw) as List<dynamic>;
-      return decoded.map((e) => OutboxCommand.fromJson(e as Map<String, dynamic>)).toList();
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return [];
+
+      final validCommands = <OutboxCommand>[];
+      for (final item in decoded) {
+        if (item is Map) {
+          try {
+            validCommands.add(OutboxCommand.fromJson(Map<String, dynamic>.from(item)));
+          } catch (_) {
+            // Skip corrupted command entry without dropping remaining valid outbox items
+          }
+        }
+      }
+      return validCommands;
     } catch (_) {
       return [];
     }
