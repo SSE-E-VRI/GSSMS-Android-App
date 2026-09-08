@@ -33,7 +33,11 @@ void main() {
     test('enqueueCommand writes command to cache and updates pending count', () async {
       final syncManager = container.read(syncManagerProvider.notifier);
 
-      when(() => mockApiService.submitLine(10, any())).thenAnswer((_) async {});
+      when(() => mockApiService.submitLine(
+            10,
+            any(),
+            idempotencyKey: any(named: 'idempotencyKey'),
+          )).thenAnswer((_) async {});
 
       final cmd = OutboxCommand(
         idempotencyKey: 'cmd_1',
@@ -47,13 +51,21 @@ void main() {
 
       final state = container.read(syncManagerProvider);
       expect(state.mode, SyncConnectivityMode.online);
-      verify(() => mockApiService.submitLine(10, any())).called(1);
+      verify(() => mockApiService.submitLine(
+            10,
+            any(),
+            idempotencyKey: any(named: 'idempotencyKey'),
+          )).called(1);
     });
 
     test('drainOutbox handles network error gracefully and flags offline mode', () async {
       final syncManager = container.read(syncManagerProvider.notifier);
 
-      when(() => mockApiService.submitLine(10, any())).thenThrow(
+      when(() => mockApiService.submitLine(
+            10,
+            any(),
+            idempotencyKey: any(named: 'idempotencyKey'),
+          )).thenThrow(
         DioException(
           requestOptions: RequestOptions(path: '/'),
           type: DioExceptionType.connectionError,
@@ -84,7 +96,11 @@ void main() {
     test('drainOutbox flags 409 conflict appropriately without blocking queue', () async {
       final syncManager = container.read(syncManagerProvider.notifier);
 
-      when(() => mockApiService.changeStatus(10, status: any(named: 'status'))).thenThrow(
+      when(() => mockApiService.changeStatus(
+            10,
+            status: any(named: 'status'),
+            idempotencyKey: any(named: 'idempotencyKey'),
+          )).thenThrow(
         DioException(
           requestOptions: RequestOptions(path: '/'),
           response: Response(
@@ -110,6 +126,44 @@ void main() {
       final commands = await cacheService.getOutboxCommands();
       expect(commands[0].status, OutboxCommandStatus.conflict);
       expect(commands[0].lastError?.contains('Conflict'), isTrue);
+    });
+
+    test('invalidateSessionBoundWork prevents an in-flight drain from rewriting the outbox',
+        () async {
+      final syncManager = container.read(syncManagerProvider.notifier);
+
+      when(() => mockApiService.submitLine(
+            10,
+            any(),
+            idempotencyKey: any(named: 'idempotencyKey'),
+          )).thenAnswer((_) async {
+        syncManager.invalidateSessionBoundWork();
+        await cacheService.clearAllCache();
+        throw DioException(
+          requestOptions: RequestOptions(path: '/'),
+          type: DioExceptionType.badResponse,
+          response: Response(
+            requestOptions: RequestOptions(path: '/'),
+            statusCode: 401,
+          ),
+        );
+      });
+
+      final cmd = OutboxCommand(
+        idempotencyKey: 'cmd_session',
+        type: OutboxCommandType.submitLine,
+        entityId: 10,
+        payload: const {'line_id': 1, 'value': '230V'},
+        createdAt: DateTime.now(),
+        ownerUserId: 1,
+      );
+      await cacheService.saveOutboxCommands([cmd]);
+      await cacheService.setCacheOwnerUserId(1);
+
+      await syncManager.drainOutbox();
+
+      final remaining = await cacheService.getOutboxCommands();
+      expect(remaining, isEmpty);
     });
   });
 }

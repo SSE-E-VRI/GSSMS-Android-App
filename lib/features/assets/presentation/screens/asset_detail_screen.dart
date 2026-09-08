@@ -3,8 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
 import 'package:gssms_mobile/features/assets/domain/models/asset.dart';
 import 'package:gssms_mobile/features/assets/presentation/controllers/asset_controllers.dart';
+import 'package:gssms_mobile/features/auth/domain/rbac.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
-import 'package:gssms_mobile/features/auth/presentation/controllers/auth_state.dart';
+import 'package:gssms_mobile/features/auth/presentation/widgets/permission_denied_view.dart';
 import 'package:gssms_mobile/features/complaints/presentation/screens/complaint_create_screen.dart';
 import 'package:intl/intl.dart';
 
@@ -22,12 +23,25 @@ class _AssetDetailScreenState extends ConsumerState<AssetDetailScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (!sessionAllows(
+          sessionFromAuth(ref.read(authControllerProvider)),
+          'assets.view')) {
+        return;
+      }
       ref.read(assetDetailControllerProvider(widget.assetId).notifier).loadAsset();
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    if (!sessionAllows(sessionOf(ref), 'assets.view')) {
+      return Scaffold(
+        appBar: AppBar(title: Text('Asset #${widget.assetId}')),
+        body: const PermissionDeniedView(),
+      );
+    }
+
     final state = ref.watch(assetDetailControllerProvider(widget.assetId));
 
     return Scaffold(
@@ -241,14 +255,12 @@ class _AssetDetailScreenState extends ConsumerState<AssetDetailScreen> {
     if (state is! AssetDetailLoaded) return null;
     final asset = state.asset;
 
-    final authState = ref.watch(authControllerProvider);
-    final session = authState is Authenticated ? authState.session : null;
     // rbac/registry.py MODULES builds every permission code as
     // `{module}.{action}` from CRUD = ["view", "create", "edit", "delete"] —
     // there is no "add" action, so `complaints.add` never appears in a real
     // JWT's permissions claim and this gate was unconditionally hiding the
     // button for every user.
-    if (!(session?.hasPermission('complaints.create') ?? false)) {
+    if (!sessionAllows(sessionOf(ref), 'complaints.create')) {
       return null;
     }
 

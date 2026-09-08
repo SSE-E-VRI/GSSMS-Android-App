@@ -5,11 +5,15 @@ import 'package:gssms_mobile/core/theme/app_theme.dart';
 import 'package:gssms_mobile/core/widgets/date_range_filter_bar.dart';
 import 'package:gssms_mobile/core/widgets/org_scope_filter_bar.dart';
 import 'package:gssms_mobile/features/auth/domain/models/user_session.dart';
+import 'package:gssms_mobile/features/auth/domain/rbac.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
-import 'package:gssms_mobile/features/auth/presentation/controllers/auth_state.dart';
+import 'package:gssms_mobile/features/auth/presentation/widgets/permission_denied_view.dart';
+import 'dart:async';
+import 'package:gssms_mobile/features/reports/domain/models/infrastructure_option.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/work_order.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_order_controllers.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_order_state.dart';
+import 'package:gssms_mobile/features/work_orders/presentation/screens/work_order_create_screen.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/screens/work_order_detail_screen.dart';
 import 'package:intl/intl.dart';
 
@@ -29,6 +33,10 @@ class _WorkOrderListScreenState extends ConsumerState<WorkOrderListScreen> {
     _searchController.addListener(_onSearchTextChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      if (!sessionAllows(
+          sessionFromAuth(ref.read(authControllerProvider)), 'maintenance.view')) {
+        return;
+      }
       ref.read(workOrderListControllerProvider.notifier).fetchWorkOrders();
     });
   }
@@ -49,7 +57,14 @@ class _WorkOrderListScreenState extends ConsumerState<WorkOrderListScreen> {
   Widget build(BuildContext context) {
     final listState = ref.watch(workOrderListControllerProvider);
     final authState = ref.watch(authControllerProvider);
-    final session = authState is Authenticated ? authState.session : null;
+    final session = sessionFromAuth(authState);
+
+    if (!sessionAllows(session, 'maintenance.view')) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Work Orders')),
+        body: const PermissionDeniedView(),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -75,11 +90,39 @@ class _WorkOrderListScreenState extends ConsumerState<WorkOrderListScreen> {
           if (session != null) _buildOrgScope(listState, session),
           _buildDateRange(listState),
           _buildFilterChips(listState),
+          _buildTypeChips(listState),
+          _buildInfraFilter(listState),
           Expanded(
             child: _buildListBody(listState),
           ),
         ],
       ),
+      // Web "+ New Job Work". Unlike the complaint/inspection FABs,
+      // `maintenance.create` alone is not enough here: the backend's
+      // WorkOrderPermission.CREATE_ROLES restricts the generic create action
+      // to DEPOT_INCHARGE/DEPOT_USER with no admin-tier bypass, so
+      // SUPER_ADMIN/ZR_ADMIN/DIV_ADMIN/DIV_HQ_USER hold the permission but
+      // would still 403 on submit — canCreateWorkOrder folds in that role
+      // check (RBAC-05).
+      floatingActionButton: canCreateWorkOrder(session)
+          ? FloatingActionButton.extended(
+              key: const Key('fab_create_work_order'),
+              icon: const Icon(Icons.add_task_outlined),
+              label: const Text('New Job Work'),
+              backgroundColor: AppTheme.railwayBlue,
+              foregroundColor: Colors.white,
+              onPressed: () async {
+                final created = await Navigator.of(context).push<bool>(
+                    MaterialPageRoute(
+                        builder: (_) => const WorkOrderCreateScreen()));
+                if (created == true && mounted) {
+                  unawaited(ref
+                      .read(workOrderListControllerProvider.notifier)
+                      .fetchWorkOrders(forceRefresh: true));
+                }
+              },
+            )
+          : null,
     );
   }
 
@@ -173,6 +216,153 @@ class _WorkOrderListScreenState extends ConsumerState<WorkOrderListScreen> {
             ),
           );
         }).toList(),
+      ),
+    );
+  }
+
+  /// Web Job Works chips: All / Corrective / Preventive. "Closed" on web is
+  /// a status — covered by the status chips above — so only the two type
+  /// chips are added here.
+  Widget _buildTypeChips(WorkOrderListState state) {
+    final selected =
+        state is WorkOrderListLoaded ? state.selectedTypeFilter : null;
+    final options = [
+      (null, 'All Types'),
+      (WorkOrderType.corrective, 'Corrective'),
+      (WorkOrderType.preventive, 'Preventive'),
+    ];
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+      child: Row(
+        children: options.map((opt) {
+          final isSelected = selected == opt.$1;
+          return Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: FilterChip(
+              key: Key(
+                  'type_chip_${(opt.$2).toLowerCase().replaceAll(' ', '_')}'),
+              selected: isSelected,
+              label: Text(opt.$2, style: const TextStyle(fontSize: 12)),
+              labelStyle: TextStyle(
+                color: isSelected ? Colors.white : AppTheme.primaryBlue,
+                fontWeight:
+                    isSelected ? FontWeight.bold : FontWeight.normal,
+              ),
+              selectedColor: AppTheme.primaryBlue,
+              backgroundColor: Colors.white,
+              checkmarkColor: Colors.white,
+              onSelected: (_) {
+                ref
+                    .read(workOrderListControllerProvider.notifier)
+                    .setTypeFilter(opt.$1);
+              },
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  /// Web filter row: Infra Type + Infra Name + Clear. Client-side until the
+  /// API offers matching query params — filters the already-loaded page via
+  /// [WorkOrderListLoaded.filteredOrders], so it works offline.
+  Widget _buildInfraFilter(WorkOrderListState state) {
+    final loaded = state is WorkOrderListLoaded
+        ? state
+        : (state is WorkOrderListError ? state.previousLoaded : null);
+    final infraType = loaded?.infraType ?? InfraFilterType.all;
+    final infraName = loaded?.infraName;
+    final names = loaded?.availableInfraNames ?? const <String>[];
+    const infraOptions = [
+      InfraFilterType.all,
+      InfraFilterType.station,
+      InfraFilterType.lcGate,
+      InfraFilterType.serviceBuilding,
+      InfraFilterType.staffQuarter,
+    ];
+    String infraLabel(InfraFilterType t) =>
+        t == InfraFilterType.all ? 'All Types' : t.label;
+    final hasInfraFilter =
+        infraType != InfraFilterType.all || (infraName?.isNotEmpty ?? false);
+
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+      child: Row(
+        children: [
+          Expanded(
+            flex: 5,
+            child: DropdownButtonFormField<InfraFilterType>(
+              key: const Key('wo_infra_type_dropdown'),
+              isExpanded: true,
+              value: infraType,
+              decoration: const InputDecoration(
+                labelText: 'Infra Type',
+                contentPadding:
+                    EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                border: OutlineInputBorder(),
+              ),
+              items: infraOptions
+                  .map((t) => DropdownMenuItem(
+                      value: t,
+                      child: Text(infraLabel(t),
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 13))))
+                  .toList(),
+              onChanged: (t) {
+                if (t == null) return;
+                ref
+                    .read(workOrderListControllerProvider.notifier)
+                    .setInfraFilter(t, null);
+              },
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            flex: 5,
+            child: DropdownButtonFormField<String>(
+              key: const Key('wo_infra_name_dropdown'),
+              isExpanded: true,
+              value: names.contains(infraName) ? infraName : null,
+              decoration: const InputDecoration(
+                labelText: 'Infra Name',
+                contentPadding:
+                    EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                border: OutlineInputBorder(),
+              ),
+              hint: const Text('All',
+                  style: TextStyle(fontSize: 13)),
+              items: [
+                const DropdownMenuItem<String>(
+                    value: null, child: Text('All')),
+                ...names.map((n) => DropdownMenuItem(
+                    value: n,
+                    child: Text(n,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 13)))),
+              ],
+              onChanged: (n) {
+                ref
+                    .read(workOrderListControllerProvider.notifier)
+                    .setInfraName(n);
+              },
+            ),
+          ),
+          if (hasInfraFilter) ...[
+            const SizedBox(width: 4),
+            IconButton(
+              key: const Key('wo_infra_clear_button'),
+              tooltip: 'Clear infra filters',
+              icon: const Icon(Icons.clear, size: 18),
+              onPressed: () {
+                ref
+                    .read(workOrderListControllerProvider.notifier)
+                    .clearInfraFilters();
+              },
+            ),
+          ],
+        ],
       ),
     );
   }

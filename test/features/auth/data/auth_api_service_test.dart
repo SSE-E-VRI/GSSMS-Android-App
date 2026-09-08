@@ -218,5 +218,55 @@ void main() {
       expect(tokens.accessToken, 'new_jwt_access');
       expect(tokens.refreshToken, 'existing_refresh_token');
     });
+
+    test('getUser calls GET /api/v1/users/{id}/', () async {
+      when(() => mockDio.get('/api/v1/users/7/')).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(path: '/api/v1/users/7/'),
+          statusCode: 200,
+          data: {
+            'id': 7,
+            'username': 'srdee',
+            'email': 'srdee@example.com',
+            'phone_number': '999',
+            'designation': 'SrDEE',
+          },
+        ),
+      );
+
+      final data = await apiService.getUser(7);
+      expect(data['username'], 'srdee');
+      expect(data['designation'], 'SrDEE');
+    });
+
+    test('updateUser PATCHes personal fields to /api/v1/users/{id}/', () async {
+      registerFallbackValue(<String, dynamic>{});
+      when(
+        () => mockDio.patch('/api/v1/users/7/', data: any(named: 'data')),
+      ).thenAnswer(
+        (_) async => Response(
+          requestOptions: RequestOptions(path: '/api/v1/users/7/'),
+          statusCode: 200,
+          data: {'id': 7, 'email': 'new@example.com'},
+        ),
+      );
+
+      await apiService.updateUser(7, {
+        'email': 'new@example.com',
+        'phone_number': '111',
+        'designation': 'SrDEE',
+      });
+
+      verify(
+        () => mockDio.patch(
+          '/api/v1/users/7/',
+          data: {
+            'email': 'new@example.com',
+            'phone_number': '111',
+            'designation': 'SrDEE',
+          },
+        ),
+      ).called(1);
+    });
   });
 }

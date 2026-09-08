@@ -167,6 +167,103 @@ class DashboardStats extends Equatable {
       ];
 }
 
+enum PendingActionKind {
+  verification('VERIFICATION', 'Verification'),
+  assignment('ASSIGNMENT', 'Assignment'),
+  complaint('COMPLAINT', 'Complaint'),
+  inspection('INSPECTION', 'Inspection'),
+  task('TASK', 'Task'),
+  unknown('UNKNOWN', 'Action');
+
+  const PendingActionKind(this.code, this.displayName);
+  final String code;
+  final String displayName;
+
+  static PendingActionKind fromString(String? code) {
+    if (code == null) return PendingActionKind.unknown;
+    final upper = code.trim().toUpperCase();
+    for (final k in PendingActionKind.values) {
+      if (k.code == upper) return k;
+    }
+    if (upper.contains('VERIFY')) return PendingActionKind.verification;
+    if (upper.contains('ASSIGN')) return PendingActionKind.assignment;
+    if (upper.contains('COMPLAINT')) return PendingActionKind.complaint;
+    if (upper.contains('INSPECT')) return PendingActionKind.inspection;
+    return PendingActionKind.unknown;
+  }
+}
+
+/// One actionable row from `summary.pending_tasks`. The backend shape is not
+/// contract-pinned, so every field is coerced with fallbacks and unknown
+/// shapes degrade to a generic task row rather than crashing the dashboard.
+class PendingAction extends Equatable {
+  const PendingAction({
+    required this.id,
+    this.kind = PendingActionKind.unknown,
+    required this.title,
+    this.subtitle,
+    this.workOrderId,
+    this.complaintId,
+    this.inspectionId,
+    this.dueDate,
+  });
+
+  final int id;
+  final PendingActionKind kind;
+  final String title;
+  final String? subtitle;
+  final int? workOrderId;
+  final int? complaintId;
+  final int? inspectionId;
+  final DateTime? dueDate;
+
+  static int? _fkId(dynamic v) =>
+      v is Map ? asJsonInt(v['id']) : asJsonInt(v);
+
+  factory PendingAction.fromJson(Map<String, dynamic> json) {
+    final workOrderId =
+        _fkId(json['work_order_id'] ?? json['work_order'] ?? json['wo_id']);
+    final complaintId = _fkId(json['complaint_id'] ?? json['complaint']);
+    final inspectionId =
+        _fkId(json['inspection_id'] ?? json['inspection']);
+    return PendingAction(
+      id: asJsonInt(json['id']) ??
+          workOrderId ??
+          complaintId ??
+          inspectionId ??
+          0,
+      kind: PendingActionKind.fromString(asJsonString(
+          json['kind'] ?? json['type'] ?? json['action'] ?? json['category'])),
+      title: asJsonString(
+              json['title'] ??
+                  json['name'] ??
+                  json['label'] ??
+                  json['subject'] ??
+                  json['ticket_number']) ??
+          'Pending action',
+      subtitle: asJsonString(json['subtitle'] ??
+          json['description'] ??
+          json['station_name'] ??
+          json['depot_name'] ??
+          json['remarks']),
+      workOrderId: workOrderId,
+      complaintId:
+          _fkId(json['complaint_id'] ?? json['complaint']),
+      inspectionId:
+          _fkId(json['inspection_id'] ?? json['inspection']),
+      dueDate: json['due_date'] != null
+          ? DateTime.tryParse(json['due_date'].toString())
+          : (json['created_at'] != null
+              ? DateTime.tryParse(json['created_at'].toString())
+              : null),
+    );
+  }
+
+  @override
+  List<Object?> get props =>
+      [id, kind, title, subtitle, workOrderId, complaintId, inspectionId, dueDate];
+}
+
 class DashboardSummary extends Equatable {
   const DashboardSummary({
     required this.stats,
@@ -174,13 +271,17 @@ class DashboardSummary extends Equatable {
   });
 
   final DashboardStats stats;
-  final List<dynamic> pendingTasks;
+  final List<PendingAction> pendingTasks;
 
   factory DashboardSummary.fromJson(Map<String, dynamic> json) {
     final rawStats = json['stats'] as Map<String, dynamic>? ?? json;
+    final rawTasks = json['pending_tasks'] as List<dynamic>? ?? const [];
     return DashboardSummary(
       stats: DashboardStats.fromJson(rawStats),
-      pendingTasks: json['pending_tasks'] as List<dynamic>? ?? const [],
+      pendingTasks: rawTasks
+          .whereType<Map>()
+          .map((e) => PendingAction.fromJson(Map<String, dynamic>.from(e)))
+          .toList(),
     );
   }
 

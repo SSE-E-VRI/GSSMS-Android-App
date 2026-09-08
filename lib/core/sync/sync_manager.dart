@@ -60,6 +60,7 @@ final syncManagerProvider = NotifierProvider<SyncManager, SyncState>(() {
 class SyncManager extends Notifier<SyncState> {
   bool _isDraining = false;
   Future<void> _lock = Future.value();
+  int _sessionEpoch = 0;
 
   @override
   SyncState build() {
@@ -70,6 +71,14 @@ class SyncManager extends Notifier<SyncState> {
 
   ILocalCacheService get _cacheService => ref.read(localCacheServiceProvider);
   WorkOrderApiService get _apiService => ref.read(workOrderApiServiceProvider);
+
+  Future<int?> _cacheOwnerUserId() => _cacheService.getCacheOwnerUserId();
+
+  /// Bump the session generation so an in-flight drain cannot persist the
+  /// previous user's outbox after logout or an identity change.
+  void invalidateSessionBoundWork() {
+    _sessionEpoch++;
+  }
 
   Future<void> refreshPendingCount() async {
     final commands = await _cacheService.getOutboxCommands();
@@ -96,8 +105,11 @@ class SyncManager extends Notifier<SyncState> {
 
   Future<void> enqueueCommand(OutboxCommand command, {bool autoDrain = true}) async {
     await _synchronized(() async {
+      final ownerId = command.ownerUserId ?? await _cacheOwnerUserId();
+      final stamped =
+          ownerId == null ? command : command.copyWith(ownerUserId: ownerId);
       final commands = await _cacheService.getOutboxCommands();
-      commands.add(command);
+      commands.add(stamped);
       await _cacheService.saveOutboxCommands(commands);
       await refreshPendingCount();
     });
@@ -116,16 +128,32 @@ class SyncManager extends Notifier<SyncState> {
     _isDraining = true;
 
     await _synchronized(() async {
+      final epoch = _sessionEpoch;
       state = state.copyWith(mode: SyncConnectivityMode.syncing, clearError: true);
 
       try {
+        if (epoch != _sessionEpoch) {
+          return;
+        }
+
         final commands = await _cacheService.getOutboxCommands();
-        final pendingCommands = commands.where((c) => c.status == OutboxCommandStatus.pending).toList();
+        final actorUserId = await _cacheOwnerUserId();
+        final scopedCommands = actorUserId == null
+            ? commands
+            : commands.where((c) => c.ownerUserId == actorUserId).toList();
+        final pendingCommands =
+            scopedCommands.where((c) => c.status == OutboxCommandStatus.pending).toList();
 
         if (pendingCommands.isEmpty) {
+          if (epoch != _sessionEpoch) return;
+          await _cacheService.saveOutboxCommands(scopedCommands);
+          if (epoch != _sessionEpoch) {
+            await _cacheService.saveOutboxCommands(const []);
+            return;
+          }
           state = state.copyWith(
             mode: SyncConnectivityMode.online,
-            pendingCount: commands
+            pendingCount: scopedCommands
                 .where((c) => c.status != OutboxCommandStatus.synced)
                 .length,
             lastSyncTime: DateTime.now(),
@@ -135,8 +163,12 @@ class SyncManager extends Notifier<SyncState> {
 
         final remainingCommands = <OutboxCommand>[];
 
-        for (var i = 0; i < commands.length; i++) {
-          final cmd = commands[i];
+        for (var i = 0; i < scopedCommands.length; i++) {
+          if (epoch != _sessionEpoch) {
+            remainingCommands.clear();
+            break;
+          }
+          final cmd = scopedCommands[i];
           if (cmd.status != OutboxCommandStatus.pending) {
             remainingCommands.add(cmd);
             continue;
@@ -161,7 +193,7 @@ class SyncManager extends Notifier<SyncState> {
                 retryCount: cmd.retryCount + 1,
                 lastError: 'Network offline. Will retry automatically.',
               ));
-              remainingCommands.addAll(commands.sublist(i + 1));
+              remainingCommands.addAll(scopedCommands.sublist(i + 1));
               state = state.copyWith(
                 mode: SyncConnectivityMode.offline,
                 lastError: 'Network offline. Queued for background sync.',
@@ -191,7 +223,14 @@ class SyncManager extends Notifier<SyncState> {
           }
         }
 
+        if (epoch != _sessionEpoch) {
+          return;
+        }
         await _cacheService.saveOutboxCommands(remainingCommands);
+        if (epoch != _sessionEpoch) {
+          await _cacheService.saveOutboxCommands(const []);
+          return;
+        }
         final activePending = remainingCommands.where((c) => c.status == OutboxCommandStatus.pending).length;
 
         state = state.copyWith(

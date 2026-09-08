@@ -197,5 +197,30 @@ void main() {
 
       await apiService.submitLine(55, {'line_id': 12, 'value': '230V'});
     });
+
+    test('createWorkOrder POSTs /api/v1/maintenance/work-orders/ with payload', () async {
+      dio.httpClientAdapter = MockAdapter((options) async {
+        expect(options.path, '/api/v1/maintenance/work-orders/');
+        expect(options.method, 'POST');
+        final data = options.data as Map<String, dynamic>;
+        expect(data['title'], 'Station monthly maintenance');
+        expect(data['type'], 'PREVENTIVE');
+        expect(data['source'], 'MOBILE');
+        return _json({
+          'id': 202,
+          'status': 'NEW',
+          'type': 'PREVENTIVE',
+          'title': 'Station monthly maintenance',
+        }, 201);
+      });
+
+      final created = await apiService.createWorkOrder({
+        'title': 'Station monthly maintenance',
+        'type': 'PREVENTIVE',
+        'source': 'MOBILE',
+      });
+      expect(created.id, 202);
+      expect(created.status, WorkOrderStatus.newOrder);
+    });
   });
 }

@@ -51,6 +51,7 @@ class OutboxCommand extends Equatable {
     this.retryCount = 0,
     this.lastError,
     this.status = OutboxCommandStatus.pending,
+    this.ownerUserId,
   });
 
   final String idempotencyKey;
@@ -62,10 +63,15 @@ class OutboxCommand extends Equatable {
   final String? lastError;
   final OutboxCommandStatus status;
 
+  /// JWT `user_id` of the session that queued this mutation. Commands without
+  /// an owner, or owned by a different user, are never replayed.
+  final int? ownerUserId;
+
   OutboxCommand copyWith({
     int? retryCount,
     String? lastError,
     OutboxCommandStatus? status,
+    int? ownerUserId,
   }) {
     return OutboxCommand(
       idempotencyKey: idempotencyKey,
@@ -76,6 +82,7 @@ class OutboxCommand extends Equatable {
       retryCount: retryCount ?? this.retryCount,
       lastError: lastError ?? this.lastError,
       status: status ?? this.status,
+      ownerUserId: ownerUserId ?? this.ownerUserId,
     );
   }
 
@@ -89,6 +96,7 @@ class OutboxCommand extends Equatable {
       'retry_count': retryCount,
       'last_error': lastError,
       'status': status.code,
+      if (ownerUserId != null) 'owner_user_id': ownerUserId,
     };
   }
 
@@ -115,6 +123,10 @@ class OutboxCommand extends Equatable {
         ? 'legacy_${typeCode}_${entityId}_${createdAt.millisecondsSinceEpoch}'
         : rawIdempotencyKey;
 
+    final ownerRaw = json['owner_user_id'];
+    final ownerUserId =
+        ownerRaw is int ? ownerRaw : int.tryParse('$ownerRaw');
+
     return OutboxCommand(
       idempotencyKey: idempotencyKey,
       type: parsedType,
@@ -124,6 +136,7 @@ class OutboxCommand extends Equatable {
       retryCount: json['retry_count'] is int ? json['retry_count'] as int : (int.tryParse('${json['retry_count']}') ?? 0),
       lastError: json['last_error']?.toString(),
       status: OutboxCommandStatus.fromCode(json['status']?.toString() ?? 'PENDING'),
+      ownerUserId: ownerUserId,
     );
   }
 
@@ -137,5 +150,6 @@ class OutboxCommand extends Equatable {
         retryCount,
         lastError,
         status,
+        ownerUserId,
       ];
 }

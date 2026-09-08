@@ -9,8 +9,9 @@ import 'package:gssms_mobile/features/assets/presentation/controllers/asset_cont
 import 'package:gssms_mobile/features/assets/presentation/screens/asset_detail_screen.dart';
 import 'package:gssms_mobile/features/assets/presentation/widgets/qr_scanner_dialog.dart';
 import 'package:gssms_mobile/features/auth/domain/models/user_session.dart';
+import 'package:gssms_mobile/features/auth/domain/rbac.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
-import 'package:gssms_mobile/features/auth/presentation/controllers/auth_state.dart';
+import 'package:gssms_mobile/features/auth/presentation/widgets/permission_denied_view.dart';
 
 class AssetListScreen extends ConsumerStatefulWidget {
   const AssetListScreen({super.key});
@@ -29,6 +30,12 @@ class _AssetListScreenState extends ConsumerState<AssetListScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      if (!sessionAllows(
+          sessionFromAuth(ref.read(authControllerProvider)),
+          'assets.view')) {
+        return;
+      }
       ref.read(assetListControllerProvider.notifier).fetchAssets();
     });
   }
@@ -93,8 +100,14 @@ class _AssetListScreenState extends ConsumerState<AssetListScreen> {
   @override
   Widget build(BuildContext context) {
     final listState = ref.watch(assetListControllerProvider);
-    final authState = ref.watch(authControllerProvider);
-    final session = authState is Authenticated ? authState.session : null;
+    final session = sessionFromAuth(ref.watch(authControllerProvider));
+
+    if (!sessionAllows(session, 'assets.view')) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Asset Registry')),
+        body: const PermissionDeniedView(),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(

@@ -168,5 +168,37 @@ void main() {
       expect(updated.description, 'Real work order description');
       expect(updated.status, WorkOrderStatus.reworkRequired);
     });
+
+    test('transitionStatus does not enqueue VERIFIED when offline', () async {
+      const original = WorkOrder(
+        id: 101,
+        status: WorkOrderStatus.techCompleted,
+        type: WorkOrderType.preventive,
+        title: 'Monthly Transformer Inspection',
+      );
+      await cacheService.cacheWorkOrderDetail(original);
+
+      when(() => mockApiService.changeStatus(
+            101,
+            status: 'VERIFIED',
+            remarks: any(named: 'remarks'),
+            checklist: any(named: 'checklist'),
+            evidence: any(named: 'evidence'),
+          )).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/'),
+          type: DioExceptionType.connectionError,
+        ),
+      );
+
+      await expectLater(
+        repository.transitionStatus(101, status: 'VERIFIED'),
+        throwsA(isA<OnlineRequiredException>()),
+      );
+      verifyNever(() => mockSyncManager.enqueueCommand(any()));
+
+      final cached = await cacheService.getCachedWorkOrderDetail(101);
+      expect(cached?.status, WorkOrderStatus.techCompleted);
+    });
   });
 }

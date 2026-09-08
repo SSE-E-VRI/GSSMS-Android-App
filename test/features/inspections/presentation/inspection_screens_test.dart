@@ -33,7 +33,12 @@ const _sessionWithInspectionsAdd = UserSession(
   lastName: '',
   primaryRole: AuthRole.depotIncharge,
   roles: [AuthRole.depotIncharge],
-  permissions: ['inspections.create', 'inspections.edit'],
+  permissions: [
+    'inspections.view',
+    'inspections.create',
+    'inspections.edit',
+    'maintenance.view'
+  ],
   scope: OrgScope(level: OrgScopeLevel.depot),
 );
 
@@ -48,11 +53,17 @@ const _sessionNonDepotRole = UserSession(
   lastName: '',
   primaryRole: AuthRole.divAdmin,
   roles: [AuthRole.divAdmin],
-  permissions: ['inspections.create', 'inspections.edit'],
+  permissions: ['inspections.view', 'inspections.create', 'inspections.edit'],
   scope: OrgScope(level: OrgScopeLevel.division),
 );
 
 void main() {
+  setUpAll(() {
+    registerFallbackValue('fallback');
+    registerFallbackValue(0);
+    registerFallbackValue(<String>['fallback']);
+  });
+
   group('Inspection Screens Widget Tests', () {
     late MockInspectionRepository mockRepo;
 
@@ -137,7 +148,7 @@ void main() {
     });
 
     testWidgets(
-        'Convert action is hidden for a non-depot role even with inspections.edit',
+        'Convert action is hidden for a non-depot role holding inspections.edit',
         (tester) async {
       when(() => mockRepo.fetchInspections())
           .thenAnswer((_) async => testInspections);
@@ -251,45 +262,160 @@ void main() {
           find.byKey(const Key('convert_to_work_order_button')), findsNothing);
     });
 
-    testWidgets('InspectionCreateScreen validates inputs and submits',
+    testWidgets('InspectionCreateScreen validates inputs and submits (web-parity form)',
         (tester) async {
       when(() => mockRepo.createInspection(
             title: any(named: 'title'),
             description: any(named: 'description'),
             priority: any(named: 'priority'),
             assetId: any(named: 'assetId'),
+            depotId: any(named: 'depotId'),
+            stationId: any(named: 'stationId'),
+            infrastructureId: any(named: 'infrastructureId'),
+            scheduledDate: any(named: 'scheduledDate'),
+            inspectionPoints: any(named: 'inspectionPoints'),
           )).thenAnswer((_) async => testInspections[0]);
 
       await tester.pumpWidget(
         ProviderScope(
-          overrides: [inspectionRepositoryProvider.overrideWithValue(mockRepo)],
+          overrides: [
+            inspectionRepositoryProvider.overrideWithValue(mockRepo),
+            authControllerProvider.overrideWith(
+              () => _FakeAuthenticatedController(_sessionWithInspectionsAdd),
+            ),
+          ],
           child: const MaterialApp(home: InspectionCreateScreen()),
         ),
       );
 
       await tester.pumpAndSettle();
 
+      // Initial validation: empty title + empty points
+      await tester.ensureVisible(find.byKey(const Key('submit_inspection_button')));
       await tester.tap(find.byKey(const Key('submit_inspection_button')));
       await tester.pumpAndSettle();
 
       expect(find.text('Please enter a title'), findsOneWidget);
-      expect(find.text('Please enter detailed findings'), findsOneWidget);
+      expect(find.text('Please add at least one inspection point'), findsOneWidget);
+      // Legacy hidden field still present for backward-compat finders (offstage)
+      expect(find.byKey(const Key('inspection_description_field'), skipOffstage: false), findsOneWidget);
 
       await tester.enterText(
           find.byKey(const Key('inspection_title_field')), 'Test Title');
+      // Points field may have been scrolled off — bring it back
+      await tester.ensureVisible(find.byKey(const Key('inspection_point_field_0')));
       await tester.enterText(
-          find.byKey(const Key('inspection_description_field')),
+          find.byKey(const Key('inspection_point_field_0')),
           'Detailed findings');
       await tester.pumpAndSettle();
 
+      await tester.ensureVisible(find.byKey(const Key('submit_inspection_button')));
+      await tester.tap(find.byKey(const Key('submit_inspection_button')));
+      await tester.pumpAndSettle();
+
+      final captured = verify(() => mockRepo.createInspection(
+            title: captureAny(named: 'title'),
+            description: captureAny(named: 'description'),
+            priority: captureAny(named: 'priority'),
+            assetId: captureAny(named: 'assetId'),
+            depotId: captureAny(named: 'depotId'),
+            stationId: captureAny(named: 'stationId'),
+            infrastructureId: captureAny(named: 'infrastructureId'),
+            scheduledDate: captureAny(named: 'scheduledDate'),
+            inspectionPoints: captureAny(named: 'inspectionPoints'),
+          )).captured;
+      // captured is [title, description, priority, assetId, depotId, stationId, infraId, scheduledDate, inspectionPoints]
+      expect(captured[0], 'Test Title');
+      expect(captured[1], 'Detailed findings');
+      expect(captured[2], 'MEDIUM');
+      expect(captured[8], contains('Detailed findings'));
+    });
+
+    testWidgets('InspectionCreateScreen mirrors web Add Inspection Note layout',
+        (tester) async {
+      when(() => mockRepo.createInspection(
+            title: any(named: 'title'),
+            description: any(named: 'description'),
+            priority: any(named: 'priority'),
+            assetId: any(named: 'assetId'),
+            depotId: any(named: 'depotId'),
+            stationId: any(named: 'stationId'),
+            infrastructureId: any(named: 'infrastructureId'),
+            scheduledDate: any(named: 'scheduledDate'),
+            inspectionPoints: any(named: 'inspectionPoints'),
+          )).thenAnswer((_) async => testInspections[0]);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            inspectionRepositoryProvider.overrideWithValue(mockRepo),
+            authControllerProvider.overrideWith(
+              () => _FakeAuthenticatedController(_sessionWithInspectionsAdd),
+            ),
+          ],
+          child: const MaterialApp(home: InspectionCreateScreen()),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      // Web header + depot/title/date/location/points/cancel/save all present
+      // Labels are RichText (wrapping fix) — match via plain-text predicate.
+      Finder richLabel(String s) => find.byWidgetPredicate(
+          (w) => w is RichText && w.text.toPlainText().contains(s));
+      expect(find.text('Add Inspection Note'), findsWidgets);
+      expect(find.byKey(const Key('inspection_depot_dropdown')), findsOneWidget);
+      expect(find.byKey(const Key('inspection_title_field')), findsOneWidget);
+      expect(richLabel('Title / Subject'), findsOneWidget);
+      expect(find.byKey(const Key('inspection_date_field')), findsOneWidget);
+      expect(richLabel('Date of Inspection'), findsOneWidget);
+      expect(find.text('Location Details (Optional)'), findsOneWidget);
+      expect(find.byKey(const Key('inspection_infra_type_dropdown')), findsOneWidget);
+      expect(find.byKey(const Key('inspection_location_dropdown')), findsOneWidget);
+      expect(richLabel('Inspection Points'), findsOneWidget);
+      expect(find.byKey(const Key('inspection_point_field_0')), findsOneWidget);
+      expect(find.byKey(const Key('add_inspection_point_button')), findsOneWidget);
+      expect(find.byKey(const Key('cancel_inspection_button')), findsOneWidget);
+      expect(find.byKey(const Key('submit_inspection_button')), findsOneWidget);
+      expect(find.text('Save Inspection'), findsOneWidget);
+      expect(find.text('Cancel'), findsOneWidget);
+
+      // Add Point creates a new row
+      await tester.ensureVisible(find.byKey(const Key('add_inspection_point_button')));
+      await tester.tap(find.byKey(const Key('add_inspection_point_button')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('inspection_point_field_1')), findsOneWidget);
+      expect(find.text('2.'), findsOneWidget);
+
+      // Fill both points
+      await tester.ensureVisible(find.byKey(const Key('inspection_point_field_0')));
+      await tester.enterText(find.byKey(const Key('inspection_point_field_0')), 'Point A');
+      await tester.ensureVisible(find.byKey(const Key('inspection_point_field_1')));
+      await tester.enterText(find.byKey(const Key('inspection_point_field_1')), 'Point B');
+      await tester.pumpAndSettle();
+
+      // Remove second point
+      await tester.ensureVisible(find.byKey(const Key('remove_inspection_point_1')));
+      await tester.tap(find.byKey(const Key('remove_inspection_point_1')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('inspection_point_field_1')), findsNothing);
+
+      // Title still required if empty
+      await tester.enterText(find.byKey(const Key('inspection_title_field')), 'Web Title');
+      await tester.ensureVisible(find.byKey(const Key('submit_inspection_button')));
       await tester.tap(find.byKey(const Key('submit_inspection_button')));
       await tester.pumpAndSettle();
 
       verify(() => mockRepo.createInspection(
-            title: 'Test Title',
-            description: 'Detailed findings',
-            priority: 'MEDIUM',
-            assetId: null,
+            title: 'Web Title',
+            description: 'Point A',
+            priority: any(named: 'priority'),
+            assetId: any(named: 'assetId'),
+            depotId: any(named: 'depotId'),
+            stationId: any(named: 'stationId'),
+            infrastructureId: any(named: 'infrastructureId'),
+            scheduledDate: any(named: 'scheduledDate'),
+            inspectionPoints: any(named: 'inspectionPoints'),
           )).called(1);
     });
   });

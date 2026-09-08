@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import 'package:gssms_mobile/core/widgets/org_scope_filter_bar.dart';
+import 'package:gssms_mobile/features/reports/domain/models/infrastructure_option.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/maintenance_record.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/work_order.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/work_order_action.dart';
@@ -21,23 +22,81 @@ class WorkOrderListLoaded extends WorkOrderListState {
   const WorkOrderListLoaded({
     required this.workOrders,
     this.selectedStatusFilter,
+    this.selectedTypeFilter,
     this.searchQuery = '',
     this.dateFrom,
     this.dateTo,
     this.orgScope = OrgScopeSelection.empty,
+    this.infraType = InfraFilterType.all,
+    this.infraName,
   });
 
   final List<WorkOrder> workOrders;
   final WorkOrderStatus? selectedStatusFilter;
+  // Web Job Works chips: All / Corrective / Preventive (+ Closed is a status).
+  final WorkOrderType? selectedTypeFilter;
   final String searchQuery;
   final DateTime? dateFrom;
   final DateTime? dateTo;
   final OrgScopeSelection orgScope;
+  // Web filter row: Infra Type + Infra Name (client-side until the API
+  // offers server params — WorkOrderViewSet only takes zone/div/depot/station).
+  final InfraFilterType infraType;
+  final String? infraName;
+
+  /// Distinct infra/location names present in the loaded page, for the
+  /// Infra Name dropdown (mirrors web's Infra Name options without an extra
+  /// API call, and works offline).
+  List<String> get availableInfraNames {
+    final names = <String>{};
+    for (final wo in workOrders) {
+      for (final n in [wo.infrastructureName, wo.stationName]) {
+        if (n != null && n.trim().isNotEmpty) names.add(n.trim());
+      }
+    }
+    return names.toList()..sort();
+  }
+
+  static bool _matchesInfraType(WorkOrder wo, InfraFilterType type) {
+    if (type == InfraFilterType.all) return true;
+    final raw = (wo.infrastructureType ?? '').toUpperCase();
+    // Station rows often leave infrastructure_type empty and carry only a
+    // station name — treat those as Station so the filter is useful.
+    if (raw.isEmpty) {
+      return type == InfraFilterType.station &&
+          (wo.stationName?.isNotEmpty ?? false);
+    }
+    switch (type) {
+      case InfraFilterType.station:
+        return raw.contains('STATION');
+      case InfraFilterType.lcGate:
+        return raw.contains('LC');
+      case InfraFilterType.serviceBuilding:
+        return raw.contains('SERVICE') || raw.contains('SB');
+      case InfraFilterType.staffQuarter:
+        return raw.contains('STAFF') || raw.contains('QUARTER') || raw.contains('SQ');
+      case InfraFilterType.all:
+        return true;
+    }
+  }
 
   List<WorkOrder> get filteredOrders {
     var result = workOrders;
     if (selectedStatusFilter != null) {
       result = result.where((wo) => wo.status == selectedStatusFilter).toList();
+    }
+    if (selectedTypeFilter != null) {
+      result = result.where((wo) => wo.type == selectedTypeFilter).toList();
+    }
+    if (infraType != InfraFilterType.all) {
+      result = result.where((wo) => _matchesInfraType(wo, infraType)).toList();
+    }
+    if (infraName != null && infraName!.trim().isNotEmpty) {
+      final q = infraName!.trim().toLowerCase();
+      result = result.where((wo) {
+        return (wo.infrastructureName?.toLowerCase() == q) ||
+            (wo.stationName?.toLowerCase() == q);
+      }).toList();
     }
     if (searchQuery.trim().isNotEmpty) {
       final q = searchQuery.toLowerCase();
@@ -45,8 +104,15 @@ class WorkOrderListLoaded extends WorkOrderListState {
         final title = wo.displayTitle.toLowerCase();
         final asset = (wo.assetName ?? '').toLowerCase();
         final station = (wo.stationName ?? '').toLowerCase();
+        final infra = (wo.infrastructureName ?? '').toLowerCase();
+        final ticket = (wo.ticketNumber ?? '').toLowerCase();
         final idStr = wo.id.toString();
-        return title.contains(q) || asset.contains(q) || station.contains(q) || idStr.contains(q);
+        return title.contains(q) ||
+            asset.contains(q) ||
+            station.contains(q) ||
+            infra.contains(q) ||
+            ticket.contains(q) ||
+            idStr.contains(q);
       }).toList();
     }
     return result;
@@ -56,25 +122,42 @@ class WorkOrderListLoaded extends WorkOrderListState {
     List<WorkOrder>? workOrders,
     WorkOrderStatus? selectedStatusFilter,
     bool clearStatusFilter = false,
+    WorkOrderType? selectedTypeFilter,
+    bool clearTypeFilter = false,
     String? searchQuery,
     DateTime? dateFrom,
     DateTime? dateTo,
     bool clearDateRange = false,
     OrgScopeSelection? orgScope,
+    InfraFilterType? infraType,
+    String? infraName,
+    bool clearInfraName = false,
   }) {
     return WorkOrderListLoaded(
       workOrders: workOrders ?? this.workOrders,
       selectedStatusFilter: clearStatusFilter ? null : (selectedStatusFilter ?? this.selectedStatusFilter),
+      selectedTypeFilter: clearTypeFilter ? null : (selectedTypeFilter ?? this.selectedTypeFilter),
       searchQuery: searchQuery ?? this.searchQuery,
       dateFrom: clearDateRange ? null : (dateFrom ?? this.dateFrom),
       dateTo: clearDateRange ? null : (dateTo ?? this.dateTo),
       orgScope: orgScope ?? this.orgScope,
+      infraType: infraType ?? this.infraType,
+      infraName: clearInfraName ? null : (infraName ?? this.infraName),
     );
   }
 
   @override
-  List<Object?> get props =>
-      [workOrders, selectedStatusFilter, searchQuery, dateFrom, dateTo, orgScope];
+  List<Object?> get props => [
+        workOrders,
+        selectedStatusFilter,
+        selectedTypeFilter,
+        searchQuery,
+        dateFrom,
+        dateTo,
+        orgScope,
+        infraType,
+        infraName,
+      ];
 }
 
 class WorkOrderListError extends WorkOrderListState {

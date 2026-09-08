@@ -26,6 +26,15 @@ class StartExecutionQueuedOffline implements Exception {
       'Execution start has been queued and will begin automatically once the connection is restored.';
 }
 
+/// VERIFIED / CLOSED must not be queued offline (SSOT §8.3).
+class OnlineRequiredException implements Exception {
+  const OnlineRequiredException(this.message);
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
 abstract class IWorkOrderRepository {
   Future<List<WorkOrder>> fetchWorkOrders({
     String? status,
@@ -40,6 +49,17 @@ abstract class IWorkOrderRepository {
   });
 
   Future<WorkOrder> fetchWorkOrderById(int id);
+  Future<WorkOrder> createWorkOrder({
+    required String title,
+    String? description,
+    String type = 'PREVENTIVE',
+    String priority = 'MEDIUM',
+    int? depotId,
+    int? stationId,
+    int? infrastructureId,
+    int? assetId,
+    String? dueDate,
+  });
   Future<WorkOrderActionSet> fetchAllowedActions(int workOrderId);
   Future<WorkOrderAudit> fetchAudit(int workOrderId);
   Future<List<Technician>> fetchAssignableTechnicians({int? depotId});
@@ -169,6 +189,36 @@ class WorkOrderRepository implements IWorkOrderRepository {
     }
   }
 
+  @override
+  Future<WorkOrder> createWorkOrder({
+    required String title,
+    String? description,
+    String type = 'PREVENTIVE',
+    String priority = 'MEDIUM',
+    int? depotId,
+    int? stationId,
+    int? infrastructureId,
+    int? assetId,
+    String? dueDate,
+  }) async {
+    final payload = <String, dynamic>{
+      'title': title,
+      if (description != null && description.trim().isNotEmpty)
+        'description': description.trim(),
+      'type': type,
+      'priority': priority,
+      'source': 'MOBILE',
+      if (depotId != null) 'depot': depotId,
+      if (stationId != null) 'station': stationId,
+      if (infrastructureId != null) 'infrastructure': infrastructureId,
+      if (assetId != null) 'asset': assetId,
+      if (dueDate != null) 'due_date': dueDate,
+    };
+    final order = await _apiService.createWorkOrder(payload);
+    await _cacheService.cacheWorkOrderDetail(order);
+    return order;
+  }
+
   /// Transitions the server permits right now. These are deliberately not
   /// cached: an offline client cannot know whether a transition is still
   /// allowed, and showing a stale action invites a write that will be rejected.
@@ -255,6 +305,12 @@ class WorkOrderRepository implements IWorkOrderRepository {
       return order;
     } catch (e) {
       if (_isNetworkException(e) && _syncManager != null) {
+        final normalized = status.trim().toUpperCase();
+        if (normalized == 'VERIFIED' || normalized == 'CLOSED') {
+          throw const OnlineRequiredException(
+            'Verification and closure require a live connection. Connect to the network and try again.',
+          );
+        }
         final cmd = OutboxCommand(
           idempotencyKey: 'trans_${workOrderId}_${status}_${DateTime.now().millisecondsSinceEpoch}',
           type: OutboxCommandType.transitionStatus,

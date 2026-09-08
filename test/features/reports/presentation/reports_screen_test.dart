@@ -3,11 +3,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
+import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:gssms_mobile/features/reports/data/reports_repository.dart';
 import 'package:gssms_mobile/features/reports/domain/models/infrastructure_option.dart';
 import 'package:gssms_mobile/features/reports/domain/models/maintenance_register_entry.dart';
 import 'package:gssms_mobile/features/reports/presentation/controllers/reports_controller.dart';
 import 'package:gssms_mobile/features/reports/presentation/screens/reports_screen.dart';
+import '../../../helpers/fake_auth.dart';
 
 class MockReportsRepository extends Mock implements IReportsRepository {}
 
@@ -48,6 +50,11 @@ void main() {
         ProviderScope(
           overrides: [
             reportsRepositoryProvider.overrideWithValue(mockRepo),
+            authControllerProvider.overrideWith(
+              () => FakeAuthenticatedController(fakeSession(
+                permissions: const ['reports.view'],
+              )),
+            ),
           ],
           child: MaterialApp(
             theme: AppTheme.lightTheme,

@@ -2,8 +2,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
+import 'package:gssms_mobile/features/auth/domain/models/user_session.dart';
+import 'package:gssms_mobile/features/auth/domain/rbac.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
-import 'package:gssms_mobile/features/auth/presentation/controllers/auth_state.dart';
+import 'package:gssms_mobile/features/auth/presentation/widgets/permission_denied_view.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/technician.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/work_order.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/work_order_action.dart';
@@ -12,7 +14,9 @@ import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_
 import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_order_state.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/screens/checklist_screen.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/screens/verification_workspace_screen.dart';
+import 'package:gssms_mobile/features/work_orders/services/work_order_pdf_service.dart';
 import 'package:intl/intl.dart';
+import 'package:printing/printing.dart';
 
 class WorkOrderDetailScreen extends ConsumerStatefulWidget {
   const WorkOrderDetailScreen({super.key, required this.workOrderId});
@@ -29,6 +33,10 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      if (!sessionAllows(
+          sessionFromAuth(ref.read(authControllerProvider)), 'maintenance.view')) {
+        return;
+      }
       ref
           .read(workOrderDetailControllerProvider(widget.workOrderId).notifier)
           .loadDetail();
@@ -40,7 +48,14 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
     final detailState =
         ref.watch(workOrderDetailControllerProvider(widget.workOrderId));
     final authState = ref.watch(authControllerProvider);
-    final userSession = authState is Authenticated ? authState.session : null;
+    final userSession = sessionFromAuth(authState);
+
+    if (!sessionAllows(userSession, 'maintenance.view')) {
+      return Scaffold(
+        appBar: AppBar(title: Text('Work Order #${widget.workOrderId}')),
+        body: const PermissionDeniedView(),
+      );
+    }
 
     ref.listen(workOrderDetailControllerProvider(widget.workOrderId), (prev, next) {
       if (next is WorkOrderDetailLoaded && next.errorMessage != null) {
@@ -57,6 +72,16 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
       appBar: AppBar(
         title: Text('Work Order #${widget.workOrderId}'),
         actions: [
+          // Web per-row PDF action — share/print the Job Work sheet.
+          if (canExportPdf(userSession))
+            IconButton(
+            key: const Key('work_order_pdf_button'),
+            icon: const Icon(Icons.picture_as_pdf_outlined),
+            tooltip: 'Export PDF',
+            onPressed: detailState is WorkOrderDetailLoaded
+                ? () => _exportPdf(detailState)
+                : null,
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () => ref
@@ -66,8 +91,30 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
         ],
       ),
       body: _buildBody(detailState, userSession),
-      bottomNavigationBar: _buildBottomActions(detailState),
+      bottomNavigationBar: _buildBottomActions(detailState, userSession),
     );
+  }
+
+  Future<void> _exportPdf(WorkOrderDetailLoaded loaded) async {
+    try {
+      final doc = await WorkOrderPdfService.build(
+        loaded.workOrder,
+        audit: loaded.audit,
+      );
+      await Printing.layoutPdf(
+        onLayout: (_) async => doc.save(),
+        name:
+            'JobWork_${loaded.workOrder.displayReference.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_')}.pdf',
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Failed to export PDF: $e'),
+              backgroundColor: AppTheme.errorRed),
+        );
+      }
+    }
   }
 
   Widget _buildBody(WorkOrderDetailState state, dynamic session) {
@@ -439,26 +486,25 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
     );
   }
 
-  /// Bottom action bar driven by the server's allowed-actions response.
-  ///
-  /// Django owns the workflow: which transitions a given user may perform on a
-  /// given work order depends on role, assignment, checklist completeness and
-  /// SLA state. Re-deriving that on the client drifts from the server and
-  /// offers buttons whose writes are then rejected, so the app renders what the
-  /// server says and nothing more. "Start Execution" / "Open Checklist" stay
-  /// client-side because they are navigation into the record, not transitions.
-  Widget? _buildBottomActions(WorkOrderDetailState state) {
+  /// Bottom action bar: server `allowed` transitions, plus Start Execution /
+  /// Open Checklist only when `maintenance.edit` and the matching allowed
+  /// action is present. Status alone never shows a mutating control.
+  Widget? _buildBottomActions(
+      WorkOrderDetailState state, UserSession? session) {
     if (state is! WorkOrderDetailLoaded) return null;
     final wo = state.workOrder;
     final actions = <Widget>[];
+    final canEdit = sessionAllows(session, 'maintenance.edit');
+    final canChecklist = canWriteChecklist(session);
+    final allowed = state.actions;
 
-    // `linkedRecordId` is null until execution has started server-side. An
-    // IN_PROGRESS order without one cannot open a checklist — offer Start
-    // Execution instead of a button that only shows a "no record" snackbar.
     final needsExecutionStart = wo.status == WorkOrderStatus.assigned ||
         wo.status == WorkOrderStatus.reworkRequired ||
         (wo.status == WorkOrderStatus.inProgress && wo.linkedRecordId == null);
-    if (needsExecutionStart) {
+    final canStart = canEdit &&
+        needsExecutionStart &&
+        (allowed?.allowsTarget('IN_PROGRESS') ?? false);
+    if (canStart) {
       actions.add(
         Expanded(
           child: ElevatedButton.icon(
@@ -474,7 +520,10 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
           ),
         ),
       );
-    } else if (wo.status == WorkOrderStatus.inProgress) {
+    } else if (canChecklist &&
+        wo.status == WorkOrderStatus.inProgress &&
+        ((allowed?.allowsTarget('TECH_COMPLETED') ?? false) ||
+            (allowed?.allowsTarget('IN_PROGRESS') ?? false))) {
       actions.add(
         Expanded(
           child: ElevatedButton.icon(
@@ -507,7 +556,14 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
       );
     }
 
-    for (final action in state.actions?.allowed ?? const []) {
+    // RBAC-06: defence in depth. The server's `allowed-actions` payload is
+    // already role/scope-aware (WorkOrderLifecycleService.can_transition), so
+    // this loop is not reachable by an under-permissioned session today — but
+    // every other mutating control on this screen is gated by `canEdit`
+    // first, and this was the one that wasn't. "Status alone never shows a
+    // mutating control" (see the doc comment above) should hold even if the
+    // server payload is ever stale or malformed.
+    for (final action in canEdit ? (state.actions?.allowed ?? const []) : const <WorkOrderAction>[]) {
       if (actions.isNotEmpty) actions.add(const SizedBox(width: 12));
       actions.add(
         Expanded(

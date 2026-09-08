@@ -6,8 +6,9 @@ import 'package:gssms_mobile/core/theme/app_theme.dart';
 import 'package:gssms_mobile/core/widgets/date_range_filter_bar.dart';
 import 'package:gssms_mobile/core/widgets/org_scope_filter_bar.dart';
 import 'package:gssms_mobile/features/auth/domain/models/user_session.dart';
+import 'package:gssms_mobile/features/auth/domain/rbac.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
-import 'package:gssms_mobile/features/auth/presentation/controllers/auth_state.dart';
+import 'package:gssms_mobile/features/auth/presentation/widgets/permission_denied_view.dart';
 import 'package:gssms_mobile/features/complaints/domain/models/complaint.dart';
 import 'package:gssms_mobile/features/complaints/presentation/controllers/complaint_controllers.dart';
 import 'package:gssms_mobile/features/complaints/presentation/screens/complaint_create_screen.dart';
@@ -31,6 +32,11 @@ class _ComplaintListScreenState extends ConsumerState<ComplaintListScreen> {
     _searchController.addListener(_onSearchTextChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      if (!sessionAllows(
+          sessionFromAuth(ref.read(authControllerProvider)),
+          'complaints.view')) {
+        return;
+      }
       ref.read(complaintListControllerProvider.notifier).fetchComplaints();
     });
   }
@@ -49,8 +55,14 @@ class _ComplaintListScreenState extends ConsumerState<ComplaintListScreen> {
   @override
   Widget build(BuildContext context) {
     final listState = ref.watch(complaintListControllerProvider);
-    final authState = ref.watch(authControllerProvider);
-    final session = authState is Authenticated ? authState.session : null;
+    final session = sessionFromAuth(ref.watch(authControllerProvider));
+
+    if (!sessionAllows(session, 'complaints.view')) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Complaints & Issues')),
+        body: const PermissionDeniedView(),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -82,8 +94,7 @@ class _ComplaintListScreenState extends ConsumerState<ComplaintListScreen> {
       // `{module}.{action}` from CRUD = ["view", "create", "edit", "delete"] —
       // there is no "add" action, so `complaints.add` never appears in a real
       // JWT's permissions claim and this FAB was unconditionally hidden.
-      floatingActionButton:
-          (session?.hasPermission('complaints.create') ?? false)
+      floatingActionButton: sessionAllows(session, 'complaints.create')
               ? FloatingActionButton.extended(
                   key: const Key('fab_create_complaint'),
                   icon: const Icon(Icons.add_comment_outlined),

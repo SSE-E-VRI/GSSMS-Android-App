@@ -52,6 +52,29 @@ class UserSession extends Equatable {
   /// Display helper for Super Admin identity badge
   bool get isSuperAdmin => primaryRole == AuthRole.superAdmin;
 
+  /// True when a refreshed JWT changed identity, roles, permissions, or org
+  /// scope. Cached work orders and outbox mutations from the previous context
+  /// must not be reused.
+  bool authorizationChangedFrom(UserSession previous) {
+    if (userId != previous.userId) return true;
+    if (depotId != previous.depotId) return true;
+    if (primaryRole != previous.primaryRole) return true;
+    if (scope != previous.scope) return true;
+    final roleCodes = roles.map((r) => r.code).toSet();
+    final previousRoleCodes = previous.roles.map((r) => r.code).toSet();
+    if (roleCodes.length != previousRoleCodes.length ||
+        !roleCodes.containsAll(previousRoleCodes)) {
+      return true;
+    }
+    final permCodes = permissions.toSet();
+    final previousPermCodes = previous.permissions.toSet();
+    if (permCodes.length != previousPermCodes.length ||
+        !permCodes.containsAll(previousPermCodes)) {
+      return true;
+    }
+    return false;
+  }
+
   /// Construct UserSession by decoding JWT access token claims.
   factory UserSession.fromJwt(String token) {
     try {
@@ -117,6 +140,10 @@ class UserSession extends Equatable {
     DateTime? validUntil;
     if (claims['valid_until'] != null) {
       validUntil = DateTime.tryParse(claims['valid_until'].toString());
+    }
+    if (validUntil != null &&
+        DateTime.now().toUtc().isAfter(validUntil.toUtc())) {
+      throw const GuestExpiredException();
     }
 
     // Parse scope

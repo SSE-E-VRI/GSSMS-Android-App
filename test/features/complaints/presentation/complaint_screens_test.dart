@@ -46,7 +46,7 @@ const _sessionWithComplaintsAdd = UserSession(
   lastName: '',
   primaryRole: AuthRole.depotIncharge,
   roles: [AuthRole.depotIncharge],
-  permissions: ['complaints.create'],
+  permissions: ['complaints.view', 'complaints.create'],
   scope: OrgScope(level: OrgScopeLevel.depot),
 );
 

@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:gssms_mobile/features/notifications/domain/models/notification_item.dart';
 import 'package:gssms_mobile/features/notifications/presentation/screens/notifications_screen.dart';
 import 'package:gssms_mobile/features/work_orders/data/work_order_repository.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/work_order.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_order_controllers.dart';
 import 'package:mocktail/mocktail.dart';
+import '../../../helpers/fake_auth.dart';
 
 class MockWorkOrderRepository extends Mock implements IWorkOrderRepository {}
 
@@ -122,7 +124,12 @@ void main() {
     testWidgets('renders alerts derived from real work orders', (tester) async {
       await tester.pumpWidget(
         ProviderScope(
-          overrides: [workOrderRepositoryProvider.overrideWithValue(mockRepo)],
+          overrides: [
+            workOrderRepositoryProvider.overrideWithValue(mockRepo),
+            authControllerProvider.overrideWith(
+              () => FakeAuthenticatedController(fakeSession()),
+            ),
+          ],
           child: const MaterialApp(home: NotificationsScreen()),
         ),
       );
@@ -137,7 +144,12 @@ void main() {
     testWidgets('mark all as read updates every alert', (tester) async {
       await tester.pumpWidget(
         ProviderScope(
-          overrides: [workOrderRepositoryProvider.overrideWithValue(mockRepo)],
+          overrides: [
+            workOrderRepositoryProvider.overrideWithValue(mockRepo),
+            authControllerProvider.overrideWith(
+              () => FakeAuthenticatedController(fakeSession()),
+            ),
+          ],
           child: const MaterialApp(home: NotificationsScreen()),
         ),
       );
@@ -169,7 +181,12 @@ void main() {
 
       await tester.pumpWidget(
         ProviderScope(
-          overrides: [workOrderRepositoryProvider.overrideWithValue(mockRepo)],
+          overrides: [
+            workOrderRepositoryProvider.overrideWithValue(mockRepo),
+            authControllerProvider.overrideWith(
+              () => FakeAuthenticatedController(fakeSession()),
+            ),
+          ],
           child: const MaterialApp(home: NotificationsScreen()),
         ),
       );

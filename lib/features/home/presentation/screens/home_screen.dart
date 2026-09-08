@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../assets/presentation/screens/asset_list_screen.dart';
+import '../../../auth/domain/models/auth_role.dart';
 import '../../../auth/domain/models/user_session.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
+import '../../../auth/presentation/screens/user_profile_screen.dart';
 import '../../../complaints/presentation/screens/complaint_list_screen.dart';
 import '../../../dashboard/presentation/screens/dashboard_screen.dart';
 import '../../../energy/presentation/screens/energy_placeholder_screen.dart';
@@ -11,7 +13,6 @@ import '../../../inspections/presentation/screens/inspection_list_screen.dart';
 import '../../../maintenance/presentation/screens/maintenance_screen.dart';
 import '../../../notifications/presentation/screens/notifications_screen.dart';
 import '../../../reports/presentation/screens/reports_screen.dart';
-import '../../../work_orders/presentation/screens/work_order_list_screen.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({
@@ -25,20 +26,23 @@ class HomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       appBar: AppBar(
+        titleSpacing: 16,
         title: const Text('GSSMS Operations'),
         actions: [
-          IconButton(
-            key: const Key('home_notifications_button'),
-            icon: const Icon(Icons.notifications_outlined),
-            tooltip: 'Notifications',
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => const NotificationsScreen(),
-                ),
-              );
-            },
-          ),
+          _buildHeaderProfile(context),
+          if (session.hasPermission('maintenance.view'))
+            IconButton(
+              key: const Key('home_notifications_button'),
+              icon: const Icon(Icons.notifications_outlined),
+              tooltip: 'Notifications',
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const NotificationsScreen(),
+                  ),
+                );
+              },
+            ),
           IconButton(
             key: const Key('home_logout_button'),
             icon: const Icon(Icons.logout),
@@ -54,15 +58,6 @@ class HomeScreen extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // User Profile Card
-            _buildProfileCard(),
-            const SizedBox(height: 16),
-
-            // Scope & Org Details Card
-            _buildScopeCard(),
-            const SizedBox(height: 24),
-
-            // Available Operational Modules (strictly permission gated)
             const Text(
               'Operational Modules',
               style: TextStyle(
@@ -79,162 +74,75 @@ class HomeScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildProfileCard() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Row(
-          children: [
-            CircleAvatar(
-              radius: 28,
-              backgroundColor: AppTheme.primaryBlue.withOpacity(0.12),
-              child: Text(
-                session.displayName.isNotEmpty
-                    ? session.displayName.substring(0, 1).toUpperCase()
-                    : 'U',
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.primaryBlue,
-                ),
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    session.displayName,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.textDark,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 4,
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppTheme.primaryBlue,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          session.primaryRole.displayName,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                      if (session.has2FA)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.green.shade50,
-                            borderRadius: BorderRadius.circular(4),
-                            border: Border.all(color: Colors.green.shade300),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.check_circle, size: 12, color: Colors.green.shade700),
-                              const SizedBox(width: 4),
-                              Text(
-                                '2FA Active',
-                                style: TextStyle(
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w500,
-                                  color: Colors.green.shade800,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  Widget _buildHeaderProfile(BuildContext context) {
+    final initial = session.displayName.isNotEmpty
+        ? session.displayName.substring(0, 1).toUpperCase()
+        : 'U';
 
-  Widget _buildScopeCard() {
-    final scope = session.scope;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.location_on_outlined, size: 20, color: AppTheme.primaryBlue),
-                const SizedBox(width: 8),
-                const Text(
-                  'Organizational Scope',
-                  style: TextStyle(
-                    fontSize: 15,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        key: const Key('home_profile_button'),
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => const UserProfileScreen(),
+            ),
+          );
+        },
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircleAvatar(
+                radius: 16,
+                backgroundColor: Colors.white.withOpacity(0.18),
+                child: Text(
+                  initial,
+                  style: const TextStyle(
+                    fontSize: 14,
                     fontWeight: FontWeight.bold,
-                    color: AppTheme.textDark,
+                    color: Colors.white,
                   ),
                 ),
-                const Spacer(),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade200,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: Text(
-                    'Level: ${scope.level.value}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.textDark,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const Divider(height: 20),
-            if (scope.depot != null || session.depotName != null)
-              _buildScopeRow('Depot', session.depotName ?? scope.depot?.name ?? 'N/A'),
-            if (scope.division != null)
-              _buildScopeRow('Division', scope.division?.name ?? 'N/A'),
-            if (scope.zone != null)
-              _buildScopeRow('Zone', scope.zone?.name ?? 'N/A'),
-            if (session.validUntil != null)
-              _buildScopeRow(
-                'Access Valid Until',
-                session.validUntil!.toLocal().toString().split('.')[0],
               ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildScopeRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 2.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: const TextStyle(fontSize: 13, color: AppTheme.textMuted)),
-          Text(
-            value,
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textDark),
+              const SizedBox(width: 8),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 160),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      session.displayName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                        height: 1.15,
+                      ),
+                    ),
+                    Text(
+                      session.primaryRole.displayName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.white.withOpacity(0.75),
+                        height: 1.15,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -242,8 +150,9 @@ class HomeScreen extends ConsumerWidget {
   Widget _buildModulesGrid(BuildContext context) {
     final modules = <Widget>[];
 
-    // Dashboard module
-    if (session.hasPermission('dashboard.view') || session.hasPermission('maintenance.view')) {
+    // Dashboard module — `dashboard.view` only. Do not widen with
+    // maintenance.view (MAINTENANCE_STAFF has no dashboard.view).
+    if (session.hasPermission('dashboard.view')) {
       modules.add(_buildModuleCard(
         key: const Key('module_dashboard'),
         title: 'Dashboard',
@@ -261,7 +170,10 @@ class HomeScreen extends ConsumerWidget {
       ));
     }
 
-    // Maintenance Management module
+    // Maintenance module — the single entry point for Job Works / Work
+    // Orders (there is no `work_orders` module in the RBAC catalogue; work
+    // orders live under `maintenance`, so a separate tile only duplicated
+    // this one). Reach the list via Maintenance → Job Works / Work Orders.
     if (session.hasPermission('maintenance.view')) {
       modules.add(_buildModuleCard(
         key: const Key('module_maintenance'),
@@ -274,28 +186,6 @@ class HomeScreen extends ConsumerWidget {
           Navigator.of(context).push(
             MaterialPageRoute(
               builder: (_) => const MaintenanceScreen(),
-            ),
-          );
-        },
-      ));
-    }
-
-    // Work Orders module (gated strictly by server permission).
-    // There is no `work_orders` module in the RBAC catalogue — work orders live
-    // under `maintenance` ("Maintenance & Work Orders", rbac/registry.py MODULES),
-    // so `maintenance.view` is the only permission that can ever grant this tile.
-    if (session.hasPermission('maintenance.view')) {
-      modules.add(_buildModuleCard(
-        key: const Key('module_work_orders'),
-        title: 'Work Orders',
-        subtitle: 'Assigned maintenance & checklists',
-        icon: Icons.assignment_outlined,
-        emoji: '🛠️',
-        color: AppTheme.primaryBlue,
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => const WorkOrderListScreen(),
             ),
           );
         },
@@ -359,12 +249,8 @@ class HomeScreen extends ConsumerWidget {
       ));
     }
 
-    // Reports module. The register_report endpoint's read gate
-    // (MaintenanceRecordPermission.has_permission, safe methods) accepts
-    // EITHER maintenance.view OR reports.view — matching only the first would
-    // hide this tile from a reports-only auditor/HQ role the server would
-    // actually let in.
-    if (session.hasPermission('maintenance.view') || session.hasPermission('reports.view')) {
+    // Reports module — `reports.view` only. Do not widen with maintenance.view.
+    if (session.hasPermission('reports.view')) {
       modules.add(_buildModuleCard(
         key: const Key('module_reports'),
         title: 'Reports & Audit',
@@ -382,18 +268,19 @@ class HomeScreen extends ConsumerWidget {
       ));
     }
 
-    // Energy module — honest placeholder until GAP-04 lands (Phase 5)
-    if (session.hasPermission('energy.view')) {
+    if (_showEnergyPlaceholder(session)) {
       modules.add(_buildModuleCard(
         key: const Key('module_energy'),
         title: 'Energy & Solar',
-        subtitle: 'Grid readings and solar logs — coming soon',
+        subtitle: 'Meter photos & bills — coming soon',
         icon: Icons.solar_power_outlined,
-        emoji: '⚡',
+        emoji: '☀️',
         color: Colors.indigo,
         onTap: () {
           Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => const EnergyPlaceholderScreen()),
+            MaterialPageRoute(
+              builder: (_) => const EnergyPlaceholderScreen(),
+            ),
           );
         },
       ));
@@ -430,6 +317,12 @@ class HomeScreen extends ConsumerWidget {
       childAspectRatio: 1.15,
       children: modules,
     );
+  }
+
+  bool _showEnergyPlaceholder(UserSession session) {
+    if (session.roles.contains(AuthRole.ebBillClerk)) return true;
+    if (session.permissions.contains('*')) return false;
+    return session.permissions.any((p) => p.startsWith('energy.'));
   }
 
   Widget _buildModuleCard({

@@ -5,6 +5,7 @@ import 'package:gssms_mobile/core/network/dio_client.dart';
 import 'package:gssms_mobile/core/sync/sync_manager.dart';
 import 'package:gssms_mobile/core/widgets/date_range_filter_bar.dart';
 import 'package:gssms_mobile/core/widgets/org_scope_filter_bar.dart';
+import 'package:gssms_mobile/features/reports/domain/models/infrastructure_option.dart';
 import 'package:gssms_mobile/features/work_orders/data/work_order_api_service.dart';
 import 'package:gssms_mobile/features/work_orders/data/work_order_repository.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/maintenance_record.dart';
@@ -83,6 +84,78 @@ class WorkOrderListController extends Notifier<WorkOrderListState> {
       state = current.copyWith(
         selectedStatusFilter: status,
         clearStatusFilter: status == null,
+      );
+    }
+  }
+
+  /// Web Job Works type chips (All / Corrective / Preventive) — in-memory,
+  /// like the status chips, so they combine with search + infra filters.
+  void setTypeFilter(WorkOrderType? type) {
+    final s = state;
+    if (s is WorkOrderListLoaded) {
+      state = s.copyWith(
+        selectedTypeFilter: type,
+        clearTypeFilter: type == null,
+      );
+    } else if (s is WorkOrderListError && s.previousLoaded != null) {
+      state = WorkOrderListError(
+        s.message,
+        previousLoaded: s.previousLoaded!.copyWith(
+          selectedTypeFilter: type,
+          clearTypeFilter: type == null,
+        ),
+      );
+    }
+  }
+
+  /// Web filter row: Infra Type + Infra Name. Client-side until the API
+  /// offers matching query params.
+  void setInfraFilter(InfraFilterType type, String? name) {
+    final s = state;
+    if (s is WorkOrderListLoaded) {
+      // Changing type invalidates a name picked under the old type.
+      final keepName = s.infraType == type ? name : null;
+      state = s.copyWith(
+        infraType: type,
+        infraName: keepName,
+        clearInfraName: keepName == null,
+      );
+    } else if (s is WorkOrderListError && s.previousLoaded != null) {
+      state = WorkOrderListError(
+        s.message,
+        previousLoaded: s.previousLoaded!.copyWith(
+          infraType: type,
+          infraName: null,
+          clearInfraName: true,
+        ),
+      );
+    }
+  }
+
+  void setInfraName(String? name) {
+    final s = state;
+    if (s is WorkOrderListLoaded) {
+      state = s.copyWith(infraName: name, clearInfraName: name == null);
+    } else if (s is WorkOrderListError && s.previousLoaded != null) {
+      state = WorkOrderListError(
+        s.message,
+        previousLoaded: s.previousLoaded!
+            .copyWith(infraName: name, clearInfraName: name == null),
+      );
+    }
+  }
+
+  void clearInfraFilters() {
+    final s = state;
+    if (s is WorkOrderListLoaded) {
+      state = s.copyWith(infraType: InfraFilterType.all, clearInfraName: true);
+    } else if (s is WorkOrderListError && s.previousLoaded != null) {
+      state = WorkOrderListError(
+        s.message,
+        previousLoaded: s.previousLoaded!.copyWith(
+          infraType: InfraFilterType.all,
+          clearInfraName: true,
+        ),
       );
     }
   }

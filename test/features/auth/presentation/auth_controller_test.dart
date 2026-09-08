@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gssms_mobile/core/database/local_cache_service.dart';
+import 'package:gssms_mobile/core/sync/sync_manager.dart';
 import 'package:gssms_mobile/features/auth/data/auth_repository.dart';
 import 'package:gssms_mobile/features/auth/domain/models/auth_exceptions.dart';
 import 'package:gssms_mobile/features/auth/domain/models/auth_role.dart';
@@ -28,6 +30,7 @@ void main() {
       container = ProviderContainer(
         overrides: [
           authRepositoryProvider.overrideWithValue(mockRepository),
+          localCacheServiceProvider.overrideWithValue(InMemoryLocalCacheService()),
         ],
       );
     });
@@ -138,6 +141,34 @@ void main() {
 
       final state = container.read(authControllerProvider);
       expect(state, isA<Unauthenticated>());
+    });
+
+    test('onAccessTokenRefreshed updates Authenticated session claims', () async {
+      when(
+        () => mockRepository.login(
+          username: 'maintenance_user',
+          password: 'password123',
+        ),
+      ).thenAnswer((_) async => testSession);
+
+      final controller = container.read(authControllerProvider.notifier);
+      await controller.login('maintenance_user', 'password123');
+
+      const refreshed = UserSession(
+        accessToken: 'new_access_token',
+        username: 'maintenance_user',
+        userId: 7,
+        primaryRole: AuthRole.maintenanceStaff,
+        roles: [AuthRole.maintenanceStaff],
+        permissions: ['maintenance.view', 'maintenance.edit'],
+      );
+
+      await controller.onAccessTokenRefreshed(refreshed, testSession);
+
+      final state = container.read(authControllerProvider);
+      expect(state, isA<Authenticated>());
+      expect((state as Authenticated).session.permissions, contains('maintenance.edit'));
+      expect(state.session.accessToken, 'new_access_token');
     });
   });
 }

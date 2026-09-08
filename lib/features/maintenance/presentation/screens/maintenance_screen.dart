@@ -4,8 +4,9 @@ import 'package:gssms_mobile/core/sync/widgets/sync_status_badge.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
 import 'package:gssms_mobile/core/widgets/org_scope_filter_bar.dart';
 import 'package:gssms_mobile/features/auth/domain/models/user_session.dart';
+import 'package:gssms_mobile/features/auth/domain/rbac.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
-import 'package:gssms_mobile/features/auth/presentation/controllers/auth_state.dart';
+import 'package:gssms_mobile/features/auth/presentation/widgets/permission_denied_view.dart';
 import 'package:gssms_mobile/features/complaints/presentation/screens/complaint_list_screen.dart';
 import 'package:gssms_mobile/features/dashboard/domain/models/dashboard_models.dart';
 import 'package:gssms_mobile/features/dashboard/presentation/controllers/dashboard_controller.dart';
@@ -27,6 +28,10 @@ class _MaintenanceScreenState extends ConsumerState<MaintenanceScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      if (!sessionAllows(
+          sessionFromAuth(ref.read(authControllerProvider)), 'maintenance.view')) {
+        return;
+      }
       ref.read(dashboardControllerProvider.notifier).loadDashboard();
     });
   }
@@ -35,7 +40,14 @@ class _MaintenanceScreenState extends ConsumerState<MaintenanceScreen> {
   Widget build(BuildContext context) {
     final state = ref.watch(dashboardControllerProvider);
     final authState = ref.watch(authControllerProvider);
-    final session = authState is Authenticated ? authState.session : null;
+    final session = sessionFromAuth(authState);
+
+    if (!sessionAllows(session, 'maintenance.view')) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Maintenance Management')),
+        body: const PermissionDeniedView(),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -241,8 +253,9 @@ class _MaintenanceScreenState extends ConsumerState<MaintenanceScreen> {
     DashboardStats stats,
     UserSession? session,
   ) {
-    final tiles = <Widget>[
-      ListTile(
+    final tiles = <Widget>[];
+    if (sessionAllows(session, 'maintenance.view')) {
+      tiles.add(ListTile(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         tileColor: Colors.white,
         leading: const CircleAvatar(backgroundColor: Color(0xFFE3F2FD), child: Icon(Icons.assignment, color: AppTheme.railwayBlue)),
@@ -250,10 +263,10 @@ class _MaintenanceScreenState extends ConsumerState<MaintenanceScreen> {
         subtitle: Text('${stats.pendingTaskCount} pending tasks'),
         trailing: const Icon(Icons.arrow_forward_ios, size: 16),
         onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const WorkOrderListScreen())),
-      ),
-    ];
+      ));
+    }
 
-    if (session?.hasPermission('complaints.view') ?? false) {
+    if (sessionAllows(session, 'complaints.view')) {
       tiles.add(ListTile(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         tileColor: Colors.white,
@@ -265,7 +278,7 @@ class _MaintenanceScreenState extends ConsumerState<MaintenanceScreen> {
       ));
     }
 
-    if (session?.hasPermission('inspections.view') ?? false) {
+    if (sessionAllows(session, 'inspections.view')) {
       tiles.add(ListTile(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         tileColor: Colors.white,

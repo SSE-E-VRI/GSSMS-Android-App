@@ -87,6 +87,13 @@ void main() {
       expect(retrieved[0].payload['value'], '230V');
     });
 
+    test('stores cache owner user id', () async {
+      await cacheService.setCacheOwnerUserId(42);
+      expect(await cacheService.getCacheOwnerUserId(), 42);
+      await cacheService.clearAllCache();
+      expect(await cacheService.getCacheOwnerUserId(), isNull);
+    });
+
     test('clearAllCache removes all stored data', () async {
       const order = WorkOrder(id: 1, status: WorkOrderStatus.newOrder, type: WorkOrderType.preventive);
       await cacheService.cacheWorkOrders([order]);

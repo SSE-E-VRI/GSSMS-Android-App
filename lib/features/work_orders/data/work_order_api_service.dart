@@ -82,6 +82,24 @@ class WorkOrderApiService {
         .toList();
   }
 
+  /// Creates a Job Work. Payload keys follow the complaint/inspection
+  /// convention (`station`/`infrastructure`/`depot`/`asset` ids, `type`,
+  /// `priority`, `due_date` yyyy-MM-dd, `source: MOBILE`). The server owns
+  /// validation — 400/403 surface as DioException for the UI to render.
+  Future<WorkOrder> createWorkOrder(Map<String, dynamic> payload) async {
+    final response = await _dio.post('$_workOrders/', data: payload);
+    final data = _asObject(response.data);
+    if (data == null) {
+      throw DioException(
+        requestOptions: response.requestOptions,
+        response: response,
+        type: DioExceptionType.badResponse,
+        message: 'Unexpected work-order payload',
+      );
+    }
+    return WorkOrder.fromJson(data);
+  }
+
   Future<WorkOrder> getWorkOrder(int id) async {
     final response = await _dio.get('$_workOrders/$id/');
     final data = _asObject(response.data);

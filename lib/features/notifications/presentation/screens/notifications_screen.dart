@@ -1,10 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
+import 'package:gssms_mobile/features/auth/domain/models/user_session.dart';
+import 'package:gssms_mobile/features/auth/domain/rbac.dart';
+import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
+import 'package:gssms_mobile/features/auth/presentation/widgets/permission_denied_view.dart';
 import 'package:gssms_mobile/features/notifications/domain/models/notification_item.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_order_controllers.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_order_state.dart';
-import 'package:gssms_mobile/features/work_orders/presentation/screens/work_order_detail_screen.dart';
+import 'package:gssms_mobile/features/work_orders/presentation/work_order_navigation.dart';
 import 'package:intl/intl.dart';
 
 /// Alerts derived from the work orders the server returned.
@@ -73,6 +77,10 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     // Alerts come from the work order list, so make sure it has been loaded
     // when this screen is opened directly from Home.
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!sessionAllows(
+          sessionFromAuth(ref.read(authControllerProvider)), 'maintenance.view')) {
+        return;
+      }
       final listState = ref.read(workOrderListControllerProvider);
       if (listState is! WorkOrderListLoaded) {
         ref.read(workOrderListControllerProvider.notifier).fetchWorkOrders();
@@ -82,6 +90,14 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final session = sessionOf(ref);
+    if (!sessionAllows(session, 'maintenance.view')) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Notifications & Alerts')),
+        body: const PermissionDeniedView(),
+      );
+    }
+
     final notifications = ref.watch(notificationsListProvider);
     final listState = ref.watch(workOrderListControllerProvider);
     final dateFormat = DateFormat('dd MMM, hh:mm a');
@@ -98,7 +114,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
           ),
         ],
       ),
-      body: _buildBody(notifications, listState, dateFormat),
+      body: _buildBody(notifications, listState, dateFormat, session),
     );
   }
 
@@ -106,6 +122,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     List<NotificationItem> notifications,
     WorkOrderListState listState,
     DateFormat dateFormat,
+    UserSession? session,
   ) {
     if (listState is WorkOrderListLoading) {
       return const Center(child: CircularProgressIndicator());
@@ -221,11 +238,10 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                 ref.read(notificationsListProvider.notifier).markAsRead(item.id);
                 if (item.targetEntityType == 'WORK_ORDER' &&
                     item.targetEntityId != null) {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          WorkOrderDetailScreen(workOrderId: item.targetEntityId!),
-                    ),
+                  openWorkOrderGuarded(
+                    context: context,
+                    session: session,
+                    workOrderId: item.targetEntityId!,
                   );
                 }
               },
