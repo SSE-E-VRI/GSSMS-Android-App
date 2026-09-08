@@ -16,10 +16,11 @@ abstract class IComplaintRepository {
   Future<Complaint> createComplaint({
     required String title,
     required String description,
-    required String severity,
-    int? assetId,
-    int? stationId,
+    required String department,
     int? depotId,
+    int? stationId,
+    int? infrastructureId,
+    int? assetId,
   });
 }
 
@@ -58,19 +59,21 @@ class ComplaintRepository implements IComplaintRepository {
   Future<Complaint> createComplaint({
     required String title,
     required String description,
-    required String severity,
-    int? assetId,
-    int? stationId,
+    required String department,
     int? depotId,
+    int? stationId,
+    int? infrastructureId,
+    int? assetId,
   }) async {
     final payload = {
       'title': title,
       'description': description,
-      'severity': severity,
+      'department': department,
       'source': 'MOBILE',
-      if (assetId != null) 'asset': assetId,
-      if (stationId != null) 'station': stationId,
       if (depotId != null) 'depot': depotId,
+      if (stationId != null) 'station': stationId,
+      if (infrastructureId != null) 'infrastructure': infrastructureId,
+      if (assetId != null) 'asset': assetId,
     };
     return _apiService.createComplaint(payload);
   }
