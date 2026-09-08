@@ -86,7 +86,7 @@ void main() {
       final created = await apiService.createComplaint({
         'title': 'New Failure',
         'description': 'Description',
-        'severity': 'HIGH',
+        'department': 'ELECTRICAL',
       });
 
       expect(created.id, 11);

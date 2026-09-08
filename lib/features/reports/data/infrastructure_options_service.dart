@@ -18,18 +18,25 @@ class InfrastructureOptionsService {
     return const [];
   }
 
-  Future<List<InfrastructureOption>> fetchOptions(InfraFilterType type) async {
+  Future<List<InfrastructureOption>> fetchOptions(InfraFilterType type,
+      {int? depotId}) async {
     if (type == InfraFilterType.all || type.queryCode == null) {
       return const [];
     }
 
     final Response<dynamic> response;
     if (type == InfraFilterType.station) {
-      response = await _dio.get<dynamic>('/api/v1/stations/');
+      response = await _dio.get<dynamic>(
+        '/api/v1/stations/',
+        queryParameters: {if (depotId != null) 'depot': depotId},
+      );
     } else {
       response = await _dio.get<dynamic>(
         '/api/v1/infrastructure/',
-        queryParameters: {'type_code': type.queryCode},
+        queryParameters: {
+          'type_code': type.queryCode,
+          if (depotId != null) 'depot': depotId,
+        },
       );
     }
 

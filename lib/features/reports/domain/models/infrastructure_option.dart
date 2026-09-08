@@ -1,26 +1,54 @@
 import 'package:equatable/equatable.dart';
 import 'package:gssms_mobile/core/utils/json_parsing.dart';
 
-/// A station or infrastructure row used by the reports type/item dropdowns.
+/// A station or infrastructure row used by the reports type/item dropdowns
+/// (and the Complaint form's Location Name dropdown for non-Station types).
 class InfrastructureOption extends Equatable {
-  const InfrastructureOption({required this.id, required this.name});
+  const InfrastructureOption(
+      {required this.id, required this.name, this.stationId, this.depotId});
 
   final int id;
   final String name;
 
+  /// The station this row sits at — `null` when this row *is* a station
+  /// (its own [id] is the station id then). Present on `/api/v1/infrastructure/`
+  /// rows (LC Gate/Service Building/Staff Quarter), which are always
+  /// attached to one station.
+  final int? stationId;
+
+  /// The depot this row belongs to (via its station). Used to filter the
+  /// Location Name dropdown by the complaint's chosen Depot the same way web
+  /// does client-side, since `/api/v1/infrastructure/` doesn't take a depot
+  /// filter param when queried for [InfraFilterType.station] (that path uses
+  /// `/api/v1/stations/`, whose own `depot` query param handles it server-side).
+  final int? depotId;
+
   factory InfrastructureOption.fromJson(Map<String, dynamic> json) {
     final rawId = json['id'];
-    final id = rawId is int ? rawId : int.tryParse(rawId?.toString() ?? '') ?? 0;
+    final id =
+        rawId is int ? rawId : int.tryParse(rawId?.toString() ?? '') ?? 0;
     final name = asJsonString(json['name']) ??
         asJsonString(json['station_name']) ??
         asJsonString(json['title']) ??
         asJsonString(json['code']) ??
         'Item #$id';
-    return InfrastructureOption(id: id, name: name);
+
+    int? asId(dynamic v) {
+      if (v is int) return v;
+      if (v is Map) return asId(v['id']);
+      return int.tryParse(v?.toString() ?? '');
+    }
+
+    return InfrastructureOption(
+      id: id,
+      name: name,
+      stationId: asId(json['station']),
+      depotId: asId(json['depot']),
+    );
   }
 
   @override
-  List<Object?> get props => [id, name];
+  List<Object?> get props => [id, name, stationId, depotId];
 }
 
 /// Web ReportsView infrastructure types. `queryCode` is what the options
