@@ -5,6 +5,7 @@ import 'package:gssms_mobile/features/auth/domain/models/user_session.dart';
 import 'package:gssms_mobile/features/auth/domain/rbac.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_state.dart';
+import 'package:gssms_mobile/features/auth/presentation/widgets/permission_denied_view.dart';
 import 'package:gssms_mobile/features/inspections/domain/models/inspection.dart';
 import 'package:gssms_mobile/features/inspections/presentation/controllers/inspection_controllers.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_order_controllers.dart';
@@ -122,6 +123,18 @@ class _InspectionDetailScreenState
   Widget build(BuildContext context) {
     final authState = ref.watch(authControllerProvider);
     final session = authState is Authenticated ? authState.session : null;
+
+    // RBAC-04: this screen is only ever pushed from InspectionListScreen,
+    // which already gates `inspections.view` — but a permission revoked
+    // mid-session (a refreshed JWT with a narrower `permissions` claim)
+    // must not leave an already-pushed detail route rendering stale data.
+    if (!sessionAllows(session, 'inspections.view')) {
+      return Scaffold(
+        appBar: AppBar(title: Text(_inspection.inspectionNumber)),
+        body: const PermissionDeniedView(),
+      );
+    }
+
     final dateFormat = DateFormat('dd MMM yyyy, hh:mm a');
     final inspection = _inspection;
 

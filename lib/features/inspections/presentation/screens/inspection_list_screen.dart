@@ -219,8 +219,9 @@ class _InspectionListScreenState extends ConsumerState<InspectionListScreen> {
   }
 
   Widget _buildListBody(InspectionListState state) {
-    if (state is InspectionListLoading)
+    if (state is InspectionListLoading) {
       return const Center(child: CircularProgressIndicator());
+    }
     if (state is InspectionListError) {
       final previous = state.previousLoaded;
       if (previous != null) {

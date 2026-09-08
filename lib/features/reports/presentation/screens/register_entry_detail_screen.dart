@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:printing/printing.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
 import 'package:gssms_mobile/features/auth/domain/rbac.dart';
+import 'package:gssms_mobile/features/auth/presentation/widgets/permission_denied_view.dart';
 import 'package:gssms_mobile/features/reports/domain/models/maintenance_register_entry.dart';
 import 'package:gssms_mobile/features/reports/services/register_entry_pdf_service.dart';
 
@@ -48,6 +49,18 @@ class _RegisterEntryDetailScreenState
   @override
   Widget build(BuildContext context) {
     final entry = widget.entry;
+
+    // RBAC-04: this screen is only ever pushed from ReportsScreen, which
+    // already gates `reports.view` — but a permission revoked mid-session
+    // (a refreshed JWT with a narrower `permissions` claim) must not leave
+    // an already-pushed detail route rendering stale data.
+    if (!sessionAllows(sessionOf(ref), 'reports.view')) {
+      return Scaffold(
+        appBar: AppBar(title: Text(entry.masterName)),
+        body: const PermissionDeniedView(),
+      );
+    }
+
     final dateStr = entry.date != null ? DateFormat('dd/MM/yyyy').format(entry.date!) : 'N/A';
 
     return Scaffold(

@@ -3,7 +3,7 @@ import 'package:gssms_mobile/features/auth/domain/models/user_profile.dart';
 
 void main() {
   test('UserProfile.fromJson maps web user payload fields', () {
-    final profile = UserProfile.fromJson({
+    final profile = UserProfile.fromJson(const {
       'id': 12,
       'username': 'srdee',
       'role': 'ADMIN',
