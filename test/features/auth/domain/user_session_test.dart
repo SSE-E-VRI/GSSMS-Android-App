@@ -124,6 +124,56 @@ void main() {
       expect(maintenanceSession.hasPermission('users.create'), isFalse);
     });
 
+    test('authorizationChangedFrom detects permission and scope changes', () {
+      const original = UserSession(
+        accessToken: 't',
+        username: 'u',
+        userId: 1,
+        depotId: 10,
+        primaryRole: AuthRole.depotUser,
+        roles: [AuthRole.depotUser],
+        permissions: ['maintenance.view'],
+        scope: OrgScope(level: OrgScopeLevel.depot),
+      );
+      const sameAuth = UserSession(
+        accessToken: 'other-token',
+        username: 'u',
+        userId: 1,
+        depotId: 10,
+        primaryRole: AuthRole.depotUser,
+        roles: [AuthRole.depotUser],
+        permissions: ['maintenance.view'],
+        scope: OrgScope(level: OrgScopeLevel.depot),
+      );
+      const narrowerPerms = UserSession(
+        accessToken: 't2',
+        username: 'u',
+        userId: 1,
+        depotId: 10,
+        primaryRole: AuthRole.depotUser,
+        roles: [AuthRole.depotUser],
+        permissions: ['dashboard.view'],
+        scope: OrgScope(level: OrgScopeLevel.depot),
+      );
+      const movedDepot = UserSession(
+        accessToken: 't3',
+        username: 'u',
+        userId: 1,
+        depotId: 99,
+        primaryRole: AuthRole.depotUser,
+        roles: [AuthRole.depotUser],
+        permissions: ['maintenance.view'],
+        scope: OrgScope(
+          level: OrgScopeLevel.depot,
+          depot: OrgUnitInfo(id: 99, name: 'Other'),
+        ),
+      );
+
+      expect(sameAuth.authorizationChangedFrom(original), isFalse);
+      expect(narrowerPerms.authorizationChangedFrom(original), isTrue);
+      expect(movedDepot.authorizationChangedFrom(original), isTrue);
+    });
+
     test('expired valid_until throws GuestExpiredException', () {
       expect(
         () => UserSession.fromClaims(const {

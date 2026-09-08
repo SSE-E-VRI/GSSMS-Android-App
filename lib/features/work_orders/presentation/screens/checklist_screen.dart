@@ -32,8 +32,8 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      if (!sessionAllows(
-          sessionFromAuth(ref.read(authControllerProvider)), 'maintenance.edit')) {
+      if (!canWriteChecklist(
+          sessionFromAuth(ref.read(authControllerProvider)))) {
         return;
       }
       ref.read(checklistControllerProvider(widget.recordId).notifier).loadRecord();
@@ -42,7 +42,7 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (!sessionAllows(sessionOf(ref), 'maintenance.edit')) {
+    if (!canWriteChecklist(sessionOf(ref))) {
       return Scaffold(
         appBar: AppBar(title: Text('Checklist #${widget.recordId}')),
         body: const PermissionDeniedView(),
@@ -800,7 +800,12 @@ class _CompletionSheetState extends ConsumerState<_CompletionSheet> {
   }
 
   Future<void> _submit() async {
-    if (!sessionAllows(sessionOf(ref), 'maintenance.edit')) return;
+    if (!canWriteChecklist(sessionOf(ref))) {
+      if (mounted) {
+        showPermissionDeniedSnackBar(context);
+      }
+      return;
+    }
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
     final otherStaff = _otherStaffController.text.trim();

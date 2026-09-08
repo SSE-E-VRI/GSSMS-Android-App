@@ -495,6 +495,7 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
     final wo = state.workOrder;
     final actions = <Widget>[];
     final canEdit = sessionAllows(session, 'maintenance.edit');
+    final canChecklist = canWriteChecklist(session);
     final allowed = state.actions;
 
     final needsExecutionStart = wo.status == WorkOrderStatus.assigned ||
@@ -519,7 +520,7 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
           ),
         ),
       );
-    } else if (canEdit &&
+    } else if (canChecklist &&
         wo.status == WorkOrderStatus.inProgress &&
         ((allowed?.allowsTarget('TECH_COMPLETED') ?? false) ||
             (allowed?.allowsTarget('IN_PROGRESS') ?? false))) {
@@ -555,7 +556,14 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
       );
     }
 
-    for (final action in state.actions?.allowed ?? const []) {
+    // RBAC-06: defence in depth. The server's `allowed-actions` payload is
+    // already role/scope-aware (WorkOrderLifecycleService.can_transition), so
+    // this loop is not reachable by an under-permissioned session today — but
+    // every other mutating control on this screen is gated by `canEdit`
+    // first, and this was the one that wasn't. "Status alone never shows a
+    // mutating control" (see the doc comment above) should hold even if the
+    // server payload is ever stale or malformed.
+    for (final action in canEdit ? (state.actions?.allowed ?? const []) : const <WorkOrderAction>[]) {
       if (actions.isNotEmpty) actions.add(const SizedBox(width: 12));
       actions.add(
         Expanded(

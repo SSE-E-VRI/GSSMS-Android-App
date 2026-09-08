@@ -1,3 +1,4 @@
+import 'package:gssms_mobile/features/auth/domain/models/auth_role.dart';
 import 'package:gssms_mobile/features/auth/domain/models/user_session.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_state.dart';
@@ -33,4 +34,49 @@ UserSession? sessionOf(WidgetRef ref) {
 /// there is no server round-trip left to catch a client-side leak.
 bool canExportPdf(UserSession? session) {
   return sessionAllows(session, 'reports.export');
+}
+
+/// Roles the backend's `WorkOrderPermission.CREATE_ROLES` accepts for the
+/// generic work-order create action (`POST /work-orders/`) — see
+/// `maintenance/views.py`. Unlike every other work-order permission this one
+/// has no `is_super_admin` bypass: `maintenance.create` alone (which
+/// SUPER_ADMIN, ZR_ADMIN, DIV_ADMIN and DIV_HQ_USER all hold per the registry)
+/// is not enough, so the mobile create flow must not offer it to a role
+/// outside this set — it would be a guaranteed 403 on submit.
+const _workOrderCreateRoles = {AuthRole.depotIncharge, AuthRole.depotUser};
+
+/// Whether this session may reach the "New Job Work" create flow: the
+/// `maintenance.create` permission AND membership of one of the roles the
+/// server actually accepts for it (see [_workOrderCreateRoles]).
+bool canCreateWorkOrder(UserSession? session) {
+  if (session == null) return false;
+  if (!sessionAllows(session, 'maintenance.create')) return false;
+  return session.roles.any(_workOrderCreateRoles.contains);
+}
+
+/// Roles ConversionService accepts for inspection → job-work. `inspections.edit`
+/// is held by SUPER_ADMIN/ZR_ADMIN/DIV_ADMIN as well, but those roles are
+/// hard-rejected server-side — matching [canCreateWorkOrder].
+const _inspectionConvertRoles = {AuthRole.depotIncharge, AuthRole.depotUser};
+
+bool canConvertInspection(UserSession? session) {
+  if (session == null) return false;
+  if (!sessionAllows(session, 'inspections.edit')) return false;
+  return session.roles.any(_inspectionConvertRoles.contains);
+}
+
+/// Record-write policy on `MaintenanceRecordViewSet`: SUPER_ADMIN / DIV_ADMIN /
+/// ZR_ADMIN, or assigned MAINTENANCE_STAFF. DEPOT_INCHARGE / DEPOT_USER and
+/// HQ users hold `maintenance.edit` but are read-only for checklist records.
+const _checklistWriterRoles = {
+  AuthRole.superAdmin,
+  AuthRole.divAdmin,
+  AuthRole.zrAdmin,
+  AuthRole.maintenanceStaff,
+};
+
+bool canWriteChecklist(UserSession? session) {
+  if (session == null) return false;
+  if (!sessionAllows(session, 'maintenance.edit')) return false;
+  return session.roles.any(_checklistWriterRoles.contains);
 }

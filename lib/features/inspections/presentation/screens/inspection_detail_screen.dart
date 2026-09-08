@@ -41,12 +41,11 @@ class _InspectionDetailScreenState
     _inspection = widget.inspection;
   }
 
-  /// Conversion is permission-gated (`inspections.edit`). Django's
-  /// ConversionService remains the authority and will 403 roles it rejects.
+  /// Conversion is gated to the depot roles ConversionService actually accepts.
   bool _canConvert(UserSession? session) {
     if (session == null) return false;
     if (_inspection.isConverted) return false;
-    return sessionAllows(session, 'inspections.edit');
+    return canConvertInspection(session);
   }
 
   Future<void> _confirmConvert() async {

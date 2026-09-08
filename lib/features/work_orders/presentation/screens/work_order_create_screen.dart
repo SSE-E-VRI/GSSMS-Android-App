@@ -91,7 +91,7 @@ class _WorkOrderCreateScreenState
   Future<void> _bootstrap() async {
     if (!mounted) return;
     final session = sessionFromAuth(ref.read(authControllerProvider));
-    if (!sessionAllows(session, 'maintenance.create')) {
+    if (!canCreateWorkOrder(session)) {
       if (mounted) setState(() => _bootstrapped = true);
       return;
     }
@@ -205,7 +205,12 @@ class _WorkOrderCreateScreenState
   }
 
   Future<void> _submit() async {
-    if (!sessionAllows(sessionOf(ref), 'maintenance.create')) return;
+    if (!canCreateWorkOrder(sessionOf(ref))) {
+      if (mounted) {
+        showPermissionDeniedSnackBar(context);
+      }
+      return;
+    }
     if (!(_formKey.currentState?.validate() ?? false)) return;
     if (_canSelectDepot && _selectedDepotId == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -250,7 +255,12 @@ class _WorkOrderCreateScreenState
 
   @override
   Widget build(BuildContext context) {
-    if (!sessionAllows(sessionOf(ref), 'maintenance.create')) {
+    // RBAC-05: `maintenance.create` alone is not enough — the backend's
+    // WorkOrderPermission.CREATE_ROLES restricts the generic create action to
+    // DEPOT_INCHARGE/DEPOT_USER with no admin-tier bypass, so canCreateWorkOrder
+    // folds in that role check to avoid a guaranteed 403 on submit for
+    // SUPER_ADMIN/ZR_ADMIN/DIV_ADMIN/DIV_HQ_USER.
+    if (!canCreateWorkOrder(sessionOf(ref))) {
       return Scaffold(
         appBar: AppBar(
           title: const Text('New Job Work'),

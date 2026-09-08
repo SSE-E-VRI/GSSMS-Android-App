@@ -5,6 +5,11 @@ import 'package:gssms_mobile/features/auth/domain/models/auth_exceptions.dart';
 import 'package:gssms_mobile/features/auth/domain/models/user_profile.dart';
 import 'package:gssms_mobile/features/auth/domain/models/user_session.dart';
 
+typedef AuthSessionRefreshed = Future<void> Function(
+  UserSession session,
+  UserSession? previous,
+);
+
 abstract class IAuthRepository {
   UserSession? get currentSession;
   String? get currentAccessToken;
@@ -39,13 +44,16 @@ class AuthRepository implements IAuthRepository {
     required AuthApiService apiService,
     required ISecureStorageService secureStorage,
     ILocalCacheService? cacheService,
+    AuthSessionRefreshed? onSessionRefreshed,
   })  : _apiService = apiService,
         _secureStorage = secureStorage,
-        _cacheService = cacheService;
+        _cacheService = cacheService,
+        _onSessionRefreshed = onSessionRefreshed;
 
   final AuthApiService _apiService;
   final ISecureStorageService _secureStorage;
   final ILocalCacheService? _cacheService;
+  final AuthSessionRefreshed? _onSessionRefreshed;
 
   UserSession? _currentSession;
   String? _currentAccessToken;
@@ -79,6 +87,7 @@ class AuthRepository implements IAuthRepository {
 
     _currentAccessToken = tokens.accessToken;
     _currentSession = newSession;
+    await _bindCacheToSession(newSession, previous: null);
     return _currentSession!;
   }
 
@@ -101,6 +110,7 @@ class AuthRepository implements IAuthRepository {
 
       _currentAccessToken = tokens.accessToken;
       _currentSession = newSession;
+      await _bindCacheToSession(newSession, previous: null);
       return _currentSession;
     } on GuestExpiredException {
       await logout();
@@ -143,8 +153,11 @@ class AuthRepository implements IAuthRepository {
         await _secureStorage.saveRefreshToken(tokens.refreshToken!);
       }
 
+      final previous = _currentSession;
       _currentAccessToken = tokens.accessToken;
       _currentSession = newSession;
+      await _bindCacheToSession(newSession, previous: previous);
+      await _onSessionRefreshed?.call(newSession, previous);
       return _currentAccessToken;
     } on UnauthorizedException {
       await logout();
@@ -169,6 +182,7 @@ class AuthRepository implements IAuthRepository {
     }
     _currentAccessToken = tokens.accessToken;
     _currentSession = UserSession.fromJwt(tokens.accessToken);
+    await _bindCacheToSession(_currentSession!, previous: null);
     return _currentSession!;
   }
 
@@ -184,6 +198,28 @@ class AuthRepository implements IAuthRepository {
       throw const AuthException('Unable to load profile: missing user id');
     }
     return id;
+  }
+
+  Future<void> _bindCacheToSession(
+    UserSession session, {
+    required UserSession? previous,
+  }) async {
+    final cache = _cacheService;
+    if (cache == null) return;
+
+    final owner = await cache.getCacheOwnerUserId();
+    final userChanged = session.userId != null &&
+        owner != null &&
+        owner != session.userId;
+    final authChanged =
+        previous != null && session.authorizationChangedFrom(previous);
+
+    if (userChanged || authChanged) {
+      await cache.clearAllCache();
+    }
+    if (session.userId != null) {
+      await cache.setCacheOwnerUserId(session.userId!);
+    }
   }
 
   @override

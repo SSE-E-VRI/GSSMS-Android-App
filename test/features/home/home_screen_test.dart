@@ -203,5 +203,22 @@ void main() {
       expect(find.byKey(const Key('module_maintenance')), findsNothing);
       expect(find.byKey(const Key('module_dashboard')), findsNothing);
     });
+
+    testWidgets('EB_BILL_CLERK sees the Energy placeholder instead of an empty grid',
+        (tester) async {
+      const clerk = UserSession(
+        accessToken: 't',
+        username: 'clerk',
+        primaryRole: AuthRole.ebBillClerk,
+        roles: [AuthRole.ebBillClerk],
+        permissions: ['energy.view', 'energy.create'],
+      );
+
+      await tester.pumpWidget(createTestWidget(clerk));
+
+      expect(find.byKey(const Key('module_energy')), findsOneWidget);
+      expect(find.byKey(const Key('module_maintenance')), findsNothing);
+      expect(find.text('No operational modules enabled by server permissions.'), findsNothing);
+    });
   });
 }

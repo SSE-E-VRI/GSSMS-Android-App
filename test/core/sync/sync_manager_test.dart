@@ -127,5 +127,43 @@ void main() {
       expect(commands[0].status, OutboxCommandStatus.conflict);
       expect(commands[0].lastError?.contains('Conflict'), isTrue);
     });
+
+    test('invalidateSessionBoundWork prevents an in-flight drain from rewriting the outbox',
+        () async {
+      final syncManager = container.read(syncManagerProvider.notifier);
+
+      when(() => mockApiService.submitLine(
+            10,
+            any(),
+            idempotencyKey: any(named: 'idempotencyKey'),
+          )).thenAnswer((_) async {
+        syncManager.invalidateSessionBoundWork();
+        await cacheService.clearAllCache();
+        throw DioException(
+          requestOptions: RequestOptions(path: '/'),
+          type: DioExceptionType.badResponse,
+          response: Response(
+            requestOptions: RequestOptions(path: '/'),
+            statusCode: 401,
+          ),
+        );
+      });
+
+      final cmd = OutboxCommand(
+        idempotencyKey: 'cmd_session',
+        type: OutboxCommandType.submitLine,
+        entityId: 10,
+        payload: const {'line_id': 1, 'value': '230V'},
+        createdAt: DateTime.now(),
+        ownerUserId: 1,
+      );
+      await cacheService.saveOutboxCommands([cmd]);
+      await cacheService.setCacheOwnerUserId(1);
+
+      await syncManager.drainOutbox();
+
+      final remaining = await cacheService.getOutboxCommands();
+      expect(remaining, isEmpty);
+    });
   });
 }

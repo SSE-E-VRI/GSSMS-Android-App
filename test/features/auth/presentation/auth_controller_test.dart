@@ -142,5 +142,33 @@ void main() {
       final state = container.read(authControllerProvider);
       expect(state, isA<Unauthenticated>());
     });
+
+    test('onAccessTokenRefreshed updates Authenticated session claims', () async {
+      when(
+        () => mockRepository.login(
+          username: 'maintenance_user',
+          password: 'password123',
+        ),
+      ).thenAnswer((_) async => testSession);
+
+      final controller = container.read(authControllerProvider.notifier);
+      await controller.login('maintenance_user', 'password123');
+
+      const refreshed = UserSession(
+        accessToken: 'new_access_token',
+        username: 'maintenance_user',
+        userId: 7,
+        primaryRole: AuthRole.maintenanceStaff,
+        roles: [AuthRole.maintenanceStaff],
+        permissions: ['maintenance.view', 'maintenance.edit'],
+      );
+
+      await controller.onAccessTokenRefreshed(refreshed, testSession);
+
+      final state = container.read(authControllerProvider);
+      expect(state, isA<Authenticated>());
+      expect((state as Authenticated).session.permissions, contains('maintenance.edit'));
+      expect(state.session.accessToken, 'new_access_token');
+    });
   });
 }

@@ -148,7 +148,7 @@ void main() {
     });
 
     testWidgets(
-        'Convert action is shown for a non-depot role holding inspections.edit',
+        'Convert action is hidden for a non-depot role holding inspections.edit',
         (tester) async {
       when(() => mockRepo.fetchInspections())
           .thenAnswer((_) async => testInspections);
@@ -174,7 +174,7 @@ void main() {
 
       expect(find.byType(InspectionDetailScreen), findsOneWidget);
       expect(
-          find.byKey(const Key('convert_to_work_order_button')), findsOneWidget);
+          find.byKey(const Key('convert_to_work_order_button')), findsNothing);
     });
 
     testWidgets(

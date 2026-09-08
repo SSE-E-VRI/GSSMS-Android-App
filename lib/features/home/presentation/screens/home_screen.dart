@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../assets/presentation/screens/asset_list_screen.dart';
+import '../../../auth/domain/models/auth_role.dart';
 import '../../../auth/domain/models/user_session.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../../../auth/presentation/screens/user_profile_screen.dart';
 import '../../../complaints/presentation/screens/complaint_list_screen.dart';
 import '../../../dashboard/presentation/screens/dashboard_screen.dart';
+import '../../../energy/presentation/screens/energy_placeholder_screen.dart';
 import '../../../inspections/presentation/screens/inspection_list_screen.dart';
 import '../../../maintenance/presentation/screens/maintenance_screen.dart';
 import '../../../notifications/presentation/screens/notifications_screen.dart';
@@ -266,6 +268,24 @@ class HomeScreen extends ConsumerWidget {
       ));
     }
 
+    if (_showEnergyPlaceholder(session)) {
+      modules.add(_buildModuleCard(
+        key: const Key('module_energy'),
+        title: 'Energy & Solar',
+        subtitle: 'Meter photos & bills — coming soon',
+        icon: Icons.solar_power_outlined,
+        emoji: '☀️',
+        color: Colors.indigo,
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => const EnergyPlaceholderScreen(),
+            ),
+          );
+        },
+      ));
+    }
+
     if (modules.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(20),
@@ -297,6 +317,12 @@ class HomeScreen extends ConsumerWidget {
       childAspectRatio: 1.15,
       children: modules,
     );
+  }
+
+  bool _showEnergyPlaceholder(UserSession session) {
+    if (session.roles.contains(AuthRole.ebBillClerk)) return true;
+    if (session.permissions.contains('*')) return false;
+    return session.permissions.any((p) => p.startsWith('energy.'));
   }
 
   Widget _buildModuleCard({

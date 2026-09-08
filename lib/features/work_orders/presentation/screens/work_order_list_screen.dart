@@ -97,10 +97,14 @@ class _WorkOrderListScreenState extends ConsumerState<WorkOrderListScreen> {
           ),
         ],
       ),
-      // Web "+ New Job Work" — strict create-permission gate like the
-      // complaint/inspection FABs. The server may still 403/405 for roles
-      // without a create grant; the form surfaces that readably.
-      floatingActionButton: sessionAllows(session, 'maintenance.create')
+      // Web "+ New Job Work". Unlike the complaint/inspection FABs,
+      // `maintenance.create` alone is not enough here: the backend's
+      // WorkOrderPermission.CREATE_ROLES restricts the generic create action
+      // to DEPOT_INCHARGE/DEPOT_USER with no admin-tier bypass, so
+      // SUPER_ADMIN/ZR_ADMIN/DIV_ADMIN/DIV_HQ_USER hold the permission but
+      // would still 403 on submit — canCreateWorkOrder folds in that role
+      // check (RBAC-05).
+      floatingActionButton: canCreateWorkOrder(session)
           ? FloatingActionButton.extended(
               key: const Key('fab_create_work_order'),
               icon: const Icon(Icons.add_task_outlined),

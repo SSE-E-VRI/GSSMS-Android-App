@@ -17,6 +17,9 @@ abstract class ILocalCacheService {
   Future<void> saveOutboxCommands(List<OutboxCommand> commands);
   Future<List<OutboxCommand>> getOutboxCommands();
 
+  Future<int?> getCacheOwnerUserId();
+  Future<void> setCacheOwnerUserId(int userId);
+
   Future<void> clearAllCache();
 }
 
@@ -34,6 +37,7 @@ class LocalCacheService implements ILocalCacheService {
   static const String _kWorkOrderDetailPrefix = 'gssms_cache_wo_detail_';
   static const String _kRecordPrefix = 'gssms_cache_record_';
   static const String _kOutboxCommandsKey = 'gssms_cache_outbox_commands';
+  static const String _kCacheOwnerUserIdKey = 'gssms_cache_owner_user_id';
 
   @override
   Future<void> cacheWorkOrders(List<WorkOrder> workOrders) async {
@@ -201,6 +205,18 @@ class LocalCacheService implements ILocalCacheService {
   }
 
   @override
+  Future<int?> getCacheOwnerUserId() async {
+    final prefs = await _getPrefs();
+    return prefs.getInt(_kCacheOwnerUserIdKey);
+  }
+
+  @override
+  Future<void> setCacheOwnerUserId(int userId) async {
+    final prefs = await _getPrefs();
+    await prefs.setInt(_kCacheOwnerUserIdKey, userId);
+  }
+
+  @override
   Future<void> clearAllCache() async {
     final prefs = await _getPrefs();
     final keys = prefs.getKeys();
@@ -253,6 +269,16 @@ class InMemoryLocalCacheService implements ILocalCacheService {
   @override
   Future<List<OutboxCommand>> getOutboxCommands() async {
     return (_storage['outbox'] as List<OutboxCommand>?) ?? [];
+  }
+
+  @override
+  Future<int?> getCacheOwnerUserId() async {
+    return _storage['owner_user_id'] as int?;
+  }
+
+  @override
+  Future<void> setCacheOwnerUserId(int userId) async {
+    _storage['owner_user_id'] = userId;
   }
 
   @override

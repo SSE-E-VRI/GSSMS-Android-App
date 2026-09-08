@@ -26,6 +26,15 @@ class StartExecutionQueuedOffline implements Exception {
       'Execution start has been queued and will begin automatically once the connection is restored.';
 }
 
+/// VERIFIED / CLOSED must not be queued offline (SSOT §8.3).
+class OnlineRequiredException implements Exception {
+  const OnlineRequiredException(this.message);
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
 abstract class IWorkOrderRepository {
   Future<List<WorkOrder>> fetchWorkOrders({
     String? status,
@@ -296,6 +305,12 @@ class WorkOrderRepository implements IWorkOrderRepository {
       return order;
     } catch (e) {
       if (_isNetworkException(e) && _syncManager != null) {
+        final normalized = status.trim().toUpperCase();
+        if (normalized == 'VERIFIED' || normalized == 'CLOSED') {
+          throw const OnlineRequiredException(
+            'Verification and closure require a live connection. Connect to the network and try again.',
+          );
+        }
         final cmd = OutboxCommand(
           idempotencyKey: 'trans_${workOrderId}_${status}_${DateTime.now().millisecondsSinceEpoch}',
           type: OutboxCommandType.transitionStatus,

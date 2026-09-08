@@ -58,4 +58,112 @@ void main() {
       expect(canExportPdf(maintenanceViewSession), isFalse);
     });
   });
+
+  test('wildcard permission grants every code', () {
+      const wildcard = UserSession(
+        accessToken: 't',
+        username: 'u',
+        primaryRole: AuthRole.superAdmin,
+        roles: [AuthRole.superAdmin],
+        permissions: ['*'],
+      );
+      expect(sessionAllows(wildcard, 'maintenance.edit'), isTrue);
+      expect(sessionAllows(wildcard, 'reports.export'), isTrue);
+      expect(canExportPdf(wildcard), isTrue);
+    });
+
+    test('sessionAllowsAny is fail-closed and matches any listed code', () {
+      expect(sessionAllowsAny(null, ['maintenance.view']), isFalse);
+      expect(
+        sessionAllowsAny(maintenanceViewSession, ['dashboard.view', 'maintenance.view']),
+        isTrue,
+      );
+      expect(
+        sessionAllowsAny(maintenanceViewSession, ['dashboard.view', 'reports.export']),
+        isFalse,
+      );
+    });
+
+    group('canCreateWorkOrder', () {
+      test('requires maintenance.create and a depot create role', () {
+        const incharge = UserSession(
+          accessToken: 't',
+          username: 'u',
+          primaryRole: AuthRole.depotIncharge,
+          roles: [AuthRole.depotIncharge],
+          permissions: ['maintenance.create'],
+        );
+        expect(canCreateWorkOrder(incharge), isTrue);
+      });
+
+      test('denies admin roles that hold maintenance.create', () {
+        const admin = UserSession(
+          accessToken: 't',
+          username: 'u',
+          primaryRole: AuthRole.divAdmin,
+          roles: [AuthRole.divAdmin],
+          permissions: ['maintenance.create', '*'],
+        );
+        expect(canCreateWorkOrder(admin), isFalse);
+      });
+
+      test('denies depot incharge without maintenance.create', () {
+        const incharge = UserSession(
+          accessToken: 't',
+          username: 'u',
+          primaryRole: AuthRole.depotIncharge,
+          roles: [AuthRole.depotIncharge],
+          permissions: ['maintenance.view'],
+        );
+        expect(canCreateWorkOrder(incharge), isFalse);
+      });
+    });
+
+    group('canConvertInspection', () {
+      test('allows depot incharge with inspections.edit', () {
+        const incharge = UserSession(
+          accessToken: 't',
+          username: 'u',
+          primaryRole: AuthRole.depotIncharge,
+          roles: [AuthRole.depotIncharge],
+          permissions: ['inspections.edit'],
+        );
+        expect(canConvertInspection(incharge), isTrue);
+      });
+
+      test('denies zone/division admins that hold inspections.edit', () {
+        const zr = UserSession(
+          accessToken: 't',
+          username: 'u',
+          primaryRole: AuthRole.zrAdmin,
+          roles: [AuthRole.zrAdmin],
+          permissions: ['inspections.edit', '*'],
+        );
+        expect(canConvertInspection(zr), isFalse);
+      });
+    });
+
+    group('canWriteChecklist', () {
+      test('allows maintenance staff with maintenance.edit', () {
+        const staff = UserSession(
+          accessToken: 't',
+          username: 'u',
+          primaryRole: AuthRole.maintenanceStaff,
+          roles: [AuthRole.maintenanceStaff],
+          permissions: ['maintenance.edit'],
+        );
+        expect(canWriteChecklist(staff), isTrue);
+      });
+
+      test('denies depot incharge despite maintenance.edit', () {
+        const incharge = UserSession(
+          accessToken: 't',
+          username: 'u',
+          primaryRole: AuthRole.depotIncharge,
+          roles: [AuthRole.depotIncharge],
+          permissions: ['maintenance.edit'],
+        );
+        expect(canWriteChecklist(incharge), isFalse);
+      });
+    });
 }

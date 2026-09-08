@@ -13,6 +13,9 @@ import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_
 /// so a later login on a shared device cannot read the previous user's data.
 Future<void> clearOperationalSession(Ref ref) async {
   try {
+    ref.read(syncManagerProvider.notifier).invalidateSessionBoundWork();
+  } catch (_) {}
+  try {
     await ref.read(localCacheServiceProvider).clearAllCache();
   } catch (_) {
     // SharedPreferences may be unavailable in unit tests; still invalidate.

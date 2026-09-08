@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gssms_mobile/core/database/local_cache_service.dart';
 import 'package:gssms_mobile/core/storage/secure_storage_service.dart';
@@ -25,6 +27,8 @@ void main() {
       mockSecureStorage = MockSecureStorageService();
       mockCache = MockLocalCacheService();
       when(() => mockCache.clearAllCache()).thenAnswer((_) async {});
+      when(() => mockCache.getCacheOwnerUserId()).thenAnswer((_) async => null);
+      when(() => mockCache.setCacheOwnerUserId(any())).thenAnswer((_) async {});
       repository = AuthRepository(
         apiService: mockApiService,
         secureStorage: mockSecureStorage,
@@ -118,6 +122,53 @@ void main() {
         () => repository.getProfile(),
         throwsA(isA<AuthException>()),
       );
+    });
+
+    test('refreshToken clears cache when permissions or scope change', () async {
+      String unsignedJwt(Map<String, dynamic> claims) {
+        String enc(String raw) =>
+            base64Url.encode(utf8.encode(raw)).replaceAll('=', '');
+        return '${enc('{"alg":"none","typ":"JWT"}')}.${enc(jsonEncode(claims))}.';
+      }
+
+      final originalJwt = unsignedJwt({
+        'username': 'test_user',
+        'user_id': 1,
+        'role': 'DEPOT_USER',
+        'roles': ['DEPOT_USER'],
+        'permissions': ['maintenance.view', 'maintenance.edit'],
+        'depot_id': 10,
+      });
+      final narrowedJwt = unsignedJwt({
+        'username': 'test_user',
+        'user_id': 1,
+        'role': 'DEPOT_USER',
+        'roles': ['DEPOT_USER'],
+        'permissions': ['maintenance.view'],
+        'depot_id': 99,
+      });
+
+      when(() => mockApiService.login(
+            username: 'test_user',
+            password: 'password123',
+          )).thenAnswer(
+        (_) async => AuthTokens(accessToken: originalJwt, refreshToken: 'refresh'),
+      );
+      when(() => mockSecureStorage.saveRefreshToken('refresh'))
+          .thenAnswer((_) async {});
+      await repository.login(username: 'test_user', password: 'password123');
+
+      when(() => mockSecureStorage.getRefreshToken())
+          .thenAnswer((_) async => 'refresh');
+      when(() => mockApiService.refreshToken('refresh'))
+          .thenAnswer((_) async => AuthTokens(accessToken: narrowedJwt));
+      when(() => mockCache.getCacheOwnerUserId()).thenAnswer((_) async => 1);
+
+      await repository.refreshToken();
+
+      verify(() => mockCache.clearAllCache()).called(1);
+      expect(repository.currentSession?.depotId, 99);
+      expect(repository.currentSession?.permissions, ['maintenance.view']);
     });
   });
 }

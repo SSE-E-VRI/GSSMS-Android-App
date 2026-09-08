@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gssms_mobile/features/auth/domain/models/auth_role.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:gssms_mobile/features/work_orders/data/work_order_repository.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/maintenance_record.dart';
@@ -63,7 +64,9 @@ void main() {
           overrides: [
             workOrderRepositoryProvider.overrideWithValue(mockRepo),
             authControllerProvider.overrideWith(
-              () => FakeAuthenticatedController(fakeSession()),
+              () => FakeAuthenticatedController(
+                fakeSession(role: AuthRole.maintenanceStaff),
+              ),
             ),
           ],
           child: const MaterialApp(home: ChecklistScreen(recordId: 55)),

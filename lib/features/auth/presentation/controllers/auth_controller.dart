@@ -7,6 +7,7 @@ import 'package:gssms_mobile/core/sync/sync_manager.dart';
 import 'package:gssms_mobile/features/auth/data/auth_api_service.dart';
 import 'package:gssms_mobile/features/auth/data/auth_repository.dart';
 import 'package:gssms_mobile/features/auth/domain/models/auth_exceptions.dart';
+import 'package:gssms_mobile/features/auth/domain/models/user_session.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_state.dart';
 
 // Top-level Providers
@@ -41,6 +42,11 @@ final authRepositoryProvider = Provider<IAuthRepository>((ref) {
     apiService: apiService,
     secureStorage: storage,
     cacheService: ref.watch(localCacheServiceProvider),
+    onSessionRefreshed: (session, previous) {
+      return ref
+          .read(authControllerProvider.notifier)
+          .onAccessTokenRefreshed(session, previous);
+    },
   );
   return repository;
 });
@@ -164,9 +170,28 @@ class AuthController extends Notifier<AuthState> {
     }
   }
 
+  /// Silent token refresh: push the new JWT claims into UI gates, and drop
+  /// cached operational data when identity, permissions, or org scope changed.
+  Future<void> onAccessTokenRefreshed(
+    UserSession session,
+    UserSession? previous,
+  ) async {
+    final authChanged =
+        previous != null && session.authorizationChangedFrom(previous);
+    if (authChanged) {
+      await clearOperationalSession(ref);
+    }
+    if (state is Authenticated) {
+      state = Authenticated(session);
+    }
+  }
+
   /// Triggered by interceptor when token refresh fails or guest access expires
   void handleSessionExpired([String? reason]) {
     _pendingPassword = null;
+    try {
+      ref.read(syncManagerProvider.notifier).invalidateSessionBoundWork();
+    } catch (_) {}
     Future<void> cleanup() async {
       await clearOperationalSession(ref);
     }
