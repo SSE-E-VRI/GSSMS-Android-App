@@ -18,8 +18,10 @@ abstract class IInspectionRepository {
     String priority = 'MEDIUM',
     int? assetId,
     int? stationId,
+    int? infrastructureId,
     int? depotId,
     String? scheduledDate,
+    List<String>? inspectionPoints,
   });
   Future<Map<String, dynamic>> convertToWorkOrder(int inspectionId);
 }
@@ -59,8 +61,10 @@ class InspectionRepository implements IInspectionRepository {
     String priority = 'MEDIUM',
     int? assetId,
     int? stationId,
+    int? infrastructureId,
     int? depotId,
     String? scheduledDate,
+    List<String>? inspectionPoints,
   }) async {
     final payload = <String, dynamic>{
       'title': title,
@@ -69,8 +73,10 @@ class InspectionRepository implements IInspectionRepository {
       'source': 'MOBILE',
       if (assetId != null) 'asset': assetId,
       if (stationId != null) 'station': stationId,
+      if (infrastructureId != null) 'infrastructure': infrastructureId,
       if (depotId != null) 'depot': depotId,
       if (scheduledDate != null) 'scheduled_date': scheduledDate,
+      if (inspectionPoints != null && inspectionPoints.isNotEmpty) 'inspection_points': inspectionPoints,
     };
     return _apiService.createInspection(payload);
   }
