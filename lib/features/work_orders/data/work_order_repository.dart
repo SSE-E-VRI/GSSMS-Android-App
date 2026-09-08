@@ -40,6 +40,17 @@ abstract class IWorkOrderRepository {
   });
 
   Future<WorkOrder> fetchWorkOrderById(int id);
+  Future<WorkOrder> createWorkOrder({
+    required String title,
+    String? description,
+    String type = 'PREVENTIVE',
+    String priority = 'MEDIUM',
+    int? depotId,
+    int? stationId,
+    int? infrastructureId,
+    int? assetId,
+    String? dueDate,
+  });
   Future<WorkOrderActionSet> fetchAllowedActions(int workOrderId);
   Future<WorkOrderAudit> fetchAudit(int workOrderId);
   Future<List<Technician>> fetchAssignableTechnicians({int? depotId});
@@ -167,6 +178,36 @@ class WorkOrderRepository implements IWorkOrderRepository {
       }
       rethrow;
     }
+  }
+
+  @override
+  Future<WorkOrder> createWorkOrder({
+    required String title,
+    String? description,
+    String type = 'PREVENTIVE',
+    String priority = 'MEDIUM',
+    int? depotId,
+    int? stationId,
+    int? infrastructureId,
+    int? assetId,
+    String? dueDate,
+  }) async {
+    final payload = <String, dynamic>{
+      'title': title,
+      if (description != null && description.trim().isNotEmpty)
+        'description': description.trim(),
+      'type': type,
+      'priority': priority,
+      'source': 'MOBILE',
+      if (depotId != null) 'depot': depotId,
+      if (stationId != null) 'station': stationId,
+      if (infrastructureId != null) 'infrastructure': infrastructureId,
+      if (assetId != null) 'asset': assetId,
+      if (dueDate != null) 'due_date': dueDate,
+    };
+    final order = await _apiService.createWorkOrder(payload);
+    await _cacheService.cacheWorkOrderDetail(order);
+    return order;
   }
 
   /// Transitions the server permits right now. These are deliberately not

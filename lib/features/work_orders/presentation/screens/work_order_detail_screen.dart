@@ -12,7 +12,9 @@ import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_
 import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_order_state.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/screens/checklist_screen.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/screens/verification_workspace_screen.dart';
+import 'package:gssms_mobile/features/work_orders/services/work_order_pdf_service.dart';
 import 'package:intl/intl.dart';
+import 'package:printing/printing.dart';
 
 class WorkOrderDetailScreen extends ConsumerStatefulWidget {
   const WorkOrderDetailScreen({super.key, required this.workOrderId});
@@ -57,6 +59,15 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
       appBar: AppBar(
         title: Text('Work Order #${widget.workOrderId}'),
         actions: [
+          // Web per-row PDF action — share/print the Job Work sheet.
+          IconButton(
+            key: const Key('work_order_pdf_button'),
+            icon: const Icon(Icons.picture_as_pdf_outlined),
+            tooltip: 'Export PDF',
+            onPressed: detailState is WorkOrderDetailLoaded
+                ? () => _exportPdf(detailState)
+                : null,
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: () => ref
@@ -68,6 +79,28 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
       body: _buildBody(detailState, userSession),
       bottomNavigationBar: _buildBottomActions(detailState),
     );
+  }
+
+  Future<void> _exportPdf(WorkOrderDetailLoaded loaded) async {
+    try {
+      final doc = await WorkOrderPdfService.build(
+        loaded.workOrder,
+        audit: loaded.audit,
+      );
+      await Printing.layoutPdf(
+        onLayout: (_) async => doc.save(),
+        name:
+            'JobWork_${loaded.workOrder.displayReference.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_')}.pdf',
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Failed to export PDF: $e'),
+              backgroundColor: AppTheme.errorRed),
+        );
+      }
+    }
   }
 
   Widget _buildBody(WorkOrderDetailState state, dynamic session) {
