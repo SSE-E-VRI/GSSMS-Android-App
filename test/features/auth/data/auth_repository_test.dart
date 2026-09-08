@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gssms_mobile/core/database/local_cache_service.dart';
 import 'package:gssms_mobile/core/storage/secure_storage_service.dart';
 import 'package:gssms_mobile/features/auth/data/auth_api_service.dart';
 import 'package:gssms_mobile/features/auth/data/auth_repository.dart';
@@ -8,11 +9,13 @@ import 'package:mocktail/mocktail.dart';
 
 class MockAuthApiService extends Mock implements AuthApiService {}
 class MockSecureStorageService extends Mock implements ISecureStorageService {}
+class MockLocalCacheService extends Mock implements ILocalCacheService {}
 
 void main() {
   group('AuthRepository Unit Tests', () {
     late MockAuthApiService mockApiService;
     late MockSecureStorageService mockSecureStorage;
+    late MockLocalCacheService mockCache;
     late AuthRepository repository;
 
     const dummyJwt = 'eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJ1c2VybmFtZSI6InRlc3RfdXNlciIsInJvbGUiOiJNQUlOVEVOQU5DRV9TVEFGRiIsInJvbGVzIjpbIk1BSU5URU5BTkNFX1NUQUZGIl0sInBlcm1pc3Npb25zIjpbIm1haW50ZW5hbmNlLnZpZXciXX0.';
@@ -20,9 +23,12 @@ void main() {
     setUp(() {
       mockApiService = MockAuthApiService();
       mockSecureStorage = MockSecureStorageService();
+      mockCache = MockLocalCacheService();
+      when(() => mockCache.clearAllCache()).thenAnswer((_) async {});
       repository = AuthRepository(
         apiService: mockApiService,
         secureStorage: mockSecureStorage,
+        cacheService: mockCache,
       );
     });
 
@@ -96,14 +102,22 @@ void main() {
       expect(repository.currentSession, isNull);
     });
 
-    test('logout clears secure storage and nullifies in-memory session and token', () async {
+    test('logout clears secure storage, cache, and nullifies in-memory session and token', () async {
       when(() => mockSecureStorage.clearTokens()).thenAnswer((_) async {});
 
       await repository.logout();
 
       verify(() => mockSecureStorage.clearTokens()).called(1);
+      verify(() => mockCache.clearAllCache()).called(1);
       expect(repository.currentAccessToken, isNull);
       expect(repository.currentSession, isNull);
+    });
+
+    test('getProfile throws when session has no user id', () async {
+      expect(
+        () => repository.getProfile(),
+        throwsA(isA<AuthException>()),
+      );
     });
   });
 }

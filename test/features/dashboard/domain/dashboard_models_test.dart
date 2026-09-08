@@ -67,5 +67,30 @@ void main() {
       expect(summary.stats.statusSegments.single.label, '2');
       expect(summary.stats.typeStats.single.label, '8');
     });
+
+    test('PendingAction parses tolerant shapes and skips non-maps', () {
+      final summary = DashboardSummary.fromJson(const {
+        'stats': {'total_work_orders': 5},
+        'pending_tasks': [
+          {
+            'id': 9,
+            'kind': 'verification',
+            'title': 'Verify TR-01 job',
+            'station_name': 'VRI',
+            'work_order_id': 101,
+          },
+          {'type': 'COMPLAINT', 'name': 'Fan failure', 'complaint_id': 7},
+          'not-a-map',
+          42,
+        ],
+      });
+
+      expect(summary.pendingTasks.length, 2);
+      expect(summary.pendingTasks[0].kind, PendingActionKind.verification);
+      expect(summary.pendingTasks[0].workOrderId, 101);
+      expect(summary.pendingTasks[0].subtitle, 'VRI');
+      expect(summary.pendingTasks[1].kind, PendingActionKind.complaint);
+      expect(summary.pendingTasks[1].complaintId, 7);
+    });
   });
 }

@@ -5,8 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:gssms_mobile/core/sync/widgets/sync_status_badge.dart';
+import 'package:gssms_mobile/features/auth/domain/rbac.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_state.dart';
+import 'package:gssms_mobile/features/auth/presentation/widgets/permission_denied_view.dart';
 import 'package:gssms_mobile/features/work_orders/data/evidence_service.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/maintenance_record.dart';
@@ -30,12 +32,23 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      if (!sessionAllows(
+          sessionFromAuth(ref.read(authControllerProvider)), 'maintenance.edit')) {
+        return;
+      }
       ref.read(checklistControllerProvider(widget.recordId).notifier).loadRecord();
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    if (!sessionAllows(sessionOf(ref), 'maintenance.edit')) {
+      return Scaffold(
+        appBar: AppBar(title: Text('Checklist #${widget.recordId}')),
+        body: const PermissionDeniedView(),
+      );
+    }
+
     final state = ref.watch(checklistControllerProvider(widget.recordId));
 
     ref.listen(checklistControllerProvider(widget.recordId), (prev, next) {
@@ -787,6 +800,7 @@ class _CompletionSheetState extends ConsumerState<_CompletionSheet> {
   }
 
   Future<void> _submit() async {
+    if (!sessionAllows(sessionOf(ref), 'maintenance.edit')) return;
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
     final otherStaff = _otherStaffController.text.trim();

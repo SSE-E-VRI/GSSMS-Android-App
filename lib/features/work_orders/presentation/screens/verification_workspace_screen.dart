@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
+import 'package:gssms_mobile/features/auth/domain/rbac.dart';
+import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
+import 'package:gssms_mobile/features/auth/presentation/widgets/permission_denied_view.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/maintenance_record.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/work_order_action.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/controllers/verification_workspace_controller.dart';
@@ -28,9 +31,16 @@ class _VerificationWorkspaceScreenState
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      if (!sessionAllows(
+          sessionFromAuth(ref.read(authControllerProvider)), 'maintenance.edit')) {
+        return;
+      }
       ref
           .read(verificationWorkspaceControllerProvider(widget.workOrderId).notifier)
           .load();
+      ref
+          .read(workOrderDetailControllerProvider(widget.workOrderId).notifier)
+          .loadDetail();
     });
   }
 
@@ -42,18 +52,33 @@ class _VerificationWorkspaceScreenState
 
   @override
   Widget build(BuildContext context) {
+    final canEdit = sessionAllows(sessionOf(ref), 'maintenance.edit');
+    if (!canEdit) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Verify work order')),
+        body: const PermissionDeniedView(),
+      );
+    }
+
     final state =
         ref.watch(verificationWorkspaceControllerProvider(widget.workOrderId));
     final detailState =
         ref.watch(workOrderDetailControllerProvider(widget.workOrderId));
     final submitting = (state is VerificationWorkspaceLoaded && state.isSubmitting) ||
         (detailState is WorkOrderDetailLoaded && detailState.isTransitioning);
+    final returnAction = detailState is WorkOrderDetailLoaded
+        ? detailState.actions?.enabledAction('REWORK_REQUIRED')
+        : null;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Verify work order')),
       body: _buildBody(state),
       bottomNavigationBar: state is VerificationWorkspaceLoaded
-          ? _buildActions(state.workspace.canVerify, submitting)
+          ? _buildActions(
+              canVerify: state.workspace.canVerify,
+              submitting: submitting,
+              returnAction: returnAction,
+            )
           : null,
     );
   }
@@ -314,7 +339,11 @@ class _VerificationWorkspaceScreenState
     return AppTheme.railwayGreen;
   }
 
-  Widget _buildActions(bool canVerify, bool submitting) {
+  Widget _buildActions({
+    required bool canVerify,
+    required bool submitting,
+    required WorkOrderAction? returnAction,
+  }) {
     return SafeArea(
       child: Container(
         padding: const EdgeInsets.all(16),
@@ -333,7 +362,9 @@ class _VerificationWorkspaceScreenState
             Expanded(
               child: OutlinedButton(
                 key: const Key('return_to_technician_button'),
-                onPressed: submitting ? null : _showReturnDialog,
+                onPressed: (returnAction == null || submitting)
+                    ? null
+                    : () => _showReturnDialog(returnAction),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppTheme.errorRed,
                   side: const BorderSide(color: AppTheme.errorRed),
@@ -385,15 +416,9 @@ class _VerificationWorkspaceScreenState
     _showFailureMessage();
   }
 
-  Future<void> _showReturnDialog() async {
+  Future<void> _showReturnDialog(WorkOrderAction action) async {
     final textController = TextEditingController();
     final formKey = GlobalKey<FormState>();
-    const action = WorkOrderAction(
-      targetStatus: 'REWORK_REQUIRED',
-      label: 'Return to Technician',
-      enabled: true,
-      requiresReason: true,
-    );
 
     final remarks = await showDialog<String>(
       context: context,

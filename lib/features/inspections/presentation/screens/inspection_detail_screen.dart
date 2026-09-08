@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
-import 'package:gssms_mobile/features/auth/domain/models/auth_role.dart';
 import 'package:gssms_mobile/features/auth/domain/models/user_session.dart';
+import 'package:gssms_mobile/features/auth/domain/rbac.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_state.dart';
 import 'package:gssms_mobile/features/inspections/domain/models/inspection.dart';
 import 'package:gssms_mobile/features/inspections/presentation/controllers/inspection_controllers.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_order_controllers.dart';
-import 'package:gssms_mobile/features/work_orders/presentation/screens/work_order_detail_screen.dart';
+import 'package:gssms_mobile/features/work_orders/presentation/work_order_navigation.dart';
 import 'package:intl/intl.dart';
 
 /// Read-only detail view for one logged inspection, plus the Convert to Job
@@ -40,17 +40,12 @@ class _InspectionDetailScreenState
     _inspection = widget.inspection;
   }
 
-  /// Mirrors web's usePermissions().isDepotRole: ConversionService rejects
-  /// every role except DEPOT_INCHARGE/DEPOT_USER with a 403
-  /// ("Users with role {role} are not permitted to convert records."), so the
-  /// button is gated on that exact pair rather than a broader depot-scope
-  /// check that would just produce a dead button for other depot-level roles.
+  /// Conversion is permission-gated (`inspections.edit`). Django's
+  /// ConversionService remains the authority and will 403 roles it rejects.
   bool _canConvert(UserSession? session) {
     if (session == null) return false;
     if (_inspection.isConverted) return false;
-    if (!session.hasPermission('inspections.edit')) return false;
-    return session.roles.contains(AuthRole.depotIncharge) ||
-        session.roles.contains(AuthRole.depotUser);
+    return sessionAllows(session, 'inspections.edit');
   }
 
   Future<void> _confirmConvert() async {
@@ -205,7 +200,9 @@ class _InspectionDetailScreenState
                     'Completed', dateFormat.format(inspection.completedDate!)),
             ],
           ),
-          if (inspection.isConverted && inspection.workOrderId != null) ...[
+          if (inspection.isConverted &&
+              inspection.workOrderId != null &&
+              sessionAllows(session, 'maintenance.view')) ...[
             const SizedBox(height: 12),
             _sectionCard(
               children: [
@@ -216,12 +213,10 @@ class _InspectionDetailScreenState
                   icon: const Icon(Icons.arrow_forward),
                   label: const Text('View Linked Job Work'),
                   onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => WorkOrderDetailScreen(
-                          workOrderId: inspection.workOrderId!,
-                        ),
-                      ),
+                    openWorkOrderGuarded(
+                      context: context,
+                      session: session,
+                      workOrderId: inspection.workOrderId!,
                     );
                   },
                 ),

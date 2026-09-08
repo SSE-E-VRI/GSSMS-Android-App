@@ -5,8 +5,10 @@ import 'package:gssms_mobile/core/theme/app_theme.dart';
 import 'package:gssms_mobile/core/widgets/date_range_filter_bar.dart';
 import 'package:gssms_mobile/core/widgets/org_scope_filter_bar.dart';
 import 'package:gssms_mobile/features/auth/domain/models/user_session.dart';
+import 'package:gssms_mobile/features/auth/domain/rbac.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_state.dart';
+import 'package:gssms_mobile/features/auth/presentation/widgets/permission_denied_view.dart';
 import 'dart:async';
 import 'package:gssms_mobile/features/reports/domain/models/infrastructure_option.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/work_order.dart';
@@ -32,6 +34,10 @@ class _WorkOrderListScreenState extends ConsumerState<WorkOrderListScreen> {
     _searchController.addListener(_onSearchTextChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      if (!sessionAllows(
+          sessionFromAuth(ref.read(authControllerProvider)), 'maintenance.view')) {
+        return;
+      }
       ref.read(workOrderListControllerProvider.notifier).fetchWorkOrders();
     });
   }
@@ -52,7 +58,14 @@ class _WorkOrderListScreenState extends ConsumerState<WorkOrderListScreen> {
   Widget build(BuildContext context) {
     final listState = ref.watch(workOrderListControllerProvider);
     final authState = ref.watch(authControllerProvider);
-    final session = authState is Authenticated ? authState.session : null;
+    final session = sessionFromAuth(authState);
+
+    if (!sessionAllows(session, 'maintenance.view')) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Work Orders')),
+        body: const PermissionDeniedView(),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -88,8 +101,7 @@ class _WorkOrderListScreenState extends ConsumerState<WorkOrderListScreen> {
       // Web "+ New Job Work" — strict create-permission gate like the
       // complaint/inspection FABs. The server may still 403/405 for roles
       // without a create grant; the form surfaces that readably.
-      floatingActionButton: (session?.hasPermission('maintenance.create') ??
-              false)
+      floatingActionButton: sessionAllows(session, 'maintenance.create')
           ? FloatingActionButton.extended(
               key: const Key('fab_create_work_order'),
               icon: const Icon(Icons.add_task_outlined),

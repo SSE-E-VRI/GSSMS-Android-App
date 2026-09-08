@@ -97,6 +97,33 @@ class AuthApiService {
     }
   }
 
+  /// GET /api/v1/users/{id}/ — same payload the web profile screen loads.
+  Future<Map<String, dynamic>> getUser(int userId) async {
+    try {
+      final response = await _dio.get('/api/v1/users/$userId/');
+      final data = response.data;
+      if (data is Map<String, dynamic>) return data;
+      if (data is Map) return Map<String, dynamic>.from(data);
+      throw const AuthException('Invalid user profile response');
+    } on DioException catch (e) {
+      throw _parseDioError(e);
+    }
+  }
+
+  /// PATCH /api/v1/users/{id}/ — personal fields or `{password: …}`.
+  Future<Map<String, dynamic>> updateUser(int userId, Map<String, dynamic> payload) async {
+    try {
+      final response = await _dio.patch('/api/v1/users/$userId/', data: payload);
+      final data = response.data;
+      if (data == null) return {};
+      if (data is Map<String, dynamic>) return data;
+      if (data is Map) return Map<String, dynamic>.from(data);
+      return {};
+    } on DioException catch (e) {
+      throw _parseDioError(e);
+    }
+  }
+
   /// Call POST /api/v1/auth/refresh/
   Future<AuthTokens> refreshToken(String refreshToken) async {
     try {
@@ -130,6 +157,17 @@ class AuthApiService {
       if (data is Map) {
         detail = data['detail']?.toString() ?? data['message']?.toString() ?? detail;
         code = data['code']?.toString();
+        if (data['detail'] == null && data['message'] == null) {
+          final parts = <String>[];
+          for (final value in data.values) {
+            if (value is List) {
+              parts.addAll(value.map((e) => e.toString()));
+            } else if (value is String && value.isNotEmpty) {
+              parts.add(value);
+            }
+          }
+          if (parts.isNotEmpty) detail = parts.join(' ');
+        }
       } else if (data is String && data.isNotEmpty) {
         detail = data;
       }

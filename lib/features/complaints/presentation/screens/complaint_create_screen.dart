@@ -10,8 +10,10 @@ import 'package:gssms_mobile/core/theme/app_theme.dart';
 import 'package:gssms_mobile/features/assets/data/asset_api_service.dart';
 import 'package:gssms_mobile/features/assets/domain/models/asset.dart';
 import 'package:gssms_mobile/features/auth/domain/models/org_scope.dart';
+import 'package:gssms_mobile/features/auth/domain/rbac.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_state.dart';
+import 'package:gssms_mobile/features/auth/presentation/widgets/permission_denied_view.dart';
 import 'package:gssms_mobile/features/complaints/presentation/controllers/complaint_controllers.dart';
 import 'package:gssms_mobile/features/reports/domain/models/infrastructure_option.dart';
 import 'package:gssms_mobile/features/reports/presentation/controllers/reports_controller.dart';
@@ -98,8 +100,11 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
 
   Future<void> _bootstrap() async {
     if (!mounted) return;
-    final authState = ref.read(authControllerProvider);
-    final session = authState is Authenticated ? authState.session : null;
+    final session = sessionFromAuth(ref.read(authControllerProvider));
+    if (!sessionAllows(session, 'complaints.create')) {
+      if (mounted) setState(() => _bootstrapped = true);
+      return;
+    }
     final scope = session?.scope ?? const OrgScope();
 
     setState(() {
@@ -221,6 +226,7 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
   }
 
   Future<void> _submitComplaint() async {
+    if (!sessionAllows(sessionOf(ref), 'complaints.create')) return;
     if (!_formKey.currentState!.validate()) return;
     if (_selectedDepartment == null) {
       setState(() => _departmentError = 'Please select a department');
@@ -276,6 +282,16 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!sessionAllows(sessionOf(ref), 'complaints.create')) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Log New Complaint'),
+          backgroundColor: AppTheme.primaryDark,
+        ),
+        body: const PermissionDeniedView(),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Log New Complaint'),

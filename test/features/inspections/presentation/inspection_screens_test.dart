@@ -33,7 +33,12 @@ const _sessionWithInspectionsAdd = UserSession(
   lastName: '',
   primaryRole: AuthRole.depotIncharge,
   roles: [AuthRole.depotIncharge],
-  permissions: ['inspections.create', 'inspections.edit'],
+  permissions: [
+    'inspections.view',
+    'inspections.create',
+    'inspections.edit',
+    'maintenance.view'
+  ],
   scope: OrgScope(level: OrgScopeLevel.depot),
 );
 
@@ -48,7 +53,7 @@ const _sessionNonDepotRole = UserSession(
   lastName: '',
   primaryRole: AuthRole.divAdmin,
   roles: [AuthRole.divAdmin],
-  permissions: ['inspections.create', 'inspections.edit'],
+  permissions: ['inspections.view', 'inspections.create', 'inspections.edit'],
   scope: OrgScope(level: OrgScopeLevel.division),
 );
 
@@ -143,7 +148,7 @@ void main() {
     });
 
     testWidgets(
-        'Convert action is hidden for a non-depot role even with inspections.edit',
+        'Convert action is shown for a non-depot role holding inspections.edit',
         (tester) async {
       when(() => mockRepo.fetchInspections())
           .thenAnswer((_) async => testInspections);
@@ -169,7 +174,7 @@ void main() {
 
       expect(find.byType(InspectionDetailScreen), findsOneWidget);
       expect(
-          find.byKey(const Key('convert_to_work_order_button')), findsNothing);
+          find.byKey(const Key('convert_to_work_order_button')), findsOneWidget);
     });
 
     testWidgets(
@@ -273,7 +278,12 @@ void main() {
 
       await tester.pumpWidget(
         ProviderScope(
-          overrides: [inspectionRepositoryProvider.overrideWithValue(mockRepo)],
+          overrides: [
+            inspectionRepositoryProvider.overrideWithValue(mockRepo),
+            authControllerProvider.overrideWith(
+              () => _FakeAuthenticatedController(_sessionWithInspectionsAdd),
+            ),
+          ],
           child: const MaterialApp(home: InspectionCreateScreen()),
         ),
       );
@@ -337,7 +347,12 @@ void main() {
 
       await tester.pumpWidget(
         ProviderScope(
-          overrides: [inspectionRepositoryProvider.overrideWithValue(mockRepo)],
+          overrides: [
+            inspectionRepositoryProvider.overrideWithValue(mockRepo),
+            authControllerProvider.overrideWith(
+              () => _FakeAuthenticatedController(_sessionWithInspectionsAdd),
+            ),
+          ],
           child: const MaterialApp(home: InspectionCreateScreen()),
         ),
       );

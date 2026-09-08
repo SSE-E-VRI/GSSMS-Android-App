@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
+import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:gssms_mobile/features/work_orders/data/work_order_repository.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/maintenance_record.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_order_controllers.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/screens/checklist_screen.dart';
 import 'package:mocktail/mocktail.dart';
+import '../../../helpers/fake_auth.dart';
 
 class MockWorkOrderRepository extends Mock implements IWorkOrderRepository {}
 
@@ -36,7 +38,12 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [workOrderRepositoryProvider.overrideWithValue(mockRepo)],
+        overrides: [
+          workOrderRepositoryProvider.overrideWithValue(mockRepo),
+          authControllerProvider.overrideWith(
+            () => FakeAuthenticatedController(fakeSession()),
+          ),
+        ],
         child: MaterialApp(
           theme: AppTheme.lightTheme,
           home: const ChecklistScreen(recordId: 23),

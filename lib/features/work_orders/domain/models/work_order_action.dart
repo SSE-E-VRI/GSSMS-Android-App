@@ -76,6 +76,18 @@ class WorkOrderActionSet extends Equatable {
 
   bool get hasAnyAction => allowed.isNotEmpty || blocked.isNotEmpty;
 
+  bool allowsTarget(String status) => enabledAction(status) != null;
+
+  WorkOrderAction? enabledAction(String status) {
+    final target = status.trim().toUpperCase();
+    for (final action in allowed) {
+      if (action.enabled && action.targetStatus.toUpperCase() == target) {
+        return action;
+      }
+    }
+    return null;
+  }
+
   factory WorkOrderActionSet.fromJson(Map<String, dynamic> json) {
     List<WorkOrderAction> parse(String key) {
       final raw = json[key];

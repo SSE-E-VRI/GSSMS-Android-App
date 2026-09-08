@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
+import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:gssms_mobile/features/work_orders/data/work_order_repository.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/maintenance_record.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/work_order.dart';
@@ -12,6 +13,7 @@ import 'package:gssms_mobile/features/work_orders/presentation/screens/checklist
 import 'package:gssms_mobile/features/work_orders/presentation/screens/work_order_detail_screen.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/screens/work_order_list_screen.dart';
 import 'package:mocktail/mocktail.dart';
+import '../../../helpers/fake_auth.dart';
 
 class MockWorkOrderRepository extends Mock implements IWorkOrderRepository {}
 
@@ -55,6 +57,9 @@ void main() {
         ProviderScope(
           overrides: [
             workOrderRepositoryProvider.overrideWithValue(mockRepo),
+            authControllerProvider.overrideWith(
+              () => FakeAuthenticatedController(fakeSession()),
+            ),
           ],
           child: MaterialApp(
             theme: AppTheme.lightTheme,
@@ -106,6 +111,9 @@ void main() {
         ProviderScope(
           overrides: [
             workOrderRepositoryProvider.overrideWithValue(mockRepo),
+            authControllerProvider.overrideWith(
+              () => FakeAuthenticatedController(fakeSession()),
+            ),
           ],
           child: MaterialApp(
             theme: AppTheme.lightTheme,
@@ -136,6 +144,11 @@ void main() {
           currentStatus: 'ASSIGNED',
           allowed: [
             WorkOrderAction(
+              targetStatus: 'IN_PROGRESS',
+              label: 'Start',
+              enabled: true,
+            ),
+            WorkOrderAction(
               targetStatus: 'ON_HOLD',
               label: 'On Hold',
               enabled: true,
@@ -165,6 +178,9 @@ void main() {
         ProviderScope(
           overrides: [
             workOrderRepositoryProvider.overrideWithValue(mockRepo),
+            authControllerProvider.overrideWith(
+              () => FakeAuthenticatedController(fakeSession()),
+            ),
           ],
           child: const MaterialApp(
             home: WorkOrderDetailScreen(workOrderId: 101),
@@ -208,6 +224,9 @@ void main() {
         ProviderScope(
           overrides: [
             workOrderRepositoryProvider.overrideWithValue(mockRepo),
+            authControllerProvider.overrideWith(
+              () => FakeAuthenticatedController(fakeSession()),
+            ),
           ],
           child: const MaterialApp(
             home: WorkOrderDetailScreen(workOrderId: 101),
@@ -231,6 +250,9 @@ void main() {
         ProviderScope(
           overrides: [
             workOrderRepositoryProvider.overrideWithValue(mockRepo),
+            authControllerProvider.overrideWith(
+              () => FakeAuthenticatedController(fakeSession()),
+            ),
           ],
           child: const MaterialApp(
             home: ChecklistScreen(recordId: 55),

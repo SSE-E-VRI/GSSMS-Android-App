@@ -8,8 +8,10 @@ import 'package:gssms_mobile/core/theme/app_theme.dart';
 import 'package:gssms_mobile/features/assets/data/asset_api_service.dart';
 import 'package:gssms_mobile/features/assets/domain/models/asset.dart';
 import 'package:gssms_mobile/features/auth/domain/models/org_scope.dart';
+import 'package:gssms_mobile/features/auth/domain/rbac.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_state.dart';
+import 'package:gssms_mobile/features/auth/presentation/widgets/permission_denied_view.dart';
 import 'package:gssms_mobile/features/reports/domain/models/infrastructure_option.dart';
 import 'package:gssms_mobile/features/reports/presentation/controllers/reports_controller.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/work_order.dart';
@@ -89,8 +91,11 @@ class _WorkOrderCreateScreenState
 
   Future<void> _bootstrap() async {
     if (!mounted) return;
-    final authState = ref.read(authControllerProvider);
-    final session = authState is Authenticated ? authState.session : null;
+    final session = sessionFromAuth(ref.read(authControllerProvider));
+    if (!sessionAllows(session, 'maintenance.create')) {
+      if (mounted) setState(() => _bootstrapped = true);
+      return;
+    }
     final scope = session?.scope ?? const OrgScope();
     setState(() {
       _canSelectDepot = session != null &&
@@ -201,6 +206,7 @@ class _WorkOrderCreateScreenState
   }
 
   Future<void> _submit() async {
+    if (!sessionAllows(sessionOf(ref), 'maintenance.create')) return;
     if (!(_formKey.currentState?.validate() ?? false)) return;
     if (_canSelectDepot && _selectedDepotId == null) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -245,6 +251,16 @@ class _WorkOrderCreateScreenState
 
   @override
   Widget build(BuildContext context) {
+    if (!sessionAllows(sessionOf(ref), 'maintenance.create')) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('New Job Work'),
+          backgroundColor: AppTheme.primaryDark,
+        ),
+        body: const PermissionDeniedView(),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('New Job Work'),

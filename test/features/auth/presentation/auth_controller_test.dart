@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gssms_mobile/core/database/local_cache_service.dart';
+import 'package:gssms_mobile/core/sync/sync_manager.dart';
 import 'package:gssms_mobile/features/auth/data/auth_repository.dart';
 import 'package:gssms_mobile/features/auth/domain/models/auth_exceptions.dart';
 import 'package:gssms_mobile/features/auth/domain/models/auth_role.dart';
@@ -28,6 +30,7 @@ void main() {
       container = ProviderContainer(
         overrides: [
           authRepositoryProvider.overrideWithValue(mockRepository),
+          localCacheServiceProvider.overrideWithValue(InMemoryLocalCacheService()),
         ],
       );
     });

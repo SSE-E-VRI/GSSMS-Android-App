@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gssms_mobile/features/auth/domain/models/auth_exceptions.dart';
 import 'package:gssms_mobile/features/auth/domain/models/auth_role.dart';
 import 'package:gssms_mobile/features/auth/domain/models/org_scope.dart';
 import 'package:gssms_mobile/features/auth/domain/models/user_session.dart';
@@ -121,6 +122,19 @@ void main() {
       expect(maintenanceSession.hasPermission('maintenance.view'), isTrue);
       expect(maintenanceSession.hasPermission('maintenance.edit'), isTrue);
       expect(maintenanceSession.hasPermission('users.create'), isFalse);
+    });
+
+    test('expired valid_until throws GuestExpiredException', () {
+      expect(
+        () => UserSession.fromClaims(const {
+          'username': 'guest',
+          'role': 'GUEST',
+          'roles': ['GUEST'],
+          'permissions': ['dashboard.view'],
+          'valid_until': '2000-01-01T00:00:00Z',
+        }, 'token'),
+        throwsA(isA<GuestExpiredException>()),
+      );
     });
   });
 }

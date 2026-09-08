@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
+import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:gssms_mobile/features/work_orders/data/work_order_repository.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/maintenance_record.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/technician.dart';
@@ -14,6 +15,7 @@ import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_
 import 'package:gssms_mobile/features/work_orders/presentation/screens/verification_workspace_screen.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/screens/work_order_detail_screen.dart';
 import 'package:mocktail/mocktail.dart';
+import '../../../helpers/fake_auth.dart';
 
 class MockWorkOrderRepository extends Mock implements IWorkOrderRepository {}
 
@@ -46,7 +48,12 @@ void main() {
 
   Widget wrap(Widget home) {
     return ProviderScope(
-      overrides: [workOrderRepositoryProvider.overrideWithValue(mockRepo)],
+      overrides: [
+        workOrderRepositoryProvider.overrideWithValue(mockRepo),
+        authControllerProvider.overrideWith(
+          () => FakeAuthenticatedController(fakeSession()),
+        ),
+      ],
       child: MaterialApp(
         theme: AppTheme.lightTheme,
         home: home,
@@ -131,7 +138,17 @@ void main() {
       when(() => mockRepo.fetchWorkOrderById(101))
           .thenAnswer((_) async => techCompleted);
       when(() => mockRepo.fetchAllowedActions(101)).thenAnswer(
-        (_) async => const WorkOrderActionSet(workOrderId: 101),
+        (_) async => const WorkOrderActionSet(
+          workOrderId: 101,
+          allowed: [
+            WorkOrderAction(
+              targetStatus: 'REWORK_REQUIRED',
+              label: 'Return to Technician',
+              enabled: true,
+              requiresReason: true,
+            ),
+          ],
+        ),
       );
     }
 

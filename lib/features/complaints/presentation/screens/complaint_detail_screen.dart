@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
+import 'package:gssms_mobile/features/auth/domain/rbac.dart';
+import 'package:gssms_mobile/features/auth/presentation/widgets/permission_denied_view.dart';
 import 'package:gssms_mobile/features/complaints/domain/models/complaint.dart';
 import 'package:intl/intl.dart';
 
@@ -10,13 +13,20 @@ import 'package:intl/intl.dart';
 /// asset, and current status. There is no edit endpoint on the backend for
 /// complaints — web's own detail view is view-only too — so this screen is
 /// display-only rather than a reopened create form.
-class ComplaintDetailScreen extends StatelessWidget {
+class ComplaintDetailScreen extends ConsumerWidget {
   const ComplaintDetailScreen({super.key, required this.complaint});
 
   final Complaint complaint;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (!sessionAllows(sessionOf(ref), 'complaints.view')) {
+      return Scaffold(
+        appBar: AppBar(title: Text(complaint.complaintNumber)),
+        body: const PermissionDeniedView(),
+      );
+    }
+
     final dateFormat = DateFormat('dd MMM yyyy, hh:mm a');
 
     return Scaffold(

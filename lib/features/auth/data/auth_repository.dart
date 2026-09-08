@@ -1,6 +1,8 @@
+import 'package:gssms_mobile/core/database/local_cache_service.dart';
 import 'package:gssms_mobile/core/storage/secure_storage_service.dart';
 import 'package:gssms_mobile/features/auth/data/auth_api_service.dart';
 import 'package:gssms_mobile/features/auth/domain/models/auth_exceptions.dart';
+import 'package:gssms_mobile/features/auth/domain/models/user_profile.dart';
 import 'package:gssms_mobile/features/auth/domain/models/user_session.dart';
 
 abstract class IAuthRepository {
@@ -22,17 +24,28 @@ abstract class IAuthRepository {
   Future<UserSession> verifyOtp({required String username, required String otp});
   Future<Map<String, dynamic>> setupTotp();
   Future<void> verifyTotp(String code);
+
+  Future<UserProfile> getProfile();
+  Future<UserProfile> updateProfile({
+    required String email,
+    required String phoneNumber,
+    required String designation,
+  });
+  Future<void> changePassword(String newPassword);
 }
 
 class AuthRepository implements IAuthRepository {
   AuthRepository({
     required AuthApiService apiService,
     required ISecureStorageService secureStorage,
+    ILocalCacheService? cacheService,
   })  : _apiService = apiService,
-        _secureStorage = secureStorage;
+        _secureStorage = secureStorage,
+        _cacheService = cacheService;
 
   final AuthApiService _apiService;
   final ISecureStorageService _secureStorage;
+  final ILocalCacheService? _cacheService;
 
   UserSession? _currentSession;
   String? _currentAccessToken;
@@ -165,10 +178,55 @@ class AuthRepository implements IAuthRepository {
   @override
   Future<void> verifyTotp(String code) => _apiService.verifyTotp(code);
 
+  int _requireUserId() {
+    final id = _currentSession?.userId;
+    if (id == null) {
+      throw const AuthException('Unable to load profile: missing user id');
+    }
+    return id;
+  }
+
+  @override
+  Future<UserProfile> getProfile() async {
+    final data = await _apiService.getUser(_requireUserId());
+    return UserProfile.fromJson(data);
+  }
+
+  @override
+  Future<UserProfile> updateProfile({
+    required String email,
+    required String phoneNumber,
+    required String designation,
+  }) async {
+    final data = await _apiService.updateUser(_requireUserId(), {
+      'email': email,
+      'phone_number': phoneNumber,
+      'designation': designation,
+    });
+    if (data.isEmpty) {
+      return UserProfile(
+        id: _requireUserId(),
+        username: _currentSession?.username ?? '',
+        email: email,
+        phoneNumber: phoneNumber,
+        designation: designation,
+      );
+    }
+    return UserProfile.fromJson(data);
+  }
+
+  @override
+  Future<void> changePassword(String newPassword) async {
+    await _apiService.updateUser(_requireUserId(), {'password': newPassword});
+  }
+
   @override
   Future<void> logout() async {
     _currentSession = null;
     _currentAccessToken = null;
     await _secureStorage.clearTokens();
+    try {
+      await _cacheService?.clearAllCache();
+    } catch (_) {}
   }
 }

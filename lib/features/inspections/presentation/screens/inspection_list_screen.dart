@@ -6,8 +6,9 @@ import 'package:gssms_mobile/core/theme/app_theme.dart';
 import 'package:gssms_mobile/core/widgets/date_range_filter_bar.dart';
 import 'package:gssms_mobile/core/widgets/org_scope_filter_bar.dart';
 import 'package:gssms_mobile/features/auth/domain/models/user_session.dart';
+import 'package:gssms_mobile/features/auth/domain/rbac.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
-import 'package:gssms_mobile/features/auth/presentation/controllers/auth_state.dart';
+import 'package:gssms_mobile/features/auth/presentation/widgets/permission_denied_view.dart';
 import 'package:gssms_mobile/features/inspections/domain/models/inspection.dart';
 import 'package:gssms_mobile/features/inspections/presentation/controllers/inspection_controllers.dart';
 import 'package:gssms_mobile/features/inspections/presentation/screens/inspection_create_screen.dart';
@@ -31,6 +32,11 @@ class _InspectionListScreenState extends ConsumerState<InspectionListScreen> {
     _searchController.addListener(_onSearchTextChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      if (!sessionAllows(
+          sessionFromAuth(ref.read(authControllerProvider)),
+          'inspections.view')) {
+        return;
+      }
       ref.read(inspectionListControllerProvider.notifier).fetchInspections();
     });
   }
@@ -49,8 +55,15 @@ class _InspectionListScreenState extends ConsumerState<InspectionListScreen> {
   @override
   Widget build(BuildContext context) {
     final listState = ref.watch(inspectionListControllerProvider);
-    final authState = ref.watch(authControllerProvider);
-    final session = authState is Authenticated ? authState.session : null;
+    final session = sessionFromAuth(ref.watch(authControllerProvider));
+
+    if (!sessionAllows(session, 'inspections.view')) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Field Inspections')),
+        body: const PermissionDeniedView(),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Field Inspections'),
@@ -79,8 +92,7 @@ class _InspectionListScreenState extends ConsumerState<InspectionListScreen> {
       // `{module}.{action}` from CRUD = ["view", "create", "edit", "delete"] —
       // there is no "add" action, so `inspections.add` never appears in a real
       // JWT's permissions claim and this FAB was unconditionally hidden.
-      floatingActionButton:
-          (session?.hasPermission('inspections.create') ?? false)
+      floatingActionButton: sessionAllows(session, 'inspections.create')
               ? FloatingActionButton.extended(
                   key: const Key('fab_create_inspection'),
                   icon: const Icon(Icons.add_task_outlined),

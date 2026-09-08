@@ -6,8 +6,10 @@ import 'package:gssms_mobile/core/theme/app_theme.dart';
 import 'package:gssms_mobile/core/widgets/date_range_filter_bar.dart';
 import 'package:gssms_mobile/core/widgets/org_scope_filter_bar.dart';
 import 'package:gssms_mobile/features/auth/domain/models/user_session.dart';
+import 'package:gssms_mobile/features/auth/domain/rbac.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_state.dart';
+import 'package:gssms_mobile/features/auth/presentation/widgets/permission_denied_view.dart';
 import 'package:gssms_mobile/features/reports/domain/models/infrastructure_option.dart';
 import 'package:gssms_mobile/features/reports/domain/models/maintenance_register_entry.dart';
 import 'package:gssms_mobile/features/reports/presentation/controllers/reports_controller.dart';
@@ -26,6 +28,10 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!sessionAllows(
+          sessionFromAuth(ref.read(authControllerProvider)), 'reports.view')) {
+        return;
+      }
       ref.read(reportsControllerProvider.notifier).loadRegister();
     });
   }
@@ -34,7 +40,14 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   Widget build(BuildContext context) {
     final state = ref.watch(reportsControllerProvider);
     final authState = ref.watch(authControllerProvider);
-    final session = authState is Authenticated ? authState.session : null;
+    final session = sessionFromAuth(authState);
+
+    if (!sessionAllows(session, 'reports.view')) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Reports & Audit')),
+        body: const PermissionDeniedView(),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(

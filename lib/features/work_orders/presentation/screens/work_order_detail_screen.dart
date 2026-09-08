@@ -2,8 +2,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
+import 'package:gssms_mobile/features/auth/domain/models/user_session.dart';
+import 'package:gssms_mobile/features/auth/domain/rbac.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_state.dart';
+import 'package:gssms_mobile/features/auth/presentation/widgets/permission_denied_view.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/technician.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/work_order.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/work_order_action.dart';
@@ -31,6 +34,10 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
+      if (!sessionAllows(
+          sessionFromAuth(ref.read(authControllerProvider)), 'maintenance.view')) {
+        return;
+      }
       ref
           .read(workOrderDetailControllerProvider(widget.workOrderId).notifier)
           .loadDetail();
@@ -42,7 +49,14 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
     final detailState =
         ref.watch(workOrderDetailControllerProvider(widget.workOrderId));
     final authState = ref.watch(authControllerProvider);
-    final userSession = authState is Authenticated ? authState.session : null;
+    final userSession = sessionFromAuth(authState);
+
+    if (!sessionAllows(userSession, 'maintenance.view')) {
+      return Scaffold(
+        appBar: AppBar(title: Text('Work Order #${widget.workOrderId}')),
+        body: const PermissionDeniedView(),
+      );
+    }
 
     ref.listen(workOrderDetailControllerProvider(widget.workOrderId), (prev, next) {
       if (next is WorkOrderDetailLoaded && next.errorMessage != null) {
@@ -60,7 +74,8 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
         title: Text('Work Order #${widget.workOrderId}'),
         actions: [
           // Web per-row PDF action — share/print the Job Work sheet.
-          IconButton(
+          if (canExportPdf(userSession))
+            IconButton(
             key: const Key('work_order_pdf_button'),
             icon: const Icon(Icons.picture_as_pdf_outlined),
             tooltip: 'Export PDF',
@@ -77,7 +92,7 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
         ],
       ),
       body: _buildBody(detailState, userSession),
-      bottomNavigationBar: _buildBottomActions(detailState),
+      bottomNavigationBar: _buildBottomActions(detailState, userSession),
     );
   }
 
@@ -472,26 +487,24 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
     );
   }
 
-  /// Bottom action bar driven by the server's allowed-actions response.
-  ///
-  /// Django owns the workflow: which transitions a given user may perform on a
-  /// given work order depends on role, assignment, checklist completeness and
-  /// SLA state. Re-deriving that on the client drifts from the server and
-  /// offers buttons whose writes are then rejected, so the app renders what the
-  /// server says and nothing more. "Start Execution" / "Open Checklist" stay
-  /// client-side because they are navigation into the record, not transitions.
-  Widget? _buildBottomActions(WorkOrderDetailState state) {
+  /// Bottom action bar: server `allowed` transitions, plus Start Execution /
+  /// Open Checklist only when `maintenance.edit` and the matching allowed
+  /// action is present. Status alone never shows a mutating control.
+  Widget? _buildBottomActions(
+      WorkOrderDetailState state, UserSession? session) {
     if (state is! WorkOrderDetailLoaded) return null;
     final wo = state.workOrder;
     final actions = <Widget>[];
+    final canEdit = sessionAllows(session, 'maintenance.edit');
+    final allowed = state.actions;
 
-    // `linkedRecordId` is null until execution has started server-side. An
-    // IN_PROGRESS order without one cannot open a checklist — offer Start
-    // Execution instead of a button that only shows a "no record" snackbar.
     final needsExecutionStart = wo.status == WorkOrderStatus.assigned ||
         wo.status == WorkOrderStatus.reworkRequired ||
         (wo.status == WorkOrderStatus.inProgress && wo.linkedRecordId == null);
-    if (needsExecutionStart) {
+    final canStart = canEdit &&
+        needsExecutionStart &&
+        (allowed?.allowsTarget('IN_PROGRESS') ?? false);
+    if (canStart) {
       actions.add(
         Expanded(
           child: ElevatedButton.icon(
@@ -507,7 +520,10 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
           ),
         ),
       );
-    } else if (wo.status == WorkOrderStatus.inProgress) {
+    } else if (canEdit &&
+        wo.status == WorkOrderStatus.inProgress &&
+        ((allowed?.allowsTarget('TECH_COMPLETED') ?? false) ||
+            (allowed?.allowsTarget('IN_PROGRESS') ?? false))) {
       actions.add(
         Expanded(
           child: ElevatedButton.icon(

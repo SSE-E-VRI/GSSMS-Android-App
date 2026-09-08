@@ -9,7 +9,9 @@ import 'package:gssms_mobile/features/assets/domain/models/asset.dart';
 import 'package:gssms_mobile/features/assets/presentation/controllers/asset_controllers.dart';
 import 'package:gssms_mobile/features/assets/presentation/screens/asset_detail_screen.dart';
 import 'package:gssms_mobile/features/assets/presentation/screens/asset_list_screen.dart';
+import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:mocktail/mocktail.dart';
+import '../../../helpers/fake_auth.dart';
 
 class MockAssetRepository extends Mock implements IAssetRepository {}
 
@@ -47,6 +49,11 @@ void main() {
         ProviderScope(
           overrides: [
             assetRepositoryProvider.overrideWithValue(mockRepo),
+            authControllerProvider.overrideWith(
+              () => FakeAuthenticatedController(
+                fakeSession(permissions: const ['assets.view']),
+              ),
+            ),
           ],
           child: const MaterialApp(
             home: AssetListScreen(),
@@ -69,6 +76,13 @@ void main() {
         ProviderScope(
           overrides: [
             assetRepositoryProvider.overrideWithValue(mockRepo),
+            authControllerProvider.overrideWith(
+              () => FakeAuthenticatedController(
+                fakeSession(
+                  permissions: const ['assets.view', 'complaints.create'],
+                ),
+              ),
+            ),
           ],
           child: const MaterialApp(
             home: AssetDetailScreen(assetId: 42),
@@ -94,6 +108,11 @@ void main() {
         ProviderScope(
           overrides: [
             assetRepositoryProvider.overrideWithValue(mockRepo),
+            authControllerProvider.overrideWith(
+              () => FakeAuthenticatedController(
+                fakeSession(permissions: const ['assets.view']),
+              ),
+            ),
           ],
           child: const MaterialApp(
             home: AssetDetailScreen(assetId: 42),

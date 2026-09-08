@@ -118,6 +118,10 @@ class UserSession extends Equatable {
     if (claims['valid_until'] != null) {
       validUntil = DateTime.tryParse(claims['valid_until'].toString());
     }
+    if (validUntil != null &&
+        DateTime.now().toUtc().isAfter(validUntil.toUtc())) {
+      throw const GuestExpiredException();
+    }
 
     // Parse scope
     final rawScope = claims['scope'];

@@ -42,7 +42,11 @@ void main() {
     test('keeps commands queued behind the one that hit the network error', () async {
       // The first command syncs, the second goes offline. Everything after the
       // failure must survive in the outbox rather than being dropped.
-      when(() => mockApiService.submitLine(10, any())).thenAnswer((invocation) async {
+      when(() => mockApiService.submitLine(
+            10,
+            any(),
+            idempotencyKey: any(named: 'idempotencyKey'),
+          )).thenAnswer((invocation) async {
         final payload = invocation.positionalArguments[1] as Map<String, dynamic>;
         if (payload['line_id'] == 1) return;
         throw DioException(
