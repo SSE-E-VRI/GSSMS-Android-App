@@ -22,4 +22,23 @@ plugins {
     id "org.jetbrains.kotlin.android" version "1.9.22" apply false
 }
 
+// Workaround for AGP 8.3 conflict when both ANDROID_PREFS_ROOT and ANDROID_USER_HOME environment variables exist on Windows
+System.clearProperty("ANDROID_PREFS_ROOT")
+System.clearProperty("android.prefs.root")
+
+try {
+    Class<?> pe = Class.forName("java.lang.ProcessEnvironment")
+    java.lang.reflect.Field f1 = pe.getDeclaredField("theCaseInsensitiveEnvironment")
+    f1.setAccessible(true)
+    Map map1 = (Map) f1.get(null)
+    map1.remove("ANDROID_PREFS_ROOT")
+    map1.remove("android_prefs_root")
+
+    java.lang.reflect.Field f2 = pe.getDeclaredField("theEnvironment")
+    f2.setAccessible(true)
+    Map map2 = (Map) f2.get(null)
+    map2.remove("ANDROID_PREFS_ROOT")
+    map2.remove("android_prefs_root")
+} catch (Throwable ignore) {}
+
 include ":app"

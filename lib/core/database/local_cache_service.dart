@@ -203,7 +203,12 @@ class LocalCacheService implements ILocalCacheService {
   @override
   Future<void> clearAllCache() async {
     final prefs = await _getPrefs();
-    await prefs.clear();
+    final keys = prefs.getKeys();
+    for (final key in keys) {
+      if (key.startsWith('gssms_cache_')) {
+        await prefs.remove(key);
+      }
+    }
   }
 }
 

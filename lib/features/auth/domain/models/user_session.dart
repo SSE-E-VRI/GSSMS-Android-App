@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
+import 'auth_exceptions.dart';
 import 'auth_role.dart';
 import 'org_scope.dart';
 
@@ -53,8 +54,25 @@ class UserSession extends Equatable {
 
   /// Construct UserSession by decoding JWT access token claims.
   factory UserSession.fromJwt(String token) {
-    final Map<String, dynamic> claims = JwtDecoder.decode(token);
-    return UserSession.fromClaims(claims, token);
+    try {
+      final Map<String, dynamic> claims = JwtDecoder.decode(token);
+      final expSeconds = claims['exp'];
+      if (expSeconds is num) {
+        // Allow a small leeway for device/server clock skew so a token issued
+        // moments ago by login()/refreshToken() isn't rejected as already
+        // expired just because the device clock runs ahead of the server's.
+        const clockSkewLeeway = Duration(seconds: 30);
+        final expiresAt = DateTime.fromMillisecondsSinceEpoch(
+            (expSeconds * 1000).round(), isUtc: true);
+        if (DateTime.now().toUtc().isAfter(expiresAt.add(clockSkewLeeway))) {
+          throw const UnauthorizedException('Token is expired');
+        }
+      }
+      return UserSession.fromClaims(claims, token);
+    } catch (e) {
+      if (e is AuthException) rethrow;
+      throw UnauthorizedException('Invalid JWT format or claims: $e');
+    }
   }
 
   /// Construct UserSession from pre-decoded claims map.

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:equatable/equatable.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -58,6 +59,7 @@ final syncManagerProvider = NotifierProvider<SyncManager, SyncState>(() {
 
 class SyncManager extends Notifier<SyncState> {
   bool _isDraining = false;
+  Future<void> _lock = Future.value();
 
   @override
   SyncState build() {
@@ -75,11 +77,30 @@ class SyncManager extends Notifier<SyncState> {
     state = state.copyWith(pendingCount: pending);
   }
 
+  Future<T> _synchronized<T>(Future<T> Function() action) {
+    final previous = _lock;
+    final completer = Completer<T>();
+    _lock = completer.future.then((_) => null, onError: (_) => null);
+
+    previous.whenComplete(() async {
+      try {
+        final result = await action();
+        completer.complete(result);
+      } catch (e, st) {
+        completer.completeError(e, st);
+      }
+    });
+
+    return completer.future;
+  }
+
   Future<void> enqueueCommand(OutboxCommand command, {bool autoDrain = true}) async {
-    final commands = await _cacheService.getOutboxCommands();
-    commands.add(command);
-    await _cacheService.saveOutboxCommands(commands);
-    await refreshPendingCount();
+    await _synchronized(() async {
+      final commands = await _cacheService.getOutboxCommands();
+      commands.add(command);
+      await _cacheService.saveOutboxCommands(commands);
+      await refreshPendingCount();
+    });
 
     // Trigger sync attempt immediately
     if (autoDrain) {
@@ -88,99 +109,110 @@ class SyncManager extends Notifier<SyncState> {
   }
 
   Future<void> drainOutbox() async {
+    // Set the guard synchronously (no `await` before it) so a second call
+    // arriving before this one's queued action even starts can't slip past
+    // the check and queue a redundant drain behind it.
     if (_isDraining) return;
     _isDraining = true;
 
-    state = state.copyWith(mode: SyncConnectivityMode.syncing, clearError: true);
+    await _synchronized(() async {
+      state = state.copyWith(mode: SyncConnectivityMode.syncing, clearError: true);
 
-    try {
-      final commands = await _cacheService.getOutboxCommands();
-      final pendingCommands = commands.where((c) => c.status == OutboxCommandStatus.pending).toList();
+      try {
+        final commands = await _cacheService.getOutboxCommands();
+        final pendingCommands = commands.where((c) => c.status == OutboxCommandStatus.pending).toList();
 
-      if (pendingCommands.isEmpty) {
-        state = state.copyWith(
-          mode: SyncConnectivityMode.online,
-          pendingCount: commands
-              .where((c) => c.status != OutboxCommandStatus.synced)
-              .length,
-          lastSyncTime: DateTime.now(),
-        );
-        return;
-      }
-
-      final remainingCommands = <OutboxCommand>[];
-
-      for (var i = 0; i < commands.length; i++) {
-        final cmd = commands[i];
-        if (cmd.status != OutboxCommandStatus.pending) {
-          remainingCommands.add(cmd);
-          continue;
+        if (pendingCommands.isEmpty) {
+          state = state.copyWith(
+            mode: SyncConnectivityMode.online,
+            pendingCount: commands
+                .where((c) => c.status != OutboxCommandStatus.synced)
+                .length,
+            lastSyncTime: DateTime.now(),
+          );
+          return;
         }
 
-        try {
-          await _executeCommand(cmd);
-          // Synced successfully - omit from remaining outbox
-        } on DioException catch (dioErr) {
-          final isNetwork = dioErr.type == DioExceptionType.connectionTimeout ||
-              dioErr.type == DioExceptionType.connectionError ||
-              dioErr.type == DioExceptionType.receiveTimeout;
+        final remainingCommands = <OutboxCommand>[];
 
-          if (isNetwork) {
-            // Keep command in pending state and pause outbox draining
-            remainingCommands.add(cmd.copyWith(
-              retryCount: cmd.retryCount + 1,
-              lastError: 'Network offline. Will retry automatically.',
-            ));
-            // Carry over every command we have not attempted yet. Without this
-            // they would be dropped from the persisted outbox, permanently
-            // losing queued offline field work.
-            remainingCommands.addAll(commands.sublist(i + 1));
-            state = state.copyWith(
-              mode: SyncConnectivityMode.offline,
-              lastError: 'Network offline. Queued for background sync.',
-            );
-            break;
+        for (var i = 0; i < commands.length; i++) {
+          final cmd = commands[i];
+          if (cmd.status != OutboxCommandStatus.pending) {
+            remainingCommands.add(cmd);
+            continue;
           }
 
-          final statusCode = dioErr.response?.statusCode;
-          if (statusCode == 409) {
-            // Conflict
-            remainingCommands.add(cmd.copyWith(
-              status: OutboxCommandStatus.conflict,
-              lastError: 'Conflict: ${dioErr.response?.data}',
-            ));
-          } else {
-            // Unrecoverable validation or server error
+          try {
+            await _executeCommand(cmd);
+            // Synced successfully - omit from remaining outbox
+          } on DioException catch (dioErr) {
+            final errStr = dioErr.toString().toLowerCase();
+            final isNetwork = dioErr.type == DioExceptionType.connectionTimeout ||
+                dioErr.type == DioExceptionType.connectionError ||
+                dioErr.type == DioExceptionType.receiveTimeout ||
+                dioErr.type == DioExceptionType.sendTimeout ||
+                (dioErr.type == DioExceptionType.unknown && dioErr.error is SocketException) ||
+                errStr.contains('socketexception') ||
+                errStr.contains('network is unreachable');
+
+            if (isNetwork) {
+              // Keep command in pending state and pause outbox draining
+              remainingCommands.add(cmd.copyWith(
+                retryCount: cmd.retryCount + 1,
+                lastError: 'Network offline. Will retry automatically.',
+              ));
+              remainingCommands.addAll(commands.sublist(i + 1));
+              state = state.copyWith(
+                mode: SyncConnectivityMode.offline,
+                lastError: 'Network offline. Queued for background sync.',
+              );
+              break;
+            }
+
+            final statusCode = dioErr.response?.statusCode;
+            if (statusCode == 409) {
+              // Conflict
+              remainingCommands.add(cmd.copyWith(
+                status: OutboxCommandStatus.conflict,
+                lastError: 'Conflict: ${dioErr.response?.data}',
+              ));
+            } else {
+              // Unrecoverable validation or server error
+              remainingCommands.add(cmd.copyWith(
+                status: OutboxCommandStatus.failed,
+                lastError: 'Failed (${dioErr.response?.statusCode}): ${dioErr.response?.data}',
+              ));
+            }
+          } catch (e) {
             remainingCommands.add(cmd.copyWith(
               status: OutboxCommandStatus.failed,
-              lastError: 'Failed (${dioErr.response?.statusCode}): ${dioErr.response?.data}',
+              lastError: e.toString(),
             ));
           }
-        } catch (e) {
-          remainingCommands.add(cmd.copyWith(
-            status: OutboxCommandStatus.failed,
-            lastError: e.toString(),
-          ));
         }
+
+        await _cacheService.saveOutboxCommands(remainingCommands);
+        final activePending = remainingCommands.where((c) => c.status == OutboxCommandStatus.pending).length;
+
+        state = state.copyWith(
+          mode: activePending == 0 ? SyncConnectivityMode.online : SyncConnectivityMode.offline,
+          pendingCount: remainingCommands.length,
+          lastSyncTime: DateTime.now(),
+        );
+      } finally {
+        _isDraining = false;
       }
-
-      await _cacheService.saveOutboxCommands(remainingCommands);
-      final activePending = remainingCommands.where((c) => c.status == OutboxCommandStatus.pending).length;
-
-      state = state.copyWith(
-        mode: activePending == 0 ? SyncConnectivityMode.online : SyncConnectivityMode.offline,
-        pendingCount: remainingCommands.length,
-        lastSyncTime: DateTime.now(),
-      );
-    } finally {
-      _isDraining = false;
-    }
+    });
   }
 
   Future<void> _executeCommand(OutboxCommand cmd) async {
     switch (cmd.type) {
       case OutboxCommandType.submitLine:
-        await _apiService.submitLine(cmd.entityId, cmd.payload);
+        await _apiService.submitLine(
+          cmd.entityId,
+          cmd.payload,
+          idempotencyKey: cmd.idempotencyKey,
+        );
         break;
       case OutboxCommandType.transitionStatus:
         await _apiService.changeStatus(
@@ -189,10 +221,14 @@ class SyncManager extends Notifier<SyncState> {
           remarks: cmd.payload['remarks'] as String?,
           checklist: cmd.payload['checklist'] as Map<String, dynamic>?,
           evidence: (cmd.payload['evidence'] as List<dynamic>?)?.map((e) => e as int).toList(),
+          idempotencyKey: cmd.idempotencyKey,
         );
         break;
       case OutboxCommandType.startExecution:
-        await _apiService.startExecution(cmd.entityId);
+        await _apiService.startExecution(
+          cmd.entityId,
+          idempotencyKey: cmd.idempotencyKey,
+        );
         break;
       case OutboxCommandType.completeRecord:
         await _apiService.completeRecord(
@@ -200,6 +236,7 @@ class SyncManager extends Notifier<SyncState> {
           technicianName: cmd.payload['technician_name'] as String? ?? '',
           remarks: cmd.payload['remarks'] as String? ?? '',
           supervisorName: cmd.payload['supervisor_name'] as String?,
+          idempotencyKey: cmd.idempotencyKey,
         );
         break;
       case OutboxCommandType.uploadEvidence:
@@ -208,6 +245,7 @@ class SyncManager extends Notifier<SyncState> {
           proofJpegPath: cmd.payload['proof_path'] as String?,
           remarks: cmd.payload['remarks'] as String?,
           otherStaff: cmd.payload['other_staff'] as String?,
+          idempotencyKey: cmd.idempotencyKey,
         );
         break;
     }

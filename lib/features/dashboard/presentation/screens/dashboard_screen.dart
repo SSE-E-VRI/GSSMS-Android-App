@@ -3,6 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:gssms_mobile/core/sync/widgets/sync_status_badge.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
+import 'package:gssms_mobile/core/widgets/org_scope_filter_bar.dart';
+import 'package:gssms_mobile/features/auth/domain/models/user_session.dart';
+import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
+import 'package:gssms_mobile/features/auth/presentation/controllers/auth_state.dart';
 import 'package:gssms_mobile/features/dashboard/domain/models/dashboard_models.dart';
 import 'package:gssms_mobile/features/dashboard/presentation/controllers/dashboard_controller.dart';
 import 'package:gssms_mobile/features/dashboard/presentation/controllers/dashboard_state.dart';
@@ -27,6 +31,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(dashboardControllerProvider);
+    final authState = ref.watch(authControllerProvider);
+    final session = authState is Authenticated ? authState.session : null;
 
     return Scaffold(
       appBar: AppBar(
@@ -43,7 +49,34 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           ),
         ],
       ),
-      body: _buildBody(state),
+      body: Column(
+        children: [
+          if (session != null) _buildOrgScope(state, session),
+          Expanded(child: _buildBody(state)),
+        ],
+      ),
+    );
+  }
+
+  /// Depot-only by design: `summary` accepts nothing broader (see
+  /// DashboardApiService.getSummary), and offering Zone/Division here would
+  /// narrow the attention card while leaving the KPI donut beside it
+  /// unfiltered. Station is not a level either endpoint supports.
+  Widget _buildOrgScope(DashboardState state, UserSession session) {
+    final loaded = state is DashboardLoaded
+        ? state
+        : (state is DashboardError ? state.previousLoaded : null);
+    // The bar collapses to nothing for a depot-scoped viewer, so its own
+    // padding is used rather than an outer wrapper that would leave a gap.
+    return OrgScopeFilterBar(
+      scope: session.scope,
+      selection: loaded?.orgScope ?? OrgScopeSelection.empty,
+      enableZoneDivision: false,
+      enableStation: false,
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      onChanged: (selection) {
+        ref.read(dashboardControllerProvider.notifier).setOrgScope(selection);
+      },
     );
   }
 

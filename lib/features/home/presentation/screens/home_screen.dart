@@ -243,7 +243,7 @@ class HomeScreen extends ConsumerWidget {
     final modules = <Widget>[];
 
     // Dashboard module
-    if (session.hasPermission('maintenance.view')) {
+    if (session.hasPermission('dashboard.view') || session.hasPermission('maintenance.view')) {
       modules.add(_buildModuleCard(
         key: const Key('module_dashboard'),
         title: 'Dashboard',
@@ -280,7 +280,10 @@ class HomeScreen extends ConsumerWidget {
       ));
     }
 
-    // Work Orders module (gated strictly by server permission)
+    // Work Orders module (gated strictly by server permission).
+    // There is no `work_orders` module in the RBAC catalogue — work orders live
+    // under `maintenance` ("Maintenance & Work Orders", rbac/registry.py MODULES),
+    // so `maintenance.view` is the only permission that can ever grant this tile.
     if (session.hasPermission('maintenance.view')) {
       modules.add(_buildModuleCard(
         key: const Key('module_work_orders'),

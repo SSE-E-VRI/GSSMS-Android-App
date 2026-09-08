@@ -138,6 +138,16 @@ void main() {
       expect(techs.single.name, 'Ramesh');
     });
 
+    test('getAssignableTechnicians passes depot when depotId is given', () async {
+      dio.httpClientAdapter = MockAdapter((options) async {
+        expect(options.queryParameters['role'], 'MAINTENANCE_STAFF');
+        expect(options.queryParameters['depot'], 7);
+        return _json({'results': <dynamic>[]}, 200);
+      });
+
+      await apiService.getAssignableTechnicians(depotId: 7);
+    });
+
     test('verifyWorkOrder POSTs /work-orders/{id}/verify/', () async {
       dio.httpClientAdapter = MockAdapter((options) async {
         expect(options.path, '/api/v1/maintenance/work-orders/101/verify/');

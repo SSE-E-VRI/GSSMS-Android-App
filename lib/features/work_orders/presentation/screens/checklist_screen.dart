@@ -29,6 +29,7 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       ref.read(checklistControllerProvider(widget.recordId).notifier).loadRecord();
     });
   }
@@ -475,9 +476,16 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
   }
 
   void _saveProgress() {
+    // Each line saves (or queues offline) as it is entered — there is no
+    // separate draft to persist. Say so honestly instead of implying this
+    // button performed a save, and refresh from the server so the progress
+    // bar reflects the authoritative state.
+    unawaited(ref
+        .read(checklistControllerProvider(widget.recordId).notifier)
+        .loadRecord());
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Progress saved successfully.'),
+        content: Text('Entries save automatically per item — refreshed from server.'),
         backgroundColor: AppTheme.railwayGreen,
         duration: Duration(seconds: 2),
       ),
@@ -894,9 +902,24 @@ class _ReplacedAssetSheetState extends State<_ReplacedAssetSheet> {
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
                 onPressed: () {
+                  if (_assetNameController.text.trim().isEmpty ||
+                      _newSerialController.text.trim().isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Enter the asset name and the new serial / asset code.'),
+                        backgroundColor: AppTheme.errorRed,
+                      ),
+                    );
+                    return;
+                  }
+                  // No server endpoint accepts a replaced asset yet: keep the
+                  // entry visible as a local note and direct the technician to
+                  // include it in the closing remarks, which do reach the
+                  // supervisor — instead of implying it was recorded server-side.
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('Replaced asset recorded.'),
+                      content: Text(
+                          'Noted locally — include these details in your closing remarks for the supervisor.'),
                       backgroundColor: AppTheme.railwayGreen,
                     ),
                   );
@@ -1012,9 +1035,31 @@ class _ReplacedComponentSheetState extends State<_ReplacedComponentSheet> {
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
                 onPressed: () {
+                  if (_componentNameController.text.trim().isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Enter the component name.'),
+                        backgroundColor: AppTheme.errorRed,
+                      ),
+                    );
+                    return;
+                  }
+                  final qty = int.tryParse(_quantityController.text.trim());
+                  if (qty == null || qty <= 0) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Enter a valid quantity (1 or more).'),
+                        backgroundColor: AppTheme.errorRed,
+                      ),
+                    );
+                    return;
+                  }
+                  // No server endpoint accepts a replaced component yet — same
+                  // honest local-note handling as the replaced-asset sheet.
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('Replaced component recorded.'),
+                      content: Text(
+                          'Noted locally — include these details in your closing remarks for the supervisor.'),
                       backgroundColor: AppTheme.railwayGreen,
                     ),
                   );
@@ -1182,6 +1227,30 @@ class _ChecklistLineCardState extends State<_ChecklistLineCard> {
   }
 
   @override
+  void didUpdateWidget(covariant _ChecklistLineCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.line != oldWidget.line) {
+      if (!_valueFocus.hasFocus && _valueController.text != widget.line.scalarValue) {
+        _valueController.text = widget.line.scalarValue;
+      }
+      if (!_remarksFocus.hasFocus && _remarksController.text != (widget.line.observationAction ?? '')) {
+        _remarksController.text = widget.line.observationAction ?? '';
+      }
+      final components = widget.line.componentValues;
+      for (final key in widget.line.valueType.componentKeys) {
+        final focus = _componentFocusNodes[key];
+        final ctrl = _componentControllers[key];
+        if (ctrl != null && focus != null && !focus.hasFocus) {
+          ctrl.text = components[key] ?? '';
+        }
+      }
+      _status = widget.line.status;
+      _statusOptionId = widget.line.statusOptionId;
+      _actionOptionId = widget.line.actionOptionId;
+    }
+  }
+
+  @override
   void dispose() {
     _debounceTimer?.cancel();
     _valueFocus.removeListener(_onFocusChanged);
@@ -1253,6 +1322,13 @@ class _ChecklistLineCardState extends State<_ChecklistLineCard> {
   void _onStatusOptionChanged(int? value) {
     setState(() {
       _statusOptionId = value;
+      if (value != null) {
+        final matchedOption = _line.statusOptions.firstWhere(
+          (o) => o.id == value,
+          orElse: () => _line.statusOptions.first,
+        );
+        _status = matchedOption.semantic ?? 'OK';
+      }
       // Actions belong to a specific status; clear a selection the new status
       // does not offer rather than sending one the backend will reject.
       final stillValid = _line.statusOptions

@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
 import 'package:gssms_mobile/features/assets/domain/models/asset.dart';
 import 'package:gssms_mobile/features/assets/presentation/controllers/asset_controllers.dart';
+import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
+import 'package:gssms_mobile/features/auth/presentation/controllers/auth_state.dart';
 import 'package:gssms_mobile/features/complaints/presentation/screens/complaint_create_screen.dart';
 import 'package:intl/intl.dart';
 
@@ -30,7 +32,7 @@ class _AssetDetailScreenState extends ConsumerState<AssetDetailScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('Asset #${widget.assetId}'),
+        title: Text(_titleFor(state)),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -43,6 +45,18 @@ class _AssetDetailScreenState extends ConsumerState<AssetDetailScreen> {
       body: _buildBody(state),
       bottomNavigationBar: _buildBottomBar(state),
     );
+  }
+
+  /// The asset's own category (e.g. "CLS Panels") once loaded — that's what
+  /// identifies the asset to someone opening this screen, not its internal
+  /// id. Falls back to the id while loading or on error, when there's no
+  /// category to show yet.
+  String _titleFor(AssetDetailState state) {
+    if (state is AssetDetailLoaded) {
+      final category = state.asset.assetCategoryName;
+      if (category != null && category.trim().isNotEmpty) return category;
+    }
+    return 'Asset #${widget.assetId}';
   }
 
   Widget _buildBody(AssetDetailState state) {
@@ -106,24 +120,13 @@ class _AssetDetailScreenState extends ConsumerState<AssetDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  asset.uniqueId,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.railwayBlue,
-                  ),
-                ),
-                Chip(
-                  label: Text(
-                    asset.warrantyStatus.displayName,
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ],
+            Text(
+              asset.uniqueId,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: AppTheme.railwayBlue,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
@@ -237,6 +240,17 @@ class _AssetDetailScreenState extends ConsumerState<AssetDetailScreen> {
   Widget? _buildBottomBar(AssetDetailState state) {
     if (state is! AssetDetailLoaded) return null;
     final asset = state.asset;
+
+    final authState = ref.watch(authControllerProvider);
+    final session = authState is Authenticated ? authState.session : null;
+    // rbac/registry.py MODULES builds every permission code as
+    // `{module}.{action}` from CRUD = ["view", "create", "edit", "delete"] —
+    // there is no "add" action, so `complaints.add` never appears in a real
+    // JWT's permissions claim and this gate was unconditionally hiding the
+    // button for every user.
+    if (!(session?.hasPermission('complaints.create') ?? false)) {
+      return null;
+    }
 
     return Container(
       padding: const EdgeInsets.all(16),

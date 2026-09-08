@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:gssms_mobile/core/utils/json_parsing.dart';
 
 /// One entry in a work order's history, from
 /// `GET /maintenance/work-orders/{id}/audit/`.
@@ -30,15 +31,15 @@ class WorkOrderAuditEvent extends Equatable {
   factory WorkOrderAuditEvent.fromJson(Map<String, dynamic> json) {
     final ts = json['timestamp'] ?? json['created_at'];
     return WorkOrderAuditEvent(
-      eventId: json['event_id']?.toString() ?? '',
-      eventType: json['event_type'] as String? ?? 'EVENT',
-      fromState: json['from_state'] as String?,
-      toState: json['to_state'] as String?,
-      actor: json['actor'] as String?,
-      actorRole: json['actor_role'] as String?,
-      reason: json['reason'] as String? ?? json['remarks'] as String?,
+      eventId: asJsonString(json['event_id']) ?? '',
+      eventType: asJsonString(json['event_type']) ?? 'EVENT',
+      fromState: asJsonString(json['from_state']),
+      toState: asJsonString(json['to_state']),
+      actor: asJsonString(json['actor']),
+      actorRole: asJsonString(json['actor_role']),
+      reason: asJsonString(json['reason']) ?? asJsonString(json['remarks']),
       timestamp: ts is String && ts.isNotEmpty ? DateTime.tryParse(ts) : null,
-      isReturn: json['is_return'] as bool? ?? false,
+      isReturn: asJsonBool(json['is_return']) ?? false,
     );
   }
 
@@ -88,17 +89,18 @@ class WorkOrderAudit extends Equatable {
   }
 
   factory WorkOrderAudit.fromJson(Map<String, dynamic> json) {
-    final raw = json['events'] as List<dynamic>? ?? const [];
+    final raw = json['events'];
+    final list = raw is List ? raw : const [];
     return WorkOrderAudit(
-      workOrderId: json['work_order_id'] as int? ?? 0,
-      ticketNumber: json['ticket_number'] as String?,
-      currentStatus: json['current_status'] as String?,
-      events: raw
-          .whereType<Map<String, dynamic>>()
-          .map(WorkOrderAuditEvent.fromJson)
+      workOrderId: asJsonInt(json['work_order_id'] ?? json['work_order']) ?? 0,
+      ticketNumber: asJsonString(json['ticket_number']),
+      currentStatus: asJsonString(json['current_status']),
+      events: list
+          .whereType<Map>()
+          .map((e) => WorkOrderAuditEvent.fromJson(Map<String, dynamic>.from(e)))
           .toList(),
-      returnCount: json['return_count'] as int? ?? 0,
-      currentlyReturned: json['currently_returned'] as bool? ?? false,
+      returnCount: asJsonInt(json['return_count']) ?? 0,
+      currentlyReturned: asJsonBool(json['currently_returned']) ?? false,
     );
   }
 

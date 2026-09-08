@@ -82,9 +82,9 @@ class MaintenanceActionOption extends Equatable {
 
   factory MaintenanceActionOption.fromJson(Map<String, dynamic> json) {
     return MaintenanceActionOption(
-      id: json['id'] as int? ?? 0,
-      label: json['label'] as String? ?? json['name'] as String? ?? '',
-      isDeficiency: json['is_deficiency'] as bool? ?? false,
+      id: asJsonInt(json['id']) ?? 0,
+      label: asJsonString(json['label']) ?? asJsonString(json['name']) ?? '',
+      isDeficiency: asJsonBool(json['is_deficiency']) ?? false,
     );
   }
 
@@ -114,15 +114,16 @@ class MaintenanceStatusOption extends Equatable {
   final List<MaintenanceActionOption> actionOptions;
 
   factory MaintenanceStatusOption.fromJson(Map<String, dynamic> json) {
-    final rawActions = json['action_options'] as List<dynamic>? ?? const [];
+    final rawActions = json['action_options'];
+    final actionList = rawActions is List ? rawActions : const [];
     return MaintenanceStatusOption(
-      id: json['id'] as int? ?? 0,
-      label: json['label'] as String? ?? json['name'] as String? ?? '',
-      semantic: json['semantic'] as String?,
-      isDeficiency: json['is_deficiency'] as bool? ?? false,
-      actionOptions: rawActions
-          .whereType<Map<String, dynamic>>()
-          .map(MaintenanceActionOption.fromJson)
+      id: asJsonInt(json['id']) ?? 0,
+      label: asJsonString(json['label']) ?? asJsonString(json['name']) ?? '',
+      semantic: asJsonString(json['semantic']),
+      isDeficiency: asJsonBool(json['is_deficiency']) ?? false,
+      actionOptions: actionList
+          .whereType<Map>()
+          .map((e) => MaintenanceActionOption.fromJson(Map<String, dynamic>.from(e)))
           .toList(),
     );
   }
@@ -317,35 +318,37 @@ class MaintenanceRecordLine extends Equatable {
   }
 
   factory MaintenanceRecordLine.fromJson(Map<String, dynamic> json) {
-    final rawStatusOptions = json['status_options'] as List<dynamic>? ?? const [];
+    final rawStatusOptions = json['status_options'];
+    final statusOptionList = rawStatusOptions is List ? rawStatusOptions : const [];
 
     return MaintenanceRecordLine(
-      id: json['id'] as int? ?? 0,
-      itemName: json['item_name'] as String? ??
-          json['asset_name_snapshot'] as String? ??
+      id: asJsonInt(json['id']) ?? 0,
+      itemName: asJsonString(json['item_name']) ??
+          asJsonString(json['asset_name_snapshot']) ??
           'Checklist Item',
-      inspectionPoint: json['inspection_point'] as String? ??
-          json['checkpoint_snapshot'] as String?,
-      valueType: MaintenanceValueType.fromString(json['value_type'] as String?),
-      itemKind: MaintenanceItemKind.fromString(json['item_kind'] as String?),
-      isRequired: json['required'] as bool? ?? false,
-      assetCategory: json['asset_category'] as String?,
-      unit: json['unit_snapshot'] as String?,
-      referenceValue: json['reference_value_snapshot'] as String?,
-      statusOptions: rawStatusOptions
-          .whereType<Map<String, dynamic>>()
-          .map(MaintenanceStatusOption.fromJson)
+      inspectionPoint: asJsonString(json['inspection_point']) ??
+          asJsonString(json['checkpoint_snapshot']),
+      valueType: MaintenanceValueType.fromString(asJsonString(json['value_type'])),
+      itemKind: MaintenanceItemKind.fromString(asJsonString(json['item_kind'])),
+      isRequired: asJsonBool(json['required'] ?? json['is_required']) ?? false,
+      assetCategory: asJsonString(json['asset_category']),
+      unit: asJsonString(json['unit_snapshot'] ?? json['unit']),
+      referenceValue: asJsonString(
+          json['reference_value_snapshot'] ?? json['reference_value']),
+      statusOptions: statusOptionList
+          .whereType<Map>()
+          .map((e) => MaintenanceStatusOption.fromJson(Map<String, dynamic>.from(e)))
           .toList(),
       recordedValue: json['recorded_value'],
-      status: json['status'] as String? ?? 'OK',
+      status: asJsonString(json['status']) ?? 'OK',
       statusOptionId: _asInt(json['status_option']),
       actionOptionId: _asInt(json['action_option']),
       failureCodeId: _asInt(json['failure_code']),
-      observationAction: json['observation_action'] as String?,
-      deficiency: json['deficiency'] as String?,
-      deficiencyAttended: json['deficiency_attended'] as bool? ?? false,
-      excluded: json['excluded'] as bool? ?? false,
-      exclusionReason: json['exclusion_reason'] as String?,
+      observationAction: asJsonString(json['observation_action']),
+      deficiency: asJsonString(json['deficiency']),
+      deficiencyAttended: asJsonBool(json['deficiency_attended']) ?? false,
+      excluded: asJsonBool(json['excluded']) ?? false,
+      exclusionReason: asJsonString(json['exclusion_reason']),
       isSaved: true,
     );
   }
@@ -382,16 +385,21 @@ class MaintenanceRecordLine extends Equatable {
         inspectionPoint,
         valueType,
         itemKind,
+        isRequired,
         assetCategory,
+        unit,
+        referenceValue,
         statusOptions,
         recordedValue,
         status,
         statusOptionId,
         actionOptionId,
+        failureCodeId,
         observationAction,
         deficiency,
         deficiencyAttended,
         excluded,
+        exclusionReason,
         isSaved,
       ];
 }
@@ -441,29 +449,31 @@ class MaintenanceRecord extends Equatable {
   double get progress => totalLines == 0 ? 0.0 : completedLines / totalLines;
 
   factory MaintenanceRecord.fromJson(Map<String, dynamic> json) {
-    final rawLines = json['lines'] as List<dynamic>? ?? const [];
-    final schedule = json['schedule_details'] as Map<String, dynamic>?;
+    final rawLines = json['lines'];
+    final lineList = rawLines is List ? rawLines : const [];
+    final sched = json['schedule_details'];
+    final schedule = sched is Map ? Map<String, dynamic>.from(sched) : null;
 
     return MaintenanceRecord(
-      id: json['id'] as int? ?? 0,
+      id: asJsonInt(json['id']) ?? 0,
       workOrderId: _asInt(json['work_order']) ??
           _asInt(json['work_order_id']) ??
           _asInt(schedule?['work_order_id']),
-      workOrderTicket: schedule?['work_order_ticket'] as String?,
+      workOrderTicket: asJsonString(schedule?['work_order_ticket']),
       scheduleId: _asInt(json['schedule']) ?? _asInt(json['schedule_id']),
-      templateName: schedule?['template_name'] as String? ??
-          schedule?['maintenance_master_name'] as String?,
-      stationName: schedule?['station_name'] as String?,
+      templateName: asJsonString(schedule?['template_name']) ??
+          asJsonString(schedule?['maintenance_master_name']),
+      stationName: asJsonString(schedule?['station_name']),
       depotName: asJsonString(schedule?['depot_name']),
       divisionName: asJsonString(schedule?['division_name']),
-      technicianName: json['technician_name'] as String?,
+      technicianName: asJsonString(json['technician_name']),
       dateOfMaintenance: _asDate(json['date_of_maintenance']),
-      lines: rawLines
-          .whereType<Map<String, dynamic>>()
-          .map(MaintenanceRecordLine.fromJson)
+      lines: lineList
+          .whereType<Map>()
+          .map((e) => MaintenanceRecordLine.fromJson(Map<String, dynamic>.from(e)))
           .toList(),
-      remarks: json['remarks'] as String?,
-      status: json['status'] as String?,
+      remarks: asJsonString(json['remarks']),
+      status: asJsonString(json['status']),
     );
   }
 

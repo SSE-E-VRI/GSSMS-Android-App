@@ -28,6 +28,7 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       ref
           .read(workOrderDetailControllerProvider(widget.workOrderId).notifier)
           .loadDetail();
@@ -40,6 +41,17 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
         ref.watch(workOrderDetailControllerProvider(widget.workOrderId));
     final authState = ref.watch(authControllerProvider);
     final userSession = authState is Authenticated ? authState.session : null;
+
+    ref.listen(workOrderDetailControllerProvider(widget.workOrderId), (prev, next) {
+      if (next is WorkOrderDetailLoaded && next.errorMessage != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(next.errorMessage!),
+            backgroundColor: AppTheme.errorRed,
+          ),
+        );
+      }
+    });
 
     return Scaffold(
       appBar: AppBar(
@@ -440,8 +452,13 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
     final wo = state.workOrder;
     final actions = <Widget>[];
 
-    if (wo.status == WorkOrderStatus.assigned ||
-        wo.status == WorkOrderStatus.reworkRequired) {
+    // `linkedRecordId` is null until execution has started server-side. An
+    // IN_PROGRESS order without one cannot open a checklist — offer Start
+    // Execution instead of a button that only shows a "no record" snackbar.
+    final needsExecutionStart = wo.status == WorkOrderStatus.assigned ||
+        wo.status == WorkOrderStatus.reworkRequired ||
+        (wo.status == WorkOrderStatus.inProgress && wo.linkedRecordId == null);
+    if (needsExecutionStart) {
       actions.add(
         Expanded(
           child: ElevatedButton.icon(
@@ -504,7 +521,7 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
             onPressed: state.isTransitioning
                 ? null
                 : () => _onAllowedAction(action),
-            child: Text(action.label, textAlign: TextAlign.center),
+            child: Text(_actionLabel(action), textAlign: TextAlign.center),
           ),
         ),
       );
@@ -526,6 +543,14 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
       ),
       child: Row(children: actions),
     );
+  }
+
+  // The server labels the NEW → ASSIGNED transition "Assigned" (the resulting
+  // state), but tapping it only opens the technician picker — nothing is
+  // assigned yet. "Assign" reads as the action the button performs.
+  String _actionLabel(WorkOrderAction action) {
+    if (action.targetStatus.toUpperCase() == 'ASSIGNED') return 'Assign';
+    return action.label;
   }
 
   Color _actionColor(String targetStatus) {
@@ -683,8 +708,12 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
                   const Padding(
                     padding: EdgeInsets.only(bottom: 8),
                     child: Text(
-                      'This transition may require a failure code to be recorded on the checklist.',
-                      style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                      'This work order is on a CRITICAL/HIGH asset, so the server '
+                      'requires a failure code and restored time on it before this '
+                      'transition is allowed (ISO 55000). Neither can be recorded '
+                      'from the app yet — record them in the web console first, or '
+                      'this action will be rejected.',
+                      style: TextStyle(fontSize: 12, color: AppTheme.errorRed),
                     ),
                   ),
                 TextFormField(

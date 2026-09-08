@@ -8,7 +8,6 @@ abstract class IInspectionRepository {
     int? zoneId,
     int? divisionId,
     int? depotId,
-    int? stationId,
     String? dateFrom,
     String? dateTo,
   });
@@ -36,7 +35,6 @@ class InspectionRepository implements IInspectionRepository {
     int? zoneId,
     int? divisionId,
     int? depotId,
-    int? stationId,
     String? dateFrom,
     String? dateTo,
   }) {
@@ -46,7 +44,6 @@ class InspectionRepository implements IInspectionRepository {
       zoneId: zoneId,
       divisionId: divisionId,
       depotId: depotId,
-      stationId: stationId,
       dateFrom: dateFrom,
       dateTo: dateTo,
     );

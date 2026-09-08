@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gssms_mobile/core/network/dio_client.dart';
+import 'package:gssms_mobile/core/network/paginated_fetch.dart';
 import 'package:gssms_mobile/features/inspections/domain/models/inspection.dart';
 
 final inspectionApiServiceProvider = Provider<InspectionApiService>((ref) {
@@ -18,7 +19,6 @@ class InspectionApiService {
     int? zoneId,
     int? divisionId,
     int? depotId,
-    int? stationId,
     String? dateFrom,
     String? dateTo,
   }) async {
@@ -34,36 +34,65 @@ class InspectionApiService {
     } else if (zoneId != null) {
       query['zone'] = zoneId;
     }
-    if (stationId != null) query['station'] = stationId;
     if (dateFrom != null && dateFrom.isNotEmpty) query['start_date'] = dateFrom;
     if (dateTo != null && dateTo.isNotEmpty) query['end_date'] = dateTo;
 
-    final response = await _dio.get('/api/v1/inspections/', queryParameters: query);
-    final dynamic data = response.data;
-    final List<dynamic> results;
-    if (data is Map<String, dynamic> && data.containsKey('results')) {
-      results = data['results'] as List<dynamic>;
-    } else if (data is List<dynamic>) {
-      results = data;
-    } else {
-      results = [];
-    }
-    return results.map((e) => Inspection.fromJson(e as Map<String, dynamic>)).toList();
+    // InspectionViewSet sets no pagination_class, so this returns in one
+    // request today; the bounded walk is here so it stays correct if
+    // pagination is ever switched on server-side.
+    final page = await fetchAllPages(_dio, '/api/v1/inspections/', queryParameters: query);
+    return page.items
+        .whereType<Map>()
+        .map((e) => Inspection.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+
+  Map<String, dynamic>? _asObject(dynamic data) {
+    if (data is Map<String, dynamic>) return data;
+    if (data is Map) return Map<String, dynamic>.from(data);
+    return null;
   }
 
   Future<Inspection> getInspection(int id) async {
     final response = await _dio.get('/api/v1/inspections/$id/');
-    return Inspection.fromJson(response.data as Map<String, dynamic>);
+    final data = _asObject(response.data);
+    if (data == null) {
+      throw DioException(
+        requestOptions: response.requestOptions,
+        response: response,
+        type: DioExceptionType.badResponse,
+        message: 'Unexpected inspection payload',
+      );
+    }
+    return Inspection.fromJson(data);
   }
 
   Future<Inspection> createInspection(Map<String, dynamic> payload) async {
     final response = await _dio.post('/api/v1/inspections/', data: payload);
-    return Inspection.fromJson(response.data as Map<String, dynamic>);
+    final data = _asObject(response.data);
+    if (data == null) {
+      throw DioException(
+        requestOptions: response.requestOptions,
+        response: response,
+        type: DioExceptionType.badResponse,
+        message: 'Unexpected inspection payload',
+      );
+    }
+    return Inspection.fromJson(data);
   }
 
   /// Convert inspection to work order — POST /api/v1/inspections/{id}/convert_to_work_order/
   Future<Map<String, dynamic>> convertToWorkOrder(int inspectionId) async {
     final response = await _dio.post('/api/v1/inspections/$inspectionId/convert_to_work_order/');
-    return response.data as Map<String, dynamic>;
+    final data = _asObject(response.data);
+    if (data == null) {
+      throw DioException(
+        requestOptions: response.requestOptions,
+        response: response,
+        type: DioExceptionType.badResponse,
+        message: 'Unexpected convert-to-work-order payload',
+      );
+    }
+    return data;
   }
 }

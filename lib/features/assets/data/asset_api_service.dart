@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gssms_mobile/core/network/dio_client.dart';
+import 'package:gssms_mobile/core/network/paginated_fetch.dart';
 import 'package:gssms_mobile/features/assets/domain/models/asset.dart';
 
 final assetApiServiceProvider = Provider<AssetApiService>((ref) {
@@ -8,41 +9,56 @@ final assetApiServiceProvider = Provider<AssetApiService>((ref) {
   return AssetApiService(dio);
 });
 
+/// A page-walked asset list, plus whether the walk hit its page cap.
+class AssetPage {
+  const AssetPage({required this.assets, required this.truncated});
+
+  final List<Asset> assets;
+  final bool truncated;
+}
+
 class AssetApiService {
   AssetApiService(this._dio);
 
   final Dio _dio;
 
-  Future<List<Asset>> getAssets({
+  /// Assets visible to the caller, narrowed server-side.
+  ///
+  /// Only parameters AssetViewSet.get_queryset actually reads are sent:
+  /// zone/division/depot/station are independent `if`s there (all four can be
+  /// combined), the category filter is `asset_category` and matches on the
+  /// category *code*, not its display name, and there is no `status` filter at
+  /// all — asset lifecycle state is filtered client-side.
+  ///
+  /// This is the one list endpoint in the app that actually paginates
+  /// (StandardResultsSetPagination), so the walk is bounded and the result
+  /// reports whether it stopped short.
+  Future<AssetPage> getAssets({
     String? search,
-    String? status,
-    String? category,
+    String? assetCategoryCode,
+    int? zoneId,
+    int? divisionId,
     int? depotId,
     int? stationId,
   }) async {
     final query = <String, dynamic>{};
     if (search != null && search.isNotEmpty) query['search'] = search;
-    if (status != null && status.isNotEmpty) query['status'] = status;
-    if (category != null && category.isNotEmpty) query['category'] = category;
+    if (assetCategoryCode != null && assetCategoryCode.isNotEmpty) {
+      query['asset_category'] = assetCategoryCode;
+    }
+    if (zoneId != null) query['zone'] = zoneId;
+    if (divisionId != null) query['division'] = divisionId;
     if (depotId != null) query['depot'] = depotId;
     if (stationId != null) query['station'] = stationId;
 
-    final response = await _dio.get(
-      '/api/v1/assets/',
-      queryParameters: query,
+    final page = await fetchAllPages(_dio, '/api/v1/assets/', queryParameters: query);
+    return AssetPage(
+      assets: page.items
+          .whereType<Map<String, dynamic>>()
+          .map(Asset.fromJson)
+          .toList(),
+      truncated: page.truncated,
     );
-
-    final dynamic data = response.data;
-    final List<dynamic> results;
-    if (data is Map<String, dynamic> && data.containsKey('results')) {
-      results = data['results'] as List<dynamic>;
-    } else if (data is List<dynamic>) {
-      results = data;
-    } else {
-      results = [];
-    }
-
-    return results.map((e) => Asset.fromJson(e as Map<String, dynamic>)).toList();
   }
 
   Future<Asset> getAsset(int id) async {
@@ -60,7 +76,7 @@ class AssetApiService {
     if (trimmed.isEmpty) return null;
 
     final matches = await getAssets(search: trimmed);
-    for (final asset in matches) {
+    for (final asset in matches.assets) {
       if (asset.matchesCode(trimmed)) return asset;
     }
     return null;

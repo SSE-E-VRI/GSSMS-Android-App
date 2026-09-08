@@ -40,7 +40,7 @@ class SecureStorageService implements ISecureStorageService {
       await _storage.write(key: _refreshTokenKey, value: token);
     } catch (_) {
       try {
-        await _storage.deleteAll();
+        await _storage.delete(key: _refreshTokenKey);
         await _storage.write(key: _refreshTokenKey, value: token);
       } catch (_) {}
     }
@@ -51,6 +51,8 @@ class SecureStorageService implements ISecureStorageService {
     try {
       await _storage.delete(key: _refreshTokenKey);
     } catch (_) {
+      // If KeyStore or decryption fails, fall back to wiping all secure
+      // storage so a stale refresh token can't survive a failed delete.
       try {
         await _storage.deleteAll();
       } catch (_) {}

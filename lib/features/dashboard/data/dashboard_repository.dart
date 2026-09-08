@@ -2,8 +2,12 @@ import 'package:gssms_mobile/features/dashboard/data/dashboard_api_service.dart'
 import 'package:gssms_mobile/features/dashboard/domain/models/dashboard_models.dart';
 
 abstract class IDashboardRepository {
-  Future<AttentionSummary> fetchAttention();
-  Future<DashboardSummary> fetchSummary();
+  Future<AttentionSummary> fetchAttention({
+    int? zoneId,
+    int? divisionId,
+    int? depotId,
+  });
+  Future<DashboardSummary> fetchSummary({int? depotId});
 }
 
 /// Read-only: unlike [WorkOrderRepository], there is no local cache to fall
@@ -18,8 +22,18 @@ class DashboardRepository implements IDashboardRepository {
   final DashboardApiService _apiService;
 
   @override
-  Future<AttentionSummary> fetchAttention() => _apiService.getAttention();
+  Future<AttentionSummary> fetchAttention({
+    int? zoneId,
+    int? divisionId,
+    int? depotId,
+  }) =>
+      _apiService.getAttention(
+        zoneId: zoneId,
+        divisionId: divisionId,
+        depotId: depotId,
+      );
 
   @override
-  Future<DashboardSummary> fetchSummary() => _apiService.getSummary();
+  Future<DashboardSummary> fetchSummary({int? depotId}) =>
+      _apiService.getSummary(depotId: depotId);
 }

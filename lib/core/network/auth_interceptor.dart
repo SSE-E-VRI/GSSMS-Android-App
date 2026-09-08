@@ -36,11 +36,10 @@ class AuthInterceptor extends QueuedInterceptor {
   /// rebuilt if the adapter is swapped (as tests and runtime reconfiguration do).
   Dio get _retryClient {
     final cached = _cachedRetryClient;
-    if (cached != null &&
-        identical(cached.httpClientAdapter, dio.httpClientAdapter)) {
+    if (cached != null && identical(cached.httpClientAdapter, dio.httpClientAdapter)) {
       return cached;
     }
-    final client = Dio(dio.options)
+    final client = Dio(dio.options.copyWith())
       ..httpClientAdapter = dio.httpClientAdapter;
     _cachedRetryClient = client;
     return client;
@@ -49,7 +48,8 @@ class AuthInterceptor extends QueuedInterceptor {
   bool _isAuthEndpoint(String path) {
     return path.contains('/auth/login/') ||
         path.contains('/auth/refresh/') ||
-        path.contains('/auth/otp/');
+        path.contains('/auth/otp/') ||
+        path.contains('/auth/totp/validate/');
   }
 
   @override
@@ -141,9 +141,6 @@ class AuthInterceptor extends QueuedInterceptor {
       );
 
       // Replay through a bare Dio that shares this client's adapter and options.
-      // Going through Dio rather than calling the adapter directly preserves the
-      // request body, its encoding and the response parsing, while the empty
-      // interceptor list avoids re-locking this QueuedInterceptor.
       try {
         final response = await _retryClient.fetch<dynamic>(requestOptions);
         return handler.resolve(response);

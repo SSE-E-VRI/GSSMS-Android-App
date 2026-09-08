@@ -138,19 +138,24 @@ class AuthApiService {
       if (code == '2FA_REQUIRED' || detail == '2FA_REQUIRED') {
         return const TwoFactorRequiredException();
       }
-      if (code == 'INVALID_OTP' || detail.toLowerCase().contains('invalid 2fa')) {
+      final lowerDetail = detail.toLowerCase();
+      if (code == 'INVALID_OTP' || lowerDetail.contains('invalid 2fa') || lowerDetail.contains('invalid otp')) {
         return InvalidOtpException(detail);
       }
-      if (code == 'RATE_LIMIT_EXCEEDED' || detail.toLowerCase().contains('too many')) {
+      if (code == 'RATE_LIMIT_EXCEEDED' || lowerDetail.contains('too many')) {
         return RateLimitExceededException(detail);
       }
-      if (code == 'GUEST_EXPIRED' || detail.toLowerCase().contains('demo access has expired')) {
+      if (code == 'GUEST_EXPIRED' || lowerDetail.contains('demo access has expired')) {
         return GuestExpiredException(detail);
       }
-      if (detail.toLowerCase().contains('account is disabled')) {
+      if (lowerDetail.contains('account is disabled')) {
         return AccountDisabledException(detail);
       }
-      if (statusCode == 400 && (detail.toLowerCase().contains('user not found') || detail.toLowerCase().contains('invalid password'))) {
+      if ((statusCode == 400 || statusCode == 401) &&
+          (lowerDetail.contains('user not found') ||
+           lowerDetail.contains('invalid password') ||
+           lowerDetail.contains('no active account') ||
+           lowerDetail.contains('invalid credentials'))) {
         return InvalidCredentialsException(detail);
       }
       if (statusCode == 401) {

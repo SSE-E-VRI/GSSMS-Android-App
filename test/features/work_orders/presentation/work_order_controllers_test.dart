@@ -399,9 +399,11 @@ void main() {
 
       expect(ok, isFalse);
       verifyNever(() => mockRepo.transitionStatus(any(), status: any(named: 'status')));
+      final state = container.read(workOrderDetailControllerProvider(1));
+      expect(state, isA<WorkOrderDetailLoaded>());
       expect(
-        container.read(workOrderDetailControllerProvider(1)),
-        isA<WorkOrderDetailError>(),
+        (state as WorkOrderDetailLoaded).errorMessage,
+        contains('A technician must be assigned'),
       );
     });
 
@@ -422,7 +424,7 @@ void main() {
       expect(state.workOrder.verifiedByName, 'incharge_kumar');
     });
 
-    test('verifyWorkOrder surfaces a WorkOrderDetailError on failure', () async {
+    test('verifyWorkOrder surfaces an errorMessage on failure without losing the loaded work order', () async {
       await loadAs(techCompleted);
       when(() => mockRepo.verifyWorkOrder(1, remarks: any(named: 'remarks')))
           .thenThrow(Exception('cannot verify'));
@@ -432,9 +434,11 @@ void main() {
           .verifyWorkOrder(remarks: 'OK');
 
       expect(ok, isFalse);
+      final state = container.read(workOrderDetailControllerProvider(1));
+      expect(state, isA<WorkOrderDetailLoaded>());
       expect(
-        container.read(workOrderDetailControllerProvider(1)),
-        isA<WorkOrderDetailError>(),
+        (state as WorkOrderDetailLoaded).errorMessage,
+        contains('cannot verify'),
       );
     });
   });

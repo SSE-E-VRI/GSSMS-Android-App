@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:gssms_mobile/core/utils/json_parsing.dart';
 
 /// A status transition the server says this user may (or may not) perform on a
 /// work order, from `GET /maintenance/work-orders/{id}/allowed-actions/`.
@@ -31,17 +32,18 @@ class WorkOrderAction extends Equatable {
   final String? guardStatus;
 
   factory WorkOrderAction.fromJson(Map<String, dynamic> json) {
-    final requirements = json['requirements'] as Map<String, dynamic>?;
+    final req = json['requirements'];
+    final requirements = req is Map ? Map<String, dynamic>.from(req) : null;
     return WorkOrderAction(
-      targetStatus: json['target_status'] as String? ?? '',
-      label: json['label'] as String? ?? json['target_status'] as String? ?? '',
-      enabled: json['enabled'] as bool? ?? false,
-      disabledReason: json['disabled_reason'] as String?,
-      requiresReason: json['requires_reason'] as bool? ??
-          requirements?['remarks'] as bool? ??
+      targetStatus: asJsonString(json['target_status']) ?? '',
+      label: asJsonString(json['label']) ?? asJsonString(json['target_status']) ?? '',
+      enabled: asJsonBool(json['enabled']) ?? false,
+      disabledReason: asJsonString(json['disabled_reason']),
+      requiresReason: asJsonBool(json['requires_reason']) ??
+          asJsonBool(requirements?['remarks']) ??
           false,
-      requiresFailureCode: requirements?['failure_code'] as bool? ?? false,
-      guardStatus: json['guard_status'] as String?,
+      requiresFailureCode: asJsonBool(requirements?['failure_code']) ?? false,
+      guardStatus: asJsonString(json['guard_status']),
     );
   }
 
@@ -76,16 +78,17 @@ class WorkOrderActionSet extends Equatable {
 
   factory WorkOrderActionSet.fromJson(Map<String, dynamic> json) {
     List<WorkOrderAction> parse(String key) {
-      final raw = json[key] as List<dynamic>? ?? const [];
+      final raw = json[key];
+      if (raw is! List) return const [];
       return raw
-          .whereType<Map<String, dynamic>>()
-          .map(WorkOrderAction.fromJson)
+          .whereType<Map>()
+          .map((e) => WorkOrderAction.fromJson(Map<String, dynamic>.from(e)))
           .toList();
     }
 
     return WorkOrderActionSet(
-      workOrderId: json['work_order'] as int? ?? 0,
-      currentStatus: json['current_status'] as String?,
+      workOrderId: asJsonInt(json['work_order'] ?? json['work_order_id']) ?? 0,
+      currentStatus: asJsonString(json['current_status']),
       allowed: parse('allowed_actions'),
       blocked: parse('blocked_actions'),
     );

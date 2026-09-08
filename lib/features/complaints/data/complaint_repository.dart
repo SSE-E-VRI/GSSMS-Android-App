@@ -8,7 +8,6 @@ abstract class IComplaintRepository {
     int? zoneId,
     int? divisionId,
     int? depotId,
-    int? stationId,
     String? dateFrom,
     String? dateTo,
   });
@@ -36,7 +35,6 @@ class ComplaintRepository implements IComplaintRepository {
     int? zoneId,
     int? divisionId,
     int? depotId,
-    int? stationId,
     String? dateFrom,
     String? dateTo,
   }) async {
@@ -46,7 +44,6 @@ class ComplaintRepository implements IComplaintRepository {
       zoneId: zoneId,
       divisionId: divisionId,
       depotId: depotId,
-      stationId: stationId,
       dateFrom: dateFrom,
       dateTo: dateTo,
     );

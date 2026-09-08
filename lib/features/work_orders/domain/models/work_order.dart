@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:gssms_mobile/core/utils/json_parsing.dart';
 
 enum WorkOrderStatus {
   newOrder('NEW', 'New'),
@@ -99,10 +100,10 @@ class WorkOrderEventSummary extends Equatable {
       dt = DateTime.tryParse(ts);
     }
     return WorkOrderEventSummary(
-      eventType: json['event_type'] as String? ?? 'EVENT',
-      actor: json['actor'] as String? ?? 'System',
+      eventType: asJsonString(json['event_type']) ?? 'EVENT',
+      actor: asJsonString(json['actor']) ?? 'System',
       createdAt: dt,
-      remarks: json['remarks'] as String?,
+      remarks: asJsonString(json['remarks']),
     );
   }
 
@@ -214,7 +215,7 @@ class WorkOrder extends Equatable {
   WorkOrder copyWith({
     WorkOrderStatus? status,
     String? description,
-    DateTime? reportCompletedAt,
+    Object? reportCompletedAt = _woUnset,
     int? linkedRecordId,
   }) {
     return WorkOrder(
@@ -243,7 +244,9 @@ class WorkOrder extends Equatable {
       verifiedByName: verifiedByName,
       dueDate: dueDate,
       createdAt: createdAt,
-      reportCompletedAt: reportCompletedAt ?? this.reportCompletedAt,
+      reportCompletedAt: identical(reportCompletedAt, _woUnset)
+          ? this.reportCompletedAt
+          : reportCompletedAt as DateTime?,
       latestEventSummary: latestEventSummary,
       linkedRecordId: linkedRecordId ?? this.linkedRecordId,
       originalScheduleId: originalScheduleId,
@@ -261,44 +264,47 @@ class WorkOrder extends Equatable {
     }
 
     WorkOrderEventSummary? eventSummary;
-    if (json['latest_event_summary'] is Map<String, dynamic>) {
+    final latestRaw = json['latest_event_summary'];
+    if (latestRaw is Map) {
       eventSummary = WorkOrderEventSummary.fromJson(
-        json['latest_event_summary'] as Map<String, dynamic>,
+        Map<String, dynamic>.from(latestRaw),
       );
     }
 
+    int? fkId(dynamic v) => v is Map ? asJsonInt(v['id']) : asJsonInt(v);
+
     return WorkOrder(
-      id: json['id'] as int? ?? 0,
-      status: WorkOrderStatus.fromString(json['status'] as String?),
-      type: WorkOrderType.fromString(json['type'] as String?),
-      ticketNumber: json['ticket_number'] as String?,
-      maintenanceMasterName: json['maintenance_master_name'] as String?,
-      slaStatus: json['sla_status'] as String?,
-      escalationLevel: json['escalation_level'] as String?,
-      stationId: json['station'] as int?,
-      title: json['title'] as String?,
-      description: json['description'] as String?,
-      priority: WorkOrderPriority.fromString(json['priority'] as String?),
-      assetId: json['asset'] as int?,
-      assetName: json['asset_name'] as String?,
-      assetCriticality: json['asset_criticality'] as String?,
-      depotId: json['depot'] as int?,
-      depotName: json['depot_name'] as String?,
-      stationName: json['station_name'] as String?,
-      infrastructureName: json['infrastructure_name'] as String?,
-      infrastructureType: json['infrastructure_type'] as String?,
-      assignedToId: json['assigned_to'] as int?,
-      assignedToName: json['assigned_to_name'] as String?,
-      reportedByName: json['reported_by_name'] as String?,
-      verifiedByName: json['verified_by_name'] as String?,
+      id: asJsonInt(json['id']) ?? 0,
+      status: WorkOrderStatus.fromString(asJsonString(json['status'])),
+      type: WorkOrderType.fromString(asJsonString(json['type'])),
+      ticketNumber: asJsonString(json['ticket_number']),
+      maintenanceMasterName: asJsonString(json['maintenance_master_name']),
+      slaStatus: asJsonString(json['sla_status']),
+      escalationLevel: asJsonString(json['escalation_level']),
+      stationId: fkId(json['station']),
+      title: asJsonString(json['title']),
+      description: asJsonString(json['description']),
+      priority: WorkOrderPriority.fromString(asJsonString(json['priority'])),
+      assetId: fkId(json['asset']),
+      assetName: asJsonString(json['asset_name']),
+      assetCriticality: asJsonString(json['asset_criticality']),
+      depotId: fkId(json['depot']),
+      depotName: asJsonString(json['depot_name']),
+      stationName: asJsonString(json['station_name']),
+      infrastructureName: asJsonString(json['infrastructure_name']),
+      infrastructureType: asJsonString(json['infrastructure_type']),
+      assignedToId: fkId(json['assigned_to']),
+      assignedToName: asJsonString(json['assigned_to_name']),
+      reportedByName: asJsonString(json['reported_by_name']),
+      verifiedByName: asJsonString(json['verified_by_name']),
       dueDate: parseDate(json['due_date']),
       createdAt: parseDate(json['created_at']),
       reportCompletedAt: parseDate(json['report_completed_at']),
       latestEventSummary: eventSummary,
-      linkedRecordId: json['linked_record_id'] as int?,
-      originalScheduleId: json['original_schedule_id'] as int?,
-      originalComplaintId: json['original_complaint_id'] as int?,
-      originalInspectionId: json['original_inspection_id'] as int?,
+      linkedRecordId: asJsonInt(json['linked_record_id']),
+      originalScheduleId: asJsonInt(json['original_schedule_id']),
+      originalComplaintId: asJsonInt(json['original_complaint_id']),
+      originalInspectionId: asJsonInt(json['original_inspection_id']),
     );
   }
 
@@ -310,17 +316,33 @@ class WorkOrder extends Equatable {
         ticketNumber,
         maintenanceMasterName,
         slaStatus,
+        escalationLevel,
+        stationId,
+        stationName,
         title,
         description,
         priority,
         assetId,
         assetName,
+        assetCriticality,
         depotId,
         depotName,
+        infrastructureName,
+        infrastructureType,
         assignedToId,
         assignedToName,
+        reportedByName,
+        verifiedByName,
         dueDate,
         createdAt,
+        reportCompletedAt,
+        latestEventSummary,
         linkedRecordId,
+        originalScheduleId,
+        originalComplaintId,
+        originalInspectionId,
       ];
 }
+
+/// Sentinel so [WorkOrder.copyWith] can clear [WorkOrder.reportCompletedAt].
+const Object _woUnset = Object();

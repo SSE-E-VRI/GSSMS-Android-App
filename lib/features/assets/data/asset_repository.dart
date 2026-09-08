@@ -2,10 +2,11 @@ import 'package:gssms_mobile/features/assets/data/asset_api_service.dart';
 import 'package:gssms_mobile/features/assets/domain/models/asset.dart';
 
 abstract class IAssetRepository {
-  Future<List<Asset>> fetchAssets({
+  Future<AssetPage> fetchAssets({
     String? search,
-    String? status,
-    String? category,
+    String? assetCategoryCode,
+    int? zoneId,
+    int? divisionId,
     int? depotId,
     int? stationId,
   });
@@ -20,17 +21,19 @@ class AssetRepository implements IAssetRepository {
   final AssetApiService _apiService;
 
   @override
-  Future<List<Asset>> fetchAssets({
+  Future<AssetPage> fetchAssets({
     String? search,
-    String? status,
-    String? category,
+    String? assetCategoryCode,
+    int? zoneId,
+    int? divisionId,
     int? depotId,
     int? stationId,
   }) async {
     return _apiService.getAssets(
       search: search,
-      status: status,
-      category: category,
+      assetCategoryCode: assetCategoryCode,
+      zoneId: zoneId,
+      divisionId: divisionId,
       depotId: depotId,
       stationId: stationId,
     );

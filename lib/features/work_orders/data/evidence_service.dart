@@ -64,6 +64,10 @@ class EvidenceService {
   /// Copies [sourcePath] into the app's evidence directory so a queued upload
   /// survives the OS clearing its caches.
   Future<EvidenceFile> persist(String sourcePath) async {
+    final source = File(sourcePath);
+    if (!await source.exists()) {
+      throw FileSystemException('Source photo not found', sourcePath);
+    }
     final docs = await getApplicationDocumentsDirectory();
     final dir = Directory('${docs.path}${Platform.pathSeparator}$_evidenceDirName');
     if (!await dir.exists()) {
@@ -72,9 +76,12 @@ class EvidenceService {
 
     final stamp = DateTime.now().millisecondsSinceEpoch;
     final target = '${dir.path}${Platform.pathSeparator}proof_$stamp.jpg';
-    final copied = await File(sourcePath).copy(target);
-
-    return EvidenceFile(path: copied.path, sizeBytes: await copied.length());
+    try {
+      final copied = await source.copy(target);
+      return EvidenceFile(path: copied.path, sizeBytes: await copied.length());
+    } on FileSystemException catch (e) {
+      throw FileSystemException('Could not save proof photo: ${e.message}', target);
+    }
   }
 
   /// Removes a stored evidence file once its upload has been accepted.

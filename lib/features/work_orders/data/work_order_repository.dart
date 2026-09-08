@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
 import 'package:gssms_mobile/core/database/local_cache_service.dart';
 import 'package:gssms_mobile/core/sync/outbox_command.dart';
@@ -34,12 +36,13 @@ abstract class IWorkOrderRepository {
     int? divisionId,
     int? depotId,
     int? stationId,
+    bool assignedToMe = false,
   });
 
   Future<WorkOrder> fetchWorkOrderById(int id);
   Future<WorkOrderActionSet> fetchAllowedActions(int workOrderId);
   Future<WorkOrderAudit> fetchAudit(int workOrderId);
-  Future<List<Technician>> fetchAssignableTechnicians();
+  Future<List<Technician>> fetchAssignableTechnicians({int? depotId});
   Future<WorkOrder> assignTechnician(int workOrderId, int technicianId);
   Future<WorkOrder> verifyWorkOrder(int workOrderId, {String? remarks});
   Future<VerificationWorkspace> fetchVerificationWorkspace(int workOrderId);
@@ -84,10 +87,19 @@ class WorkOrderRepository implements IWorkOrderRepository {
 
   bool _isNetworkException(dynamic e) {
     if (e is DioException) {
-      return e.type == DioExceptionType.connectionTimeout ||
+      if (e.type == DioExceptionType.connectionTimeout ||
           e.type == DioExceptionType.connectionError ||
           e.type == DioExceptionType.receiveTimeout ||
-          e.type == DioExceptionType.sendTimeout;
+          e.type == DioExceptionType.sendTimeout) {
+        return true;
+      }
+      // On Android, airplane-mode/DNS failures typically surface as
+      // `unknown` wrapping a SocketException — without this the offline
+      // cache fallback and outbox enqueue never trigger.
+      if (e.type == DioExceptionType.unknown && e.error is SocketException) {
+        return true;
+      }
+      if (e.error is SocketException) return true;
     }
     return false;
   }
@@ -102,6 +114,7 @@ class WorkOrderRepository implements IWorkOrderRepository {
     int? divisionId,
     int? depotId,
     int? stationId,
+    bool assignedToMe = false,
   }) async {
     // Only the unfiltered list is cached/restored — caching per filter
     // combination isn't worth the key-space, but that means the cache must
@@ -116,7 +129,8 @@ class WorkOrderRepository implements IWorkOrderRepository {
         zoneId != null ||
         divisionId != null ||
         depotId != null ||
-        stationId != null;
+        stationId != null ||
+        assignedToMe;
     try {
       final orders = await _apiService.getWorkOrders(
         status: status,
@@ -127,6 +141,7 @@ class WorkOrderRepository implements IWorkOrderRepository {
         divisionId: divisionId,
         depotId: depotId,
         stationId: stationId,
+        assignedToMe: assignedToMe,
       );
       if (!hasFilters) await _cacheService.cacheWorkOrders(orders);
       return orders;
@@ -168,8 +183,8 @@ class WorkOrderRepository implements IWorkOrderRepository {
   }
 
   @override
-  Future<List<Technician>> fetchAssignableTechnicians() {
-    return _apiService.getAssignableTechnicians();
+  Future<List<Technician>> fetchAssignableTechnicians({int? depotId}) {
+    return _apiService.getAssignableTechnicians(depotId: depotId);
   }
 
   @override
@@ -262,7 +277,7 @@ class WorkOrderRepository implements IWorkOrderRepository {
           final updated = cached.copyWith(
             status: WorkOrderStatus.fromString(status),
             reportCompletedAt:
-                status == 'TECH_COMPLETED' ? DateTime.now() : null,
+                status == 'TECH_COMPLETED' ? DateTime.now() : cached.reportCompletedAt,
           );
           await _cacheService.cacheWorkOrderDetail(updated);
           return updated;

@@ -56,10 +56,11 @@ void main() {
         ], 200);
       });
 
-      final assets = await apiService.getAssets(search: 'TR-01');
-      expect(assets.length, 1);
-      expect(assets[0].uniqueId, 'TR-01');
-      expect(assets[0].criticality, AssetCriticality.critical);
+      final page = await apiService.getAssets(search: 'TR-01');
+      expect(page.truncated, isFalse);
+      expect(page.assets.length, 1);
+      expect(page.assets[0].uniqueId, 'TR-01');
+      expect(page.assets[0].criticality, AssetCriticality.critical);
     });
 
     test('findAssetByCode resolves a scan through the search endpoint', () async {

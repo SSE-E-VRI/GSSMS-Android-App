@@ -326,10 +326,18 @@ class _OrgScopeFilterBarState extends ConsumerState<OrgScopeFilterBar> {
               )
             : null,
       ),
+      // "All" is a real, selectable menu item (value: null) rather than just
+      // the unselected hint — otherwise, once a real option is picked, there
+      // was no item in the list that could take the selection back to null
+      // and clear the filter. The hint stays as a fallback for the moment a
+      // cascading reload leaves `value` null with no items loaded yet.
       hint: const Text('All', overflow: TextOverflow.ellipsis),
-      items: options
-          .map((o) => DropdownMenuItem(value: o.id, child: Text(o.name, overflow: TextOverflow.ellipsis)))
-          .toList(),
+      items: [
+        const DropdownMenuItem<int>(value: null, child: Text('All')),
+        ...options.map(
+          (o) => DropdownMenuItem(value: o.id, child: Text(o.name, overflow: TextOverflow.ellipsis)),
+        ),
+      ],
       onChanged: loading ? null : onChanged,
     );
   }

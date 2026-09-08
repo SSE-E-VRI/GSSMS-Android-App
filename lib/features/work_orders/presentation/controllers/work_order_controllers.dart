@@ -219,7 +219,9 @@ class WorkOrderDetailController extends FamilyNotifier<WorkOrderDetailState, int
   }
 
   Future<List<Technician>> fetchAssignableTechnicians() {
-    return _repository.fetchAssignableTechnicians();
+    final current = state;
+    final depotId = current is WorkOrderDetailLoaded ? current.workOrder.depotId : null;
+    return _repository.fetchAssignableTechnicians(depotId: depotId);
   }
 
   /// PATCH `assigned_to` then transition to ASSIGNED — same order as the web client.
@@ -246,8 +248,11 @@ class WorkOrderDetailController extends FamilyNotifier<WorkOrderDetailState, int
       );
       return true;
     } catch (e) {
-      state = current.copyWith(isTransitioning: false, actionMessage: null);
-      state = WorkOrderDetailError('Failed to assign technician: ${_readableError(e)}');
+      state = current.copyWith(
+        isTransitioning: false,
+        actionMessage: null,
+        errorMessage: 'Failed to assign technician: ${_readableError(e)}',
+      );
       return false;
     }
   }
@@ -269,8 +274,11 @@ class WorkOrderDetailController extends FamilyNotifier<WorkOrderDetailState, int
       );
       return true;
     } catch (e) {
-      state = current.copyWith(isTransitioning: false, actionMessage: null);
-      state = WorkOrderDetailError('Verification failed: ${_readableError(e)}');
+      state = current.copyWith(
+        isTransitioning: false,
+        actionMessage: null,
+        errorMessage: 'Verification failed: ${_readableError(e)}',
+      );
       return false;
     }
   }
@@ -300,8 +308,11 @@ class WorkOrderDetailController extends FamilyNotifier<WorkOrderDetailState, int
       unawaited(ref.read(workOrderListControllerProvider.notifier).fetchWorkOrders(forceRefresh: true));
       return true;
     } catch (e) {
-      state = current.copyWith(isTransitioning: false, actionMessage: null);
-      state = WorkOrderDetailError('Status transition failed: ${_readableError(e)}');
+      state = current.copyWith(
+        isTransitioning: false,
+        actionMessage: null,
+        errorMessage: 'Status transition failed: ${_readableError(e)}',
+      );
       return false;
     }
   }

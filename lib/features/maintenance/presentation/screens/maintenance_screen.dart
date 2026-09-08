@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gssms_mobile/core/sync/widgets/sync_status_badge.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
+import 'package:gssms_mobile/core/widgets/org_scope_filter_bar.dart';
 import 'package:gssms_mobile/features/auth/domain/models/user_session.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_state.dart';
@@ -25,6 +26,7 @@ class _MaintenanceScreenState extends ConsumerState<MaintenanceScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       ref.read(dashboardControllerProvider.notifier).loadDashboard();
     });
   }
@@ -50,7 +52,34 @@ class _MaintenanceScreenState extends ConsumerState<MaintenanceScreen> {
           ),
         ],
       ),
-      body: _buildBody(state, session),
+      body: Column(
+        children: [
+          if (session != null) _buildOrgScope(state, session),
+          Expanded(child: _buildBody(state, session)),
+        ],
+      ),
+    );
+  }
+
+  /// Same depot-only filter as the Dashboard tab, backed by the same
+  /// controller — the two screens read one summary, so they share one
+  /// selection rather than drifting apart. See DashboardApiService.getSummary
+  /// for why depot is the only level offered.
+  Widget _buildOrgScope(DashboardState state, UserSession session) {
+    final loaded = state is DashboardLoaded
+        ? state
+        : (state is DashboardError ? state.previousLoaded : null);
+    // The bar collapses to nothing for a depot-scoped viewer, so its own
+    // padding is used rather than an outer wrapper that would leave a gap.
+    return OrgScopeFilterBar(
+      scope: session.scope,
+      selection: loaded?.orgScope ?? OrgScopeSelection.empty,
+      enableZoneDivision: false,
+      enableStation: false,
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      onChanged: (selection) {
+        ref.read(dashboardControllerProvider.notifier).setOrgScope(selection);
+      },
     );
   }
 
@@ -60,6 +89,52 @@ class _MaintenanceScreenState extends ConsumerState<MaintenanceScreen> {
     }
 
     if (state is DashboardError) {
+      // Keep showing the last good summary with an inline error instead of
+      // wiping the screen on a failed refresh (e.g. offline reopen).
+      final fallback = state.previousLoaded;
+      if (fallback != null) {
+        return RefreshIndicator(
+          onRefresh: () =>
+              ref.read(dashboardControllerProvider.notifier).loadDashboard(),
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              Material(
+                color: AppTheme.errorRed.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(8),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.cloud_off, size: 18, color: AppTheme.errorRed),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          state.message,
+                          style: const TextStyle(fontSize: 12, color: AppTheme.errorRed),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              _buildComplianceCard(fallback.summary.stats.complianceRate),
+              const SizedBox(height: 16),
+              StatusDonutChart(
+                title: 'Job Work Distribution',
+                segments: fallback.summary.stats.statusSegments,
+                total: fallback.summary.stats.totalWorkOrders,
+              ),
+              const SizedBox(height: 16),
+              _buildQuickActions(
+                  context, fallback.summary.stats, session),
+            ],
+          ),
+        );
+      }
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24),

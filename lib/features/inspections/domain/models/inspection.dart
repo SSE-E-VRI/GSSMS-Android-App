@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:gssms_mobile/core/utils/json_parsing.dart';
 
 enum InspectionStatus {
   pending('PENDING', 'Pending'),
@@ -60,6 +61,8 @@ class Inspection extends Equatable {
     this.completedDate,
     this.createdAt,
     this.reportedByName,
+    this.isConverted = false,
+    this.workOrderId,
   });
 
   final int id;
@@ -79,31 +82,48 @@ class Inspection extends Equatable {
   final DateTime? createdAt;
   final String? reportedByName;
 
+  /// From InspectionSerializer.get_is_converted — whether a Work Order has
+  /// already been migrated from this inspection. This is the authoritative
+  /// signal, independent of [status] (which the server may or may not also
+  /// reflect as CONVERTED).
+  final bool isConverted;
+
+  /// From InspectionSerializer.get_wo_id — the linked Work Order's id, when
+  /// [isConverted] is true.
+  final int? workOrderId;
+
   factory Inspection.fromJson(Map<String, dynamic> json) {
     DateTime? parseDate(dynamic d) {
       if (d == null || d == '') return null;
       return DateTime.tryParse(d.toString());
     }
 
+    int? fkId(dynamic v) => v is Map ? asJsonInt(v['id']) : asJsonInt(v);
+
     return Inspection(
-      id: json['id'] as int? ?? 0,
-      inspectionNumber: json['inspection_number'] as String? ??
-          json['ticket_number'] as String? ??
+      id: asJsonInt(json['id']) ?? 0,
+      inspectionNumber: asJsonString(json['inspection_number']) ??
+          asJsonString(json['ticket_number']) ??
           'INSP-${json['id']}',
-      title: json['title'] as String? ?? 'Untitled Inspection',
-      description: json['description'] as String?,
-      status: InspectionStatus.fromString(json['status'] as String?),
-      priority: InspectionPriority.fromString(json['priority'] as String? ?? json['severity'] as String?),
-      stationId: json['station'] as int?,
-      stationName: json['station_name'] as String?,
-      depotId: json['depot'] as int?,
-      depotName: json['depot_name'] as String?,
-      assetId: json['asset'] as int?,
-      assetName: json['asset_name'] as String?,
+      title: asJsonString(json['title']) ?? 'Untitled Inspection',
+      description: asJsonString(json['description']),
+      status: InspectionStatus.fromString(asJsonString(json['status'])),
+      priority: InspectionPriority.fromString(
+          asJsonString(json['priority']) ?? asJsonString(json['severity'])),
+      stationId: fkId(json['station']),
+      stationName: asJsonString(json['station_name']),
+      depotId: fkId(json['depot']),
+      depotName: asJsonString(json['depot_name']),
+      assetId: fkId(json['asset']),
+      assetName: asJsonString(json['asset_name']),
       scheduledDate: parseDate(json['scheduled_date']),
       completedDate: parseDate(json['completed_date'] ?? json['resolved_at']),
       createdAt: parseDate(json['created_at']),
-      reportedByName: json['reported_by_name'] as String? ?? json['created_by_name'] as String?,
+      reportedByName: asJsonString(json['reported_by_name']) ??
+          asJsonString(json['created_by_name']),
+      isConverted: asJsonBool(json['is_converted']) ?? false,
+      workOrderId: asJsonInt(
+          json['wo_id'] ?? json['work_order_id'] ?? json['work_order']),
     );
   }
 
@@ -125,5 +145,7 @@ class Inspection extends Equatable {
         completedDate,
         createdAt,
         reportedByName,
+        isConverted,
+        workOrderId,
       ];
 }

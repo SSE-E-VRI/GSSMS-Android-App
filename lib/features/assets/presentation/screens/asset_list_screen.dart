@@ -3,10 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gssms_mobile/core/sync/widgets/sync_status_badge.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
+import 'package:gssms_mobile/core/widgets/org_scope_filter_bar.dart';
 import 'package:gssms_mobile/features/assets/domain/models/asset.dart';
 import 'package:gssms_mobile/features/assets/presentation/controllers/asset_controllers.dart';
 import 'package:gssms_mobile/features/assets/presentation/screens/asset_detail_screen.dart';
 import 'package:gssms_mobile/features/assets/presentation/widgets/qr_scanner_dialog.dart';
+import 'package:gssms_mobile/features/auth/domain/models/user_session.dart';
+import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
+import 'package:gssms_mobile/features/auth/presentation/controllers/auth_state.dart';
 
 class AssetListScreen extends ConsumerStatefulWidget {
   const AssetListScreen({super.key});
@@ -89,6 +93,8 @@ class _AssetListScreenState extends ConsumerState<AssetListScreen> {
   @override
   Widget build(BuildContext context) {
     final listState = ref.watch(assetListControllerProvider);
+    final authState = ref.watch(authControllerProvider);
+    final session = authState is Authenticated ? authState.session : null;
 
     return Scaffold(
       appBar: AppBar(
@@ -120,10 +126,57 @@ class _AssetListScreenState extends ConsumerState<AssetListScreen> {
               minHeight: 2,
             ),
           _buildSearchBar(),
+          if (session != null) _buildOrgScope(listState, session),
+          if (listState is AssetListLoaded && listState.truncated)
+            _buildTruncationNotice(),
           _buildCategoryChips(listState),
           Expanded(child: _buildListBody(listState)),
         ],
       ),
+    );
+  }
+
+  /// The register was too long to fetch whole. Say so — the search box and
+  /// category chips below only filter what was actually downloaded, so a user
+  /// who trusts an empty result here would conclude an asset doesn't exist.
+  Widget _buildTruncationNotice() {
+    return Container(
+      key: const Key('asset_truncation_notice'),
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: AppTheme.warningAmber.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.warningAmber.withOpacity(0.5)),
+      ),
+      child: const Row(
+        children: [
+          Icon(Icons.info_outline, size: 16, color: AppTheme.warningAmber),
+          SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Showing part of the register. Narrow by depot or station to see '
+              'the rest — search and category filters only apply to what is '
+              'listed here.',
+              style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOrgScope(AssetListState state, UserSession session) {
+    final loaded = state is AssetListLoaded
+        ? state
+        : (state is AssetListError ? state.previousLoaded : null);
+    return OrgScopeFilterBar(
+      scope: session.scope,
+      selection: loaded?.orgScope ?? OrgScopeSelection.empty,
+      onChanged: (selection) {
+        ref.read(assetListControllerProvider.notifier).setOrgScope(selection);
+      },
     );
   }
 

@@ -26,13 +26,21 @@ class _WorkOrderListScreenState extends ConsumerState<WorkOrderListScreen> {
   @override
   void initState() {
     super.initState();
+    _searchController.addListener(_onSearchTextChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       ref.read(workOrderListControllerProvider.notifier).fetchWorkOrders();
     });
   }
 
+  void _onSearchTextChanged() {
+    // Rebuild so the clear button appears/disappears with the query.
+    if (mounted) setState(() {});
+  }
+
   @override
   void dispose() {
+    _searchController.removeListener(_onSearchTextChanged);
     _searchController.dispose();
     super.dispose();
   }
@@ -175,6 +183,42 @@ class _WorkOrderListScreenState extends ConsumerState<WorkOrderListScreen> {
     }
 
     if (state is WorkOrderListError) {
+      // A refresh that fails must not wipe the list the user was looking at:
+      // keep showing the stale rows with an inline error and a retry.
+      final previous = state.previousLoaded;
+      if (previous != null) {
+        return Column(
+          children: [
+            Material(
+              color: AppTheme.errorRed.withOpacity(0.08),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Row(
+                  children: [
+                    const Icon(Icons.cloud_off, size: 18, color: AppTheme.errorRed),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        state.message,
+                        style: const TextStyle(fontSize: 12, color: AppTheme.errorRed),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => ref
+                          .read(workOrderListControllerProvider.notifier)
+                          .fetchWorkOrders(forceRefresh: true),
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Expanded(child: _buildLoadedList(previous)),
+          ],
+        );
+      }
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -203,7 +247,14 @@ class _WorkOrderListScreenState extends ConsumerState<WorkOrderListScreen> {
     }
 
     if (state is WorkOrderListLoaded) {
-      final orders = state.filteredOrders;
+      return _buildLoadedList(state);
+    }
+
+    return const SizedBox.shrink();
+  }
+
+  Widget _buildLoadedList(WorkOrderListLoaded state) {
+    final orders = state.filteredOrders;
       if (orders.isEmpty) {
         return RefreshIndicator(
           onRefresh: () => ref
@@ -253,9 +304,6 @@ class _WorkOrderListScreenState extends ConsumerState<WorkOrderListScreen> {
           },
         ),
       );
-    }
-
-    return const SizedBox.shrink();
   }
 }
 

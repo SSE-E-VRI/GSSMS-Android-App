@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gssms_mobile/core/network/dio_client.dart';
+import 'package:gssms_mobile/core/widgets/org_scope_filter_bar.dart';
 import 'package:gssms_mobile/features/dashboard/data/dashboard_api_service.dart';
 import 'package:gssms_mobile/features/dashboard/data/dashboard_repository.dart';
 import 'package:gssms_mobile/features/dashboard/domain/models/dashboard_models.dart';
@@ -28,20 +29,44 @@ class DashboardController extends Notifier<DashboardState> {
 
   IDashboardRepository get _repository => ref.read(dashboardRepositoryProvider);
 
+  DashboardLoaded? _resolvePrevious() {
+    final s = state;
+    if (s is DashboardLoaded) return s;
+    if (s is DashboardError) return s.previousLoaded;
+    return null;
+  }
+
   Future<void> loadDashboard() async {
+    final previous = _resolvePrevious();
     state = const DashboardLoading();
+    await _load(previous?.orgScope ?? OrgScopeSelection.empty, previous);
+  }
+
+  /// Server-side depot filter. Both endpoints AND it with the caller's own
+  /// scope, so this can only narrow what the user is already entitled to see.
+  Future<void> setOrgScope(OrgScopeSelection scope) =>
+      _load(scope, _resolvePrevious());
+
+  Future<void> _load(OrgScopeSelection scope, DashboardLoaded? previous) async {
     try {
       final results = await Future.wait([
-        _repository.fetchAttention(),
-        _repository.fetchSummary(),
+        // attention accepts zone/division/depot; summary accepts depot only.
+        // Passing the same depot to both is what keeps the attention card and
+        // the KPI donut describing one consistent set of work.
+        _repository.fetchAttention(depotId: scope.depotId),
+        _repository.fetchSummary(depotId: scope.depotId),
       ]);
 
       state = DashboardLoaded(
         attention: results[0] as AttentionSummary,
         summary: results[1] as DashboardSummary,
+        orgScope: scope,
       );
     } catch (e) {
-      state = DashboardError('Failed to load dashboard data: $e');
+      state = DashboardError(
+        'Failed to load dashboard data: $e',
+        previousLoaded: previous?.copyWith(orgScope: scope),
+      );
     }
   }
 }

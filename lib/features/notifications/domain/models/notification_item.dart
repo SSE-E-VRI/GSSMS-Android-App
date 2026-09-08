@@ -63,7 +63,7 @@ class NotificationItem extends Equatable {
   static List<NotificationItem> fromWorkOrder(WorkOrder wo, {DateTime? now}) {
     final reference = now ?? DateTime.now();
     final items = <NotificationItem>[];
-    final when = wo.createdAt ?? wo.dueDate ?? reference;
+    final when = wo.createdAt ?? reference;
 
     void add(NotificationType type, String title, String message, DateTime at) {
       items.add(NotificationItem(
@@ -107,7 +107,7 @@ class NotificationItem extends Equatable {
     if (wo.isSlaAtRisk && _isOpen(wo.status)) {
       add(
         NotificationType.slaBreach,
-        'SLA ${wo.slaStatus}',
+        'SLA ${wo.slaStatus ?? "At Risk"}',
         '${wo.displayReference} — ${wo.displayTitle} needs attention.',
         when,
       );

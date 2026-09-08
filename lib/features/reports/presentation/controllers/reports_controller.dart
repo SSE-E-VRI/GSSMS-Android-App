@@ -54,7 +54,8 @@ class ReportsController extends Notifier<ReportsState> {
     final end = endDate ?? previous?.endDate ?? now;
     final start = startDate ?? previous?.startDate ?? now.subtract(const Duration(days: 30));
     final type = infraType ?? previous?.infraType ?? InfraFilterType.all;
-    final id = clearInfraId ? null : (infraId ?? previous?.infraId);
+    final typeChanged = infraType != null && infraType != previous?.infraType;
+    final id = (typeChanged || clearInfraId) ? null : (infraId ?? previous?.infraId);
     final scope = orgScope ?? previous?.orgScope ?? OrgScopeSelection.empty;
 
     state = const ReportsLoading();

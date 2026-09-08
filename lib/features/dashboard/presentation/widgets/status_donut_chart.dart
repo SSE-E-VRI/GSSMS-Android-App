@@ -36,7 +36,8 @@ class StatusDonutChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final displaySegments = segments.isEmpty
+    final hasData = total > 0 && segments.any((s) => s.count > 0);
+    final displaySegments = !hasData
         ? const [WorkOrderStatusSegment(label: 'No Data', count: 1, colorHex: 'CCCCCC')]
         : segments;
 

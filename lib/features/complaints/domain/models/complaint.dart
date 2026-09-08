@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:gssms_mobile/core/utils/json_parsing.dart';
 
 enum ComplaintStatus {
   open('OPEN', 'Open'),
@@ -83,20 +84,24 @@ class Complaint extends Equatable {
       return DateTime.tryParse(d.toString());
     }
 
+    int? fkId(dynamic v) => v is Map ? asJsonInt(v['id']) : asJsonInt(v);
+
     return Complaint(
-      id: json['id'] as int? ?? 0,
-      complaintNumber: json['complaint_number'] as String? ?? 'CMP-${json['id']}',
-      title: json['title'] as String? ?? 'Untitled Complaint',
-      description: json['description'] as String?,
-      status: ComplaintStatus.fromString(json['status'] as String?),
-      severity: ComplaintSeverity.fromString(json['severity'] as String?),
-      stationId: json['station'] as int?,
-      stationName: json['station_name'] as String?,
-      depotId: json['depot'] as int?,
-      depotName: json['depot_name'] as String?,
-      assetId: json['asset'] as int?,
-      assetName: json['asset_name'] as String?,
-      reportedByName: json['reported_by_name'] as String? ?? json['created_by_name'] as String?,
+      id: asJsonInt(json['id']) ?? 0,
+      complaintNumber:
+          asJsonString(json['complaint_number']) ?? 'CMP-${json['id']}',
+      title: asJsonString(json['title']) ?? 'Untitled Complaint',
+      description: asJsonString(json['description']),
+      status: ComplaintStatus.fromString(asJsonString(json['status'])),
+      severity: ComplaintSeverity.fromString(asJsonString(json['severity'])),
+      stationId: fkId(json['station']),
+      stationName: asJsonString(json['station_name']),
+      depotId: fkId(json['depot']),
+      depotName: asJsonString(json['depot_name']),
+      assetId: fkId(json['asset']),
+      assetName: asJsonString(json['asset_name']),
+      reportedByName: asJsonString(json['reported_by_name']) ??
+          asJsonString(json['created_by_name']),
       createdAt: parseDate(json['created_at']),
       resolvedAt: parseDate(json['resolved_at']),
     );

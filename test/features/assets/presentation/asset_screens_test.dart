@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gssms_mobile/features/assets/data/asset_api_service.dart';
 import 'package:gssms_mobile/features/assets/data/asset_repository.dart';
 import 'package:gssms_mobile/features/assets/domain/models/asset.dart';
 import 'package:gssms_mobile/features/assets/presentation/controllers/asset_controllers.dart';
@@ -31,7 +34,14 @@ void main() {
     });
 
     testWidgets('AssetListScreen renders asset card and QR action', (tester) async {
-      when(() => mockRepo.fetchAssets()).thenAnswer((_) async => testAssets);
+      when(() => mockRepo.fetchAssets(
+        zoneId: any(named: 'zoneId'),
+        divisionId: any(named: 'divisionId'),
+        depotId: any(named: 'depotId'),
+        stationId: any(named: 'stationId'),
+      )).thenAnswer(
+        (_) async => const AssetPage(assets: testAssets, truncated: false),
+      );
 
       await tester.pumpWidget(
         ProviderScope(
@@ -68,10 +78,37 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      expect(find.text('Asset #42'), findsOneWidget);
+      // Title reflects the asset's own category, not its internal id.
+      expect(find.text('CLS Panels'), findsOneWidget);
       expect(find.text('Main Panel'), findsOneWidget);
       expect(find.text('SUNTRON'), findsOneWidget);
       expect(find.byKey(const Key('action_log_asset_complaint')), findsOneWidget);
+    });
+
+    testWidgets('AssetDetailScreen falls back to the asset id while loading',
+        (tester) async {
+      final completer = Completer<Asset>();
+      when(() => mockRepo.fetchAssetById(42)).thenAnswer((_) => completer.future);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            assetRepositoryProvider.overrideWithValue(mockRepo),
+          ],
+          child: const MaterialApp(
+            home: AssetDetailScreen(assetId: 42),
+          ),
+        ),
+      );
+      // No pumpAndSettle: the fetch is still pending, so there is no category
+      // to title the screen with yet.
+      await tester.pump();
+
+      expect(find.text('Asset #42'), findsOneWidget);
+
+      completer.complete(testAssets[0]);
+      await tester.pumpAndSettle();
+      expect(find.text('CLS Panels'), findsOneWidget);
     });
   });
 }

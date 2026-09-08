@@ -27,6 +27,7 @@ class _VerificationWorkspaceScreenState
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       ref
           .read(verificationWorkspaceControllerProvider(widget.workOrderId).notifier)
           .load();
@@ -460,7 +461,11 @@ class _VerificationWorkspaceScreenState
 
   void _showFailureMessage() {
     final state = ref.read(workOrderDetailControllerProvider(widget.workOrderId));
-    final message = state is WorkOrderDetailError ? state.message : 'The request failed. Please try again.';
+    final message = switch (state) {
+      WorkOrderDetailError(:final message) => message,
+      WorkOrderDetailLoaded(:final errorMessage?) => errorMessage,
+      _ => 'The request failed. Please try again.',
+    };
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message), backgroundColor: AppTheme.errorRed),
     );

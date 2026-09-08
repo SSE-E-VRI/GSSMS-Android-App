@@ -14,11 +14,11 @@ enum OutboxCommandType {
   const OutboxCommandType(this.code);
   final String code;
 
-  static OutboxCommandType fromCode(String code) {
+  static OutboxCommandType? fromCode(String code) {
     for (final t in OutboxCommandType.values) {
       if (t.code == code) return t;
     }
-    return OutboxCommandType.submitLine;
+    return null;
   }
 }
 
@@ -93,15 +93,37 @@ class OutboxCommand extends Equatable {
   }
 
   factory OutboxCommand.fromJson(Map<String, dynamic> json) {
+    final typeCode = json['type']?.toString();
+    final parsedType = typeCode != null ? OutboxCommandType.fromCode(typeCode) : null;
+    if (parsedType == null) {
+      throw FormatException('Unknown or missing outbox command type: ${json['type']}');
+    }
+
+    final rawCreatedAt = json['created_at'];
+    final createdAt = rawCreatedAt is String
+        ? (DateTime.tryParse(rawCreatedAt) ?? DateTime.now())
+        : DateTime.now();
+
+    final entityIdRaw = json['entity_id'];
+    final entityId = entityIdRaw is int ? entityIdRaw : (int.tryParse('$entityIdRaw') ?? 0);
+
+    final rawIdempotencyKey = json['idempotency_key']?.toString();
+    final idempotencyKey = (rawIdempotencyKey == null || rawIdempotencyKey.isEmpty)
+        // Legacy outbox command persisted before idempotencyKey existed —
+        // synthesize a key unique to this command so it can't collide with
+        // another legacy command's empty key on the server's dedup check.
+        ? 'legacy_${typeCode}_${entityId}_${createdAt.millisecondsSinceEpoch}'
+        : rawIdempotencyKey;
+
     return OutboxCommand(
-      idempotencyKey: json['idempotency_key'] as String,
-      type: OutboxCommandType.fromCode(json['type'] as String),
-      entityId: json['entity_id'] as int,
-      payload: Map<String, dynamic>.from(json['payload'] as Map),
-      createdAt: DateTime.parse(json['created_at'] as String),
-      retryCount: json['retry_count'] as int? ?? 0,
-      lastError: json['last_error'] as String?,
-      status: OutboxCommandStatus.fromCode(json['status'] as String? ?? 'PENDING'),
+      idempotencyKey: idempotencyKey,
+      type: parsedType,
+      entityId: entityId,
+      payload: json['payload'] is Map ? Map<String, dynamic>.from(json['payload'] as Map) : {},
+      createdAt: createdAt,
+      retryCount: json['retry_count'] is int ? json['retry_count'] as int : (int.tryParse('${json['retry_count']}') ?? 0),
+      lastError: json['last_error']?.toString(),
+      status: OutboxCommandStatus.fromCode(json['status']?.toString() ?? 'PENDING'),
     );
   }
 

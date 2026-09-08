@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gssms_mobile/core/network/dio_client.dart';
+import 'package:gssms_mobile/core/network/paginated_fetch.dart';
 import 'package:gssms_mobile/features/complaints/domain/models/complaint.dart';
 
 final complaintApiServiceProvider = Provider<ComplaintApiService>((ref) {
@@ -19,7 +20,6 @@ class ComplaintApiService {
     int? zoneId,
     int? divisionId,
     int? depotId,
-    int? stationId,
     String? dateFrom,
     String? dateTo,
   }) async {
@@ -36,31 +36,37 @@ class ComplaintApiService {
     } else if (zoneId != null) {
       query['zone'] = zoneId;
     }
-    if (stationId != null) query['station'] = stationId;
     if (dateFrom != null && dateFrom.isNotEmpty) query['start_date'] = dateFrom;
     if (dateTo != null && dateTo.isNotEmpty) query['end_date'] = dateTo;
 
-    final response = await _dio.get(
-      '/api/v1/complaints/',
-      queryParameters: query,
-    );
+    // ComplaintViewSet sets no pagination_class, so this returns in one
+    // request today; the bounded walk is here so it stays correct if
+    // pagination is ever switched on server-side.
+    final page = await fetchAllPages(_dio, '/api/v1/complaints/', queryParameters: query);
+    return page.items
+        .whereType<Map>()
+        .map((e) => Complaint.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+  }
 
-    final dynamic data = response.data;
-    final List<dynamic> results;
-    if (data is Map<String, dynamic> && data.containsKey('results')) {
-      results = data['results'] as List<dynamic>;
-    } else if (data is List<dynamic>) {
-      results = data;
-    } else {
-      results = [];
-    }
-
-    return results.map((e) => Complaint.fromJson(e as Map<String, dynamic>)).toList();
+  Map<String, dynamic>? _asObject(dynamic data) {
+    if (data is Map<String, dynamic>) return data;
+    if (data is Map) return Map<String, dynamic>.from(data);
+    return null;
   }
 
   Future<Complaint> getComplaint(int id) async {
     final response = await _dio.get('/api/v1/complaints/$id/');
-    return Complaint.fromJson(response.data as Map<String, dynamic>);
+    final data = _asObject(response.data);
+    if (data == null) {
+      throw DioException(
+        requestOptions: response.requestOptions,
+        response: response,
+        type: DioExceptionType.badResponse,
+        message: 'Unexpected complaint payload',
+      );
+    }
+    return Complaint.fromJson(data);
   }
 
   Future<Complaint> createComplaint(Map<String, dynamic> complaintData) async {
@@ -68,6 +74,15 @@ class ComplaintApiService {
       '/api/v1/complaints/',
       data: complaintData,
     );
-    return Complaint.fromJson(response.data as Map<String, dynamic>);
+    final data = _asObject(response.data);
+    if (data == null) {
+      throw DioException(
+        requestOptions: response.requestOptions,
+        response: response,
+        type: DioExceptionType.badResponse,
+        message: 'Unexpected complaint payload',
+      );
+    }
+    return Complaint.fromJson(data);
   }
 }

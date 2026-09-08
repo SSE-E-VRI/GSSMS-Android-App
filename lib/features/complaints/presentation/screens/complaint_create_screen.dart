@@ -88,11 +88,14 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
                     children: [
                       const Icon(Icons.build_circle_outlined, color: AppTheme.railwayBlue),
                       const SizedBox(width: 8),
-                      Text(
-                        'Target Asset: ${widget.initialAssetName}',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.railwayBlue,
+                      Expanded(
+                        child: Text(
+                          'Target Asset: ${widget.initialAssetName}',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.railwayBlue,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],

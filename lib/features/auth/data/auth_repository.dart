@@ -43,6 +43,8 @@ class AuthRepository implements IAuthRepository {
   @override
   String? get currentAccessToken => _currentAccessToken;
 
+  Future<String?>? _inFlightRefresh;
+
   @override
   Future<UserSession> login({
     required String username,
@@ -55,12 +57,15 @@ class AuthRepository implements IAuthRepository {
       otp: otp,
     );
 
+    final newSession = UserSession.fromJwt(tokens.accessToken);
     if (tokens.refreshToken != null && tokens.refreshToken!.isNotEmpty) {
       await _secureStorage.saveRefreshToken(tokens.refreshToken!);
+    } else {
+      await _secureStorage.clearTokens();
     }
 
     _currentAccessToken = tokens.accessToken;
-    _currentSession = UserSession.fromJwt(tokens.accessToken);
+    _currentSession = newSession;
     return _currentSession!;
   }
 
@@ -75,24 +80,42 @@ class AuthRepository implements IAuthRepository {
 
     try {
       final tokens = await _apiService.refreshToken(storedRefreshToken);
+      final newSession = UserSession.fromJwt(tokens.accessToken);
+
       if (tokens.refreshToken != null && tokens.refreshToken != storedRefreshToken) {
         await _secureStorage.saveRefreshToken(tokens.refreshToken!);
       }
 
       _currentAccessToken = tokens.accessToken;
-      _currentSession = UserSession.fromJwt(tokens.accessToken);
+      _currentSession = newSession;
       return _currentSession;
     } on GuestExpiredException {
       await logout();
       rethrow;
-    } catch (_) {
+    } on UnauthorizedException {
       await logout();
+      return null;
+    } catch (_) {
+      // Network/IO transient failure: do NOT erase credentials or call logout.
       return null;
     }
   }
 
   @override
   Future<String?> refreshToken() async {
+    final existing = _inFlightRefresh;
+    if (existing != null) return existing;
+
+    final refreshFuture = _performRefreshToken();
+    _inFlightRefresh = refreshFuture;
+    try {
+      return await refreshFuture;
+    } finally {
+      _inFlightRefresh = null;
+    }
+  }
+
+  Future<String?> _performRefreshToken() async {
     final storedRefreshToken = await _secureStorage.getRefreshToken();
     if (storedRefreshToken == null || storedRefreshToken.isEmpty) {
       await logout();
@@ -101,15 +124,23 @@ class AuthRepository implements IAuthRepository {
 
     try {
       final tokens = await _apiService.refreshToken(storedRefreshToken);
+      final newSession = UserSession.fromJwt(tokens.accessToken);
+
       if (tokens.refreshToken != null && tokens.refreshToken != storedRefreshToken) {
         await _secureStorage.saveRefreshToken(tokens.refreshToken!);
       }
 
       _currentAccessToken = tokens.accessToken;
-      _currentSession = UserSession.fromJwt(tokens.accessToken);
+      _currentSession = newSession;
       return _currentAccessToken;
-    } catch (e) {
+    } on UnauthorizedException {
       await logout();
+      return null;
+    } on GuestExpiredException {
+      await logout();
+      return null;
+    } catch (_) {
+      // Transient error: do NOT logout. Return null so request retry can handle standard error.
       return null;
     }
   }

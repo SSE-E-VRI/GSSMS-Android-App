@@ -109,6 +109,7 @@ class WorkOrderDetailLoaded extends WorkOrderDetailState {
     required this.workOrder,
     this.isTransitioning = false,
     this.actionMessage,
+    this.errorMessage,
     this.actions,
     this.audit,
   });
@@ -116,6 +117,7 @@ class WorkOrderDetailLoaded extends WorkOrderDetailState {
   final WorkOrder workOrder;
   final bool isTransitioning;
   final String? actionMessage;
+  final String? errorMessage;
 
   /// Transitions the server permits. Null until loaded, and left null when the
   /// lookup fails so the UI can distinguish "not known" from "none allowed".
@@ -128,6 +130,7 @@ class WorkOrderDetailLoaded extends WorkOrderDetailState {
     WorkOrder? workOrder,
     bool? isTransitioning,
     String? actionMessage,
+    String? errorMessage,
     WorkOrderActionSet? actions,
     WorkOrderAudit? audit,
   }) {
@@ -135,6 +138,7 @@ class WorkOrderDetailLoaded extends WorkOrderDetailState {
       workOrder: workOrder ?? this.workOrder,
       isTransitioning: isTransitioning ?? this.isTransitioning,
       actionMessage: actionMessage,
+      errorMessage: errorMessage,
       actions: actions ?? this.actions,
       audit: audit ?? this.audit,
     );
@@ -142,7 +146,7 @@ class WorkOrderDetailLoaded extends WorkOrderDetailState {
 
   @override
   List<Object?> get props =>
-      [workOrder, isTransitioning, actionMessage, actions, audit];
+      [workOrder, isTransitioning, actionMessage, errorMessage, actions, audit];
 }
 
 class WorkOrderDetailError extends WorkOrderDetailState {
