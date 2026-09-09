@@ -149,7 +149,8 @@ void main() {
           storageDir: tempDir,
         );
         // Pre-populate disk cache
-        await cache.savePhotoBytes(99, samplePngBytes, ext: 'png');
+        await cache.savePhotoBytes(99, samplePngBytes,
+            ext: 'png', photoUrl: '/media/profile_pictures/user_99.png');
 
         await tester.pumpWidget(
           ProviderScope(
@@ -187,6 +188,8 @@ void main() {
     Directory createTempDir() =>
         Directory.systemTemp.createTempSync('profile_cache_hygiene_');
 
+    int filesIn(Directory dir) => dir.listSync().whereType<File>().length;
+
     test('replacing a photo clears stale other-extension files', () async {
       final tempDir = createTempDir();
       try {
@@ -194,20 +197,71 @@ void main() {
           baseUrl: 'http://localhost:8000',
           storageDir: tempDir,
         );
-        await cache.savePhotoBytes(7, samplePngBytes, ext: 'jpg');
+        const url = '/media/profile_pictures/u7.jpg';
+        await cache.savePhotoBytes(7, samplePngBytes, ext: 'jpg', photoUrl: url);
+        expect(filesIn(tempDir), 1);
+
+        await cache.savePhotoBytes(7, samplePngBytes, ext: 'png', photoUrl: url);
+        // The stale jpg must not survive to win the lookup order.
+        expect(filesIn(tempDir), 1);
+        final got = await cache.getCachedPhoto(7, photoUrl: url);
+        expect(got?.path.endsWith('.png'), isTrue);
+      } finally {
+        if (tempDir.existsSync()) tempDir.deleteSync(recursive: true);
+      }
+    });
+
+    test('a new photo URL misses the cache and purges the superseded copy', () async {
+      // Regression: entries used to be keyed on userId alone, so a photo
+      // replaced on the web was masked by the device's old copy forever.
+      final tempDir = createTempDir();
+      try {
+        final cache = ProfilePhotoCache(
+          baseUrl: 'http://localhost:8000',
+          storageDir: tempDir,
+        );
+        const oldUrl = '/media/profile_pictures/u7.jpg';
+        const newUrl = '/media/profile_pictures/u7_a1b2c3.jpg';
+
+        await cache.savePhotoBytes(7, samplePngBytes, ext: 'jpg', photoUrl: oldUrl);
+        expect(await cache.getCachedPhoto(7, photoUrl: oldUrl), isNotNull);
+
         expect(
-          File('${tempDir.path}${Platform.pathSeparator}profile_7.jpg').existsSync(),
-          isTrue,
+          await cache.getCachedPhoto(7, photoUrl: newUrl),
+          isNull,
+          reason: 'a changed URL must miss so the caller re-downloads',
         );
 
-        await cache.savePhotoBytes(7, samplePngBytes, ext: 'png');
-        // The stale jpg must not survive to win the lookup order.
+        await cache.savePhotoBytes(7, samplePngBytes, ext: 'jpg', photoUrl: newUrl);
+        expect(await cache.getCachedPhoto(7, photoUrl: newUrl), isNotNull);
         expect(
-          File('${tempDir.path}${Platform.pathSeparator}profile_7.jpg').existsSync(),
-          isFalse,
+          filesIn(tempDir),
+          1,
+          reason: 'the superseded entry must be purged, not accumulated',
         );
-        final got = await cache.getCachedPhoto(7);
-        expect(got?.path.endsWith('profile_7.png'), isTrue);
+      } finally {
+        if (tempDir.existsSync()) tempDir.deleteSync(recursive: true);
+      }
+    });
+
+    test('clearCachedPhoto removes every entry for the user', () async {
+      final tempDir = createTempDir();
+      try {
+        final cache = ProfilePhotoCache(
+          baseUrl: 'http://localhost:8000',
+          storageDir: tempDir,
+        );
+        await cache.savePhotoBytes(7, samplePngBytes, photoUrl: '/media/a.jpg');
+        await cache.savePhotoBytes(8, samplePngBytes, photoUrl: '/media/b.jpg');
+
+        await cache.clearCachedPhoto(7);
+
+        expect(await cache.getCachedPhoto(7, photoUrl: '/media/a.jpg'), isNull);
+        expect(
+          await cache.getCachedPhoto(8, photoUrl: '/media/b.jpg'),
+          isNotNull,
+          reason: 'another user\'s cache must be untouched',
+        );
       } finally {
         if (tempDir.existsSync()) tempDir.deleteSync(recursive: true);
       }
@@ -237,7 +291,9 @@ void main() {
         final result =
             await cache.downloadAndCache(8, '/media/profile_pictures/u8.jpg');
         expect(result, isNull);
-        expect(await cache.getCachedPhoto(8), isNull);
+        expect(
+            await cache.getCachedPhoto(8, photoUrl: '/media/profile_pictures/u8.jpg'),
+            isNull);
       } finally {
         if (tempDir.existsSync()) tempDir.deleteSync(recursive: true);
       }
@@ -267,7 +323,9 @@ void main() {
         final result =
             await cache.downloadAndCache(9, '/media/profile_pictures/u9.jpg');
         expect(result, isNotNull);
-        expect(await cache.getCachedPhoto(9), isNotNull);
+        expect(
+            await cache.getCachedPhoto(9, photoUrl: '/media/profile_pictures/u9.jpg'),
+            isNotNull);
       } finally {
         if (tempDir.existsSync()) tempDir.deleteSync(recursive: true);
       }

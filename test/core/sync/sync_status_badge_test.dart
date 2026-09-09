@@ -64,6 +64,81 @@ void main() {
       expect(find.text('Syncing — 2 changes queued'), findsOneWidget);
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
     });
+
+    testWidgets('stays hidden when online with only a failed command counted separately',
+        (tester) async {
+      // Regression: attentionCount used to be folded into pendingCount, which
+      // left the amber strip up permanently — reading "Syncing" — on an online,
+      // idle app that had one rejected command.
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            syncManagerProvider.overrideWith(() => _TestSyncManager(
+                  const SyncState(
+                    mode: SyncConnectivityMode.online,
+                    pendingCount: 0,
+                    attentionCount: 1,
+                  ),
+                )),
+          ],
+          child: const MaterialApp(
+            home: Scaffold(body: Center(child: SyncStatusBadge())),
+          ),
+        ),
+      );
+
+      expect(
+        find.byKey(const Key('sync_status_badge')),
+        findsNothing,
+        reason: 'stuck work is not queued work and must not claim to be syncing',
+      );
+      expect(find.textContaining('Syncing'), findsNothing);
+      expect(find.textContaining('Offline'), findsNothing);
+    });
+
+    testWidgets('renders an actionable attention strip for stuck commands',
+        (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            syncManagerProvider.overrideWith(() => _TestSyncManager(
+                  const SyncState(
+                    mode: SyncConnectivityMode.online,
+                    pendingCount: 0,
+                    attentionCount: 2,
+                  ),
+                )),
+          ],
+          child: const MaterialApp(
+            home: Scaffold(body: Center(child: SyncStatusBadge())),
+          ),
+        ),
+      );
+
+      expect(find.byKey(const Key('sync_status_badge_attention')), findsOneWidget);
+      expect(find.text('2 changes need attention — tap to retry'), findsOneWidget);
+      expect(find.byIcon(Icons.error_outline), findsOneWidget);
+    });
+
+    testWidgets('singularises the count', (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            syncManagerProvider.overrideWith(() => _TestSyncManager(
+                  const SyncState(
+                    mode: SyncConnectivityMode.offline,
+                    pendingCount: 1,
+                  ),
+                )),
+          ],
+          child: const MaterialApp(
+            home: Scaffold(body: Center(child: SyncStatusBadge())),
+          ),
+        ),
+      );
+
+      expect(find.text('Offline — 1 change queued'), findsOneWidget);
+    });
   });
 }
 

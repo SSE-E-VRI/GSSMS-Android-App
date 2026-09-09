@@ -69,7 +69,8 @@ class _ProfileAvatarState extends ConsumerState<ProfileAvatar> {
     final cache = ref.read(profilePhotoCacheProvider);
 
     // 1. Check disk cache first for instant / offline display
-    final cached = await cache.getCachedPhoto(userId);
+    final cached =
+        await cache.getCachedPhoto(userId, photoUrl: widget.photoUrl);
     if (cached != null && mounted) {
       setState(() {
         _cachedFile = cached;

@@ -22,18 +22,34 @@ class SyncState extends Equatable {
   const SyncState({
     this.mode = SyncConnectivityMode.online,
     this.pendingCount = 0,
+    this.attentionCount = 0,
     this.lastSyncTime,
     this.lastError,
   });
 
   final SyncConnectivityMode mode;
+
+  /// Commands that will still sync on their own: status PENDING or SYNCING.
+  ///
+  /// Deliberately excludes FAILED and CONFLICT. Those never drain without the
+  /// user acting, so counting them here would leave the offline banner up
+  /// forever on an online, idle app — see [attentionCount].
   final int pendingCount;
+
+  /// Commands stuck in FAILED or CONFLICT that need the user to retry or
+  /// discard them.
+  final int attentionCount;
+
   final DateTime? lastSyncTime;
   final String? lastError;
+
+  /// True when nothing is queued and nothing is stuck.
+  bool get isFullySynced => pendingCount == 0 && attentionCount == 0;
 
   SyncState copyWith({
     SyncConnectivityMode? mode,
     int? pendingCount,
+    int? attentionCount,
     DateTime? lastSyncTime,
     String? lastError,
     bool clearError = false,
@@ -41,14 +57,30 @@ class SyncState extends Equatable {
     return SyncState(
       mode: mode ?? this.mode,
       pendingCount: pendingCount ?? this.pendingCount,
+      attentionCount: attentionCount ?? this.attentionCount,
       lastSyncTime: lastSyncTime ?? this.lastSyncTime,
       lastError: clearError ? null : (lastError ?? this.lastError),
     );
   }
 
   @override
-  List<Object?> get props => [mode, pendingCount, lastSyncTime, lastError];
+  List<Object?> get props =>
+      [mode, pendingCount, attentionCount, lastSyncTime, lastError];
 }
+
+/// Counts commands that still drain on their own.
+int _countQueued(Iterable<OutboxCommand> commands) => commands
+    .where((c) =>
+        c.status == OutboxCommandStatus.pending ||
+        c.status == OutboxCommandStatus.syncing)
+    .length;
+
+/// Counts commands that cannot drain without the user acting.
+int _countNeedsAttention(Iterable<OutboxCommand> commands) => commands
+    .where((c) =>
+        c.status == OutboxCommandStatus.failed ||
+        c.status == OutboxCommandStatus.conflict)
+    .length;
 
 final localCacheServiceProvider = Provider<ILocalCacheService>((ref) {
   return LocalCacheService();
@@ -76,24 +108,21 @@ class SyncManager extends Notifier<SyncState> {
 
   Future<int?> _cacheOwnerUserId() => _cacheService.getCacheOwnerUserId();
 
-  /// Checks whether [cmd] depends on another command that has not synced yet.
-  /// Enforces:
-  /// 1. Explicit [OutboxCommand.dependsOn] dependencies.
-  /// 2. Ordering guard: an attachment command must NEVER replay before
-  ///    `submitLine` for the same line has succeeded.
+  /// Checks whether [cmd] must wait for another command in this drain.
+  ///
+  /// There is exactly one ordering rule, stated explicitly rather than through
+  /// a general dependency field: a line attachment must never replay before
+  /// `submitLine` for the same record and line has succeeded.
+  ///
+  /// A general `dependsOn` field used to exist here but nothing ever populated
+  /// it, so it read as a safety mechanism while enforcing nothing. If another
+  /// command type ever needs ordering, add its rule below — and a test — so
+  /// the guarantee stays visible in one place.
   bool _hasUnsyncedDependency(
     OutboxCommand cmd,
     List<OutboxCommand> scopedCommands,
     Set<String> syncedKeys,
   ) {
-    if (cmd.dependsOn != null && cmd.dependsOn!.isNotEmpty) {
-      final dep = cmd.dependsOn!;
-      if (!syncedKeys.contains(dep)) {
-        final hasDepInScope = scopedCommands.any((c) => c.idempotencyKey == dep);
-        if (hasDepInScope) return true;
-      }
-    }
-
     if (cmd.type == OutboxCommandType.uploadLineAttachment) {
       final lineId = cmd.payload['line_id'];
       if (lineId != null) {
@@ -117,8 +146,10 @@ class SyncManager extends Notifier<SyncState> {
 
   Future<void> refreshPendingCount() async {
     final commands = await _cacheService.getOutboxCommands();
-    final pending = commands.where((c) => c.status != OutboxCommandStatus.synced).length;
-    state = state.copyWith(pendingCount: pending);
+    state = state.copyWith(
+      pendingCount: _countQueued(commands),
+      attentionCount: _countNeedsAttention(commands),
+    );
   }
 
   Future<T> _synchronized<T>(Future<T> Function() action) {
@@ -188,9 +219,8 @@ class SyncManager extends Notifier<SyncState> {
           }
           state = state.copyWith(
             mode: SyncConnectivityMode.online,
-            pendingCount: scopedCommands
-                .where((c) => c.status != OutboxCommandStatus.synced)
-                .length,
+            pendingCount: _countQueued(scopedCommands),
+            attentionCount: _countNeedsAttention(scopedCommands),
             lastSyncTime: DateTime.now(),
           );
           return;
@@ -291,11 +321,14 @@ class SyncManager extends Notifier<SyncState> {
             excludePaths: queuedPaths,
           );
         } catch (_) {}
-        final activePending = remainingCommands.where((c) => c.status == OutboxCommandStatus.pending).length;
+        final queued = _countQueued(remainingCommands);
 
         state = state.copyWith(
-          mode: activePending == 0 ? SyncConnectivityMode.online : SyncConnectivityMode.offline,
-          pendingCount: remainingCommands.length,
+          mode: queued == 0
+              ? SyncConnectivityMode.online
+              : SyncConnectivityMode.offline,
+          pendingCount: queued,
+          attentionCount: _countNeedsAttention(remainingCommands),
           lastSyncTime: DateTime.now(),
         );
       } finally {
@@ -317,6 +350,30 @@ class SyncManager extends Notifier<SyncState> {
         }
         return c;
       }).toList();
+      await _cacheService.saveOutboxCommands(updated);
+      await refreshPendingCount();
+    });
+    await drainOutbox();
+  }
+
+  /// Resets every FAILED or CONFLICT command back to pending and drains.
+  ///
+  /// This is the only route out of [SyncState.attentionCount] for command
+  /// types with no per-item retry affordance of their own (submitLine,
+  /// uploadEvidence); without it a single rejected line would leave the
+  /// status banner up permanently.
+  Future<void> retryAllFailed() async {
+    await _synchronized(() async {
+      final commands = await _cacheService.getOutboxCommands();
+      final updated = commands
+          .map((c) => c.status == OutboxCommandStatus.failed ||
+                  c.status == OutboxCommandStatus.conflict
+              ? c.copyWith(
+                  status: OutboxCommandStatus.pending,
+                  clearError: true,
+                )
+              : c)
+          .toList();
       await _cacheService.saveOutboxCommands(updated);
       await refreshPendingCount();
     });

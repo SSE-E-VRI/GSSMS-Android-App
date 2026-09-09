@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
@@ -23,6 +24,40 @@ enum EvidenceKind {
     }
     return EvidenceKind.proof;
   }
+}
+
+/// Long edge, in pixels, that a stored evidence photo is scaled down to.
+const int kEvidenceMaxEdge = 1600;
+
+/// JPEG quality used for the re-encode.
+const int kEvidenceJpegQuality = 80;
+
+/// Bakes EXIF orientation into pixels, strips every other EXIF tag (GPS
+/// included — MOBILE_APP_SSOT.md §12 keeps location in columns, never in the
+/// image), scales the long edge to [kEvidenceMaxEdge] and re-encodes as JPEG.
+///
+/// Returns null when the bytes cannot be decoded, so the caller can fall back
+/// to storing the original.
+///
+/// Top-level and synchronous so it can be handed to `compute`.
+Uint8List? normalizeEvidenceJpeg(Uint8List rawBytes) {
+  final decoded = img.decodeImage(rawBytes);
+  if (decoded == null) return null;
+
+  final oriented = img.bakeOrientation(decoded);
+
+  img.Image resized = oriented;
+  final maxEdge =
+      oriented.width > oriented.height ? oriented.width : oriented.height;
+  if (maxEdge > kEvidenceMaxEdge) {
+    if (oriented.width >= oriented.height) {
+      resized = img.copyResize(oriented, width: kEvidenceMaxEdge);
+    } else {
+      resized = img.copyResize(oriented, height: kEvidenceMaxEdge);
+    }
+  }
+
+  return img.encodeJpg(resized, quality: kEvidenceJpegQuality);
 }
 
 /// Constraints enforced by the backend's `validate_jpeg` on
@@ -123,26 +158,16 @@ class EvidenceService {
 
     try {
       final rawBytes = await source.readAsBytes();
-      final decoded = img.decodeImage(rawBytes);
 
-      if (decoded != null) {
-        // 1. Bake orientation into pixels so orientation is preserved without EXIF tags
-        final oriented = img.bakeOrientation(decoded);
+      // decode/bake/resize/encode are pure Dart and would otherwise run on the
+      // UI isolate, freezing the checklist for the whole of a multi-hundred-ms
+      // encode — on the interaction a technician repeats most. The picker's
+      // maxWidth/maxHeight is best-effort per platform, so an unresized
+      // full-resolution pick can also mean a ~48 MB RGBA decode; neither
+      // belongs on the main isolate.
+      final processedBytes = await _runImageProcessing(rawBytes);
 
-        // 2. Downscale long edge to max 1600px
-        img.Image resized = oriented;
-        final maxEdge =
-            oriented.width > oriented.height ? oriented.width : oriented.height;
-        if (maxEdge > 1600) {
-          if (oriented.width >= oriented.height) {
-            resized = img.copyResize(oriented, width: 1600);
-          } else {
-            resized = img.copyResize(oriented, height: 1600);
-          }
-        }
-
-        // 3. Encode to clean JPEG at quality 80 (omits EXIF metadata)
-        final processedBytes = img.encodeJpg(resized, quality: 80);
+      if (processedBytes != null) {
         final targetFile = File(target);
         await targetFile.writeAsBytes(processedBytes);
         return EvidenceFile(
@@ -162,6 +187,17 @@ class EvidenceService {
     } on FileSystemException catch (e) {
       throw FileSystemException('Could not save proof photo: ${e.message}', target);
     }
+  }
+
+  /// Hook so tests can run the transform inline instead of paying for an
+  /// isolate spawn per capture.
+  @visibleForTesting
+  Future<Uint8List?> Function(Uint8List bytes)? processImageOverride;
+
+  Future<Uint8List?> _runImageProcessing(Uint8List rawBytes) {
+    final override = processImageOverride;
+    if (override != null) return override(rawBytes);
+    return compute(normalizeEvidenceJpeg, rawBytes);
   }
 
   /// Returns total bytes occupied by local evidence photos in the app's evidence directory.

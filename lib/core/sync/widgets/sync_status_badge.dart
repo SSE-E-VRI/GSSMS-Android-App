@@ -5,78 +5,151 @@ import 'package:gssms_mobile/core/theme/app_theme.dart';
 
 /// Inverted sync status banner.
 ///
-/// Renders nothing when online and fully synchronized.
-/// Renders a full-width amber "Offline — N changes queued" strip when offline
-/// or when changes are pending background synchronization.
+/// Three states, in priority order:
+///  * Stuck work (FAILED/CONFLICT) — red strip, tap to retry. Shown first
+///    because it is the only state that needs the user to do something.
+///  * Queued work (PENDING/SYNCING) — amber strip, tap to drain now.
+///  * Everything synced and online — renders nothing.
+///
+/// The stuck and queued counts are deliberately separate: a permanently
+/// rejected command never drains on its own, so folding it into the queued
+/// count would leave an "Offline"/"Syncing" strip on screen forever on an
+/// online, idle app.
 class SyncStatusBadge extends ConsumerWidget {
   const SyncStatusBadge({super.key});
+
+  static String _changes(int n) => n == 1 ? '1 change' : '$n changes';
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final syncState = ref.watch(syncManagerProvider);
 
-    // Render nothing when online and synced.
+    if (syncState.attentionCount > 0) {
+      return _Strip(
+        badgeKey: const Key('sync_status_badge_attention'),
+        background: AppTheme.errorRed,
+        foreground: Colors.white,
+        icon: Icons.error_outline,
+        message:
+            '${_changes(syncState.attentionCount)} need attention — tap to retry',
+        semanticLabel:
+            'Sync problem. ${_changes(syncState.attentionCount)} could not be sent. '
+            'Activate to retry.',
+        onTap: () async {
+          final messenger = ScaffoldMessenger.of(context);
+          await ref.read(syncManagerProvider.notifier).retryAllFailed();
+          messenger.showSnackBar(
+            const SnackBar(
+              content: Text('Retrying changes that could not be sent...'),
+              duration: Duration(seconds: 2),
+            ),
+          );
+        },
+      );
+    }
+
+    // Nothing queued and nothing stuck: the connection is not worth screen space.
     if (syncState.mode == SyncConnectivityMode.online &&
         syncState.pendingCount == 0) {
       return const SizedBox.shrink();
     }
 
-    final message = syncState.mode == SyncConnectivityMode.offline
-        ? 'Offline — ${syncState.pendingCount} changes queued'
-        : 'Syncing — ${syncState.pendingCount} changes queued';
+    final syncing = syncState.mode == SyncConnectivityMode.syncing;
+    final message = syncing
+        ? 'Syncing — ${_changes(syncState.pendingCount)} queued'
+        : 'Offline — ${_changes(syncState.pendingCount)} queued';
 
-    return InkWell(
-      key: const Key('sync_status_badge'),
-      onTap: () {
-        ref.read(syncManagerProvider.notifier).drainOutbox();
-        ScaffoldMessenger.of(context).showSnackBar(
+    return _Strip(
+      badgeKey: const Key('sync_status_badge'),
+      background: AppTheme.warningAmber,
+      foreground: Colors.black87,
+      icon: Icons.cloud_off_outlined,
+      showSpinner: syncing,
+      message: message,
+      semanticLabel: syncing
+          ? 'Syncing ${_changes(syncState.pendingCount)}.'
+          : 'Offline. ${_changes(syncState.pendingCount)} queued. Activate to retry now.',
+      onTap: () async {
+        final messenger = ScaffoldMessenger.of(context);
+        await ref.read(syncManagerProvider.notifier).drainOutbox();
+        messenger.showSnackBar(
           SnackBar(
-            content: Text(
-              syncState.pendingCount > 0
-                  ? 'Syncing ${syncState.pendingCount} pending items...'
-                  : 'Connectivity: ${syncState.mode.label}',
-            ),
+            content: Text('Syncing ${_changes(syncState.pendingCount)}...'),
             duration: const Duration(seconds: 2),
           ),
         );
       },
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        color: AppTheme.warningAmber,
-        child: Row(
-          children: [
-            if (syncState.mode == SyncConnectivityMode.syncing)
-              const SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: Colors.black87,
-                ),
-              )
-            else
-              const Icon(
-                Icons.cloud_off_outlined,
-                size: 16,
-                color: Colors.black87,
-              ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                message,
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      color: Colors.black87,
-                      fontWeight: FontWeight.bold,
-                    ) ??
-                    const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
+    );
+  }
+}
+
+class _Strip extends StatelessWidget {
+  const _Strip({
+    required this.badgeKey,
+    required this.background,
+    required this.foreground,
+    required this.icon,
+    required this.message,
+    required this.semanticLabel,
+    required this.onTap,
+    this.showSpinner = false,
+  });
+
+  final Key badgeKey;
+  final Color background;
+  final Color foreground;
+  final IconData icon;
+  final String message;
+  final String semanticLabel;
+  final Future<void> Function() onTap;
+  final bool showSpinner;
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      liveRegion: true,
+      label: semanticLabel,
+      child: ExcludeSemantics(
+        child: InkWell(
+          key: badgeKey,
+          onTap: onTap,
+          child: Container(
+            width: double.infinity,
+            constraints: const BoxConstraints(minHeight: 48),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            color: background,
+            child: Row(
+              children: [
+                if (showSpinner)
+                  SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: foreground,
                     ),
-              ),
+                  )
+                else
+                  Icon(icon, size: 16, color: foreground),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    message,
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                              color: foreground,
+                              fontWeight: FontWeight.bold,
+                            ) ??
+                        TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: foreground,
+                        ),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
