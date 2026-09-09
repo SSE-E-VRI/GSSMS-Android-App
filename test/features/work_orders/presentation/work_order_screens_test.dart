@@ -265,7 +265,7 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      expect(find.text('Checklist #55'), findsOneWidget);
+      expect(find.byKey(const Key('checklist_overflow_menu')), findsOneWidget);
       expect(find.text('Check Transformer Oil Level'), findsOneWidget);
       expect(find.text('Normal'), findsOneWidget);
       expect(find.byKey(const Key('complete_checklist_button')), findsOneWidget);

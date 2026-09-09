@@ -113,26 +113,17 @@ class _AssetListScreenState extends ConsumerState<AssetListScreen> {
       appBar: AppBar(
         title: const Text('Asset Registry'),
         actions: [
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 12),
-            child: SyncStatusBadge(),
-          ),
           IconButton(
             key: const Key('action_scan_qr'),
             icon: const Icon(Icons.qr_code_scanner),
             tooltip: 'Scan Barcode / QR',
             onPressed: _openQrScanner,
           ),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () => ref
-                .read(assetListControllerProvider.notifier)
-                .fetchAssets(forceRefresh: true),
-          ),
         ],
       ),
       body: Column(
         children: [
+          const SyncStatusBadge(),
           if (_isLookingUp)
             const LinearProgressIndicator(
               key: Key('asset_lookup_progress'),
@@ -243,39 +234,36 @@ class _AssetListScreenState extends ConsumerState<AssetListScreen> {
     if (categories.isEmpty) return const SizedBox.shrink();
 
     final selected = state.selectedCategory;
+    final totalCount = state.assets.length;
 
     return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: ChoiceChip(
-                label: const Text('All Categories'),
-                selected: selected == null,
-                onSelected: (_) => ref
-                    .read(assetListControllerProvider.notifier)
-                    .setCategoryFilter(null),
-              ),
-            ),
-            ...categories.map((cat) {
-              final isSelected = selected == cat;
-              return Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: ChoiceChip(
-                  label: Text(cat),
-                  selected: isSelected,
-                  onSelected: (_) => ref
-                      .read(assetListControllerProvider.notifier)
-                      .setCategoryFilter(cat),
-                ),
-              );
-            }),
-          ],
-        ),
+      width: double.infinity,
+      color: Theme.of(context).cardColor,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          ChoiceChip(
+            label: Text('All Categories ($totalCount)'),
+            selected: selected == null,
+            onSelected: (_) => ref
+                .read(assetListControllerProvider.notifier)
+                .setCategoryFilter(null),
+          ),
+          ...categories.map((cat) {
+            final isSelected = selected == cat;
+            final count =
+                state.assets.where((a) => a.assetCategoryName == cat).length;
+            return ChoiceChip(
+              label: Text('$cat ($count)'),
+              selected: isSelected,
+              onSelected: (_) => ref
+                  .read(assetListControllerProvider.notifier)
+                  .setCategoryFilter(cat),
+            );
+          }),
+        ],
       ),
     );
   }

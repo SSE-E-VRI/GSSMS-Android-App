@@ -6,7 +6,7 @@ import 'package:gssms_mobile/core/sync/widgets/sync_status_badge.dart';
 
 void main() {
   group('SyncStatusBadge Widget Tests', () {
-    testWidgets('renders Online state when all items are synced', (tester) async {
+    testWidgets('renders nothing when online and all items are synced', (tester) async {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
@@ -22,8 +22,7 @@ void main() {
         ),
       );
 
-      expect(find.text('Online'), findsOneWidget);
-      expect(find.byIcon(Icons.cloud_done_outlined), findsOneWidget);
+      expect(find.byKey(const Key('sync_status_badge')), findsNothing);
     });
 
     testWidgets('renders Offline queued count when offline with pending actions', (tester) async {
@@ -42,7 +41,7 @@ void main() {
         ),
       );
 
-      expect(find.text('3 Queued'), findsOneWidget);
+      expect(find.text('Offline — 3 changes queued'), findsOneWidget);
       expect(find.byIcon(Icons.cloud_off_outlined), findsOneWidget);
     });
 
@@ -62,7 +61,7 @@ void main() {
         ),
       );
 
-      expect(find.text('Syncing...'), findsOneWidget);
+      expect(find.text('Syncing — 2 changes queued'), findsOneWidget);
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
     });
   });

@@ -56,7 +56,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(tester.takeException(), isNull);
-    expect(find.text('Save Progress'), findsOneWidget);
-    expect(find.text('Sign & Submit'), findsOneWidget);
+    expect(find.text('Save Progress'), findsNothing);
+    expect(find.byKey(const Key('complete_checklist_button')), findsOneWidget);
+    expect(find.text('1 required items left'), findsOneWidget);
   });
 }

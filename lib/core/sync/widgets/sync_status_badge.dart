@@ -3,6 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gssms_mobile/core/sync/sync_manager.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
 
+/// Inverted sync status banner.
+///
+/// Renders nothing when online and fully synchronized.
+/// Renders a full-width amber "Offline — N changes queued" strip when offline
+/// or when changes are pending background synchronization.
 class SyncStatusBadge extends ConsumerWidget {
   const SyncStatusBadge({super.key});
 
@@ -10,39 +15,18 @@ class SyncStatusBadge extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final syncState = ref.watch(syncManagerProvider);
 
-    Color badgeColor;
-    IconData badgeIcon;
-    String badgeText;
-
-    switch (syncState.mode) {
-      case SyncConnectivityMode.online:
-        if (syncState.pendingCount == 0) {
-          badgeColor = AppTheme.railwayGreen;
-          badgeIcon = Icons.cloud_done_outlined;
-          badgeText = 'Online';
-        } else {
-          badgeColor = AppTheme.warningAmber;
-          badgeIcon = Icons.cloud_upload_outlined;
-          badgeText = '${syncState.pendingCount} Pending';
-        }
-        break;
-      case SyncConnectivityMode.syncing:
-        badgeColor = AppTheme.railwayBlue;
-        badgeIcon = Icons.sync;
-        badgeText = 'Syncing...';
-        break;
-      case SyncConnectivityMode.offline:
-        badgeColor = AppTheme.warningAmber;
-        badgeIcon = Icons.cloud_off_outlined;
-        badgeText = syncState.pendingCount > 0
-            ? '${syncState.pendingCount} Queued'
-            : 'Offline';
-        break;
+    // Render nothing when online and synced.
+    if (syncState.mode == SyncConnectivityMode.online &&
+        syncState.pendingCount == 0) {
+      return const SizedBox.shrink();
     }
+
+    final message = syncState.mode == SyncConnectivityMode.offline
+        ? 'Offline — ${syncState.pendingCount} changes queued'
+        : 'Syncing — ${syncState.pendingCount} changes queued';
 
     return InkWell(
       key: const Key('sync_status_badge'),
-      borderRadius: BorderRadius.circular(16),
       onTap: () {
         ref.read(syncManagerProvider.notifier).drainOutbox();
         ScaffoldMessenger.of(context).showSnackBar(
@@ -57,33 +41,39 @@ class SyncStatusBadge extends ConsumerWidget {
         );
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: badgeColor.withOpacity(0.18),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: badgeColor.withOpacity(0.5)),
-        ),
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        color: AppTheme.warningAmber,
         child: Row(
-          mainAxisSize: MainAxisSize.min,
           children: [
             if (syncState.mode == SyncConnectivityMode.syncing)
-              SizedBox(
-                width: 12,
-                height: 12,
+              const SizedBox(
+                width: 16,
+                height: 16,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: badgeColor,
+                  color: Colors.black87,
                 ),
               )
             else
-              Icon(badgeIcon, size: 14, color: badgeColor),
-            const SizedBox(width: 4),
-            Text(
-              badgeText,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                color: badgeColor,
+              const Icon(
+                Icons.cloud_off_outlined,
+                size: 16,
+                color: Colors.black87,
+              ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                message,
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: Colors.black87,
+                      fontWeight: FontWeight.bold,
+                    ) ??
+                    const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black87,
+                    ),
               ),
             ),
           ],

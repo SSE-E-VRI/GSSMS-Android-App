@@ -67,22 +67,10 @@ class _ComplaintListScreenState extends ConsumerState<ComplaintListScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Complaints & Issues'),
-        actions: [
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 12),
-            child: SyncStatusBadge(),
-          ),
-          const SizedBox(width: 4),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () => ref
-                .read(complaintListControllerProvider.notifier)
-                .fetchComplaints(forceRefresh: true),
-          ),
-        ],
       ),
       body: Column(
         children: [
+          const SyncStatusBadge(),
           _buildSearchBar(),
           if (session != null) _buildOrgScope(listState, session),
           _buildDateRange(listState),
@@ -187,46 +175,48 @@ class _ComplaintListScreenState extends ConsumerState<ComplaintListScreen> {
   Widget _buildFilterChips(ComplaintListState state) {
     final selected = state is ComplaintListLoaded ? state.selectedStatus : null;
 
+    int countFor(ComplaintStatus? status) {
+      if (state is! ComplaintListLoaded) return 0;
+      if (status == null) return state.complaints.length;
+      return state.complaints.where((c) => c.status == status).length;
+    }
+
     final filterOptions = [
-      (label: 'All', status: null),
-      (label: 'Open', status: ComplaintStatus.open),
-      (label: 'In Progress', status: ComplaintStatus.inProgress),
-      (label: 'Resolved', status: ComplaintStatus.resolved),
-      (label: 'Closed', status: ComplaintStatus.closed),
+      (label: 'All (${countFor(null)})', status: null),
+      (label: 'Open (${countFor(ComplaintStatus.open)})', status: ComplaintStatus.open),
+      (label: 'In Progress (${countFor(ComplaintStatus.inProgress)})', status: ComplaintStatus.inProgress),
+      (label: 'Resolved (${countFor(ComplaintStatus.resolved)})', status: ComplaintStatus.resolved),
+      (label: 'Closed (${countFor(ComplaintStatus.closed)})', status: ComplaintStatus.closed),
     ];
 
     return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: filterOptions.map((opt) {
-            final isSelected = selected == opt.status;
-            return Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: FilterChip(
-                label: Text(
-                  opt.label,
-                  style: TextStyle(
-                    fontSize: 12,
+      width: double.infinity,
+      color: Theme.of(context).cardColor,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: filterOptions.map((opt) {
+          final isSelected = selected == opt.status;
+          return FilterChip(
+            label: Text(
+              opt.label,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
                     fontWeight:
                         isSelected ? FontWeight.bold : FontWeight.normal,
                     color: isSelected ? Colors.white : AppTheme.railwayBlue,
                   ),
-                ),
-                selected: isSelected,
-                selectedColor: AppTheme.railwayBlue,
-                checkmarkColor: Colors.white,
-                onSelected: (_) {
-                  ref
-                      .read(complaintListControllerProvider.notifier)
-                      .setStatusFilter(opt.status);
-                },
-              ),
-            );
-          }).toList(),
-        ),
+            ),
+            selected: isSelected,
+            selectedColor: AppTheme.railwayBlue,
+            checkmarkColor: Colors.white,
+            onSelected: (_) {
+              ref
+                  .read(complaintListControllerProvider.notifier)
+                  .setStatusFilter(opt.status);
+            },
+          );
+        }).toList(),
       ),
     );
   }

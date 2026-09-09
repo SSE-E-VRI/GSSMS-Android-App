@@ -1,19 +1,19 @@
-import 'dart:io';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:intl/intl.dart';
-import 'package:gssms_mobile/core/sync/widgets/sync_status_badge.dart';
+import 'package:gssms_mobile/core/theme/app_theme.dart';
 import 'package:gssms_mobile/features/auth/domain/rbac.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_state.dart';
 import 'package:gssms_mobile/features/auth/presentation/widgets/permission_denied_view.dart';
 import 'package:gssms_mobile/features/work_orders/data/evidence_service.dart';
-import 'package:gssms_mobile/core/theme/app_theme.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/maintenance_record.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_order_controllers.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_order_state.dart';
+import 'package:gssms_mobile/features/work_orders/presentation/widgets/checklist_action_bar.dart';
+import 'package:gssms_mobile/features/work_orders/presentation/widgets/checklist_header.dart';
+import 'package:gssms_mobile/features/work_orders/presentation/widgets/checklist_line_card.dart';
 
 class ChecklistScreen extends ConsumerStatefulWidget {
   const ChecklistScreen({super.key, required this.recordId});
@@ -25,8 +25,6 @@ class ChecklistScreen extends ConsumerStatefulWidget {
 }
 
 class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
-  bool _checkedOutBySupervisor = true;
-
   @override
   void initState() {
     super.initState();
@@ -44,7 +42,21 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
   Widget build(BuildContext context) {
     if (!canWriteChecklist(sessionOf(ref))) {
       return Scaffold(
-        appBar: AppBar(title: Text('Checklist #${widget.recordId}')),
+        appBar: AppBar(
+          title: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text('Checklist'),
+              Text(
+                '#${widget.recordId}',
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: Colors.white70,
+                    ),
+              ),
+            ],
+          ),
+        ),
         body: const PermissionDeniedView(),
       );
     }
@@ -71,24 +83,30 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
     });
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Checklist #${widget.recordId}'),
-        actions: [
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 12),
-            child: SyncStatusBadge(),
-          ),
-          const SizedBox(width: 4),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () => ref
-                .read(checklistControllerProvider(widget.recordId).notifier)
-                .loadRecord(),
-          ),
-        ],
-      ),
+      appBar: state is ChecklistLoaded
+          ? null
+          : AppBar(
+              title: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('Checklist'),
+                  Text(
+                    '#${widget.recordId}',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: Colors.white70,
+                        ),
+                  ),
+                ],
+              ),
+            ),
       body: _buildBody(state),
-      bottomNavigationBar: _buildBottomBar(state),
+      bottomNavigationBar: state is ChecklistLoaded
+          ? ChecklistActionBar(
+              state: state,
+              onSignAndSubmit: _showCompletionDialog,
+            )
+          : null,
     );
   }
 
@@ -109,7 +127,9 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
               Text(
                 state.message,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: AppTheme.textSecondary),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AppTheme.textSecondary,
+                    ),
               ),
               const SizedBox(height: 16),
               ElevatedButton(
@@ -129,21 +149,107 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
       final lines = state.displayedLines;
       final categories = state.subCategories;
 
-      return Column(
-        children: [
-          _buildRailwayHeader(record),
-          _buildProgressCard(record),
-          _buildAssetHeader(state.activeSubCategory, lines),
-          if (categories.isNotEmpty) _buildCategoryFilter(categories, state.activeSubCategory),
-          Expanded(
-            child: lines.isEmpty
-                ? const Center(child: Text('No checklist items in this category.'))
-                : ListView.separated(
-                    padding: const EdgeInsets.all(16),
-                    itemCount: lines.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 12),
-                    itemBuilder: (context, index) {
-                      return _ChecklistLineCard(
+      return CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            pinned: true,
+            expandedHeight: 180,
+            actions: [
+              _buildOverflowMenu(state),
+            ],
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(4),
+              child: SizedBox(
+                height: 4,
+                child: LinearProgressIndicator(
+                  value: record.progress,
+                  backgroundColor: Colors.white24,
+                  color: record.progress == 1.0
+                      ? AppTheme.railwayGreen
+                      : AppTheme.accentOrange,
+                ),
+              ),
+            ),
+            flexibleSpace: LayoutBuilder(
+              builder: (context, constraints) {
+                final top = constraints.biggest.height;
+                final isCollapsed = top <=
+                    (kToolbarHeight + MediaQuery.of(context).padding.top + 24);
+                return FlexibleSpaceBar(
+                  collapseMode: CollapseMode.parallax,
+                  background: ChecklistHeader(record: record),
+                  titlePadding: const EdgeInsetsDirectional.only(
+                    start: 56,
+                    bottom: 10,
+                    end: 48,
+                  ),
+                  title: isCollapsed
+                      ? Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '${record.stationName ?? 'Station'} · ${record.templateName ?? 'Schedule'} · ${(record.progress * 100).toInt()}%',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium
+                                  ?.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              '${record.completedLines} of ${record.totalLines}',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .labelSmall
+                                  ?.copyWith(
+                                    color: Colors.white70,
+                                  ),
+                            ),
+                          ],
+                        )
+                      : null,
+                );
+              },
+            ),
+          ),
+          if (categories.isNotEmpty)
+            SliverPersistentHeader(
+              pinned: true,
+              delegate: _SubsystemChipsDelegate(
+                categories: categories,
+                activeCategory: state.activeSubCategory,
+                totalLines: record.activeLines.length,
+                lineCounts: {
+                  for (final cat in categories)
+                    cat: record.activeLines
+                        .where((l) => l.assetCategory == cat)
+                        .length,
+                },
+                onSelected: (cat) => ref
+                    .read(checklistControllerProvider(widget.recordId).notifier)
+                    .setActiveSubCategory(cat),
+              ),
+            ),
+          if (lines.isEmpty)
+            const SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(
+                child: Text('No checklist items in this category.'),
+              ),
+            )
+          else
+            SliverPadding(
+              padding: const EdgeInsets.all(16),
+              sliver: SliverList(
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: ChecklistLineCard(
                         key: ValueKey(lines[index].id),
                         line: lines[index],
                         onSave: (edit) {
@@ -158,10 +264,13 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
                                 remarks: edit.remarks,
                               ));
                         },
-                      );
-                    },
-                  ),
-          ),
+                      ),
+                    );
+                  },
+                  childCount: lines.length,
+                ),
+              ),
+            ),
         ],
       );
     }
@@ -169,339 +278,55 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
     return const Center(child: CircularProgressIndicator());
   }
 
-  Widget _buildRailwayHeader(MaintenanceRecord record) {
-    // Honest placeholders, not fabricated-but-plausible demo values — a
-    // realistic-looking fallback (a real depot name, a real-shaped ticket
-    // number) is indistinguishable from genuine data and a technician could
-    // act on the wrong location/ticket without realizing it's a placeholder.
-    const notSpecified = 'Not specified';
-    final dateStr = record.dateOfMaintenance != null
-        ? DateFormat('dd/MM/yyyy').format(record.dateOfMaintenance!)
-        : notSpecified;
-    final orgLine = [record.divisionName, record.depotName]
-        .where((s) => s != null && s.trim().isNotEmpty)
-        .join(' · ');
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      decoration: const BoxDecoration(
-        color: Color(0xFF0D3B66), // Deep Railway Blue matching web header
-      ),
-      child: Column(
-        children: [
-          const Text(
-            'SOUTHERN RAILWAY',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 13,
-              letterSpacing: 0.8,
-            ),
-          ),
-          if (orgLine.isNotEmpty)
-            Text(
-              orgLine,
-              style: const TextStyle(
-                color: Colors.white70,
-                fontSize: 11,
-              ),
-            ),
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Wrap(
-              alignment: WrapAlignment.spaceAround,
-              spacing: 12,
-              runSpacing: 4,
-              children: [
-                _buildHeaderMeta('Location', record.stationName ?? notSpecified),
-                _buildHeaderMeta('Schedule', record.templateName ?? notSpecified),
-                _buildHeaderMeta('Job Work', record.workOrderTicket ?? notSpecified),
-                _buildHeaderMeta('Date', dateStr),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHeaderMeta(String label, String value) {
-    return Text.rich(
-      TextSpan(
-        style: const TextStyle(fontSize: 11, color: Colors.white),
-        children: [
-          TextSpan(text: '$label: ', style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white70)),
-          TextSpan(text: value, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.amberAccent)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAssetHeader(String? activeCategory, List<MaintenanceRecordLine> lines) {
-    final assetCategory = activeCategory ??
-        (lines.isNotEmpty ? lines.first.assetCategory : null) ??
-        'Not specified';
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      color: Colors.grey.shade100,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Expanded(
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text(
-                  'ASSET: ',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
-                    color: AppTheme.textSecondary,
-                  ),
-                ),
-                Flexible(
-                  child: Text(
-                    assetCategory,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                      color: AppTheme.railwayBlue,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          InkWell(
-            onTap: () => setState(() => _checkedOutBySupervisor = !_checkedOutBySupervisor),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SizedBox(
-                  height: 20,
-                  width: 20,
-                  child: Checkbox(
-                    value: _checkedOutBySupervisor,
-                    activeColor: AppTheme.railwayBlue,
-                    onChanged: (val) {
-                      if (val != null) setState(() => _checkedOutBySupervisor = val);
-                    },
-                  ),
-                ),
-                const SizedBox(width: 4),
-                const Text(
-                  'Checked out by supervisor',
-                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w500),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildProgressCard(MaintenanceRecord record) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      color: Colors.white,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                'Execution Progress: ${(record.progress * 100).toInt()}%',
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-              ),
-              Text(
-                '${record.completedLines} of ${record.totalLines} completed',
-                style: const TextStyle(color: AppTheme.textSecondary, fontSize: 12),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: record.progress,
-              minHeight: 8,
-              backgroundColor: Colors.grey.shade200,
-              color: record.progress == 1.0 ? AppTheme.railwayGreen : AppTheme.railwayBlue,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildCategoryFilter(List<String> categories, String? activeCategory) {
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: ChoiceChip(
-                label: const Text('All Subsystems'),
-                selected: activeCategory == null,
-                onSelected: (_) => ref
-                    .read(checklistControllerProvider(widget.recordId).notifier)
-                    .setActiveSubCategory(null),
-              ),
-            ),
-            ...categories.map((cat) {
-              final isSelected = activeCategory == cat;
-              return Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: ChoiceChip(
-                  label: Text(cat),
-                  selected: isSelected,
-                  onSelected: (_) => ref
-                      .read(checklistControllerProvider(widget.recordId).notifier)
-                      .setActiveSubCategory(cat),
-                ),
-              );
-            }),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget? _buildBottomBar(ChecklistState state) {
-    if (state is! ChecklistLoaded) return null;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.08),
-            blurRadius: 8,
-            offset: const Offset(0, -2),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        child: SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
+  Widget _buildOverflowMenu(ChecklistLoaded state) {
+    return PopupMenuButton<String>(
+      key: const Key('checklist_overflow_menu'),
+      icon: const Icon(Icons.more_vert),
+      onSelected: (value) {
+        switch (value) {
+          case 'asset':
+            _showReplacedAssetSheet();
+            break;
+          case 'component':
+            _showReplacedComponentSheet();
+            break;
+          case 'preview':
+            _showPreviewSheet(state);
+            break;
+        }
+      },
+      itemBuilder: (context) => [
+        const PopupMenuItem(
+          value: 'asset',
           child: Row(
             children: [
-              OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFFD32F2F),
-                  side: const BorderSide(color: Color(0xFFD32F2F)),
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                ),
-                onPressed: () => _showReplacedAssetSheet(),
-                icon: const Icon(Icons.autorenew, size: 16),
-                label: const Text('Enter Replaced Asset', style: TextStyle(fontSize: 12)),
-              ),
-              const SizedBox(width: 8),
-              OutlinedButton.icon(
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFFE65100),
-                  side: const BorderSide(color: Color(0xFFE65100)),
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                ),
-                onPressed: () => _showReplacedComponentSheet(),
-                icon: const Icon(Icons.build_circle_outlined, size: 16),
-                label: const Text('Enter Replaced Component', style: TextStyle(fontSize: 12)),
-              ),
-              const SizedBox(width: 8),
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFFFC107), // Gold/Amber
-                  foregroundColor: Colors.black87,
-                  elevation: 0,
-                  // Overrides the app-wide ElevatedButtonTheme's full-width
-                  // minimumSize: an infinite-width minimum inside this row's
-                  // horizontal SingleChildScrollView (which hands children
-                  // unbounded width) crashes layout with "BoxConstraints
-                  // forces an infinite width" and blanks the whole screen.
-                  minimumSize: Size.zero,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                ),
-                onPressed: () => _saveProgress(),
-                icon: const Icon(Icons.save_outlined, size: 16),
-                label: const Text('Save Progress', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-              ),
-              const SizedBox(width: 8),
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF00BCD4), // Cyan
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  minimumSize: Size.zero,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                ),
-                onPressed: () => _showPreviewSheet(state),
-                icon: const Icon(Icons.remove_red_eye_outlined, size: 16),
-                label: const Text('Preview', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-              ),
-              const SizedBox(width: 8),
-              ElevatedButton.icon(
-                key: const Key('complete_checklist_button'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.railwayGreen,
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  minimumSize: Size.zero,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                ),
-                onPressed: state.isSubmitting ? null : () => _showCompletionDialog(),
-                icon: const Icon(Icons.check_circle_outline, size: 16),
-                label: const Text('Sign & Submit', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-              ),
-              const SizedBox(width: 8),
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF546E7A), // Blue grey
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  minimumSize: Size.zero,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                ),
-                onPressed: () => Navigator.of(context).pop(),
-                icon: const Icon(Icons.arrow_back, size: 16),
-                label: const Text('Back', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-              ),
+              Icon(Icons.autorenew, color: AppTheme.errorRed, size: 20),
+              SizedBox(width: 12),
+              Text('Enter Replaced Asset'),
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  void _saveProgress() {
-    // Each line saves (or queues offline) as it is entered — there is no
-    // separate draft to persist. Say so honestly instead of implying this
-    // button performed a save, and refresh from the server so the progress
-    // bar reflects the authoritative state.
-    unawaited(ref
-        .read(checklistControllerProvider(widget.recordId).notifier)
-        .loadRecord());
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Entries save automatically per item — refreshed from server.'),
-        backgroundColor: AppTheme.railwayGreen,
-        duration: Duration(seconds: 2),
-      ),
+        const PopupMenuItem(
+          value: 'component',
+          child: Row(
+            children: [
+              Icon(Icons.build_circle_outlined, color: AppTheme.statusHigh, size: 20),
+              SizedBox(width: 12),
+              Text('Enter Replaced Component'),
+            ],
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'preview',
+          child: Row(
+            children: [
+              Icon(Icons.remove_red_eye_outlined, color: AppTheme.primaryBlue, size: 20),
+              SizedBox(width: 12),
+              Text('Preview'),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -530,17 +355,74 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
   }
 
   /// Finalisation sheet: proof photo, technician signature and closing remarks.
-  ///
-  /// The server writes a signature row only when `technician_signature` is
-  /// present and rejects TECH_COMPLETED unless remarks are at least
-  /// [ChecklistController.minCompletionRemarksLength] characters, so both are
-  /// collected and validated here rather than failing after the round trip.
   void _showCompletionDialog() {
     unawaited(showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       builder: (ctx) => _CompletionSheet(recordId: widget.recordId),
     ));
+  }
+}
+
+class _SubsystemChipsDelegate extends SliverPersistentHeaderDelegate {
+  _SubsystemChipsDelegate({
+    required this.categories,
+    required this.activeCategory,
+    required this.lineCounts,
+    required this.totalLines,
+    required this.onSelected,
+  });
+
+  final List<String> categories;
+  final String? activeCategory;
+  final Map<String, int> lineCounts;
+  final int totalLines;
+  final ValueChanged<String?> onSelected;
+
+  @override
+  double get minExtent => _calculateHeight();
+
+  @override
+  double get maxExtent => _calculateHeight();
+
+  double _calculateHeight() {
+    final totalChips = categories.length + 1;
+    if (totalChips <= 3) return 48.0;
+    final rows = (totalChips / 3.0).ceil();
+    return rows * 42.0 + 8.0;
+  }
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return Container(
+      color: Theme.of(context).scaffoldBackgroundColor,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      alignment: Alignment.centerLeft,
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          ChoiceChip(
+            label: Text('All Subsystems ($totalLines)'),
+            selected: activeCategory == null,
+            onSelected: (_) => onSelected(null),
+          ),
+          for (final cat in categories)
+            ChoiceChip(
+              label: Text('$cat (${lineCounts[cat] ?? 0})'),
+              selected: activeCategory == cat,
+              onSelected: (_) => onSelected(cat),
+            ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  bool shouldRebuild(covariant _SubsystemChipsDelegate oldDelegate) {
+    return oldDelegate.categories != categories ||
+        oldDelegate.activeCategory != activeCategory ||
+        oldDelegate.totalLines != totalLines;
   }
 }
 
@@ -561,6 +443,7 @@ class _CompletionSheetState extends ConsumerState<_CompletionSheet> {
 
   EvidenceFile? _proof;
   bool _capturing = false;
+  bool _checkedOutBySupervisor = true;
 
   @override
   void initState() {
@@ -582,7 +465,8 @@ class _CompletionSheetState extends ConsumerState<_CompletionSheet> {
   Future<void> _capture(ImageSource source) async {
     setState(() => _capturing = true);
     try {
-      final file = await ref.read(evidenceServiceProvider).capture(source: source);
+      final file =
+          await ref.read(evidenceServiceProvider).capture(source: source);
       if (!mounted) return;
       if (file != null && !file.isWithinSizeLimit) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -611,8 +495,9 @@ class _CompletionSheetState extends ConsumerState<_CompletionSheet> {
   Widget build(BuildContext context) {
     final state = ref.watch(checklistControllerProvider(widget.recordId));
     final isSubmitting = state is ChecklistLoaded && state.isSubmitting;
-    final record = state is ChecklistLoaded ? state.record : null;
-    final outstanding = record == null ? 0 : record.totalLines - record.completedLines;
+    final outstanding =
+        state is ChecklistLoaded ? state.remainingRequired : 0;
+    final textTheme = Theme.of(context).textTheme;
 
     return Padding(
       padding: EdgeInsets.only(
@@ -628,14 +513,16 @@ class _CompletionSheetState extends ConsumerState<_CompletionSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Finalize Execution',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                style: textTheme.titleLarge,
               ),
               const SizedBox(height: 4),
-              const Text(
+              Text(
                 'Submit this maintenance execution for supervisor verification.',
-                style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+                style: textTheme.bodyMedium?.copyWith(
+                  color: AppTheme.textSecondary,
+                ),
               ),
               if (outstanding > 0) ...[
                 const SizedBox(height: 10),
@@ -644,7 +531,8 @@ class _CompletionSheetState extends ConsumerState<_CompletionSheet> {
                   decoration: BoxDecoration(
                     color: AppTheme.warningAmber.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppTheme.warningAmber.withOpacity(0.5)),
+                    border: Border.all(
+                        color: AppTheme.warningAmber.withOpacity(0.5)),
                   ),
                   child: Row(
                     children: [
@@ -653,9 +541,9 @@ class _CompletionSheetState extends ConsumerState<_CompletionSheet> {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          '$outstanding line(s) still unrecorded. The server will '
-                          'reject completion until every line is submitted.',
-                          style: const TextStyle(fontSize: 12),
+                          '$outstanding required line(s) still unrecorded. The server will '
+                          'reject completion until every required line is submitted.',
+                          style: textTheme.labelSmall,
                         ),
                       ),
                     ],
@@ -706,6 +594,22 @@ class _CompletionSheetState extends ConsumerState<_CompletionSheet> {
                   return null;
                 },
               ),
+              const SizedBox(height: 10),
+              CheckboxListTile(
+                key: const Key('completion_checked_out_checkbox'),
+                value: _checkedOutBySupervisor,
+                onChanged: (val) {
+                  if (val != null) setState(() => _checkedOutBySupervisor = val);
+                },
+                title: Text(
+                  'Checked out by supervisor',
+                  style: textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+              ),
               const SizedBox(height: 18),
               Row(
                 children: [
@@ -741,50 +645,73 @@ class _CompletionSheetState extends ConsumerState<_CompletionSheet> {
 
   Widget _buildProofField() {
     final proof = _proof;
+    final textTheme = Theme.of(context).textTheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Proof of Execution',
-          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          style: textTheme.titleMedium,
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 4),
+        Text(
+          'Attach a clear photo of the serviced asset or final reading (max 5 MB).',
+          style: textTheme.labelSmall?.copyWith(color: AppTheme.textSecondary),
+        ),
+        const SizedBox(height: 8),
         if (proof != null)
-          Row(
-            children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(8),
-                child: Image.file(
-                  File(proof.path),
-                  width: 64,
-                  height: 64,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => const Icon(Icons.broken_image),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              border: Border.all(color: AppTheme.borderGrey),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.check_circle, color: AppTheme.railwayGreen),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        proof.fileName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                      Text(
+                        '${(proof.sizeBytes / 1024).toStringAsFixed(1)} KB',
+                        style: textTheme.labelSmall?.copyWith(
+                              color: AppTheme.textSecondary,
+                            ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  '${proof.fileName}\n${(proof.sizeBytes / 1024).round()} KB',
-                  style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                IconButton(
+                  icon: const Icon(Icons.close, color: AppTheme.textSecondary),
+                  onPressed: () => setState(() => _proof = null),
                 ),
-              ),
-              IconButton(
-                key: const Key('completion_remove_proof'),
-                icon: const Icon(Icons.close),
-                tooltip: 'Remove photo',
-                onPressed: () => setState(() => _proof = null),
-              ),
-            ],
+              ],
+            ),
           )
         else
           Row(
             children: [
               OutlinedButton.icon(
-                key: const Key('completion_capture_photo'),
+                key: const Key('completion_take_photo'),
                 onPressed: _capturing ? null : () => _capture(ImageSource.camera),
-                icon: const Icon(Icons.photo_camera_outlined, size: 18),
-                label: const Text('Camera'),
+                icon: _capturing
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.camera_alt_outlined, size: 18),
+                label: const Text('Take Photo'),
               ),
               const SizedBox(width: 8),
               OutlinedButton.icon(
@@ -846,6 +773,7 @@ class _ReplacedAssetSheetState extends State<_ReplacedAssetSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     return Padding(
       padding: EdgeInsets.only(
         left: 16,
@@ -860,11 +788,11 @@ class _ReplacedAssetSheetState extends State<_ReplacedAssetSheet> {
           children: [
             Row(
               children: [
-                const Icon(Icons.autorenew, color: Color(0xFFD32F2F)),
+                const Icon(Icons.autorenew, color: AppTheme.errorRed),
                 const SizedBox(width: 8),
-                const Text(
+                Text(
                   'Enter Replaced Asset',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  style: textTheme.titleMedium,
                 ),
                 const Spacer(),
                 IconButton(
@@ -916,7 +844,7 @@ class _ReplacedAssetSheetState extends State<_ReplacedAssetSheet> {
               width: double.infinity,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFD32F2F),
+                  backgroundColor: AppTheme.errorRed,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
@@ -931,10 +859,6 @@ class _ReplacedAssetSheetState extends State<_ReplacedAssetSheet> {
                     );
                     return;
                   }
-                  // No server endpoint accepts a replaced asset yet: keep the
-                  // entry visible as a local note and direct the technician to
-                  // include it in the closing remarks, which do reach the
-                  // supervisor — instead of implying it was recorded server-side.
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text(
@@ -944,7 +868,7 @@ class _ReplacedAssetSheetState extends State<_ReplacedAssetSheet> {
                   );
                   Navigator.of(context).pop();
                 },
-                child: const Text('Record Replaced Asset', style: TextStyle(fontWeight: FontWeight.bold)),
+                child: const Text('Record Replaced Asset'),
               ),
             ),
           ],
@@ -978,6 +902,7 @@ class _ReplacedComponentSheetState extends State<_ReplacedComponentSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     return Padding(
       padding: EdgeInsets.only(
         left: 16,
@@ -992,11 +917,11 @@ class _ReplacedComponentSheetState extends State<_ReplacedComponentSheet> {
           children: [
             Row(
               children: [
-                const Icon(Icons.build_circle_outlined, color: Color(0xFFE65100)),
+                const Icon(Icons.build_circle_outlined, color: AppTheme.statusHigh),
                 const SizedBox(width: 8),
-                const Text(
+                Text(
                   'Enter Replaced Component',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  style: textTheme.titleMedium,
                 ),
                 const Spacer(),
                 IconButton(
@@ -1049,7 +974,7 @@ class _ReplacedComponentSheetState extends State<_ReplacedComponentSheet> {
               width: double.infinity,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFE65100),
+                  backgroundColor: AppTheme.statusHigh,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 12),
                 ),
@@ -1073,8 +998,6 @@ class _ReplacedComponentSheetState extends State<_ReplacedComponentSheet> {
                     );
                     return;
                   }
-                  // No server endpoint accepts a replaced component yet — same
-                  // honest local-note handling as the replaced-asset sheet.
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
                       content: Text(
@@ -1084,7 +1007,7 @@ class _ReplacedComponentSheetState extends State<_ReplacedComponentSheet> {
                   );
                   Navigator.of(context).pop();
                 },
-                child: const Text('Record Replaced Component', style: TextStyle(fontWeight: FontWeight.bold)),
+                child: const Text('Record Replaced Component'),
               ),
             ),
           ],
@@ -1101,6 +1024,7 @@ class _PreviewSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     return Container(
       height: MediaQuery.of(context).size.height * 0.75,
       padding: const EdgeInsets.all(16),
@@ -1109,11 +1033,11 @@ class _PreviewSheet extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.remove_red_eye_outlined, color: Color(0xFF00BCD4)),
+              const Icon(Icons.remove_red_eye_outlined, color: AppTheme.primaryBlue),
               const SizedBox(width: 8),
-              const Text(
+              Text(
                 'Checklist Summary Preview',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                style: textTheme.titleMedium,
               ),
               const Spacer(),
               IconButton(
@@ -1126,14 +1050,20 @@ class _PreviewSheet extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFF0D3B66).withOpacity(0.08),
+              color: AppTheme.primaryDark.withOpacity(0.08),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text('Completed: ${record.completedLines}/${record.totalLines}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                Text('Progress: ${(record.progress * 100).toInt()}%', style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.railwayBlue)),
+                Text(
+                  'Completed: ${record.completedLines}/${record.totalLines}',
+                  style: textTheme.labelLarge,
+                ),
+                Text(
+                  'Progress: ${(record.progress * 100).toInt()}%',
+                  style: textTheme.labelLarge?.copyWith(color: AppTheme.railwayBlue),
+                ),
               ],
             ),
           ),
@@ -1146,16 +1076,19 @@ class _PreviewSheet extends StatelessWidget {
                 final line = record.activeLines[idx];
                 return ListTile(
                   dense: true,
-                  title: Text(line.displayTitle, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                  title: Text(
+                    line.displayTitle,
+                    style: textTheme.titleMedium,
+                  ),
                   subtitle: Text(
                     line.valueType.isMultiPart
                         ? 'Readings: ${line.componentValues.entries.map((e) => "${e.key}: ${e.value}").join(", ")}'
                         : 'Status: ${line.status} ${line.scalarValue.isNotEmpty ? "(${line.scalarValue})" : ""}',
-                    style: const TextStyle(fontSize: 12),
+                    style: textTheme.labelSmall,
                   ),
                   trailing: Icon(
                     line.isCompleted ? Icons.check_circle : Icons.radio_button_unchecked,
-                    color: line.isCompleted ? AppTheme.railwayGreen : Colors.grey,
+                    color: line.isCompleted ? AppTheme.railwayGreen : AppTheme.borderGrey,
                     size: 18,
                   ),
                 );
@@ -1165,501 +1098,5 @@ class _PreviewSheet extends StatelessWidget {
         ],
       ),
     );
-  }
-}
-
-/// One checklist line.
-///
-/// The input rendered depends on the line's `value_type`, mirroring the web
-/// register: a status/action pair for inspection points, and typed measurement
-/// fields — including three-phase RYB and Volt/Amp pairs — for parameters.
-class _ChecklistLineCard extends StatefulWidget {
-  const _ChecklistLineCard({
-    super.key,
-    required this.line,
-    required this.onSave,
-  });
-
-  final MaintenanceRecordLine line;
-  final void Function(ChecklistLineEdit edit) onSave;
-
-  @override
-  State<_ChecklistLineCard> createState() => _ChecklistLineCardState();
-}
-
-/// The values a line card reports back when it saves.
-class ChecklistLineEdit {
-  const ChecklistLineEdit({
-    required this.value,
-    required this.status,
-    this.statusOptionId,
-    this.actionOptionId,
-    this.remarks,
-  });
-
-  /// String for scalar readings, `Map<String, String>` for RYB / Volt-Amp.
-  final Object? value;
-  final String status;
-  final int? statusOptionId;
-  final int? actionOptionId;
-  final String? remarks;
-}
-
-class _ChecklistLineCardState extends State<_ChecklistLineCard> {
-  /// How long typing must pause before the observation is pushed to the server.
-  static const Duration _saveDebounce = Duration(milliseconds: 800);
-
-  late final TextEditingController _valueController;
-  late final TextEditingController _remarksController;
-  late final FocusNode _valueFocus;
-  late final FocusNode _remarksFocus;
-
-  /// Controllers for the multi-part value types, keyed by component (R/Y/B...).
-  final Map<String, TextEditingController> _componentControllers = {};
-  final Map<String, FocusNode> _componentFocusNodes = {};
-
-  late String _status;
-  int? _statusOptionId;
-  int? _actionOptionId;
-  Timer? _debounceTimer;
-
-  MaintenanceRecordLine get _line => widget.line;
-
-  @override
-  void initState() {
-    super.initState();
-    _valueController = TextEditingController(text: _line.scalarValue);
-    _remarksController = TextEditingController(text: _line.observationAction ?? '');
-    _valueFocus = FocusNode()..addListener(_onFocusChanged);
-    _remarksFocus = FocusNode()..addListener(_onFocusChanged);
-
-    final components = _line.componentValues;
-    for (final key in _line.valueType.componentKeys) {
-      _componentControllers[key] =
-          TextEditingController(text: components[key] ?? '');
-      _componentFocusNodes[key] = FocusNode()..addListener(_onFocusChanged);
-    }
-
-    _status = _line.status;
-    _statusOptionId = _line.statusOptionId;
-    _actionOptionId = _line.actionOptionId;
-  }
-
-  @override
-  void didUpdateWidget(covariant _ChecklistLineCard oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.line != oldWidget.line) {
-      if (!_valueFocus.hasFocus && _valueController.text != widget.line.scalarValue) {
-        _valueController.text = widget.line.scalarValue;
-      }
-      if (!_remarksFocus.hasFocus && _remarksController.text != (widget.line.observationAction ?? '')) {
-        _remarksController.text = widget.line.observationAction ?? '';
-      }
-      final components = widget.line.componentValues;
-      for (final key in widget.line.valueType.componentKeys) {
-        final focus = _componentFocusNodes[key];
-        final ctrl = _componentControllers[key];
-        if (ctrl != null && focus != null && !focus.hasFocus) {
-          ctrl.text = components[key] ?? '';
-        }
-      }
-      _status = widget.line.status;
-      _statusOptionId = widget.line.statusOptionId;
-      _actionOptionId = widget.line.actionOptionId;
-    }
-  }
-
-  @override
-  void dispose() {
-    _debounceTimer?.cancel();
-    _valueFocus.removeListener(_onFocusChanged);
-    _remarksFocus.removeListener(_onFocusChanged);
-    _valueFocus.dispose();
-    _remarksFocus.dispose();
-    _valueController.dispose();
-    _remarksController.dispose();
-    for (final node in _componentFocusNodes.values) {
-      node.removeListener(_onFocusChanged);
-      node.dispose();
-    }
-    for (final controller in _componentControllers.values) {
-      controller.dispose();
-    }
-    super.dispose();
-  }
-
-  bool get _anyFieldFocused =>
-      _valueFocus.hasFocus ||
-      _remarksFocus.hasFocus ||
-      _componentFocusNodes.values.any((n) => n.hasFocus);
-
-  /// Flush a pending edit as soon as the technician leaves the line, so a
-  /// debounced keystroke is never lost by moving on quickly.
-  void _onFocusChanged() {
-    if (!_anyFieldFocused && _debounceTimer?.isActive == true) {
-      _triggerSave(immediate: true);
-    }
-  }
-
-  /// Text edits are debounced; discrete choices (chips, dropdowns) save at once.
-  /// Saving on every keystroke would put one HTTP request - or one queued
-  /// outbox command while offline - behind every character typed.
-  void _triggerSave({bool immediate = false}) {
-    _debounceTimer?.cancel();
-    if (immediate) {
-      _save();
-      return;
-    }
-    _debounceTimer = Timer(_saveDebounce, _save);
-  }
-
-  Object? _currentValue() {
-    if (_line.valueType.isMultiPart) {
-      return {
-        for (final key in _line.valueType.componentKeys)
-          key: _componentControllers[key]?.text.trim() ?? '',
-      };
-    }
-    final text = _valueController.text.trim();
-    return text.isEmpty ? null : text;
-  }
-
-  void _save() {
-    if (!mounted) return;
-    final remarks = _remarksController.text.trim();
-    widget.onSave(
-      ChecklistLineEdit(
-        value: _currentValue(),
-        status: _status,
-        statusOptionId: _statusOptionId,
-        actionOptionId: _actionOptionId,
-        remarks: remarks.isEmpty ? null : remarks,
-      ),
-    );
-  }
-
-  void _onStatusOptionChanged(int? value) {
-    setState(() {
-      _statusOptionId = value;
-      if (value != null) {
-        final matchedOption = _line.statusOptions.firstWhere(
-          (o) => o.id == value,
-          orElse: () => _line.statusOptions.first,
-        );
-        _status = matchedOption.semantic ?? 'OK';
-      }
-      // Actions belong to a specific status; clear a selection the new status
-      // does not offer rather than sending one the backend will reject.
-      final stillValid = _line.statusOptions
-          .where((o) => o.id == value)
-          .expand((o) => o.actionOptions)
-          .any((a) => a.id == _actionOptionId);
-      if (!stillValid) _actionOptionId = null;
-    });
-    _triggerSave(immediate: true);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final line = _line;
-
-    return Card(
-      key: Key('checklist_line_${line.id}'),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildHeader(line),
-            const Divider(height: 18),
-            ..._buildValueInput(line),
-            if (line.statusOptions.isNotEmpty) ..._buildStatusAndAction(line),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildHeader(MaintenanceRecordLine line) {
-    final hasPoint = line.inspectionPoint != null &&
-        line.inspectionPoint!.trim().isNotEmpty;
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                line.displayTitle,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-              ),
-              if (hasPoint) ...[
-                const SizedBox(height: 2),
-                Text(
-                  line.itemName,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppTheme.textSecondary,
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
-        if (line.isRequired)
-          const Padding(
-            padding: EdgeInsets.only(right: 6),
-            child: Text(
-              'Required',
-              style: TextStyle(fontSize: 10, color: AppTheme.errorRed),
-            ),
-          ),
-        Container(
-          width: 24,
-          height: 24,
-          decoration: BoxDecoration(
-            color: line.isCompleted ? const Color(0xFF2E7D32) : Colors.grey.shade300,
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: Icon(
-            Icons.check,
-            color: line.isCompleted ? Colors.white : Colors.transparent,
-            size: 16,
-          ),
-        ),
-      ],
-    );
-  }
-
-  /// The reading input for this line's value type.
-  List<Widget> _buildValueInput(MaintenanceRecordLine line) {
-    switch (line.valueType) {
-      case MaintenanceValueType.ryb:
-      case MaintenanceValueType.voltAmp:
-        return [_buildComponentInputs(line)];
-
-      case MaintenanceValueType.yesNo:
-        return [_buildYesNoInput(line)];
-
-      case MaintenanceValueType.status:
-        // Status lines carry their reading in the status/action pair below.
-        return const [];
-
-      case MaintenanceValueType.number:
-      case MaintenanceValueType.decimal:
-      case MaintenanceValueType.text:
-      case MaintenanceValueType.unknown:
-        return [_buildScalarInput(line)];
-    }
-  }
-
-  Widget _buildScalarInput(MaintenanceRecordLine line) {
-    final isNumeric = line.valueType.isNumeric;
-    final hasReference = line.referenceValue != null &&
-        line.referenceValue!.trim().isNotEmpty;
-    final hasUnit = line.unit != null && line.unit!.trim().isNotEmpty;
-    return TextField(
-      key: Key('line_value_${line.id}'),
-      controller: _valueController,
-      focusNode: _valueFocus,
-      keyboardType: isNumeric
-          ? const TextInputType.numberWithOptions(decimal: true, signed: true)
-          : TextInputType.text,
-      decoration: InputDecoration(
-        labelText: 'Reading',
-        hintText: hasReference ? 'Reference: ${line.referenceValue}' : null,
-        suffixText: hasUnit ? line.unit : null,
-        isDense: true,
-        border: const OutlineInputBorder(),
-      ),
-      onChanged: (_) => _triggerSave(),
-      onEditingComplete: () => _triggerSave(immediate: true),
-    );
-  }
-
-  Color _getComponentColor(String key) {
-    switch (key.toUpperCase()) {
-      case 'R':
-        return const Color(0xFFD32F2F); // Red
-      case 'Y':
-        return const Color(0xFFFBC02D); // Gold/Yellow
-      case 'B':
-        return const Color(0xFF1976D2); // Blue
-      default:
-        return AppTheme.railwayBlue;
-    }
-  }
-
-  /// Three-phase (R/Y/B) or Volt/Amp readings, one field per component.
-  Widget _buildComponentInputs(MaintenanceRecordLine line) {
-    final keys = line.valueType.componentKeys;
-    final hasUnit = line.unit != null && line.unit!.trim().isNotEmpty;
-    return Row(
-      children: [
-        for (final key in keys) ...[
-          Expanded(
-            child: TextField(
-              key: Key('line_${line.id}_component_$key'),
-              controller: _componentControllers[key],
-              focusNode: _componentFocusNodes[key],
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: InputDecoration(
-                labelText: key,
-                labelStyle: TextStyle(
-                  color: _getComponentColor(key),
-                  fontWeight: FontWeight.bold,
-                ),
-                isDense: true,
-                focusedBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: _getComponentColor(key), width: 2),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderSide: BorderSide(color: _getComponentColor(key).withOpacity(0.6)),
-                ),
-                border: const OutlineInputBorder(),
-              ),
-              onChanged: (_) => _triggerSave(),
-              onEditingComplete: () => _triggerSave(immediate: true),
-            ),
-          ),
-          if (key != keys.last) const SizedBox(width: 8),
-        ],
-        if (hasUnit) ...[
-          const SizedBox(width: 8),
-          Text(
-            '(${line.unit!})',
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.textSecondary),
-          ),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildYesNoInput(MaintenanceRecordLine line) {
-    final current = _valueController.text.trim();
-    return Row(
-      children: [
-        const Text(
-          'Result: ',
-          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
-        ),
-        const SizedBox(width: 8),
-        for (final option in const ['Yes', 'No']) ...[
-          ChoiceChip(
-            key: Key('line_${line.id}_yesno_${option.toLowerCase()}'),
-            label: Text(option),
-            selected: current == option,
-            onSelected: (selected) {
-              if (!selected) return;
-              setState(() => _valueController.text = option);
-              _triggerSave(immediate: true);
-            },
-          ),
-          const SizedBox(width: 8),
-        ],
-      ],
-    );
-  }
-
-  bool _isDeficientLabel(String label) {
-    final lower = label.toLowerCase();
-    return lower.contains('dirty') ||
-        lower.contains('defect') ||
-        lower.contains('fail') ||
-        lower.contains('abnormal') ||
-        lower.contains('damaged') ||
-        lower.contains('not working');
-  }
-
-  /// Status, then the actions that status permits. The action dropdown appears
-  /// only once a status is chosen, matching the backend rule that an action
-  /// must map to the selected status.
-  List<Widget> _buildStatusAndAction(MaintenanceRecordLine line) {
-    MaintenanceStatusOption? selectedStatus;
-    for (final option in line.statusOptions) {
-      if (option.id == _statusOptionId) {
-        selectedStatus = option;
-        break;
-      }
-    }
-    final actions =
-        selectedStatus?.actionOptions ?? const <MaintenanceActionOption>[];
-
-    return [
-      const SizedBox(height: 10),
-      DropdownButtonFormField<int>(
-        key: Key('line_${line.id}_status_option'),
-        value: selectedStatus?.id,
-        decoration: const InputDecoration(
-          labelText: 'Status',
-          isDense: true,
-          border: OutlineInputBorder(),
-        ),
-        items: line.statusOptions
-            .map((opt) => DropdownMenuItem<int>(
-                  value: opt.id,
-                  child: Text(
-                    opt.label,
-                    style: TextStyle(
-                      color: opt.isDeficiency ? AppTheme.errorRed : null,
-                    ),
-                  ),
-                ))
-            .toList(),
-        onChanged: _onStatusOptionChanged,
-      ),
-      if (selectedStatus != null &&
-          (selectedStatus.isDeficiency || _isDeficientLabel(selectedStatus.label))) ...[
-        const SizedBox(height: 6),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: const Color(0xFFFFC107), // Gold/Amber deficiency badge matching web UI
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: const Text(
-            'Deficiency flagged - pending severity review',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
-            ),
-          ),
-        ),
-      ],
-      if (actions.isNotEmpty) ...[
-        const SizedBox(height: 8),
-        DropdownButtonFormField<int>(
-          key: Key('line_${line.id}_action_option'),
-          value: actions.any((a) => a.id == _actionOptionId)
-              ? _actionOptionId
-              : null,
-          decoration: const InputDecoration(
-            labelText: 'Action Taken',
-            isDense: true,
-            border: OutlineInputBorder(),
-          ),
-          items: actions
-              .map((opt) => DropdownMenuItem<int>(
-                    value: opt.id,
-                    child: Text(
-                      opt.label,
-                      style: TextStyle(
-                        color: opt.isDeficiency ? AppTheme.errorRed : null,
-                      ),
-                    ),
-                  ))
-              .toList(),
-          onChanged: (val) {
-            setState(() => _actionOptionId = val);
-            _triggerSave(immediate: true);
-          },
-        ),
-      ],
-    ];
   }
 }

@@ -290,6 +290,19 @@ class ChecklistLoaded extends ChecklistState {
     return lines.where((l) => l.assetCategory == activeSubCategory).toList();
   }
 
+  /// Number of required lines that have not yet been completed.
+  /// If lines explicitly specify [isRequired], only those count; otherwise all active lines count.
+  int get remainingRequired {
+    final explicitRequired = record.activeLines.where((l) => l.isRequired);
+    if (explicitRequired.isNotEmpty) {
+      return explicitRequired.where((l) => !l.isCompleted).length;
+    }
+    return record.activeLines.where((l) => !l.isCompleted).length;
+  }
+
+  /// Whether all required lines are completed and the record can be submitted.
+  bool get canSubmit => remainingRequired == 0;
+
   ChecklistLoaded copyWith({
     MaintenanceRecord? record,
     bool? isSubmitting,

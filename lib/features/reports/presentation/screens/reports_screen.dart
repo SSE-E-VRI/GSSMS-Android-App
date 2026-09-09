@@ -43,27 +43,21 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
 
     if (!sessionAllows(session, 'reports.view')) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Reports & Audit')),
+        appBar: AppBar(title: const Text('Reports')),
         body: const PermissionDeniedView(),
       );
     }
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Reports & Audit'),
-        actions: [
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 12),
-            child: SyncStatusBadge(),
-          ),
-          const SizedBox(width: 4),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () => ref.read(reportsControllerProvider.notifier).loadRegister(),
-          ),
+        title: const Text('Reports'),
+      ),
+      body: Column(
+        children: [
+          const SyncStatusBadge(),
+          Expanded(child: _buildBody(state, session)),
         ],
       ),
-      body: _buildBody(state, session),
     );
   }
 

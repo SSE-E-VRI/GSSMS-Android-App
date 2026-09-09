@@ -105,7 +105,7 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      expect(find.text('Field Inspections'), findsOneWidget);
+      expect(find.text('Inspections'), findsOneWidget);
       expect(find.byKey(const Key('date_range_from')), findsOneWidget);
       expect(find.text('EB Bunk Monthly Check'), findsOneWidget);
       expect(find.text('INSP-001'), findsOneWidget);

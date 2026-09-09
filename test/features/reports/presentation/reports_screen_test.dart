@@ -65,7 +65,7 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      expect(find.text('Reports & Audit'), findsOneWidget);
+      expect(find.text('Reports'), findsOneWidget);
       expect(find.byKey(const Key('reports_infra_type')), findsOneWidget);
       expect(find.byKey(const Key('reports_infra_item')), findsOneWidget);
       expect(find.byKey(const Key('date_range_from')), findsOneWidget);

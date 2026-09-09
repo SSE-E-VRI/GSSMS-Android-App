@@ -69,23 +69,10 @@ class _WorkOrderListScreenState extends ConsumerState<WorkOrderListScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Work Orders'),
-        actions: [
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 12),
-            child: SyncStatusBadge(),
-          ),
-          const SizedBox(width: 4),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Refresh',
-            onPressed: () => ref
-                .read(workOrderListControllerProvider.notifier)
-                .fetchWorkOrders(forceRefresh: true),
-          ),
-        ],
       ),
       body: Column(
         children: [
+          const SyncStatusBadge(),
           _buildSearchBar(),
           if (session != null) _buildOrgScope(listState, session),
           _buildDateRange(listState),

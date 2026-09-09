@@ -52,20 +52,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Dashboard'),
-        actions: [
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 12),
-            child: SyncStatusBadge(),
-          ),
-          const SizedBox(width: 4),
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () => ref.read(dashboardControllerProvider.notifier).loadDashboard(),
-          ),
-        ],
       ),
       body: Column(
         children: [
+          const SyncStatusBadge(),
           if (session != null) _buildOrgScope(state, session),
           Expanded(child: _buildBody(state, session)),
         ],

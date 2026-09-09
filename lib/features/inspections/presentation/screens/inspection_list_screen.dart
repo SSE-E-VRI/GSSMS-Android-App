@@ -59,28 +59,18 @@ class _InspectionListScreenState extends ConsumerState<InspectionListScreen> {
 
     if (!sessionAllows(session, 'inspections.view')) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Field Inspections')),
+        appBar: AppBar(title: const Text('Inspections')),
         body: const PermissionDeniedView(),
       );
     }
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Field Inspections'),
-        actions: [
-          const Padding(
-              padding: EdgeInsets.symmetric(vertical: 12),
-              child: SyncStatusBadge()),
-          const SizedBox(width: 4),
-          IconButton(
-              icon: const Icon(Icons.refresh),
-              onPressed: () => ref
-                  .read(inspectionListControllerProvider.notifier)
-                  .fetchInspections(forceRefresh: true)),
-        ],
+        title: const Text('Inspections'),
       ),
       body: Column(
         children: [
+          const SyncStatusBadge(),
           _buildSearchBar(),
           if (session != null) _buildOrgScope(listState, session),
           _buildDateRange(listState),
