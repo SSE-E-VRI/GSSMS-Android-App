@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/theme/app_theme.dart';
+import '../core/theme/theme_mode_controller.dart';
 import '../features/auth/presentation/controllers/auth_controller.dart';
 import '../features/auth/presentation/controllers/auth_state.dart';
 import '../features/auth/presentation/screens/login_screen.dart';
@@ -27,10 +28,13 @@ class _GssmsAppState extends ConsumerState<GssmsApp> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authControllerProvider);
+    final themeMode = ref.watch(themeModeProvider);
 
     return MaterialApp(
       title: 'GSSMS Mobile',
       theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: themeMode,
       debugShowCheckedModeBanner: false,
       home: _buildHomeForState(authState),
     );
@@ -41,7 +45,8 @@ class _GssmsAppState extends ConsumerState<GssmsApp> {
       return HomeScreen(session: state.session);
     }
 
-    if (state is AuthInitial || (state is AuthLoading && state.message == 'Restoring session...')) {
+    if (state is AuthInitial ||
+        (state is AuthLoading && state.message == 'Restoring session...')) {
       return const Scaffold(
         body: Center(
           child: Column(

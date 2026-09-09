@@ -159,7 +159,7 @@ class HomeScreen extends ConsumerWidget {
         subtitle: 'Org-wide status & attention overview',
         icon: Icons.dashboard_outlined,
         emoji: '📊',
-        color: AppTheme.railwayBlue,
+        color: AppTheme.moduleDashboard,
         onTap: () {
           Navigator.of(context).push(
             MaterialPageRoute(
@@ -181,7 +181,7 @@ class HomeScreen extends ConsumerWidget {
         subtitle: 'Compliance & job work management',
         icon: Icons.build_circle_outlined,
         emoji: '🧰',
-        color: Colors.purple,
+        color: AppTheme.moduleMaintenance,
         onTap: () {
           Navigator.of(context).push(
             MaterialPageRoute(
@@ -200,7 +200,7 @@ class HomeScreen extends ConsumerWidget {
         subtitle: 'Log and track field complaints',
         icon: Icons.report_problem_outlined,
         emoji: '🚨',
-        color: AppTheme.accentOrange,
+        color: AppTheme.moduleComplaints,
         onTap: () {
           Navigator.of(context).push(
             MaterialPageRoute(
@@ -219,7 +219,7 @@ class HomeScreen extends ConsumerWidget {
         subtitle: 'Field inspections & requests',
         icon: Icons.fact_check_outlined,
         emoji: '🔍',
-        color: Colors.teal,
+        color: AppTheme.moduleInspections,
         onTap: () {
           Navigator.of(context).push(
             MaterialPageRoute(
@@ -238,7 +238,7 @@ class HomeScreen extends ConsumerWidget {
         subtitle: 'Search equipment & scan barcodes',
         icon: Icons.qr_code_scanner_outlined,
         emoji: '📦',
-        color: Colors.teal,
+        color: AppTheme.moduleAssets,
         onTap: () {
           Navigator.of(context).push(
             MaterialPageRoute(
@@ -257,7 +257,7 @@ class HomeScreen extends ConsumerWidget {
         subtitle: 'Maintenance register & audit trail',
         icon: Icons.description_outlined,
         emoji: '📄',
-        color: Colors.deepOrange,
+        color: AppTheme.moduleReports,
         onTap: () {
           Navigator.of(context).push(
             MaterialPageRoute(
@@ -275,7 +275,7 @@ class HomeScreen extends ConsumerWidget {
         subtitle: 'Meter photos & bills — coming soon',
         icon: Icons.solar_power_outlined,
         emoji: '☀️',
-        color: Colors.indigo,
+        color: AppTheme.moduleEnergy,
         onTap: () {
           Navigator.of(context).push(
             MaterialPageRoute(

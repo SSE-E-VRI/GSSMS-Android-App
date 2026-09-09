@@ -7,3 +7,18 @@ linter:
     avoid_print: true
     unawaited_futures: true
     always_declare_return_types: true
+
+analyzer:
+  plugins:
+    - custom_lint
+
+# P1-5 / P1-6: ban Color(0xFF…) and bare fontSize: inside lib/features/.
+# Severity is WARNING (see LintCode in packages/gssms_lints) so the existing
+# ~62 colour and ~229 fontSize call sites do not fail `flutter analyze`.
+# (*_pdf_service.dart files are excluded from the fontSize rule: package:pdf
+# layout styles are print layout, not Flutter text.) Clear them per screen in
+# later phases. Run `dart run custom_lint` to list them.
+custom_lint:
+  rules:
+    - avoid_hardcoded_color
+    - avoid_bare_font_size
