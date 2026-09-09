@@ -41,24 +41,33 @@ class StatusDonutChart extends StatelessWidget {
         ? const [WorkOrderStatusSegment(label: 'No Data', count: 1, colorHex: 'CCCCCC')]
         : segments;
 
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.railwayBlue),
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              height: 160,
-              child: Stack(
-                children: [
-                  PieChart(
+    final summaryItems = segments.where((s) => s.count > 0).map((s) => '${s.count} ${s.label.toLowerCase()}').join(', ');
+    final semanticsLabel = !hasData || summaryItems.isEmpty
+        ? '$title: $total total, no data'
+        : '$title: $total total, $summaryItems';
+
+    return Semantics(
+      label: semanticsLabel,
+      container: true,
+      child: Card(
+        elevation: 2,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.railwayBlue),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                height: 160,
+                child: Stack(
+                  children: [
+                    ExcludeSemantics(
+                      child: PieChart(
                     PieChartData(
                       sectionsSpace: 2,
                       centerSpaceRadius: 50,
@@ -74,7 +83,8 @@ class StatusDonutChart extends StatelessWidget {
                       }),
                     ),
                   ),
-                  Center(
+                ),
+                Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -129,6 +139,7 @@ class StatusDonutChart extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }

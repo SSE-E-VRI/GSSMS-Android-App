@@ -27,6 +27,9 @@ class AppTheme {
   /// fails contrast there).
   static const Color warningAmberDark = Color(0xFF92400E);
   static const Color errorRed = Color(0xFFEF4444);
+  static const Color errorLight = Color(0xFFFFF1F1);
+  static const Color errorBorder = Color(0xFFFECACA);
+  static const Color surfaceMuted = Color(0xFFF1F5F9);
 
   /// Near-black blue used for the dark-theme app bar (tokenized so no raw
   /// literal lives in theme wiring).

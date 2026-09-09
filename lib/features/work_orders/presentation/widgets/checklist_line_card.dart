@@ -457,6 +457,7 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
             key: Key('line_${line.id}_yesno_${option.toLowerCase()}'),
             label: Text(option),
             selected: current == option,
+            materialTapTargetSize: MaterialTapTargetSize.padded,
             onSelected: (selected) {
               if (!selected) return;
               setState(() => _valueController.text = option);
@@ -467,6 +468,26 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
         ],
       ],
     );
+  }
+
+  String _statusOptionGlyph(MaintenanceStatusOption opt) {
+    final lower = opt.label.toLowerCase();
+    if (opt.isDeficiency || _isDeficientLabel(opt.label)) {
+      if (lower.contains('failed') ||
+          lower.contains('damaged') ||
+          lower.contains('defective') ||
+          lower.contains('abnormal')) {
+        return '✕ ';
+      }
+      return '! ';
+    }
+    if (lower.contains('ok') ||
+        lower.contains('normal') ||
+        lower.contains('pass') ||
+        lower.contains('good')) {
+      return '✓ ';
+    }
+    return '• ';
   }
 
   bool _isDeficientLabel(String label) {
@@ -506,11 +527,23 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
         items: line.statusOptions
             .map((opt) => DropdownMenuItem<int>(
                   value: opt.id,
-                  child: Text(
-                    opt.label,
-                    style: TextStyle(
-                      color: opt.isDeficiency ? AppTheme.errorRed : null,
-                    ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _statusOptionGlyph(opt),
+                        style: TextStyle(
+                          color: opt.isDeficiency ? AppTheme.errorRed : null,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        opt.label,
+                        style: TextStyle(
+                          color: opt.isDeficiency ? AppTheme.errorRed : null,
+                        ),
+                      ),
+                    ],
                   ),
                 ))
             .toList(),
@@ -527,12 +560,19 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
             color: AppTheme.warningAmber,
             borderRadius: BorderRadius.circular(4),
           ),
-          child: Text(
-            'Deficiency flagged - pending severity review',
-            style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
+          child: Row(
+            children: [
+              const Text('! ', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87)),
+              Expanded(
+                child: Text(
+                  'Deficiency flagged - pending severity review',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87,
+                      ),
                 ),
+              ),
+            ],
           ),
         ),
       ],
@@ -700,6 +740,7 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
                   const Spacer(),
                   IconButton(
                     icon: const Icon(Icons.close, color: Colors.white),
+                    tooltip: 'Close preview',
                     onPressed: () => Navigator.of(ctx).pop(),
                   ),
                 ],
@@ -793,14 +834,17 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
                       : AppTheme.textSecondary,
                 ),
                 const SizedBox(width: 8),
-                Text(
-                  countSummary,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: AppTheme.textPrimary,
-                      ),
+                Expanded(
+                  child: Text(
+                    countSummary,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.textPrimary,
+                        ),
+                  ),
                 ),
-                const Spacer(),
+                const SizedBox(width: 8),
                 Icon(
                   _attachmentsExpanded ? Icons.expand_less : Icons.expand_more,
                   size: 20,

@@ -50,6 +50,7 @@ class _AssetDetailScreenState extends ConsumerState<AssetDetailScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
+            tooltip: 'Refresh asset details',
             onPressed: () => ref
                 .read(assetDetailControllerProvider(widget.assetId).notifier)
                 .loadAsset(),

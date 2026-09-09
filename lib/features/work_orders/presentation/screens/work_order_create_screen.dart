@@ -59,8 +59,8 @@ class _WorkOrderCreateScreenState
   int? _selectedAssetId;
 
   static const _webBlue = AppTheme.railwayBlue;
-  static const _webLightBg = Color(0xFFF6F8FF);
-  static const _border = Color(0xFFE3E8F5);
+  static const _webLightBg = AppTheme.backgroundLight;
+  static const _border = AppTheme.borderGrey;
 
   @override
   void initState() {
@@ -432,6 +432,7 @@ class _WorkOrderCreateScreenState
                                       : IconButton(
                                           key: const Key(
                                               'wo_due_date_clear'),
+                                          tooltip: 'Clear due date',
                                           icon: const Icon(Icons.clear,
                                               size: 18),
                                           onPressed: () => setState(
@@ -559,7 +560,7 @@ class _WorkOrderCreateScreenState
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFF),
+        color: AppTheme.surfaceCard,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: _border),
       ),
@@ -711,13 +712,13 @@ class _WorkOrderCreateScreenState
         OutlinedButton.icon(
           key: const Key('cancel_wo_button'),
           style: OutlinedButton.styleFrom(
-            foregroundColor: const Color(0xFF64748B),
-            side: const BorderSide(color: Color(0xFFCBD5E1)),
+            foregroundColor: AppTheme.textMuted,
+            side: const BorderSide(color: AppTheme.borderGrey),
             padding:
                 const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8)),
-            minimumSize: const Size(0, 44),
+            minimumSize: const Size(0, 48),
             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
           onPressed:

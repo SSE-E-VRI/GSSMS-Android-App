@@ -24,7 +24,7 @@ class AvoidHardcodedColor extends DartLintRule {
     name: 'avoid_hardcoded_color',
     problemMessage:
         'Use AppTheme / module / status tokens instead of Color(0xFF…) in lib/features/.',
-    errorSeverity: ErrorSeverity.WARNING,
+    errorSeverity: ErrorSeverity.ERROR,
   );
 
   @override

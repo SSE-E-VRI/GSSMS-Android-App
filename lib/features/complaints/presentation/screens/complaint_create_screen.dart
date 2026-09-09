@@ -70,9 +70,9 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
   String? _selectedCategory;
   int? _selectedAssetId;
 
-  static const _webRed = Color(0xFFDC3545);
-  static const _webLightBg = Color(0xFFF6F8FF);
-  static const _border = Color(0xFFE3E8F5);
+  static const _webRed = AppTheme.errorRed;
+  static const _webLightBg = AppTheme.backgroundLight;
+  static const _border = AppTheme.borderGrey;
 
   @override
   void initState() {
@@ -599,9 +599,9 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFFBFB),
+        color: AppTheme.errorLight,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFFECACA)),
+        border: Border.all(color: AppTheme.errorBorder),
         boxShadow: [
           BoxShadow(
               color: Colors.black.withOpacity(0.03),
@@ -700,7 +700,7 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
           isExpanded: true,
           value: _infraType,
           decoration: _webInput().copyWith(
-            fillColor: const Color(0xFFF8FAFF),
+            fillColor: AppTheme.surfaceCard,
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
           ),
@@ -877,13 +877,13 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
         OutlinedButton.icon(
           key: const Key('cancel_complaint_button'),
           style: OutlinedButton.styleFrom(
-            foregroundColor: const Color(0xFF64748B),
-            side: const BorderSide(color: Color(0xFFCBD5E1)),
+            foregroundColor: AppTheme.textMuted,
+            side: const BorderSide(color: AppTheme.borderGrey),
             padding:
                 const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8)),
-            minimumSize: const Size(0, 44),
+            minimumSize: const Size(0, 48),
             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
           onPressed:

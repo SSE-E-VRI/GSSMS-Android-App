@@ -372,7 +372,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
                                 '$_attemptsRemaining attempt${_attemptsRemaining != 1 ? 's' : ''} remaining before lockout.',
                                 style: const TextStyle(
                                   fontSize: 13,
-                                  color: Color(0xFF92400E),
+                                  color: AppTheme.warningAmberDark,
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
@@ -426,6 +426,9 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
                           labelText: 'New Password',
                           prefixIcon: const Icon(Icons.lock_outline),
                           suffixIcon: IconButton(
+                            tooltip: _obscureNewPassword
+                                ? 'Show password'
+                                : 'Hide password',
                             icon: Icon(
                               _obscureNewPassword
                                   ? Icons.visibility_off
@@ -459,6 +462,9 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
                           labelText: 'Confirm New Password',
                           prefixIcon: const Icon(Icons.lock_outline),
                           suffixIcon: IconButton(
+                            tooltip: _obscureConfirmPassword
+                                ? 'Show password'
+                                : 'Hide password',
                             icon: Icon(
                               _obscureConfirmPassword
                                   ? Icons.visibility_off

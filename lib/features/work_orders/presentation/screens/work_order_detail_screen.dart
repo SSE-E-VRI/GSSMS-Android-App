@@ -84,6 +84,7 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.refresh),
+            tooltip: 'Refresh work order details',
             onPressed: () => ref
                 .read(workOrderDetailControllerProvider(widget.workOrderId).notifier)
                 .loadDetail(),
@@ -193,8 +194,9 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
               children: [
                 Chip(
                   label: Text(
@@ -812,15 +814,22 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
                           style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
                         ),
                         const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Checkbox(
-                              key: const Key('high_risk_confirm_checkbox'),
-                              value: highRiskConfirmed,
-                              onChanged: (v) => setState(() => highRiskConfirmed = v ?? false),
+                        InkWell(
+                          onTap: () => setState(() => highRiskConfirmed = !highRiskConfirmed),
+                          borderRadius: BorderRadius.circular(4),
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(minHeight: 48),
+                            child: Row(
+                              children: [
+                                Checkbox(
+                                  key: const Key('high_risk_confirm_checkbox'),
+                                  value: highRiskConfirmed,
+                                  onChanged: (v) => setState(() => highRiskConfirmed = v ?? false),
+                                ),
+                                const Expanded(child: Text('I confirm this terminal transition', style: TextStyle(fontSize: 12))),
+                              ],
                             ),
-                            const Expanded(child: Text('I confirm this terminal transition', style: TextStyle(fontSize: 12))),
-                          ],
+                          ),
                         ),
                       ],
                     ),

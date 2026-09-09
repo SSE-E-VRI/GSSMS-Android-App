@@ -26,6 +26,12 @@ void main() {
     expect(AppTheme.warningAmberDark, const Color(0xFF92400E));
   });
 
+  test('error tint tokens for validation surfaces', () {
+    expect(AppTheme.errorLight, const Color(0xFFFFF1F1));
+    expect(AppTheme.errorBorder, const Color(0xFFFECACA));
+    expect(AppTheme.surfaceMuted, const Color(0xFFF1F5F9));
+  });
+
   test('spacing and radius scales are complete', () {
     expect(GssmsSpacing.s4, 4);
     expect(GssmsSpacing.s8, 8);

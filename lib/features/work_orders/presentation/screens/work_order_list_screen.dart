@@ -145,6 +145,7 @@ class _WorkOrderListScreenState extends ConsumerState<WorkOrderListScreen> {
           suffixIcon: _searchController.text.isNotEmpty
               ? IconButton(
                   icon: const Icon(Icons.clear, size: 18),
+                  tooltip: 'Clear search',
                   onPressed: () {
                     _searchController.clear();
                     ref.read(workOrderListControllerProvider.notifier).setSearchQuery('');
@@ -540,6 +541,25 @@ class _WorkOrderCard extends StatelessWidget {
     }
   }
 
+  String _getStatusGlyph(WorkOrderStatus status) {
+    switch (status) {
+      case WorkOrderStatus.verified:
+      case WorkOrderStatus.techCompleted:
+      case WorkOrderStatus.closed:
+        return '✓';
+      case WorkOrderStatus.inProgress:
+      case WorkOrderStatus.assigned:
+      case WorkOrderStatus.newOrder:
+      case WorkOrderStatus.onHold:
+        return '!';
+      case WorkOrderStatus.reworkRequired:
+      case WorkOrderStatus.cancelled:
+        return '✕';
+      case WorkOrderStatus.unknown:
+        return '•';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final statusColor = _getStatusColor(workOrder.status);
@@ -568,7 +588,10 @@ class _WorkOrderCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -585,7 +608,6 @@ class _WorkOrderCard extends StatelessWidget {
                               ),
                             ),
                           ),
-                          const SizedBox(width: 8),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
@@ -601,20 +623,32 @@ class _WorkOrderCard extends StatelessWidget {
                               ),
                             ),
                           ),
-                          const Spacer(),
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                             decoration: BoxDecoration(
                               color: statusColor.withOpacity(0.15),
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            child: Text(
-                              workOrder.status.displayName,
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: statusColor,
-                              ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  '${_getStatusGlyph(workOrder.status)} ',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: statusColor,
+                                  ),
+                                ),
+                                Text(
+                                  workOrder.status.displayName,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: statusColor,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
@@ -648,18 +682,20 @@ class _WorkOrderCard extends StatelessWidget {
                           ],
                         ),
                       const SizedBox(height: 8),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      Wrap(
+                        alignment: WrapAlignment.spaceBetween,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        spacing: 8,
+                        runSpacing: 4,
                         children: [
                           if (workOrder.dueDate != null)
                             Text(
                               'Due: ${dateFormat.format(workOrder.dueDate!)}',
                               style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
-                            )
-                          else
-                            const SizedBox.shrink(),
+                            ),
                           if (workOrder.assignedToName != null)
                             Row(
+                              mainAxisSize: MainAxisSize.min,
                               children: [
                                 const Icon(Icons.person_outline, size: 14, color: AppTheme.railwayBlue),
                                 const SizedBox(width: 4),

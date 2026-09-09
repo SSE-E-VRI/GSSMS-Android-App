@@ -9,10 +9,29 @@ class StatusChip extends StatelessWidget {
     super.key,
     required this.label,
     this.tone = GssmsStatusTone.low,
+    this.glyph,
+    this.showGlyph = true,
   });
 
   final String label;
   final GssmsStatusTone tone;
+  final String? glyph;
+  final bool showGlyph;
+
+  String get _glyph {
+    if (glyph != null) return glyph!;
+    switch (tone) {
+      case GssmsStatusTone.critical:
+        return '✕';
+      case GssmsStatusTone.high:
+      case GssmsStatusTone.medium:
+        return '!';
+      case GssmsStatusTone.low:
+        return '•';
+      case GssmsStatusTone.success:
+        return '✓';
+    }
+  }
 
   Color get _color {
     switch (tone) {
@@ -32,22 +51,43 @@ class StatusChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = _color;
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: GssmsSpacing.s8,
-        vertical: GssmsSpacing.s4,
-      ),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(GssmsRadius.r12),
-        border: Border.all(color: color.withOpacity(0.4)),
-      ),
-      child: Text(
-        label,
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w600,
+    final activeGlyph = _glyph;
+    return Semantics(
+      label: showGlyph ? '$activeGlyph $label' : label,
+      // Inner texts would otherwise merge into this label and announce twice.
+      excludeSemantics: true,
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: GssmsSpacing.s8,
+          vertical: GssmsSpacing.s4,
+        ),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(GssmsRadius.r12),
+          border: Border.all(color: color.withOpacity(0.4)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (showGlyph) ...[
+              Text(
+                activeGlyph,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: color,
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+              const SizedBox(width: 4),
+            ],
+            Text(
+              label,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.w600,
+                  ),
             ),
+          ],
+        ),
       ),
     );
   }

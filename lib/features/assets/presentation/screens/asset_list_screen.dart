@@ -198,6 +198,7 @@ class _AssetListScreenState extends ConsumerState<AssetListScreen> {
               if (_searchController.text.isNotEmpty)
                 IconButton(
                   icon: const Icon(Icons.clear, size: 18),
+                  tooltip: 'Clear search',
                   onPressed: () {
                     _searchController.clear();
                     ref
@@ -207,6 +208,7 @@ class _AssetListScreenState extends ConsumerState<AssetListScreen> {
                 ),
               IconButton(
                 icon: const Icon(Icons.qr_code_scanner, color: AppTheme.railwayBlue),
+                tooltip: 'Scan Barcode / QR',
                 onPressed: _openQrScanner,
               ),
             ],
@@ -355,21 +357,25 @@ class _AssetCard extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                    decoration: BoxDecoration(
-                      color: AppTheme.railwayBlue.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      asset.uniqueId,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.railwayBlue,
+                  Flexible(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: AppTheme.railwayBlue.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        asset.uniqueId,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: AppTheme.railwayBlue,
+                        ),
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ),
+                  const SizedBox(width: 8),
                   _criticalityBadge(asset.criticality),
                 ],
               ),

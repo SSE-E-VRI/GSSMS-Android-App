@@ -58,9 +58,9 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
   final List<FocusNode> _pointFocusNodes = [FocusNode()];
   String? _pointsError;
 
-  static const _webBlue = Color(0xFF0D6EFD);
-  static const _webLightBg = Color(0xFFF6F8FF);
-  static const _webCardBg = Color(0xFFF0F4FF);
+  static const _webBlue = AppTheme.primaryBlue;
+  static const _webLightBg = AppTheme.backgroundLight;
+  static const _webCardBg = AppTheme.surfaceCard;
 
   @override
   void initState() {
@@ -303,7 +303,7 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
                   decoration: BoxDecoration(
                     color: _webCardBg,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFE3E8F5)),
+                    border: Border.all(color: AppTheme.borderGrey),
                     boxShadow: [
                       BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 12, offset: const Offset(0, 4)),
                     ],
@@ -368,7 +368,7 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
                             const SizedBox(height: 16),
                             _inspectionPointsSection(),
                             const SizedBox(height: 16),
-                            const Divider(height: 1, color: Color(0xFFE3E8F5)),
+                            const Divider(height: 1, color: AppTheme.borderGrey),
                             const SizedBox(height: 16),
                             _actionRow(),
                           ],
@@ -421,8 +421,8 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
             filled: true,
             fillColor: Colors.white,
             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFE3E8F5))),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFE3E8F5))),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppTheme.borderGrey)),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppTheme.borderGrey)),
             suffixIcon: _loadingDepots
                 ? const Padding(padding: EdgeInsets.all(12), child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)))
                 : null,
@@ -456,8 +456,8 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
             filled: true,
             fillColor: Colors.white,
             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFE3E8F5))),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFE3E8F5))),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppTheme.borderGrey)),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppTheme.borderGrey)),
           ),
           validator: (val) => val == null || val.trim().isEmpty ? 'Please enter a title' : null,
         ),
@@ -491,8 +491,8 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
               filled: true,
               fillColor: Colors.white,
               contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFE3E8F5))),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFE3E8F5))),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppTheme.borderGrey)),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppTheme.borderGrey)),
               suffixIcon: const Icon(Icons.calendar_today_outlined, size: 18, color: AppTheme.textSecondary),
             ),
             child: Text(display, style: const TextStyle(fontSize: 14, color: AppTheme.textPrimary)),
@@ -512,7 +512,7 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFE3E8F5)),
+        border: Border.all(color: AppTheme.borderGrey),
         boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 2))],
       ),
       padding: const EdgeInsets.all(14),
@@ -559,10 +559,10 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
           value: _infraType,
           decoration: InputDecoration(
             filled: true,
-            fillColor: const Color(0xFFF8FAFF),
+            fillColor: AppTheme.surfaceCard,
             contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFE3E8F5))),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFE3E8F5))),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppTheme.borderGrey)),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppTheme.borderGrey)),
           ),
           items: infraOptions
               .map((t) => DropdownMenuItem(
@@ -597,10 +597,10 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
             hintText: hint,
             hintStyle: const TextStyle(color: AppTheme.textSecondary, fontSize: 13),
             filled: true,
-            fillColor: isGeneral ? const Color(0xFFF1F5F9) : Colors.white,
+            fillColor: isGeneral ? AppTheme.surfaceMuted : Colors.white,
             contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFE3E8F5))),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFE3E8F5))),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppTheme.borderGrey)),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppTheme.borderGrey)),
             suffixIcon: _loadingLocations
                 ? const Padding(padding: EdgeInsets.all(10), child: SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)))
                 : null,
@@ -645,8 +645,8 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
                       filled: true,
                       fillColor: Colors.white,
                       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFE3E8F5))),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: Color(0xFFE3E8F5))),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppTheme.borderGrey)),
+                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppTheme.borderGrey)),
                     ),
                     onChanged: (_) {
                       if (_pointsError != null) setState(() => _pointsError = null);
@@ -655,16 +655,16 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
                 ),
                 const SizedBox(width: 8),
                 SizedBox(
-                  height: 44,
+                  height: 48,
                   child: OutlinedButton(
                     key: Key('remove_inspection_point_$index'),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppTheme.errorRed,
-                      side: const BorderSide(color: Color(0xFFFECACA)),
-                      backgroundColor: const Color(0xFFFFF1F1),
+                      side: const BorderSide(color: AppTheme.errorBorder),
+                      backgroundColor: AppTheme.errorLight,
                       padding: const EdgeInsets.symmetric(horizontal: 10),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      minimumSize: const Size(0, 44),
+                      minimumSize: const Size(0, 48),
                     ),
                     onPressed: _pointControllers.length <= 1 ? null : () => _removePoint(index),
                     child: Column(
@@ -722,11 +722,11 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
         OutlinedButton.icon(
           key: const Key('cancel_inspection_button'),
           style: OutlinedButton.styleFrom(
-            foregroundColor: const Color(0xFF64748B),
-            side: const BorderSide(color: Color(0xFFCBD5E1)),
+            foregroundColor: AppTheme.textMuted,
+            side: const BorderSide(color: AppTheme.borderGrey),
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            minimumSize: const Size(0, 44),
+            minimumSize: const Size(0, 48),
             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
           onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(false),

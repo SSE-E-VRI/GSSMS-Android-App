@@ -712,6 +712,7 @@ class _CompletionSheetState extends ConsumerState<_CompletionSheet> {
                 ),
                 IconButton(
                   icon: const Icon(Icons.close, color: AppTheme.textSecondary),
+                  tooltip: 'Remove photo',
                   onPressed: () => setState(() => _proof = null),
                 ),
               ],
@@ -816,6 +817,7 @@ class _ReplacedAssetSheetState extends State<_ReplacedAssetSheet> {
                 const Spacer(),
                 IconButton(
                   icon: const Icon(Icons.close),
+                  tooltip: 'Close dialog',
                   onPressed: () => Navigator.of(context).pop(),
                 ),
               ],
@@ -945,6 +947,7 @@ class _ReplacedComponentSheetState extends State<_ReplacedComponentSheet> {
                 const Spacer(),
                 IconButton(
                   icon: const Icon(Icons.close),
+                  tooltip: 'Close dialog',
                   onPressed: () => Navigator.of(context).pop(),
                 ),
               ],
@@ -1061,6 +1064,7 @@ class _PreviewSheet extends StatelessWidget {
               const Spacer(),
               IconButton(
                 icon: const Icon(Icons.close),
+                tooltip: 'Close preview',
                 onPressed: () => Navigator.of(context).pop(),
               ),
             ],

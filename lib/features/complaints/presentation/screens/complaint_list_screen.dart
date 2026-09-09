@@ -139,6 +139,7 @@ class _ComplaintListScreenState extends ConsumerState<ComplaintListScreen> {
           suffixIcon: _searchController.text.isNotEmpty
               ? IconButton(
                   icon: const Icon(Icons.clear, size: 18),
+                  tooltip: 'Clear search',
                   onPressed: () {
                     _searchController.clear();
                     ref

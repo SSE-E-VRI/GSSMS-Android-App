@@ -245,7 +245,7 @@ class _MaintenanceScreenState extends ConsumerState<MaintenanceScreen> {
       tiles.add(ListTile(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         tileColor: Colors.white,
-        leading: const CircleAvatar(backgroundColor: Color(0xFFE3F2FD), child: Icon(Icons.assignment, color: AppTheme.railwayBlue)),
+        leading: CircleAvatar(backgroundColor: AppTheme.railwayBlue.withOpacity(0.12), child: const Icon(Icons.assignment, color: AppTheme.railwayBlue)),
         title: const Text('Job Works / Work Orders', style: TextStyle(fontWeight: FontWeight.bold)),
         subtitle: Text('${stats.pendingTaskCount} pending tasks'),
         trailing: const Icon(Icons.arrow_forward_ios, size: 16),
@@ -257,7 +257,7 @@ class _MaintenanceScreenState extends ConsumerState<MaintenanceScreen> {
       tiles.add(ListTile(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         tileColor: Colors.white,
-        leading: const CircleAvatar(backgroundColor: Color(0xFFFFEBEE), child: Icon(Icons.report_problem, color: AppTheme.errorRed)),
+        leading: const CircleAvatar(backgroundColor: AppTheme.errorLight, child: Icon(Icons.report_problem, color: AppTheme.errorRed)),
         title: const Text('Complaints & Failures', style: TextStyle(fontWeight: FontWeight.bold)),
         subtitle: Text('${stats.openComplaintCount} open complaints'),
         trailing: const Icon(Icons.arrow_forward_ios, size: 16),
@@ -269,7 +269,7 @@ class _MaintenanceScreenState extends ConsumerState<MaintenanceScreen> {
       tiles.add(ListTile(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         tileColor: Colors.white,
-        leading: const CircleAvatar(backgroundColor: Color(0xFFE8F5E9), child: Icon(Icons.fact_check, color: AppTheme.railwayGreen)),
+        leading: CircleAvatar(backgroundColor: AppTheme.railwayGreen.withOpacity(0.12), child: const Icon(Icons.fact_check, color: AppTheme.railwayGreen)),
         title: const Text('Inspections & Notes', style: TextStyle(fontWeight: FontWeight.bold)),
         subtitle: Text('${stats.inspectionCount} recorded notes'),
         trailing: const Icon(Icons.arrow_forward_ios, size: 16),

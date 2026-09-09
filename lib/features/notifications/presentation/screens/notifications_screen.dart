@@ -190,7 +190,9 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
           return Card(
             key: Key('notification_item_${item.id}'),
             elevation: item.isRead ? 1 : 3,
-            color: item.isRead ? Colors.white : const Color(0xFFF0F7FF),
+            color: item.isRead
+                ? Colors.white
+                : AppTheme.primaryBlue.withOpacity(0.06),
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
               side: BorderSide(

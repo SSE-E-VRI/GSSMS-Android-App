@@ -137,6 +137,7 @@ class _InspectionListScreenState extends ConsumerState<InspectionListScreen> {
           suffixIcon: _searchController.text.isNotEmpty
               ? IconButton(
                   icon: const Icon(Icons.clear, size: 18),
+                  tooltip: 'Clear search',
                   onPressed: () {
                     _searchController.clear();
                     ref
