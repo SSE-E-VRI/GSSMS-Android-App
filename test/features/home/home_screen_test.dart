@@ -443,5 +443,73 @@ void main() {
       expect(find.byKey(const Key('home_continue_work_button')), findsNothing);
       expect(find.byKey(const Key('home_start_work_button')), findsNothing);
     });
+
+    testWidgets('My Work is hidden for Depot Incharge even with an active work order',
+        (tester) async {
+      // Depot Incharge holds maintenance.view (they oversee the depot's work),
+      // but "My Work" surfaces the record assigned to the viewer as executor --
+      // a technician concept. Gating on the permission alone showed a job that
+      // wasn't the Incharge's to execute.
+      const inchargeSession = UserSession(
+        accessToken: 't',
+        username: 'incharge',
+        primaryRole: AuthRole.depotIncharge,
+        roles: [AuthRole.depotIncharge],
+        permissions: ['maintenance.view'],
+      );
+
+      const inProgressOrder = WorkOrder(
+        id: 42,
+        ticketNumber: 'WO-2026-0042',
+        status: WorkOrderStatus.inProgress,
+        type: WorkOrderType.preventive,
+        title: 'Overhaul Transformer Bay 2',
+        stationName: 'Vriddhachalam Junction',
+      );
+
+      await tester.pumpWidget(createTestWidget(
+        inchargeSession,
+        workOrderListState: const WorkOrderListLoaded(
+          workOrders: [inProgressOrder],
+        ),
+      ));
+
+      expect(find.text('MY WORK'), findsNothing);
+      expect(find.text('Overhaul Transformer Bay 2'), findsNothing);
+    });
+
+    testWidgets('My Work is hidden for every other role in the RBAC hierarchy',
+        (tester) async {
+      for (final role in [
+        AuthRole.superAdmin,
+        AuthRole.zrAdmin,
+        AuthRole.zrHqUser,
+        AuthRole.divAdmin,
+        AuthRole.divHqUser,
+        AuthRole.depotIncharge,
+        AuthRole.depotUser,
+        AuthRole.controlCell,
+        AuthRole.ebBillClerk,
+        AuthRole.guest,
+        AuthRole.viewer,
+      ]) {
+        final session = UserSession(
+          accessToken: 't',
+          username: 'u_${role.code}',
+          primaryRole: role,
+          roles: [role],
+          permissions: const ['maintenance.view'],
+        );
+
+        await tester.pumpWidget(createTestWidget(session));
+        await tester.pump();
+
+        expect(
+          find.text('MY WORK'),
+          findsNothing,
+          reason: '${role.code} must not see the technician My Work banner',
+        );
+      }
+    });
   });
 }
