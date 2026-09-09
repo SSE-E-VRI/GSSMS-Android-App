@@ -91,6 +91,20 @@ abstract class IWorkOrderRepository {
     required String remarks,
     String? supervisorName,
   });
+
+  Future<LineAttachment> uploadLineAttachment(
+    int recordId, {
+    required int lineId,
+    required String kind,
+    required String imagePath,
+    DateTime? capturedAt,
+  });
+
+  Future<void> deleteLineAttachment(
+    int recordId, {
+    required int lineId,
+    required int attachmentId,
+  });
 }
 
 class WorkOrderRepository implements IWorkOrderRepository {
@@ -449,5 +463,67 @@ class WorkOrderRepository implements IWorkOrderRepository {
       }
       rethrow;
     }
+  }
+
+  @override
+  Future<LineAttachment> uploadLineAttachment(
+    int recordId, {
+    required int lineId,
+    required String kind,
+    required String imagePath,
+    DateTime? capturedAt,
+  }) async {
+    final idempotencyKey =
+        'line_att_${recordId}_${lineId}_${DateTime.now().millisecondsSinceEpoch}';
+    try {
+      final data = await _apiService.uploadLineAttachment(
+        recordId,
+        lineId: lineId,
+        kind: kind,
+        imagePath: imagePath,
+        capturedAt: capturedAt,
+        idempotencyKey: idempotencyKey,
+      );
+      return LineAttachment.fromJson(data);
+    } catch (e) {
+      if (_isNetworkException(e) && _syncManager != null) {
+        final cmd = OutboxCommand(
+          idempotencyKey: idempotencyKey,
+          type: OutboxCommandType.uploadLineAttachment,
+          entityId: recordId,
+          payload: {
+            'line_id': lineId,
+            'kind': kind,
+            'file_path': imagePath,
+            if (capturedAt != null) 'captured_at': capturedAt.toIso8601String(),
+          },
+          createdAt: DateTime.now(),
+        );
+        await _syncManager.enqueueCommand(cmd);
+
+        return LineAttachment(
+          id: -DateTime.now().millisecondsSinceEpoch,
+          kind: kind.toUpperCase(),
+          localPath: imagePath,
+          capturedAt: capturedAt ?? DateTime.now(),
+          syncStatus: OutboxCommandStatus.pending,
+          idempotencyKey: idempotencyKey,
+        );
+      }
+      rethrow;
+    }
+  }
+
+  @override
+  Future<void> deleteLineAttachment(
+    int recordId, {
+    required int lineId,
+    required int attachmentId,
+  }) async {
+    await _apiService.deleteLineAttachment(
+      recordId,
+      lineId: lineId,
+      attachmentId: attachmentId,
+    );
   }
 }

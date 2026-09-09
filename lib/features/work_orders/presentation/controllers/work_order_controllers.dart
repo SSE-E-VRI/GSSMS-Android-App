@@ -2,10 +2,12 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gssms_mobile/core/network/dio_client.dart';
+import 'package:gssms_mobile/core/sync/outbox_command.dart';
 import 'package:gssms_mobile/core/sync/sync_manager.dart';
 import 'package:gssms_mobile/core/widgets/date_range_filter_bar.dart';
 import 'package:gssms_mobile/core/widgets/org_scope_filter_bar.dart';
 import 'package:gssms_mobile/features/reports/domain/models/infrastructure_option.dart';
+import 'package:gssms_mobile/features/work_orders/data/evidence_service.dart';
 import 'package:gssms_mobile/features/work_orders/data/work_order_api_service.dart';
 import 'package:gssms_mobile/features/work_orders/data/work_order_repository.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/maintenance_record.dart';
@@ -566,6 +568,178 @@ class ChecklistController extends FamilyNotifier<ChecklistState, int> {
         errorMessage: 'Failed to complete execution: ${_readableError(e)}',
       );
       return false;
+    }
+  }
+
+  EvidenceService get _evidenceService => ref.read(evidenceServiceProvider);
+  SyncManager get _syncManager => ref.read(syncManagerProvider.notifier);
+
+  Future<bool> uploadLineAttachment({
+    required int lineId,
+    required String kind,
+    required String imagePath,
+    DateTime? capturedAt,
+  }) async {
+    final current = state;
+    if (current is! ChecklistLoaded) return false;
+
+    try {
+      final attachment = await _repository.uploadLineAttachment(
+        arg,
+        lineId: lineId,
+        kind: kind,
+        imagePath: imagePath,
+        capturedAt: capturedAt,
+      );
+
+      // Direct (online) success returns the server row — the local durable
+      // copy is no longer needed. Queued placeholders carry no url, so their
+      // file is kept for the outbox replay.
+      if (attachment.url.isNotEmpty) {
+        try {
+          await _evidenceService.discard(imagePath);
+        } catch (_) {}
+      }
+
+      final latest = state;
+      if (latest is! ChecklistLoaded) return true;
+
+      final updatedLines = latest.record.lines.map((l) {
+        if (l.id == lineId) {
+          return l.copyWith(
+            attachments: [...l.attachments, attachment],
+          );
+        }
+        return l;
+      }).toList();
+
+      state = latest.copyWith(
+        record: latest.record.copyWith(lines: updatedLines),
+      );
+      return true;
+    } catch (e) {
+      final latest = state;
+      if (latest is! ChecklistLoaded) return false;
+      state = latest.copyWith(errorMessage: 'Failed to upload photo: ${_readableError(e)}');
+      return false;
+    }
+  }
+
+  Future<bool> deleteLineAttachment({
+    required int lineId,
+    required int attachmentId,
+    String? localPath,
+    String? idempotencyKey,
+  }) async {
+    final current = state;
+    if (current is! ChecklistLoaded) return false;
+
+    try {
+      if (idempotencyKey != null) {
+        await _syncManager.removeCommand(idempotencyKey);
+      }
+      if (localPath != null) {
+        try {
+          await _evidenceService.discard(localPath);
+        } catch (_) {}
+      }
+      if (attachmentId > 0) {
+        await _repository.deleteLineAttachment(
+          arg,
+          lineId: lineId,
+          attachmentId: attachmentId,
+        );
+      }
+
+      final latest = state;
+      if (latest is! ChecklistLoaded) return true;
+
+      final updatedLines = latest.record.lines.map((l) {
+        if (l.id == lineId) {
+          return l.copyWith(
+            attachments: l.attachments.where((a) => a.id != attachmentId).toList(),
+          );
+        }
+        return l;
+      }).toList();
+
+      state = latest.copyWith(
+        record: latest.record.copyWith(lines: updatedLines),
+      );
+      return true;
+    } catch (e) {
+      final latest = state;
+      if (latest is! ChecklistLoaded) return false;
+      state = latest.copyWith(errorMessage: 'Failed to delete photo: ${_readableError(e)}');
+      return false;
+    }
+  }
+
+  /// Reconciles locally-queued photo placeholders with outbox + server truth.
+  ///
+  /// Called after an outbox drain settles. Placeholders whose command is gone
+  /// from the outbox were uploaded — they are replaced by the fresh server
+  /// rows. Placeholders whose command remains take its status/error, so a
+  /// failed upload surfaces as a persistent per-thumbnail error (never only
+  /// a transient SnackBar). Server rows always win for uploaded content.
+  Future<void> reconcileAttachmentSyncState() async {
+    final current = state;
+    if (current is! ChecklistLoaded) return;
+    try {
+      final fresh = await _repository.fetchMaintenanceRecord(arg);
+      final outbox = await ref.read(localCacheServiceProvider).getOutboxCommands();
+      final byKey = <String, OutboxCommand>{};
+      for (final cmd in outbox) {
+        if (cmd.type == OutboxCommandType.uploadLineAttachment) {
+          byKey[cmd.idempotencyKey] = cmd;
+        }
+      }
+      final latest = state;
+      if (latest is! ChecklistLoaded) return;
+      final freshById = <int, MaintenanceRecordLine>{
+        for (final l in fresh.lines) l.id: l,
+      };
+      final merged = latest.record.lines.map((line) {
+        final serverLine = freshById[line.id];
+        final serverAtts = serverLine?.attachments ?? const <LineAttachment>[];
+        final keptPlaceholders = <LineAttachment>[];
+        for (final local in line.attachments) {
+          if (local.url.isNotEmpty) continue; // superseded by server rows
+          final key = local.idempotencyKey;
+          final cmd = key != null ? byKey[key] : null;
+          if (cmd == null) continue; // uploaded (or dropped) — server row wins
+          keptPlaceholders.add(local.copyWith(
+            syncStatus: cmd.status,
+            syncError: cmd.lastError,
+            clearError: cmd.lastError == null,
+          ));
+        }
+        return (serverLine ?? line).copyWith(
+          attachments: [...serverAtts, ...keptPlaceholders],
+        );
+      }).toList();
+      state = latest.copyWith(record: latest.record.copyWith(lines: merged));
+    } catch (_) {}
+  }
+
+  Future<void> retryAttachment(LineAttachment attachment) async {    if (attachment.idempotencyKey != null) {
+      await _syncManager.retryCommand(attachment.idempotencyKey!);
+      final latest = state;
+      if (latest is ChecklistLoaded) {
+        final updatedLines = latest.record.lines.map((l) {
+          final updatedAtts = l.attachments.map((a) {
+            if (a.idempotencyKey == attachment.idempotencyKey) {
+              return a.copyWith(
+                syncStatus: OutboxCommandStatus.pending,
+                clearError: true,
+              );
+            }
+            return a;
+          }).toList();
+          return l.copyWith(attachments: updatedAtts);
+        }).toList();
+        state = latest.copyWith(record: latest.record.copyWith(lines: updatedLines));
+      }
     }
   }
 

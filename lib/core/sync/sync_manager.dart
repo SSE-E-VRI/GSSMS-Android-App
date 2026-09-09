@@ -5,6 +5,7 @@ import 'package:equatable/equatable.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gssms_mobile/core/database/local_cache_service.dart';
 import 'package:gssms_mobile/core/sync/outbox_command.dart';
+import 'package:gssms_mobile/features/work_orders/data/evidence_service.dart';
 import 'package:gssms_mobile/features/work_orders/data/work_order_api_service.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_order_controllers.dart';
 
@@ -71,8 +72,42 @@ class SyncManager extends Notifier<SyncState> {
 
   ILocalCacheService get _cacheService => ref.read(localCacheServiceProvider);
   WorkOrderApiService get _apiService => ref.read(workOrderApiServiceProvider);
+  EvidenceService get _evidenceService => ref.read(evidenceServiceProvider);
 
   Future<int?> _cacheOwnerUserId() => _cacheService.getCacheOwnerUserId();
+
+  /// Checks whether [cmd] depends on another command that has not synced yet.
+  /// Enforces:
+  /// 1. Explicit [OutboxCommand.dependsOn] dependencies.
+  /// 2. Ordering guard: an attachment command must NEVER replay before
+  ///    `submitLine` for the same line has succeeded.
+  bool _hasUnsyncedDependency(
+    OutboxCommand cmd,
+    List<OutboxCommand> scopedCommands,
+    Set<String> syncedKeys,
+  ) {
+    if (cmd.dependsOn != null && cmd.dependsOn!.isNotEmpty) {
+      final dep = cmd.dependsOn!;
+      if (!syncedKeys.contains(dep)) {
+        final hasDepInScope = scopedCommands.any((c) => c.idempotencyKey == dep);
+        if (hasDepInScope) return true;
+      }
+    }
+
+    if (cmd.type == OutboxCommandType.uploadLineAttachment) {
+      final lineId = cmd.payload['line_id'];
+      if (lineId != null) {
+        final hasUnsyncedSubmitLine = scopedCommands.any((c) =>
+            c.type == OutboxCommandType.submitLine &&
+            c.entityId == cmd.entityId &&
+            c.payload['line_id'] == lineId &&
+            !syncedKeys.contains(c.idempotencyKey));
+        if (hasUnsyncedSubmitLine) return true;
+      }
+    }
+
+    return false;
+  }
 
   /// Bump the session generation so an in-flight drain cannot persist the
   /// previous user's outbox after logout or an identity change.
@@ -162,6 +197,7 @@ class SyncManager extends Notifier<SyncState> {
         }
 
         final remainingCommands = <OutboxCommand>[];
+        final syncedKeys = <String>{};
 
         for (var i = 0; i < scopedCommands.length; i++) {
           if (epoch != _sessionEpoch) {
@@ -174,9 +210,15 @@ class SyncManager extends Notifier<SyncState> {
             continue;
           }
 
+          if (_hasUnsyncedDependency(cmd, scopedCommands, syncedKeys)) {
+            remainingCommands.add(cmd);
+            continue;
+          }
+
           try {
             await _executeCommand(cmd);
-            // Synced successfully - omit from remaining outbox
+            // Synced successfully - track key and omit from remaining outbox
+            syncedKeys.add(cmd.idempotencyKey);
           } on DioException catch (dioErr) {
             final errStr = dioErr.toString().toLowerCase();
             final isNetwork = dioErr.type == DioExceptionType.connectionTimeout ||
@@ -231,6 +273,24 @@ class SyncManager extends Notifier<SyncState> {
           await _cacheService.saveOutboxCommands(const []);
           return;
         }
+        // Retention sweep: delete expired local evidence, never files that
+        // are still queued for upload.
+        final queuedPaths = <String>{};
+        for (final cmd in remainingCommands) {
+          final filePath = cmd.payload['file_path']?.toString();
+          if (filePath != null && filePath.isNotEmpty) {
+            queuedPaths.add(filePath);
+          }
+          final proofPath = cmd.payload['proof_path']?.toString();
+          if (proofPath != null && proofPath.isNotEmpty) {
+            queuedPaths.add(proofPath);
+          }
+        }
+        try {
+          await _evidenceService.cleanupExpiredEvidence(
+            excludePaths: queuedPaths,
+          );
+        } catch (_) {}
         final activePending = remainingCommands.where((c) => c.status == OutboxCommandStatus.pending).length;
 
         state = state.copyWith(
@@ -241,6 +301,35 @@ class SyncManager extends Notifier<SyncState> {
       } finally {
         _isDraining = false;
       }
+    });
+  }
+
+  /// Retries a previously failed or conflicting command by resetting it to pending.
+  Future<void> retryCommand(String idempotencyKey) async {
+    await _synchronized(() async {
+      final commands = await _cacheService.getOutboxCommands();
+      final updated = commands.map((c) {
+        if (c.idempotencyKey == idempotencyKey) {
+          return c.copyWith(
+            status: OutboxCommandStatus.pending,
+            clearError: true,
+          );
+        }
+        return c;
+      }).toList();
+      await _cacheService.saveOutboxCommands(updated);
+      await refreshPendingCount();
+    });
+    await drainOutbox();
+  }
+
+  /// Removes a command permanently from the outbox cache (e.g. user dismissed or deleted it).
+  Future<void> removeCommand(String idempotencyKey) async {
+    await _synchronized(() async {
+      final commands = await _cacheService.getOutboxCommands();
+      commands.removeWhere((c) => c.idempotencyKey == idempotencyKey);
+      await _cacheService.saveOutboxCommands(commands);
+      await refreshPendingCount();
     });
   }
 
@@ -279,13 +368,35 @@ class SyncManager extends Notifier<SyncState> {
         );
         break;
       case OutboxCommandType.uploadEvidence:
+        final proofPath = cmd.payload['proof_path'] as String?;
         await _apiService.uploadRecordEvidence(
           cmd.entityId,
-          proofJpegPath: cmd.payload['proof_path'] as String?,
+          proofJpegPath: proofPath,
           remarks: cmd.payload['remarks'] as String?,
           otherStaff: cmd.payload['other_staff'] as String?,
           idempotencyKey: cmd.idempotencyKey,
         );
+        if (proofPath != null) {
+          try {
+            await _evidenceService.discard(proofPath);
+          } catch (_) {}
+        }
+        break;
+      case OutboxCommandType.uploadLineAttachment:
+        final filePath = cmd.payload['file_path'] as String;
+        final capturedAtStr = cmd.payload['captured_at'] as String?;
+        final capturedAt = capturedAtStr != null ? DateTime.tryParse(capturedAtStr) : null;
+        await _apiService.uploadLineAttachment(
+          cmd.entityId,
+          lineId: cmd.payload['line_id'] as int,
+          kind: cmd.payload['kind'] as String,
+          imagePath: filePath,
+          capturedAt: capturedAt,
+          idempotencyKey: cmd.idempotencyKey,
+        );
+        try {
+          await _evidenceService.discard(filePath);
+        } catch (_) {}
         break;
     }
   }

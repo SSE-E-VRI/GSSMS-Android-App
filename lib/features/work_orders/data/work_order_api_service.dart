@@ -364,4 +364,63 @@ class WorkOrderApiService {
           : null,
     );
   }
+
+  /// Uploads a line-scoped evidence photo (BEFORE, DURING, AFTER).
+  ///
+  /// The server accepts JPEG only, up to 5 MB.
+  Future<Map<String, dynamic>> uploadLineAttachment(
+    int recordId, {
+    required int lineId,
+    required String kind,
+    required String imagePath,
+    DateTime? capturedAt,
+    String? idempotencyKey,
+  }) async {
+    final file = File(imagePath);
+    if (!await file.exists()) {
+      throw ArgumentError('Attachment photo not found at $imagePath');
+    }
+    if (await file.length() > 5 * 1024 * 1024) {
+      throw ArgumentError('Attachment photo exceeds the 5 MB server limit');
+    }
+
+    final filename = imagePath.split(Platform.pathSeparator).last;
+    final form = FormData.fromMap({
+      'kind': kind.toUpperCase(),
+      if (capturedAt != null) 'captured_at': capturedAt.toIso8601String(),
+      'image': await MultipartFile.fromFile(
+        imagePath,
+        filename: filename.isNotEmpty ? filename : 'attachment.jpg',
+        contentType: DioMediaType('image', 'jpeg'),
+      ),
+    });
+
+    final response = await _dio.post(
+      '$_records/$recordId/lines/$lineId/attachments/',
+      data: form,
+      options: idempotencyKey != null
+          ? Options(headers: {'X-Idempotency-Key': idempotencyKey, 'Idempotency-Key': idempotencyKey})
+          : null,
+    );
+
+    if (response.data is Map<String, dynamic>) {
+      return response.data as Map<String, dynamic>;
+    }
+    if (response.data is Map) {
+      return Map<String, dynamic>.from(response.data as Map);
+    }
+    return const {};
+  }
+
+  /// Deletes a line-scoped evidence photo.
+  /// Allowed only while the record is pre-TECH_COMPLETED.
+  Future<void> deleteLineAttachment(
+    int recordId, {
+    required int lineId,
+    required int attachmentId,
+  }) async {
+    await _dio.delete(
+      '$_records/$recordId/lines/$lineId/attachments/$attachmentId/',
+    );
+  }
 }

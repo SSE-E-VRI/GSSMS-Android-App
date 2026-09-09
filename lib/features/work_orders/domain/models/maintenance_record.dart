@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:equatable/equatable.dart';
+import 'package:gssms_mobile/core/sync/outbox_command.dart';
 import 'package:gssms_mobile/core/utils/json_parsing.dart';
 
 /// How a checklist line captures its reading.
@@ -140,6 +141,135 @@ class MaintenanceStatusOption extends Equatable {
   List<Object?> get props => [id, label, semantic, isDeficiency, actionOptions];
 }
 
+class LineAttachment extends Equatable {
+  const LineAttachment({
+    required this.id,
+    required this.kind,
+    this.url = '',
+    this.uploadedBy,
+    this.capturedAt,
+    this.sha256,
+    this.sizeBytes,
+    this.displayOrder = 0,
+    this.uploadedAt,
+    this.localPath,
+    this.syncStatus,
+    this.syncError,
+    this.idempotencyKey,
+  });
+
+  final int id;
+  final String kind;
+  final String url;
+  final String? uploadedBy;
+  final DateTime? capturedAt;
+  final String? sha256;
+  final int? sizeBytes;
+  final int displayOrder;
+  final DateTime? uploadedAt;
+  final String? localPath;
+  final OutboxCommandStatus? syncStatus;
+  final String? syncError;
+  final String? idempotencyKey;
+
+  bool get isSynced =>
+      syncStatus == OutboxCommandStatus.synced ||
+      (url.isNotEmpty && (syncStatus == null || syncStatus == OutboxCommandStatus.synced));
+
+  bool get isPending =>
+      syncStatus == OutboxCommandStatus.pending ||
+      syncStatus == OutboxCommandStatus.syncing;
+
+  bool get isFailed =>
+      syncStatus == OutboxCommandStatus.failed ||
+      syncStatus == OutboxCommandStatus.conflict;
+
+  LineAttachment copyWith({
+    int? id,
+    String? kind,
+    String? url,
+    String? uploadedBy,
+    DateTime? capturedAt,
+    String? sha256,
+    int? sizeBytes,
+    int? displayOrder,
+    DateTime? uploadedAt,
+    String? localPath,
+    OutboxCommandStatus? syncStatus,
+    String? syncError,
+    bool clearError = false,
+    String? idempotencyKey,
+  }) {
+    return LineAttachment(
+      id: id ?? this.id,
+      kind: kind ?? this.kind,
+      url: url ?? this.url,
+      uploadedBy: uploadedBy ?? this.uploadedBy,
+      capturedAt: capturedAt ?? this.capturedAt,
+      sha256: sha256 ?? this.sha256,
+      sizeBytes: sizeBytes ?? this.sizeBytes,
+      displayOrder: displayOrder ?? this.displayOrder,
+      uploadedAt: uploadedAt ?? this.uploadedAt,
+      localPath: localPath ?? this.localPath,
+      syncStatus: syncStatus ?? this.syncStatus,
+      syncError: clearError ? null : (syncError ?? this.syncError),
+      idempotencyKey: idempotencyKey ?? this.idempotencyKey,
+    );
+  }
+
+  factory LineAttachment.fromJson(Map<String, dynamic> json) {
+    final statusStr = json['sync_status']?.toString();
+    return LineAttachment(
+      id: asJsonInt(json['id']) ?? 0,
+      kind: asJsonString(json['kind'])?.toUpperCase() ?? 'BEFORE',
+      url: asJsonString(json['url']) ?? asJsonString(json['image']) ?? '',
+      uploadedBy: asJsonString(json['uploaded_by']),
+      capturedAt: _asDate(json['captured_at']),
+      sha256: asJsonString(json['sha256']),
+      sizeBytes: asJsonInt(json['size_bytes']),
+      displayOrder: asJsonInt(json['display_order']) ?? 0,
+      uploadedAt: _asDate(json['uploaded_at']),
+      localPath: asJsonString(json['local_path']),
+      syncStatus: statusStr != null ? OutboxCommandStatus.fromCode(statusStr) : null,
+      syncError: asJsonString(json['sync_error']),
+      idempotencyKey: asJsonString(json['idempotency_key']),
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'kind': kind,
+        'url': url,
+        'uploaded_by': uploadedBy,
+        'captured_at': capturedAt?.toIso8601String(),
+        'sha256': sha256,
+        'size_bytes': sizeBytes,
+        'display_order': displayOrder,
+        'uploaded_at': uploadedAt?.toIso8601String(),
+        if (localPath != null) 'local_path': localPath,
+        if (syncStatus != null) 'sync_status': syncStatus!.code,
+        if (syncError != null) 'sync_error': syncError,
+        if (idempotencyKey != null) 'idempotency_key': idempotencyKey,
+      };
+
+  @override
+  List<Object?> get props => [
+        id,
+        kind,
+        url,
+        uploadedBy,
+        capturedAt,
+        sha256,
+        sizeBytes,
+        displayOrder,
+        uploadedAt,
+        localPath,
+        syncStatus,
+        syncError,
+        idempotencyKey,
+      ];
+}
+
 class MaintenanceRecordLine extends Equatable {
   const MaintenanceRecordLine({
     required this.id,
@@ -163,6 +293,7 @@ class MaintenanceRecordLine extends Equatable {
     this.excluded = false,
     this.exclusionReason,
     this.isSaved = true,
+    this.attachments = const [],
   });
 
   final int id;
@@ -204,6 +335,9 @@ class MaintenanceRecordLine extends Equatable {
   final String? exclusionReason;
 
   final bool isSaved;
+
+  /// Line-scoped attachments (before/after photos).
+  final List<LineAttachment> attachments;
 
   /// Label shown as the line's heading.
   String get displayTitle {
@@ -283,6 +417,7 @@ class MaintenanceRecordLine extends Equatable {
     Object? deficiency = _unset,
     bool? deficiencyAttended,
     bool? isSaved,
+    List<LineAttachment>? attachments,
   }) {
     return MaintenanceRecordLine(
       id: id,
@@ -314,12 +449,15 @@ class MaintenanceRecordLine extends Equatable {
       excluded: excluded,
       exclusionReason: exclusionReason,
       isSaved: isSaved ?? this.isSaved,
+      attachments: attachments ?? this.attachments,
     );
   }
 
   factory MaintenanceRecordLine.fromJson(Map<String, dynamic> json) {
     final rawStatusOptions = json['status_options'];
     final statusOptionList = rawStatusOptions is List ? rawStatusOptions : const [];
+    final rawAttachments = json['attachments'];
+    final attachmentList = rawAttachments is List ? rawAttachments : const [];
 
     return MaintenanceRecordLine(
       id: asJsonInt(json['id']) ?? 0,
@@ -350,6 +488,10 @@ class MaintenanceRecordLine extends Equatable {
       excluded: asJsonBool(json['excluded']) ?? false,
       exclusionReason: asJsonString(json['exclusion_reason']),
       isSaved: true,
+      attachments: attachmentList
+          .whereType<Map>()
+          .map((e) => LineAttachment.fromJson(Map<String, dynamic>.from(e)))
+          .toList(),
     );
   }
 
@@ -376,6 +518,7 @@ class MaintenanceRecordLine extends Equatable {
         'deficiency_attended': deficiencyAttended,
         'excluded': excluded,
         'exclusion_reason': exclusionReason,
+        'attachments': attachments.map((a) => a.toJson()).toList(),
       };
 
   @override
@@ -401,6 +544,7 @@ class MaintenanceRecordLine extends Equatable {
         excluded,
         exclusionReason,
         isSaved,
+        attachments,
       ];
 }
 
@@ -438,6 +582,15 @@ class MaintenanceRecord extends Equatable {
   final List<MaintenanceRecordLine> lines;
   final String? remarks;
   final String? status;
+
+  /// Returns true if the record is at or past technician completion.
+  bool get isPastTechCompleted {
+    final s = status?.toUpperCase();
+    return s == 'TECH_COMPLETED' ||
+        s == 'VERIFIED' ||
+        s == 'CLOSED' ||
+        s == 'CANCELLED';
+  }
 
   /// Excluded lines are not part of this record's work, so they are left out of
   /// both the checklist and its progress.

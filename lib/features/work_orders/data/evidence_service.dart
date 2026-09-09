@@ -1,11 +1,32 @@
 import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 
+/// The kind/category of evidence photo being captured.
+enum EvidenceKind {
+  proof('PROOF'),
+  before('BEFORE'),
+  during('DURING'),
+  after('AFTER');
+
+  const EvidenceKind(this.code);
+  final String code;
+
+  static EvidenceKind fromCode(String? code) {
+    if (code == null) return EvidenceKind.proof;
+    final upper = code.trim().toUpperCase();
+    for (final k in EvidenceKind.values) {
+      if (k.code == upper) return k;
+    }
+    return EvidenceKind.proof;
+  }
+}
+
 /// Constraints enforced by the backend's `validate_jpeg` on
-/// `MaintenanceRecord.proof_of_execution`.
+/// `MaintenanceRecord.proof_of_execution` and `LineAttachment.image`.
 class EvidenceLimits {
   const EvidenceLimits._();
 
@@ -18,52 +39,75 @@ class EvidenceLimits {
 
 /// A captured photo, already copied somewhere durable.
 class EvidenceFile {
-  const EvidenceFile({required this.path, required this.sizeBytes});
+  const EvidenceFile({
+    required this.path,
+    required this.sizeBytes,
+    required this.kind,
+  });
 
   final String path;
   final int sizeBytes;
+  final EvidenceKind kind;
 
   String get fileName => path.split(Platform.pathSeparator).last;
 
   bool get isWithinSizeLimit => sizeBytes <= EvidenceLimits.maxBytes;
 }
 
-/// Captures proof-of-execution photos and keeps them somewhere the outbox can
-/// still find them later.
+/// Captures proof-of-execution and line-scoped photos and keeps them somewhere
+/// the outbox can still find them later.
 ///
 /// The picker hands back a file in a OS cache directory that may be reclaimed
 /// at any time. A queued upload can outlive that, so every capture is copied
 /// into the app's documents directory and referenced from there.
 class EvidenceService {
-  EvidenceService({ImagePicker? picker}) : _picker = picker ?? ImagePicker();
+  EvidenceService({
+    ImagePicker? picker,
+    this.retentionPeriod = const Duration(hours: 48),
+  }) : _picker = picker ?? ImagePicker();
 
   final ImagePicker _picker;
+  final Duration retentionPeriod;
 
   static const String _evidenceDirName = 'gssms_evidence';
+
+  /// Warning threshold for pending local evidence: 200 MB (MOBILE_APP_SSOT.md §12 / line 483).
+  static const int warningThresholdBytes = 200 * 1024 * 1024;
 
   /// Captures from the camera (or gallery) and returns a durable copy.
   /// Returns null when the user cancels.
   ///
-  /// Images are requested as JPEG at a bounded size because the server accepts
-  /// only JPEG under 5 MB, and a modern phone camera easily exceeds that.
+  /// Downscales to 1600px long edge at JPEG quality 80 and strips EXIF except
+  /// orientation (baked into pixel data) per MOBILE_APP_SSOT.md §12.
   Future<EvidenceFile?> capture({
+    required EvidenceKind kind,
     ImageSource source = ImageSource.camera,
-    int imageQuality = 85,
-    double maxWidth = 1920,
+    int imageQuality = 80,
+    double maxWidth = 1600,
+    double maxHeight = 1600,
   }) async {
     final picked = await _picker.pickImage(
       source: source,
       imageQuality: imageQuality,
       maxWidth: maxWidth,
+      maxHeight: maxHeight,
       requestFullMetadata: false,
     );
     if (picked == null) return null;
-    return persist(picked.path);
+    return persist(picked.path, kind: kind);
   }
 
-  /// Copies [sourcePath] into the app's evidence directory so a queued upload
-  /// survives the OS clearing its caches.
-  Future<EvidenceFile> persist(String sourcePath) async {
+  /// Copies and normalizes [sourcePath] into the app's evidence directory:
+  /// - Bakes EXIF orientation into pixels so orientation is preserved.
+  /// - Strips all other EXIF (GPS, device metadata).
+  /// - Scales long edge to at most 1600px.
+  /// - Re-encodes as JPEG at quality 80.
+  ///
+  /// The durable copy survives the OS clearing its caches.
+  Future<EvidenceFile> persist(
+    String sourcePath, {
+    required EvidenceKind kind,
+  }) async {
     final source = File(sourcePath);
     if (!await source.exists()) {
       throw FileSystemException('Source photo not found', sourcePath);
@@ -75,13 +119,73 @@ class EvidenceService {
     }
 
     final stamp = DateTime.now().millisecondsSinceEpoch;
-    final target = '${dir.path}${Platform.pathSeparator}proof_$stamp.jpg';
+    final target = '${dir.path}${Platform.pathSeparator}${kind.name}_$stamp.jpg';
+
     try {
-      final copied = await source.copy(target);
-      return EvidenceFile(path: copied.path, sizeBytes: await copied.length());
+      final rawBytes = await source.readAsBytes();
+      final decoded = img.decodeImage(rawBytes);
+
+      if (decoded != null) {
+        // 1. Bake orientation into pixels so orientation is preserved without EXIF tags
+        final oriented = img.bakeOrientation(decoded);
+
+        // 2. Downscale long edge to max 1600px
+        img.Image resized = oriented;
+        final maxEdge =
+            oriented.width > oriented.height ? oriented.width : oriented.height;
+        if (maxEdge > 1600) {
+          if (oriented.width >= oriented.height) {
+            resized = img.copyResize(oriented, width: 1600);
+          } else {
+            resized = img.copyResize(oriented, height: 1600);
+          }
+        }
+
+        // 3. Encode to clean JPEG at quality 80 (omits EXIF metadata)
+        final processedBytes = img.encodeJpg(resized, quality: 80);
+        final targetFile = File(target);
+        await targetFile.writeAsBytes(processedBytes);
+        return EvidenceFile(
+          path: targetFile.path,
+          sizeBytes: processedBytes.length,
+          kind: kind,
+        );
+      } else {
+        // Fallback to direct copy if image decode fails
+        final copied = await source.copy(target);
+        return EvidenceFile(
+          path: copied.path,
+          sizeBytes: await copied.length(),
+          kind: kind,
+        );
+      }
     } on FileSystemException catch (e) {
       throw FileSystemException('Could not save proof photo: ${e.message}', target);
     }
+  }
+
+  /// Returns total bytes occupied by local evidence photos in the app's evidence directory.
+  Future<int> getTotalPendingEvidenceBytes() async {
+    try {
+      final docs = await getApplicationDocumentsDirectory();
+      final dir = Directory('${docs.path}${Platform.pathSeparator}$_evidenceDirName');
+      if (!await dir.exists()) return 0;
+      int total = 0;
+      await for (final entity in dir.list(recursive: false)) {
+        if (entity is File) {
+          total += await entity.length();
+        }
+      }
+      return total;
+    } catch (_) {
+      return 0;
+    }
+  }
+
+  /// Returns true if local evidence storage is at or above the 200 MB warning cap.
+  Future<bool> isStorageNearCap() async {
+    final total = await getTotalPendingEvidenceBytes();
+    return total >= warningThresholdBytes;
   }
 
   /// Removes a stored evidence file once its upload has been accepted.
@@ -90,6 +194,35 @@ class EvidenceService {
     if (await file.exists()) {
       await file.delete();
     }
+  }
+
+  /// Deletes local evidence copies older than [maxAge] (defaults to
+  /// [retentionPeriod], 48h). Files still referenced by the outbox
+  /// ([excludePaths]) are never deleted, so a long-offline queued photo
+  /// cannot be removed before its upload succeeds.
+  Future<void> cleanupExpiredEvidence({
+    Duration? maxAge,
+    Set<String>? excludePaths,
+  }) async {
+    try {
+      final docs = await getApplicationDocumentsDirectory();
+      final dir = Directory('${docs.path}${Platform.pathSeparator}$_evidenceDirName');
+      if (!await dir.exists()) return;
+      final cutoff = DateTime.now().subtract(maxAge ?? retentionPeriod);
+      await for (final entity in dir.list(recursive: false)) {
+        if (entity is File) {
+          if (excludePaths != null && excludePaths.contains(entity.path)) {
+            continue;
+          }
+          final stat = await entity.stat();
+          if (stat.modified.isBefore(cutoff)) {
+            try {
+              await entity.delete();
+            } catch (_) {}
+          }
+        }
+      }
+    } catch (_) {}
   }
 }
 

@@ -1,7 +1,14 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
+import 'package:gssms_mobile/features/auth/domain/rbac.dart';
+import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
+import 'package:gssms_mobile/features/work_orders/data/evidence_service.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/maintenance_record.dart';
+import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_order_controllers.dart';
 
 /// The values a line card reports back when it saves.
 class ChecklistLineEdit {
@@ -21,23 +28,35 @@ class ChecklistLineEdit {
   final String? remarks;
 }
 
-class ChecklistLineCard extends StatefulWidget {
+class ChecklistLineCard extends ConsumerStatefulWidget {
   const ChecklistLineCard({
     super.key,
     required this.line,
     required this.onSave,
+    this.recordId,
+    this.isPastTechCompleted = false,
+    this.onCapturePhoto,
+    this.onDeletePhoto,
+    this.onRetryPhoto,
   });
 
   final MaintenanceRecordLine line;
   final void Function(ChecklistLineEdit edit) onSave;
+  final int? recordId;
+  final bool isPastTechCompleted;
+  final Future<void> Function(EvidenceKind kind, ImageSource source)? onCapturePhoto;
+  final Future<void> Function(LineAttachment attachment)? onDeletePhoto;
+  final Future<void> Function(LineAttachment attachment)? onRetryPhoto;
 
   @override
-  State<ChecklistLineCard> createState() => _ChecklistLineCardState();
+  ConsumerState<ChecklistLineCard> createState() => _ChecklistLineCardState();
 }
 
-class _ChecklistLineCardState extends State<ChecklistLineCard> {
+class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
   /// How long typing must pause before the observation is pushed to the server.
   static const Duration _saveDebounce = Duration(milliseconds: 800);
+
+  bool _attachmentsExpanded = false;
 
   late final TextEditingController _valueController;
   late final TextEditingController _remarksController;
@@ -54,6 +73,16 @@ class _ChecklistLineCardState extends State<ChecklistLineCard> {
   Timer? _debounceTimer;
 
   MaintenanceRecordLine get _line => widget.line;
+
+  /// Auth headers for loading protected evidence images. `protected_media`
+  /// requires authentication and `Image.network` sends none by itself, so
+  /// synced photos would otherwise render as broken images.
+  Map<String, String>? _authHeaders() {
+    final token =
+        sessionFromAuth(ref.read(authControllerProvider))?.accessToken;
+    if (token == null || token.isEmpty) return null;
+    return {'Authorization': 'Bearer $token'};
+  }
 
   @override
   void initState() {
@@ -201,14 +230,15 @@ class _ChecklistLineCardState extends State<ChecklistLineCard> {
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildHeader(context, line),
-            const Divider(height: 18),
+            const Divider(height: 10),
             ..._buildValueInput(line),
             if (line.statusOptions.isNotEmpty) ..._buildStatusAndAction(line),
+            _buildAttachmentsSection(line),
           ],
         ),
       ),
@@ -536,5 +566,472 @@ class _ChecklistLineCardState extends State<ChecklistLineCard> {
         ),
       ],
     ];
+  }
+
+  Future<void> _handleCapture(EvidenceKind kind, ImageSource source) async {
+    try {
+      final evidenceService = ref.read(evidenceServiceProvider);
+      final nearCap = await evidenceService.isStorageNearCap();
+      if (nearCap && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Storage warning: Pending evidence photos exceed 200MB. Consider syncing before taking more photos.',
+            ),
+            backgroundColor: AppTheme.warningAmber,
+            duration: Duration(seconds: 4),
+          ),
+        );
+      }
+
+      if (widget.onCapturePhoto != null) {
+        await widget.onCapturePhoto!(kind, source);
+        return;
+      }
+
+      if (widget.recordId == null) return;
+
+      final evidence = await evidenceService.capture(kind: kind, source: source);
+      if (evidence == null || !mounted) return;
+
+      await ref
+          .read(checklistControllerProvider(widget.recordId!).notifier)
+          .uploadLineAttachment(
+            lineId: widget.line.id,
+            kind: kind.name.toUpperCase(),
+            imagePath: evidence.path,
+            capturedAt: DateTime.now(),
+          );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to capture photo: $e'),
+            backgroundColor: AppTheme.errorRed,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _handleDelete(LineAttachment attachment) async {
+    if (widget.isPastTechCompleted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Cannot delete attachments after technician completion.'),
+          backgroundColor: AppTheme.errorRed,
+        ),
+      );
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('Delete Photo'),
+        content: Text(
+          'Are you sure you want to delete this ${attachment.kind.toLowerCase()} photo?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(true),
+            style: TextButton.styleFrom(foregroundColor: AppTheme.errorRed),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    if (widget.onDeletePhoto != null) {
+      await widget.onDeletePhoto!(attachment);
+      return;
+    }
+
+    if (widget.recordId == null) return;
+
+    await ref
+        .read(checklistControllerProvider(widget.recordId!).notifier)
+        .deleteLineAttachment(
+          lineId: widget.line.id,
+          attachmentId: attachment.id,
+          localPath: attachment.localPath,
+          idempotencyKey: attachment.idempotencyKey,
+        );
+  }
+
+  Future<void> _handleRetry(LineAttachment attachment) async {
+    if (widget.onRetryPhoto != null) {
+      await widget.onRetryPhoto!(attachment);
+      return;
+    }
+    if (widget.recordId == null) return;
+    await ref
+        .read(checklistControllerProvider(widget.recordId!).notifier)
+        .retryAttachment(attachment);
+  }
+
+  void _showFullscreenImage(LineAttachment attachment) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        insetPadding: const EdgeInsets.all(12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              color: AppTheme.primaryDark,
+              child: Row(
+                children: [
+                  Text(
+                    '${attachment.kind} Photo',
+                    style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white),
+                    onPressed: () => Navigator.of(ctx).pop(),
+                  ),
+                ],
+              ),
+            ),
+            ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(ctx).size.height * 0.65,
+              ),
+              child: InteractiveViewer(
+                child: attachment.localPath != null &&
+                        File(attachment.localPath!).existsSync()
+                    ? Image.file(
+                        File(attachment.localPath!),
+                        fit: BoxFit.contain,
+                      )
+                    : attachment.url.isNotEmpty
+                        ? Image.network(
+                            attachment.url,
+                            headers: _authHeaders(),
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, __, ___) => const Center(
+                              child: Icon(Icons.broken_image, size: 64, color: AppTheme.textSecondary),
+                            ),
+                          )
+                        : const Center(
+                            child: Icon(Icons.image_not_supported, size: 64, color: AppTheme.textSecondary),
+                          ),
+              ),
+            ),
+            if (attachment.capturedAt != null || attachment.uploadedBy != null)
+              Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    if (attachment.capturedAt != null)
+                      Text(
+                        'Captured: ${attachment.capturedAt!.toLocal().toString().split('.').first}',
+                        style: Theme.of(ctx).textTheme.labelSmall?.copyWith(
+                              color: AppTheme.textSecondary,
+                            ),
+                      ),
+                    if (attachment.uploadedBy != null)
+                      Text(
+                        'By: ${attachment.uploadedBy}',
+                        style: Theme.of(ctx).textTheme.labelSmall?.copyWith(
+                              color: AppTheme.textSecondary,
+                            ),
+                      ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAttachmentsSection(MaintenanceRecordLine line) {
+    final beforeAtts = line.attachments.where((a) => a.kind == 'BEFORE').toList();
+    final afterAtts = line.attachments.where((a) => a.kind == 'AFTER').toList();
+    final duringAtts = line.attachments.where((a) => a.kind == 'DURING').toList();
+
+    final countSummary = duringAtts.isEmpty
+        ? 'Before ${beforeAtts.length} · After ${afterAtts.length}'
+        : 'Before ${beforeAtts.length} · During ${duringAtts.length} · After ${afterAtts.length}';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 6),
+        InkWell(
+          key: Key('line_${line.id}_attachments_toggle'),
+          onTap: () => setState(() => _attachmentsExpanded = !_attachmentsExpanded),
+          borderRadius: BorderRadius.circular(6),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.4),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(color: AppTheme.borderGrey.withOpacity(0.5)),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.photo_camera_outlined,
+                  size: 18,
+                  color: (beforeAtts.isNotEmpty || afterAtts.isNotEmpty || duringAtts.isNotEmpty)
+                      ? AppTheme.railwayBlue
+                      : AppTheme.textSecondary,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  countSummary,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textPrimary,
+                      ),
+                ),
+                const Spacer(),
+                Icon(
+                  _attachmentsExpanded ? Icons.expand_less : Icons.expand_more,
+                  size: 20,
+                  color: AppTheme.textSecondary,
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (_attachmentsExpanded) ...[
+          const SizedBox(height: 10),
+          _buildAttachmentStrip(
+            kind: EvidenceKind.before,
+            title: 'Before Photos',
+            attachments: beforeAtts,
+          ),
+          if (duringAtts.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            _buildAttachmentStrip(
+              kind: EvidenceKind.during,
+              title: 'During Photos',
+              attachments: duringAtts,
+            ),
+          ],
+          const SizedBox(height: 10),
+          _buildAttachmentStrip(
+            kind: EvidenceKind.after,
+            title: 'After Photos',
+            attachments: afterAtts,
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildAttachmentStrip({
+    required EvidenceKind kind,
+    required String title,
+    required List<LineAttachment> attachments,
+  }) {
+    final canAdd = attachments.length < 3 && !widget.isPastTechCompleted;
+
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.grey.withOpacity(0.04),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.borderGrey.withOpacity(0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                '$title (${attachments.length}/3)',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.textPrimary,
+                    ),
+              ),
+              const Spacer(),
+              // Camera button >= 48dp touch target
+              SizedBox(
+                width: 48,
+                height: 48,
+                child: IconButton(
+                  key: Key('line_${widget.line.id}_camera_${kind.name}'),
+                  icon: const Icon(Icons.photo_camera, size: 22),
+                  tooltip: 'Capture from camera',
+                  onPressed: canAdd ? () => _handleCapture(kind, ImageSource.camera) : null,
+                  style: IconButton.styleFrom(
+                    minimumSize: const Size(48, 48),
+                    padding: EdgeInsets.zero,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 4),
+              // Gallery button >= 48dp touch target
+              SizedBox(
+                width: 48,
+                height: 48,
+                child: IconButton(
+                  key: Key('line_${widget.line.id}_gallery_${kind.name}'),
+                  icon: const Icon(Icons.photo_library_outlined, size: 22),
+                  tooltip: 'Select from gallery',
+                  onPressed: canAdd ? () => _handleCapture(kind, ImageSource.gallery) : null,
+                  style: IconButton.styleFrom(
+                    minimumSize: const Size(48, 48),
+                    padding: EdgeInsets.zero,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          if (attachments.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                'No photos captured yet.',
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: AppTheme.textSecondary,
+                      fontStyle: FontStyle.italic,
+                    ),
+              ),
+            )
+          else ...[
+            const SizedBox(height: 8),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  for (final att in attachments) ...[
+                    _buildThumbnail(att),
+                    const SizedBox(width: 10),
+                  ],
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildThumbnail(LineAttachment attachment) {
+    Color badgeColor;
+    IconData badgeIcon;
+    String badgeText;
+
+    if (attachment.isFailed) {
+      badgeColor = AppTheme.errorRed;
+      badgeIcon = Icons.warning_amber_rounded;
+      badgeText = 'failed';
+    } else if (attachment.isPending) {
+      badgeColor = AppTheme.warningAmber;
+      badgeIcon = Icons.sync;
+      badgeText = 'queued';
+    } else {
+      badgeColor = AppTheme.successGreen;
+      badgeIcon = Icons.check_circle;
+      badgeText = 'uploaded';
+    }
+
+    final hasLocal = attachment.localPath != null &&
+        File(attachment.localPath!).existsSync();
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        GestureDetector(
+          key: Key('line_attachment_thumb_${attachment.idempotencyKey ?? attachment.id}'),
+          onTap: () => _showFullscreenImage(attachment),
+          // Delete is hidden past TECH_COMPLETED (server rule); the dialog
+          // handler keeps a refusal backstop for races.
+          onLongPress: widget.isPastTechCompleted
+              ? null
+              : () => _handleDelete(attachment),
+          child: Stack(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  width: 76,
+                  height: 76,
+                  color: AppTheme.borderGrey.withOpacity(0.3),
+                  child: hasLocal
+                      ? Image.file(
+                          File(attachment.localPath!),
+                          fit: BoxFit.cover,
+                        )
+                      : attachment.url.isNotEmpty
+                          ? Image.network(
+                              attachment.url,
+                              headers: _authHeaders(),
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => const Icon(
+                                Icons.broken_image,
+                                color: AppTheme.textSecondary,
+                              ),
+                            )
+                          : const Icon(
+                              Icons.image,
+                              color: AppTheme.textSecondary,
+                            ),
+                ),
+              ),
+              // Icon-only sync badge: glyph + colour (never colour alone),
+              // with a tooltip instead of sub-12sp text.
+              Positioned(
+                top: 3,
+                right: 3,
+                child: Tooltip(
+                  message: badgeText,
+                  child: Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: BoxDecoration(
+                      color: badgeColor,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Icon(badgeIcon, size: 12, color: Colors.white),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (attachment.isFailed) ...[
+          const SizedBox(height: 4),
+          SizedBox(
+            height: 28,
+            child: TextButton.icon(
+              key: Key('retry_attachment_${attachment.idempotencyKey ?? attachment.id}'),
+              icon: const Icon(Icons.refresh, size: 13, color: AppTheme.errorRed),
+              label: Text(
+                'Retry',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: AppTheme.errorRed,
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                minimumSize: const Size(48, 28),
+              ),
+              onPressed: () => _handleRetry(attachment),
+            ),
+          ),
+        ],
+      ],
+    );
   }
 }

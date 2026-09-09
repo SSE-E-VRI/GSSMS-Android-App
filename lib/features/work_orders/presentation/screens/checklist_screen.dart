@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:gssms_mobile/core/sync/sync_manager.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
 import 'package:gssms_mobile/features/auth/domain/rbac.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
@@ -81,6 +82,21 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
         );
       }
     });
+
+    // After any outbox drain settles, reconcile queued photo placeholders
+    // with server truth (uploaded rows replace placeholders; failures
+    // surface on the thumbnails). A full reload would lose scroll/focus.
+    ref.listen(
+      syncManagerProvider.select((s) => s.lastSyncTime),
+      (prev, next) {
+        if (!mounted) return;
+        if (prev != null && next != null && next.isAfter(prev)) {
+          unawaited(ref
+              .read(checklistControllerProvider(widget.recordId).notifier)
+              .reconcileAttachmentSyncState());
+        }
+      },
+    );
 
     return Scaffold(
       appBar: state is ChecklistLoaded
@@ -252,6 +268,8 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
                       child: ChecklistLineCard(
                         key: ValueKey(lines[index].id),
                         line: lines[index],
+                        recordId: widget.recordId,
+                        isPastTechCompleted: state.record.isPastTechCompleted,
                         onSave: (edit) {
                           unawaited(ref
                               .read(checklistControllerProvider(widget.recordId).notifier)
@@ -465,8 +483,9 @@ class _CompletionSheetState extends ConsumerState<_CompletionSheet> {
   Future<void> _capture(ImageSource source) async {
     setState(() => _capturing = true);
     try {
-      final file =
-          await ref.read(evidenceServiceProvider).capture(source: source);
+      final file = await ref
+          .read(evidenceServiceProvider)
+          .capture(kind: EvidenceKind.proof, source: source);
       if (!mounted) return;
       if (file != null && !file.isWithinSizeLimit) {
         ScaffoldMessenger.of(context).showSnackBar(
