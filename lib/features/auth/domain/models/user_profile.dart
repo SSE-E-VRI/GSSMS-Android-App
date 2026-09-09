@@ -10,6 +10,7 @@ class UserProfile extends Equatable {
     this.email = '',
     this.phoneNumber = '',
     this.designation = '',
+    this.profilePicture,
   });
 
   final int id;
@@ -18,6 +19,28 @@ class UserProfile extends Equatable {
   final String email;
   final String phoneNumber;
   final String designation;
+  final String? profilePicture;
+
+  UserProfile copyWith({
+    int? id,
+    String? username,
+    String? role,
+    String? email,
+    String? phoneNumber,
+    String? designation,
+    String? profilePicture,
+    bool clearProfilePicture = false,
+  }) {
+    return UserProfile(
+      id: id ?? this.id,
+      username: username ?? this.username,
+      role: role ?? this.role,
+      email: email ?? this.email,
+      phoneNumber: phoneNumber ?? this.phoneNumber,
+      designation: designation ?? this.designation,
+      profilePicture: clearProfilePicture ? null : (profilePicture ?? this.profilePicture),
+    );
+  }
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
     return UserProfile(
@@ -27,9 +50,10 @@ class UserProfile extends Equatable {
       email: asJsonString(json['email']) ?? '',
       phoneNumber: asJsonString(json['phone_number']) ?? '',
       designation: asJsonString(json['designation']) ?? '',
+      profilePicture: asJsonString(json['profile_picture']),
     );
   }
 
   @override
-  List<Object?> get props => [id, username, role, email, phoneNumber, designation];
+  List<Object?> get props => [id, username, role, email, phoneNumber, designation, profilePicture];
 }

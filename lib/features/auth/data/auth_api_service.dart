@@ -124,6 +124,35 @@ class AuthApiService {
     }
   }
 
+  /// PATCH /api/v1/users/{id}/ — update or clear profile picture.
+  /// If filePath != null, sends multipart/form-data with profile_picture file.
+  /// If filePath == null, sends JSON {'profile_picture': null} to remove the photo.
+  Future<Map<String, dynamic>> updateUserPhoto(int userId, String? filePath) async {
+    try {
+      final dynamic data;
+      if (filePath != null) {
+        final filename = filePath.split(RegExp(r'[/\\]')).last;
+        data = FormData.fromMap({
+          'profile_picture': await MultipartFile.fromFile(
+            filePath,
+            filename: filename,
+          ),
+        });
+      } else {
+        data = {'profile_picture': null};
+      }
+
+      final response = await _dio.patch('/api/v1/users/$userId/', data: data);
+      final resData = response.data;
+      if (resData == null) return {};
+      if (resData is Map<String, dynamic>) return resData;
+      if (resData is Map) return Map<String, dynamic>.from(resData);
+      return {};
+    } on DioException catch (e) {
+      throw _parseDioError(e);
+    }
+  }
+
   /// Call POST /api/v1/auth/refresh/
   Future<AuthTokens> refreshToken(String refreshToken) async {
     try {

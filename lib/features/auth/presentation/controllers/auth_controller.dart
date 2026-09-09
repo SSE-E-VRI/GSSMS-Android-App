@@ -203,6 +203,18 @@ class AuthController extends Notifier<AuthState> {
     );
   }
 
+  /// Update profile picture in current session
+  void updateSessionProfilePicture(String? newUrl) {
+    if (state is Authenticated) {
+      final currentSession = (state as Authenticated).session;
+      final updatedSession = currentSession.copyWith(
+        profilePicture: newUrl,
+        clearProfilePicture: newUrl == null,
+      );
+      state = Authenticated(updatedSession);
+    }
+  }
+
   /// Log out user and clear stored credentials
   Future<void> logout() async {
     _pendingPassword = null;

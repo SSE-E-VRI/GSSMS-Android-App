@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:gssms_mobile/core/services/profile_photo_cache.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
+import 'package:gssms_mobile/core/widgets/profile_avatar.dart';
 import 'package:gssms_mobile/features/auth/data/auth_repository.dart';
 import 'package:gssms_mobile/features/auth/domain/models/auth_exceptions.dart';
+import 'package:gssms_mobile/features/auth/domain/models/user_profile.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
 
 class UserProfileScreen extends ConsumerStatefulWidget {
-  const UserProfileScreen({super.key});
+  const UserProfileScreen({super.key, this.imagePicker});
+
+  final ImagePicker? imagePicker;
 
   @override
   ConsumerState<UserProfileScreen> createState() => _UserProfileScreenState();
@@ -22,13 +28,15 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
   bool _loading = true;
   bool _savingProfile = false;
   bool _savingPassword = false;
+  bool _uploadingPhoto = false;
+  UserProfile? _profile;
   String _username = '';
   String _role = '';
   String? _banner;
   bool _bannerError = false;
 
-  static const _fieldFill = Color(0xFFF6F8FF);
-  static const _border = Color(0xFFE3E8F5);
+  static const _fieldFill = AppTheme.backgroundLight;
+  static const _border = AppTheme.borderGrey;
 
   IAuthRepository get _repo => ref.read(authRepositoryProvider);
 
@@ -63,6 +71,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
       final profile = await _repo.getProfile();
       if (!mounted) return;
       setState(() {
+        _profile = profile;
         _username = profile.username;
         _role = profile.role;
         _emailController.text = profile.email;
@@ -87,19 +96,169 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
     }
   }
 
+  void _showPhotoOptions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppTheme.surfaceWhite,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Wrap(
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Text(
+                  'Profile Photo',
+                  style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.textDark,
+                      ),
+                ),
+              ),
+              const Divider(height: 1),
+              ListTile(
+                key: const Key('photo_option_camera'),
+                leading: const Icon(Icons.camera_alt, color: AppTheme.primaryBlue),
+                title: const Text('Take Photo'),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  _pickAndUploadPhoto(ImageSource.camera);
+                },
+              ),
+              ListTile(
+                key: const Key('photo_option_gallery'),
+                leading: const Icon(Icons.photo_library, color: AppTheme.primaryBlue),
+                title: const Text('Choose from Gallery'),
+                onTap: () {
+                  Navigator.of(ctx).pop();
+                  _pickAndUploadPhoto(ImageSource.gallery);
+                },
+              ),
+              if (_profile?.profilePicture != null && _profile!.profilePicture!.isNotEmpty)
+                ListTile(
+                  key: const Key('photo_option_remove'),
+                  leading: const Icon(Icons.delete_outline, color: AppTheme.errorRed),
+                  title: const Text(
+                    'Remove Photo',
+                    style: TextStyle(color: AppTheme.errorRed),
+                  ),
+                  onTap: () {
+                    Navigator.of(ctx).pop();
+                    _removePhoto();
+                  },
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _pickAndUploadPhoto(ImageSource source) async {
+    final picker = widget.imagePicker ?? ImagePicker();
+    final picked = await picker.pickImage(
+      source: source,
+      maxWidth: 1024,
+      maxHeight: 1024,
+      imageQuality: 85,
+    );
+    if (picked == null) return;
+
+    setState(() {
+      _uploadingPhoto = true;
+      _banner = null;
+    });
+
+    try {
+      final updated = await _repo.updateUserPhoto(picked.path);
+      final userId = updated.id != 0 ? updated.id : (_profile?.id ?? 0);
+      if (userId != 0) {
+        await ref.read(profilePhotoCacheProvider).cacheLocalFile(userId, picked.path);
+      }
+      ref
+          .read(authControllerProvider.notifier)
+          .updateSessionProfilePicture(updated.profilePicture);
+
+      if (!mounted) return;
+      setState(() {
+        _profile = updated;
+        _uploadingPhoto = false;
+        _banner = 'Profile photo updated successfully!';
+        _bannerError = false;
+      });
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _uploadingPhoto = false;
+        _banner = e.message;
+        _bannerError = true;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _uploadingPhoto = false;
+        _banner = 'Failed to upload photo: $e';
+        _bannerError = true;
+      });
+    }
+  }
+
+  Future<void> _removePhoto() async {
+    setState(() {
+      _uploadingPhoto = true;
+      _banner = null;
+    });
+
+    try {
+      final updated = await _repo.updateUserPhoto(null);
+      final userId = updated.id != 0 ? updated.id : (_profile?.id ?? 0);
+      if (userId != 0) {
+        await ref.read(profilePhotoCacheProvider).clearCachedPhoto(userId);
+      }
+      ref
+          .read(authControllerProvider.notifier)
+          .updateSessionProfilePicture(null);
+
+      if (!mounted) return;
+      setState(() {
+        _profile = updated;
+        _uploadingPhoto = false;
+        _banner = 'Profile photo removed.';
+        _bannerError = false;
+      });
+    } on AuthException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _uploadingPhoto = false;
+        _banner = e.message;
+        _bannerError = true;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _uploadingPhoto = false;
+        _banner = 'Failed to remove photo.';
+        _bannerError = true;
+      });
+    }
+  }
+
   Future<void> _saveProfile() async {
     setState(() {
       _savingProfile = true;
       _banner = null;
     });
     try {
-      await _repo.updateProfile(
+      final updated = await _repo.updateProfile(
         email: _emailController.text.trim(),
         phoneNumber: _phoneController.text.trim(),
         designation: _designationController.text.trim(),
       );
       if (!mounted) return;
       setState(() {
+        _profile = updated;
         _savingProfile = false;
         _banner = 'Profile updated successfully!';
         _bannerError = false;
@@ -210,19 +369,32 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                             _bannerBox(_banner!, error: _bannerError),
                             const SizedBox(height: 16),
                           ],
+                          Center(
+                            child: ProfileAvatar(
+                              key: const Key('user_profile_avatar'),
+                              userId: _profile?.id,
+                              photoUrl: _profile?.profilePicture,
+                              displayName: _username,
+                              radius: 48,
+                              isUploading: _uploadingPhoto,
+                              onCameraTap: _showPhotoOptions,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
                           if (_username.isNotEmpty) ...[
-                            Text(
-                              _username,
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: AppTheme.textDark,
+                            Center(
+                              child: Text(
+                                _username,
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppTheme.textDark,
+                                ),
                               ),
                             ),
                             if (_role.isNotEmpty) ...[
                               const SizedBox(height: 6),
-                              Align(
-                                alignment: Alignment.centerLeft,
+                              Center(
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(
                                     horizontal: 8,

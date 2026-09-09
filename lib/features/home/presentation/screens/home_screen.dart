@@ -5,6 +5,7 @@ import '../../../assets/presentation/screens/asset_list_screen.dart';
 import '../../../auth/domain/models/auth_role.dart';
 import '../../../auth/domain/models/user_session.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
+import '../../../auth/presentation/controllers/auth_state.dart';
 import '../../../auth/presentation/screens/user_profile_screen.dart';
 import '../../../complaints/presentation/screens/complaint_list_screen.dart';
 import '../../../dashboard/presentation/screens/dashboard_screen.dart';
@@ -13,6 +14,7 @@ import '../../../inspections/presentation/screens/inspection_list_screen.dart';
 import '../../../maintenance/presentation/screens/maintenance_screen.dart';
 import '../../../notifications/presentation/screens/notifications_screen.dart';
 import '../../../reports/presentation/screens/reports_screen.dart';
+import '../../../../core/widgets/profile_avatar.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({
@@ -24,13 +26,16 @@ class HomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authControllerProvider);
+    final currentSession = authState is Authenticated ? authState.session : session;
+
     return Scaffold(
       appBar: AppBar(
         titleSpacing: 16,
         title: const Text('GSSMS Operations'),
         actions: [
-          _buildHeaderProfile(context),
-          if (session.hasPermission('maintenance.view'))
+          _buildHeaderProfile(context, currentSession),
+          if (currentSession.hasPermission('maintenance.view'))
             IconButton(
               key: const Key('home_notifications_button'),
               icon: const Icon(Icons.notifications_outlined),
@@ -74,11 +79,7 @@ class HomeScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildHeaderProfile(BuildContext context) {
-    final initial = session.displayName.isNotEmpty
-        ? session.displayName.substring(0, 1).toUpperCase()
-        : 'U';
-
+  Widget _buildHeaderProfile(BuildContext context, UserSession currentSession) {
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -96,17 +97,14 @@ class HomeScreen extends ConsumerWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              CircleAvatar(
+              ProfileAvatar(
+                key: const Key('home_profile_avatar'),
+                userId: currentSession.userId,
+                photoUrl: currentSession.profilePicture,
+                displayName: currentSession.displayName,
                 radius: 16,
                 backgroundColor: Colors.white.withOpacity(0.18),
-                child: Text(
-                  initial,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
+                foregroundColor: Colors.white,
               ),
               const SizedBox(width: 8),
               ConstrainedBox(
@@ -116,7 +114,7 @@ class HomeScreen extends ConsumerWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      session.displayName,
+                      currentSession.displayName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
@@ -127,7 +125,7 @@ class HomeScreen extends ConsumerWidget {
                       ),
                     ),
                     Text(
-                      session.primaryRole.displayName,
+                      currentSession.primaryRole.displayName,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(

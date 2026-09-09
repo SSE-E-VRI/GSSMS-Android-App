@@ -36,6 +36,7 @@ abstract class IAuthRepository {
     required String phoneNumber,
     required String designation,
   });
+  Future<UserProfile> updateUserPhoto(String? filePath);
   Future<void> changePassword(String newPassword);
 }
 
@@ -246,6 +247,19 @@ class AuthRepository implements IAuthRepository {
         email: email,
         phoneNumber: phoneNumber,
         designation: designation,
+      );
+    }
+    return UserProfile.fromJson(data);
+  }
+
+  @override
+  Future<UserProfile> updateUserPhoto(String? filePath) async {
+    final data = await _apiService.updateUserPhoto(_requireUserId(), filePath);
+    if (data.isEmpty) {
+      final current = await getProfile();
+      return current.copyWith(
+        profilePicture: filePath == null ? null : current.profilePicture,
+        clearProfilePicture: filePath == null,
       );
     }
     return UserProfile.fromJson(data);

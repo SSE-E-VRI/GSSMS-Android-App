@@ -20,6 +20,7 @@ class UserSession extends Equatable {
     this.has2FA = false,
     this.validUntil,
     this.scope = const OrgScope(),
+    this.profilePicture,
   });
 
   final String accessToken;
@@ -35,6 +36,7 @@ class UserSession extends Equatable {
   final bool has2FA;
   final DateTime? validUntil;
   final OrgScope scope;
+  final String? profilePicture;
 
   String get displayName {
     final name = '${firstName ?? ''} ${lastName ?? ''}'.trim();
@@ -73,6 +75,41 @@ class UserSession extends Equatable {
       return true;
     }
     return false;
+  }
+
+  UserSession copyWith({
+    String? accessToken,
+    String? username,
+    int? userId,
+    String? firstName,
+    String? lastName,
+    AuthRole? primaryRole,
+    List<AuthRole>? roles,
+    List<String>? permissions,
+    int? depotId,
+    String? depotName,
+    bool? has2FA,
+    DateTime? validUntil,
+    OrgScope? scope,
+    String? profilePicture,
+    bool clearProfilePicture = false,
+  }) {
+    return UserSession(
+      accessToken: accessToken ?? this.accessToken,
+      username: username ?? this.username,
+      userId: userId ?? this.userId,
+      firstName: firstName ?? this.firstName,
+      lastName: lastName ?? this.lastName,
+      primaryRole: primaryRole ?? this.primaryRole,
+      roles: roles ?? this.roles,
+      permissions: permissions ?? this.permissions,
+      depotId: depotId ?? this.depotId,
+      depotName: depotName ?? this.depotName,
+      has2FA: has2FA ?? this.has2FA,
+      validUntil: validUntil ?? this.validUntil,
+      scope: scope ?? this.scope,
+      profilePicture: clearProfilePicture ? null : (profilePicture ?? this.profilePicture),
+    );
   }
 
   /// Construct UserSession by decoding JWT access token claims.
@@ -158,6 +195,8 @@ class UserSession extends Equatable {
     final depotIdRaw = claims['depot_id'];
     final int? depotId = depotIdRaw is int ? depotIdRaw : int.tryParse('$depotIdRaw');
 
+    final profilePicture = claims['profile_picture']?.toString();
+
     return UserSession(
       accessToken: token,
       username: claims['username']?.toString() ?? '',
@@ -172,6 +211,7 @@ class UserSession extends Equatable {
       has2FA: claims['has_2fa'] == true,
       validUntil: validUntil,
       scope: scope,
+      profilePicture: profilePicture != null && profilePicture.isNotEmpty ? profilePicture : null,
     );
   }
 
@@ -190,5 +230,6 @@ class UserSession extends Equatable {
         has2FA,
         validUntil,
         scope,
+        profilePicture,
       ];
 }
