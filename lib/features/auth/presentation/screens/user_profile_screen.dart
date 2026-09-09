@@ -175,7 +175,13 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
       final updated = await _repo.updateUserPhoto(picked.path);
       final userId = updated.id != 0 ? updated.id : (_profile?.id ?? 0);
       if (userId != 0) {
-        await ref.read(profilePhotoCacheProvider).cacheLocalFile(userId, picked.path);
+        // Tag the local copy with the URL the server just assigned, so the
+        // very next lookup for that URL is a hit instead of a re-download.
+        await ref.read(profilePhotoCacheProvider).cacheLocalFile(
+              userId,
+              picked.path,
+              photoUrl: updated.profilePicture,
+            );
       }
       ref
           .read(authControllerProvider.notifier)

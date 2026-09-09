@@ -80,7 +80,7 @@ void main() {
       expect(state.pendingCount, 3);
     });
 
-    test('an outbox holding only failed commands still reports them as pending', () async {
+    test('a failed command stays visible as attention, not as queued work', () async {
       await cacheService.saveOutboxCommands([
         _lineCommand('cmd_failed', 1).copyWith(
           status: OutboxCommandStatus.failed,
@@ -92,10 +92,50 @@ void main() {
 
       final state = container.read(syncManagerProvider);
       expect(
-        state.pendingCount,
+        state.attentionCount,
         1,
         reason: 'unsynced work must stay visible in the badge',
       );
+      expect(
+        state.pendingCount,
+        0,
+        reason: 'a rejected command never drains on its own, so counting it as '
+            'queued would pin an "Offline"/"Syncing" strip on an idle app forever',
+      );
+      expect(
+        state.mode,
+        SyncConnectivityMode.online,
+        reason: 'nothing is waiting on connectivity',
+      );
+      expect(state.isFullySynced, isFalse);
+    });
+
+    test('retryAllFailed returns failed commands to the queue and drains them',
+        () async {
+      when(() => mockApiService.submitLine(
+            10,
+            any(),
+            idempotencyKey: any(named: 'idempotencyKey'),
+          )).thenAnswer((_) async {});
+
+      await cacheService.saveOutboxCommands([
+        _lineCommand('cmd_failed', 1).copyWith(
+          status: OutboxCommandStatus.failed,
+          lastError: 'Validation error',
+        ),
+      ]);
+
+      await container.read(syncManagerProvider.notifier).retryAllFailed();
+
+      final state = container.read(syncManagerProvider);
+      expect(state.attentionCount, 0);
+      expect(state.pendingCount, 0);
+      expect(
+        state.isFullySynced,
+        isTrue,
+        reason: 'the retry succeeded, so the banner must clear',
+      );
+      expect(await cacheService.getOutboxCommands(), isEmpty);
     });
   });
 }

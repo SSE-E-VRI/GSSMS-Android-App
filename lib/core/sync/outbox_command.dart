@@ -55,7 +55,6 @@ class OutboxCommand extends Equatable {
     this.lastError,
     this.status = OutboxCommandStatus.pending,
     this.ownerUserId,
-    this.dependsOn,
   });
 
   final String idempotencyKey;
@@ -71,17 +70,12 @@ class OutboxCommand extends Equatable {
   /// an owner, or owned by a different user, are never replayed.
   final int? ownerUserId;
 
-  /// Optional idempotency key of another command that must succeed before this
-  /// command may replay.
-  final String? dependsOn;
-
   OutboxCommand copyWith({
     int? retryCount,
     String? lastError,
     bool clearError = false,
     OutboxCommandStatus? status,
     int? ownerUserId,
-    String? dependsOn,
   }) {
     return OutboxCommand(
       idempotencyKey: idempotencyKey,
@@ -93,7 +87,6 @@ class OutboxCommand extends Equatable {
       lastError: clearError ? null : (lastError ?? this.lastError),
       status: status ?? this.status,
       ownerUserId: ownerUserId ?? this.ownerUserId,
-      dependsOn: dependsOn ?? this.dependsOn,
     );
   }
 
@@ -108,7 +101,6 @@ class OutboxCommand extends Equatable {
       'last_error': lastError,
       'status': status.code,
       if (ownerUserId != null) 'owner_user_id': ownerUserId,
-      if (dependsOn != null) 'depends_on': dependsOn,
     };
   }
 
@@ -139,8 +131,6 @@ class OutboxCommand extends Equatable {
     final ownerUserId =
         ownerRaw is int ? ownerRaw : int.tryParse('$ownerRaw');
 
-    final dependsOn = json['depends_on']?.toString();
-
     return OutboxCommand(
       idempotencyKey: idempotencyKey,
       type: parsedType,
@@ -151,7 +141,6 @@ class OutboxCommand extends Equatable {
       lastError: json['last_error']?.toString(),
       status: OutboxCommandStatus.fromCode(json['status']?.toString() ?? 'PENDING'),
       ownerUserId: ownerUserId,
-      dependsOn: dependsOn,
     );
   }
 
@@ -166,6 +155,5 @@ class OutboxCommand extends Equatable {
         lastError,
         status,
         ownerUserId,
-        dependsOn,
       ];
 }
