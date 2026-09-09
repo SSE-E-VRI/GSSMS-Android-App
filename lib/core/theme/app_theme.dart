@@ -22,6 +22,10 @@ class AppTheme {
   static const Color borderGrey = Color(0xFFE2E8F0);
   static const Color successGreen = Color(0xFF10B981);
   static const Color warningAmber = Color(0xFFF59E0B);
+
+  /// Dark amber for text on amber-tinted surfaces (warningAmber itself
+  /// fails contrast there).
+  static const Color warningAmberDark = Color(0xFF92400E);
   static const Color errorRed = Color(0xFFEF4444);
 
   /// Near-black blue used for the dark-theme app bar (tokenized so no raw

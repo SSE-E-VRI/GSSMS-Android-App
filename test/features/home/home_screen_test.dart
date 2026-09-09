@@ -10,9 +10,23 @@ import 'package:gssms_mobile/features/auth/domain/models/user_profile.dart';
 import 'package:gssms_mobile/features/auth/domain/models/user_session.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:gssms_mobile/features/home/presentation/screens/home_screen.dart';
+import 'package:gssms_mobile/features/work_orders/domain/models/work_order.dart';
+import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_order_controllers.dart';
+import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_order_state.dart';
 import 'package:mocktail/mocktail.dart';
 
 class MockAuthRepository extends Mock implements IAuthRepository {}
+
+class FakeWorkOrderListController extends WorkOrderListController {
+  FakeWorkOrderListController(this._initialState);
+  final WorkOrderListState _initialState;
+
+  @override
+  WorkOrderListState build() => _initialState;
+
+  @override
+  Future<void> fetchWorkOrders({bool forceRefresh = false}) async {}
+}
 
 void main() {
   group('HomeScreen Widget Tests', () {
@@ -22,11 +36,18 @@ void main() {
       mockRepository = MockAuthRepository();
     });
 
-    Widget createTestWidget(UserSession session) {
+    Widget createTestWidget(
+      UserSession session, {
+      WorkOrderListState? workOrderListState,
+    }) {
       return ProviderScope(
         overrides: [
           localCacheServiceProvider.overrideWithValue(InMemoryLocalCacheService()),
           authRepositoryProvider.overrideWithValue(mockRepository),
+          if (workOrderListState != null)
+            workOrderListControllerProvider.overrideWith(
+              () => FakeWorkOrderListController(workOrderListState),
+            ),
         ],
         child: MaterialApp(
           home: HomeScreen(session: session),
@@ -219,6 +240,208 @@ void main() {
       expect(find.byKey(const Key('module_energy')), findsOneWidget);
       expect(find.byKey(const Key('module_maintenance')), findsNothing);
       expect(find.text('No operational modules enabled by server permissions.'), findsNothing);
+    });
+
+    testWidgets('NavigationBar destinations resolved per role permissions', (tester) async {
+      // 1. Super Admin sees Home, Work, Assets, More
+      const superSession = UserSession(
+        accessToken: 't',
+        username: 'admin',
+        primaryRole: AuthRole.superAdmin,
+        roles: [AuthRole.superAdmin],
+        permissions: ['*'],
+      );
+      await tester.pumpWidget(createTestWidget(superSession));
+
+      expect(find.byKey(const Key('nav_home')), findsOneWidget);
+      expect(find.byKey(const Key('nav_work')), findsOneWidget);
+      expect(find.byKey(const Key('nav_assets')), findsOneWidget);
+      expect(find.byKey(const Key('nav_more')), findsOneWidget);
+
+      // 2. Technician with maintenance.view sees Home, Work, More (no Assets)
+      const techSession = UserSession(
+        accessToken: 't',
+        username: 'tech',
+        primaryRole: AuthRole.maintenanceStaff,
+        roles: [AuthRole.maintenanceStaff],
+        permissions: ['maintenance.view'],
+      );
+      await tester.pumpWidget(createTestWidget(techSession));
+
+      expect(find.byKey(const Key('nav_home')), findsOneWidget);
+      expect(find.byKey(const Key('nav_work')), findsOneWidget);
+      expect(find.byKey(const Key('nav_assets')), findsNothing);
+      expect(find.byKey(const Key('nav_more')), findsOneWidget);
+
+      // 3. Auditor with reports.view sees Home, More (no Work, no Assets)
+      const auditorSession = UserSession(
+        accessToken: 't',
+        username: 'auditor',
+        primaryRole: AuthRole.divHqUser,
+        roles: [AuthRole.divHqUser],
+        permissions: ['reports.view'],
+      );
+      await tester.pumpWidget(createTestWidget(auditorSession));
+
+      expect(find.byKey(const Key('nav_home')), findsOneWidget);
+      expect(find.byKey(const Key('nav_work')), findsNothing);
+      expect(find.byKey(const Key('nav_assets')), findsNothing);
+      expect(find.byKey(const Key('nav_more')), findsOneWidget);
+
+      // 4. Restricted guest sees Home, More
+      const guestSession = UserSession(
+        accessToken: 't',
+        username: 'guest',
+        primaryRole: AuthRole.guest,
+        roles: [AuthRole.guest],
+        permissions: [],
+      );
+      await tester.pumpWidget(createTestWidget(guestSession));
+
+      expect(find.byKey(const Key('nav_home')), findsOneWidget);
+      expect(find.byKey(const Key('nav_work')), findsNothing);
+      expect(find.byKey(const Key('nav_assets')), findsNothing);
+      expect(find.byKey(const Key('nav_more')), findsOneWidget);
+    });
+
+    testWidgets('switching tab to More displays MoreScreen profile card', (tester) async {
+      const superSession = UserSession(
+        accessToken: 't',
+        username: 'admin',
+        primaryRole: AuthRole.superAdmin,
+        roles: [AuthRole.superAdmin],
+        permissions: ['*'],
+      );
+      await tester.pumpWidget(createTestWidget(superSession));
+
+      await tester.tap(find.byKey(const Key('nav_more')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('more_profile_card')), findsOneWidget);
+      expect(find.byKey(const Key('more_menu_dashboard')), findsOneWidget);
+      await tester.scrollUntilVisible(find.byKey(const Key('more_menu_profile')), 100);
+      expect(find.byKey(const Key('more_menu_profile')), findsOneWidget);
+    });
+
+    testWidgets('Quick Actions row respects permissions', (tester) async {
+      // Super admin sees all quick action chips
+      const superSession = UserSession(
+        accessToken: 't',
+        username: 'admin',
+        primaryRole: AuthRole.superAdmin,
+        roles: [AuthRole.superAdmin],
+        permissions: ['*'],
+      );
+      await tester.pumpWidget(createTestWidget(superSession));
+
+      expect(find.byKey(const Key('quick_action_scan_asset')), findsOneWidget);
+      expect(find.byKey(const Key('quick_action_complaint')), findsOneWidget);
+      expect(find.byKey(const Key('quick_action_inspection')), findsOneWidget);
+      expect(find.byKey(const Key('quick_action_work_orders')), findsOneWidget);
+
+      // Restricted guest sees only scan asset quick action
+      const guestSession = UserSession(
+        accessToken: 't',
+        username: 'guest',
+        primaryRole: AuthRole.guest,
+        roles: [AuthRole.guest],
+        permissions: [],
+      );
+      await tester.pumpWidget(createTestWidget(guestSession));
+
+      expect(find.byKey(const Key('quick_action_scan_asset')), findsOneWidget);
+      expect(find.byKey(const Key('quick_action_complaint')), findsNothing);
+      expect(find.byKey(const Key('quick_action_inspection')), findsNothing);
+      expect(find.byKey(const Key('quick_action_work_orders')), findsNothing);
+    });
+
+    testWidgets('My Work card shows in-progress work order with CONTINUE button', (tester) async {
+      const techSession = UserSession(
+        accessToken: 't',
+        username: 'tech',
+        primaryRole: AuthRole.maintenanceStaff,
+        roles: [AuthRole.maintenanceStaff],
+        permissions: ['maintenance.view'],
+      );
+
+      const inProgressOrder = WorkOrder(
+        id: 42,
+        ticketNumber: 'WO-2026-0042',
+        status: WorkOrderStatus.inProgress,
+        type: WorkOrderType.preventive,
+        title: 'Overhaul Transformer Bay 2',
+        stationName: 'Vriddhachalam Junction',
+      );
+
+      await tester.pumpWidget(createTestWidget(
+        techSession,
+        workOrderListState: const WorkOrderListLoaded(
+          workOrders: [inProgressOrder],
+        ),
+      ));
+
+      expect(find.text('MY WORK'), findsOneWidget);
+      expect(find.text('Overhaul Transformer Bay 2'), findsOneWidget);
+      expect(find.text('In Progress'), findsOneWidget);
+      expect(find.byKey(const Key('home_continue_work_button')), findsOneWidget);
+      expect(find.byKey(const Key('home_start_work_button')), findsNothing);
+    });
+
+    testWidgets('My Work card shows assigned work order with START button', (tester) async {
+      const techSession = UserSession(
+        accessToken: 't',
+        username: 'tech',
+        primaryRole: AuthRole.maintenanceStaff,
+        roles: [AuthRole.maintenanceStaff],
+        permissions: ['maintenance.view'],
+      );
+
+      const assignedOrder = WorkOrder(
+        id: 43,
+        ticketNumber: 'WO-2026-0043',
+        status: WorkOrderStatus.assigned,
+        type: WorkOrderType.corrective,
+        title: 'Check Breaker Trip Alarm',
+        stationName: 'Vriddhachalam Junction',
+      );
+
+      await tester.pumpWidget(createTestWidget(
+        techSession,
+        workOrderListState: const WorkOrderListLoaded(
+          workOrders: [assignedOrder],
+        ),
+      ));
+
+      expect(find.text('MY WORK'), findsOneWidget);
+      expect(find.text('Check Breaker Trip Alarm'), findsOneWidget);
+      expect(find.text('Assigned to You'), findsOneWidget);
+      expect(find.byKey(const Key('home_start_work_button')), findsOneWidget);
+      expect(find.byKey(const Key('home_continue_work_button')), findsNothing);
+    });
+
+    testWidgets('My Work shows empty ready state when no active work orders', (tester) async {
+      const techSession = UserSession(
+        accessToken: 't',
+        username: 'tech',
+        primaryRole: AuthRole.maintenanceStaff,
+        roles: [AuthRole.maintenanceStaff],
+        permissions: ['maintenance.view'],
+      );
+
+      await tester.pumpWidget(createTestWidget(
+        techSession,
+        workOrderListState: const WorkOrderListLoaded(
+          workOrders: [],
+        ),
+      ));
+
+      expect(find.text('MY WORK'), findsOneWidget);
+      expect(
+        find.text('No active job works in progress. Ready for new field assignments.'),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('home_continue_work_button')), findsNothing);
+      expect(find.byKey(const Key('home_start_work_button')), findsNothing);
     });
   });
 }

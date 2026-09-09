@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:gssms_mobile/core/sync/widgets/sync_status_badge.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
 import 'package:gssms_mobile/core/widgets/date_range_filter_bar.dart';
+import 'package:gssms_mobile/core/widgets/org_scope_app_bar_filter.dart';
 import 'package:gssms_mobile/core/widgets/org_scope_filter_bar.dart';
 import 'package:gssms_mobile/features/auth/domain/models/user_session.dart';
 import 'package:gssms_mobile/features/auth/domain/rbac.dart';
@@ -48,9 +49,25 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       );
     }
 
+    final loaded = state is ReportsLoaded ? state : null;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Reports'),
+        actions: [
+          if (session != null)
+            OrgScopeAppBarFilter(
+              scope: session.scope,
+              selection: loaded?.orgScope ?? OrgScopeSelection.empty,
+              enableZoneDivision: false,
+              enableStation: false,
+              onChanged: (selection) {
+                ref
+                    .read(reportsControllerProvider.notifier)
+                    .setOrgScope(selection);
+              },
+            ),
+        ],
       ),
       body: Column(
         children: [
@@ -96,7 +113,6 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
 
       return Column(
         children: [
-          if (session != null) _buildOrgScope(state, session),
           _buildFilters(state),
           const Divider(height: 1),
           Expanded(
@@ -123,26 +139,6 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     return const Center(child: CircularProgressIndicator());
   }
 
-  Widget _buildOrgScope(ReportsLoaded state, UserSession session) {
-    return Container(
-      width: double.infinity,
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-      child: OrgScopeFilterBar(
-        scope: session.scope,
-        selection: state.orgScope,
-        padding: EdgeInsets.zero,
-        // register_report has no zone/division param, and station-level
-        // narrowing is already covered by the Infrastructure Type/Item
-        // filter below (Type=Station + item) — so only Depot is offered here.
-        enableZoneDivision: false,
-        enableStation: false,
-        onChanged: (selection) {
-          ref.read(reportsControllerProvider.notifier).setOrgScope(selection);
-        },
-      ),
-    );
-  }
 
   Widget _buildFilters(ReportsLoaded state) {
     return Container(

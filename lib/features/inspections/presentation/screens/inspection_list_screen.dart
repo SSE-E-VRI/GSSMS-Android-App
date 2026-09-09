@@ -4,8 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gssms_mobile/core/sync/widgets/sync_status_badge.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
 import 'package:gssms_mobile/core/widgets/date_range_filter_bar.dart';
+import 'package:gssms_mobile/core/widgets/org_scope_app_bar_filter.dart';
 import 'package:gssms_mobile/core/widgets/org_scope_filter_bar.dart';
-import 'package:gssms_mobile/features/auth/domain/models/user_session.dart';
 import 'package:gssms_mobile/features/auth/domain/rbac.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:gssms_mobile/features/auth/presentation/widgets/permission_denied_view.dart';
@@ -16,7 +16,12 @@ import 'package:gssms_mobile/features/inspections/presentation/screens/inspectio
 import 'package:intl/intl.dart';
 
 class InspectionListScreen extends ConsumerStatefulWidget {
-  const InspectionListScreen({super.key});
+  const InspectionListScreen({
+    super.key,
+    this.isEmbedded = false,
+  });
+
+  final bool isEmbedded;
 
   @override
   ConsumerState<InspectionListScreen> createState() =>
@@ -64,15 +69,31 @@ class _InspectionListScreenState extends ConsumerState<InspectionListScreen> {
       );
     }
 
+    final loaded = listState is InspectionListLoaded ? listState : null;
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Inspections'),
+      appBar: widget.isEmbedded
+          ? null
+          : AppBar(
+              title: const Text('Inspections'),
+        actions: [
+          if (session != null)
+            OrgScopeAppBarFilter(
+              scope: session.scope,
+              selection: loaded?.orgScope ?? OrgScopeSelection.empty,
+              enableStation: false,
+              onChanged: (selection) {
+                ref
+                    .read(inspectionListControllerProvider.notifier)
+                    .setOrgScope(selection);
+              },
+            ),
+        ],
       ),
       body: Column(
         children: [
           const SyncStatusBadge(),
           _buildSearchBar(),
-          if (session != null) _buildOrgScope(listState, session),
           _buildDateRange(listState),
           _buildFilterChips(listState),
           Expanded(child: _buildListBody(listState)),
@@ -138,20 +159,6 @@ class _InspectionListScreenState extends ConsumerState<InspectionListScreen> {
     );
   }
 
-  Widget _buildOrgScope(InspectionListState state, UserSession session) {
-    final loaded = state is InspectionListLoaded ? state : null;
-    return OrgScopeFilterBar(
-      scope: session.scope,
-      selection: loaded?.orgScope ?? OrgScopeSelection.empty,
-      // InspectionViewSet.get_queryset has no station-level filter.
-      enableStation: false,
-      onChanged: (selection) {
-        ref
-            .read(inspectionListControllerProvider.notifier)
-            .setOrgScope(selection);
-      },
-    );
-  }
 
   Widget _buildDateRange(InspectionListState state) {
     final loaded = state is InspectionListLoaded ? state : null;

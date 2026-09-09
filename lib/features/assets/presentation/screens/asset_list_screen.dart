@@ -3,12 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gssms_mobile/core/sync/widgets/sync_status_badge.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
+import 'package:gssms_mobile/core/widgets/org_scope_app_bar_filter.dart';
 import 'package:gssms_mobile/core/widgets/org_scope_filter_bar.dart';
 import 'package:gssms_mobile/features/assets/domain/models/asset.dart';
 import 'package:gssms_mobile/features/assets/presentation/controllers/asset_controllers.dart';
 import 'package:gssms_mobile/features/assets/presentation/screens/asset_detail_screen.dart';
 import 'package:gssms_mobile/features/assets/presentation/widgets/qr_scanner_dialog.dart';
-import 'package:gssms_mobile/features/auth/domain/models/user_session.dart';
 import 'package:gssms_mobile/features/auth/domain/rbac.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:gssms_mobile/features/auth/presentation/widgets/permission_denied_view.dart';
@@ -109,10 +109,22 @@ class _AssetListScreenState extends ConsumerState<AssetListScreen> {
       );
     }
 
+    final loaded = listState is AssetListLoaded ? listState : null;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Asset Registry'),
         actions: [
+          if (session != null)
+            OrgScopeAppBarFilter(
+              scope: session.scope,
+              selection: loaded?.orgScope ?? OrgScopeSelection.empty,
+              onChanged: (selection) {
+                ref
+                    .read(assetListControllerProvider.notifier)
+                    .setOrgScope(selection);
+              },
+            ),
           IconButton(
             key: const Key('action_scan_qr'),
             icon: const Icon(Icons.qr_code_scanner),
@@ -130,7 +142,6 @@ class _AssetListScreenState extends ConsumerState<AssetListScreen> {
               minHeight: 2,
             ),
           _buildSearchBar(),
-          if (session != null) _buildOrgScope(listState, session),
           if (listState is AssetListLoaded && listState.truncated)
             _buildTruncationNotice(),
           _buildCategoryChips(listState),
@@ -171,18 +182,6 @@ class _AssetListScreenState extends ConsumerState<AssetListScreen> {
     );
   }
 
-  Widget _buildOrgScope(AssetListState state, UserSession session) {
-    final loaded = state is AssetListLoaded
-        ? state
-        : (state is AssetListError ? state.previousLoaded : null);
-    return OrgScopeFilterBar(
-      scope: session.scope,
-      selection: loaded?.orgScope ?? OrgScopeSelection.empty,
-      onChanged: (selection) {
-        ref.read(assetListControllerProvider.notifier).setOrgScope(selection);
-      },
-    );
-  }
 
   Widget _buildSearchBar() {
     return Container(

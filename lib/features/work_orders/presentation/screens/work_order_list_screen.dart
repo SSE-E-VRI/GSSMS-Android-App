@@ -3,8 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gssms_mobile/core/sync/widgets/sync_status_badge.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
 import 'package:gssms_mobile/core/widgets/date_range_filter_bar.dart';
+import 'package:gssms_mobile/core/widgets/org_scope_app_bar_filter.dart';
 import 'package:gssms_mobile/core/widgets/org_scope_filter_bar.dart';
-import 'package:gssms_mobile/features/auth/domain/models/user_session.dart';
 import 'package:gssms_mobile/features/auth/domain/rbac.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:gssms_mobile/features/auth/presentation/widgets/permission_denied_view.dart';
@@ -18,7 +18,12 @@ import 'package:gssms_mobile/features/work_orders/presentation/screens/work_orde
 import 'package:intl/intl.dart';
 
 class WorkOrderListScreen extends ConsumerStatefulWidget {
-  const WorkOrderListScreen({super.key});
+  const WorkOrderListScreen({
+    super.key,
+    this.isEmbedded = false,
+  });
+
+  final bool isEmbedded;
 
   @override
   ConsumerState<WorkOrderListScreen> createState() => _WorkOrderListScreenState();
@@ -66,15 +71,30 @@ class _WorkOrderListScreenState extends ConsumerState<WorkOrderListScreen> {
       );
     }
 
+    final loaded = listState is WorkOrderListLoaded ? listState : null;
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Work Orders'),
+      appBar: widget.isEmbedded
+          ? null
+          : AppBar(
+              title: const Text('Work Orders'),
+        actions: [
+          if (session != null)
+            OrgScopeAppBarFilter(
+              scope: session.scope,
+              selection: loaded?.orgScope ?? OrgScopeSelection.empty,
+              onChanged: (selection) {
+                ref
+                    .read(workOrderListControllerProvider.notifier)
+                    .setOrgScope(selection);
+              },
+            ),
+        ],
       ),
       body: Column(
         children: [
           const SyncStatusBadge(),
           _buildSearchBar(),
-          if (session != null) _buildOrgScope(listState, session),
           _buildDateRange(listState),
           _buildFilterChips(listState),
           _buildTypeChips(listState),
@@ -113,16 +133,6 @@ class _WorkOrderListScreenState extends ConsumerState<WorkOrderListScreen> {
     );
   }
 
-  Widget _buildOrgScope(WorkOrderListState state, UserSession session) {
-    final loaded = state is WorkOrderListLoaded ? state : null;
-    return OrgScopeFilterBar(
-      scope: session.scope,
-      selection: loaded?.orgScope ?? OrgScopeSelection.empty,
-      onChanged: (selection) {
-        ref.read(workOrderListControllerProvider.notifier).setOrgScope(selection);
-      },
-    );
-  }
 
   Widget _buildSearchBar() {
     return Padding(

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gssms_mobile/core/sync/widgets/sync_status_badge.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
+import 'package:gssms_mobile/core/widgets/org_scope_app_bar_filter.dart';
 import 'package:gssms_mobile/core/widgets/org_scope_filter_bar.dart';
 import 'package:gssms_mobile/features/auth/domain/models/user_session.dart';
 import 'package:gssms_mobile/features/auth/domain/rbac.dart';
@@ -49,41 +50,37 @@ class _MaintenanceScreenState extends ConsumerState<MaintenanceScreen> {
       );
     }
 
+    final loaded = state is DashboardLoaded
+        ? state
+        : (state is DashboardError ? state.previousLoaded : null);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Maintenance Management'),
+        actions: [
+          if (session != null)
+            OrgScopeAppBarFilter(
+              scope: session.scope,
+              selection: loaded?.orgScope ?? OrgScopeSelection.empty,
+              enableZoneDivision: false,
+              enableStation: false,
+              onChanged: (selection) {
+                ref
+                    .read(dashboardControllerProvider.notifier)
+                    .setOrgScope(selection);
+              },
+            ),
+        ],
       ),
       body: Column(
         children: [
           const SyncStatusBadge(),
-          if (session != null) _buildOrgScope(state, session),
           Expanded(child: _buildBody(state, session)),
         ],
       ),
     );
   }
 
-  /// Same depot-only filter as the Dashboard tab, backed by the same
-  /// controller — the two screens read one summary, so they share one
-  /// selection rather than drifting apart. See DashboardApiService.getSummary
-  /// for why depot is the only level offered.
-  Widget _buildOrgScope(DashboardState state, UserSession session) {
-    final loaded = state is DashboardLoaded
-        ? state
-        : (state is DashboardError ? state.previousLoaded : null);
-    // The bar collapses to nothing for a depot-scoped viewer, so its own
-    // padding is used rather than an outer wrapper that would leave a gap.
-    return OrgScopeFilterBar(
-      scope: session.scope,
-      selection: loaded?.orgScope ?? OrgScopeSelection.empty,
-      enableZoneDivision: false,
-      enableStation: false,
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-      onChanged: (selection) {
-        ref.read(dashboardControllerProvider.notifier).setOrgScope(selection);
-      },
-    );
-  }
 
   Widget _buildBody(DashboardState state, UserSession? session) {
     if (state is DashboardLoading) {

@@ -43,6 +43,35 @@ class OrgScopeSelection extends Equatable {
 ///   since narrowing to one station is useful even for a depot-scoped user
 ///   with several stations under them.
 class OrgScopeFilterBar extends ConsumerStatefulWidget {
+  /// Whether any filter control would render for this scope configuration.
+  ///
+  /// Mirrors the exact predicates the bar's own build uses ([_showZone],
+  /// [_showDivision], [_showDepot] plus the station rule), so containers
+  /// like [OrgScopeAppBarFilter] collapse under precisely the same
+  /// conditions instead of reimplementing (and drifting from) them.
+  static bool hasFilterableOptions({
+    required OrgScope scope,
+    required OrgScopeSelection selection,
+    bool enableZoneDivision = true,
+    bool enableStation = true,
+  }) {
+    final showZone =
+        enableZoneDivision && scope.level == OrgScopeLevel.global;
+    final showDivision = enableZoneDivision &&
+        (scope.level == OrgScopeLevel.global ||
+            scope.level == OrgScopeLevel.zone);
+    final showDepot = enableZoneDivision
+        ? (scope.level == OrgScopeLevel.global ||
+            scope.level == OrgScopeLevel.zone ||
+            scope.level == OrgScopeLevel.division)
+        : (scope.level != OrgScopeLevel.depot &&
+            scope.level != OrgScopeLevel.self);
+    if (showZone || showDivision || showDepot) return true;
+    final effectiveDepotId =
+        showDepot ? selection.depotId : scope.depot?.id;
+    return enableStation && effectiveDepotId != null;
+  }
+
   const OrgScopeFilterBar({
     super.key,
     required this.scope,

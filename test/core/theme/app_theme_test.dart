@@ -22,6 +22,10 @@ void main() {
     expect(AppTheme.statusSuccess, const Color(0xFF059669));
   });
 
+  test('warning amber dark token for text on amber tints', () {
+    expect(AppTheme.warningAmberDark, const Color(0xFF92400E));
+  });
+
   test('spacing and radius scales are complete', () {
     expect(GssmsSpacing.s4, 4);
     expect(GssmsSpacing.s8, 8);

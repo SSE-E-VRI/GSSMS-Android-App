@@ -42,7 +42,7 @@ class _GssmsAppState extends ConsumerState<GssmsApp> {
 
   Widget _buildHomeForState(AuthState state) {
     if (state is Authenticated) {
-      return HomeScreen(session: state.session);
+      return HomeScreen(session: state.session, autoLoadData: true);
     }
 
     if (state is AuthInitial ||
