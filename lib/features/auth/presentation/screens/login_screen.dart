@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../controllers/auth_controller.dart';
 import '../controllers/auth_state.dart';
+import 'otp_email_screen.dart';
+import 'otp_flow_mode.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -184,6 +186,60 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ),
                   )
                 : const Text('Sign In'),
+          ),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              key: const Key('login_forgot_password_button'),
+              onPressed: isLoading
+                  ? null
+                  : () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => const OtpEmailScreen(
+                            mode: OtpFlowMode.forgotPassword,
+                          ),
+                        ),
+                      );
+                    },
+              child: const Text('Forgot Password?'),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              const Expanded(child: Divider(color: AppTheme.borderGrey)),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                child: Text(
+                  'OR',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textMuted.withOpacity(0.8),
+                  ),
+                ),
+              ),
+              const Expanded(child: Divider(color: AppTheme.borderGrey)),
+            ],
+          ),
+          const SizedBox(height: 16),
+          OutlinedButton.icon(
+            key: const Key('login_sign_in_with_otp_button'),
+            onPressed: isLoading
+                ? null
+                : () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const OtpEmailScreen(
+                          mode: OtpFlowMode.login,
+                        ),
+                      ),
+                    );
+                  },
+            icon: const Icon(Icons.mark_email_read_outlined, size: 20),
+            label: const Text('Sign in with Email OTP'),
           ),
         ],
       ),

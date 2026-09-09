@@ -92,5 +92,34 @@ void main() {
       await tester.pumpAndSettle(); // Settle error response
       expect(find.text('Invalid 2FA Code'), findsOneWidget);
     });
+
+    testWidgets('renders Forgot Password and Sign in with Email OTP buttons', (tester) async {
+      await tester.pumpWidget(createTestWidget());
+
+      expect(find.byKey(const Key('login_forgot_password_button')), findsOneWidget);
+      expect(find.byKey(const Key('login_sign_in_with_otp_button')), findsOneWidget);
+    });
+
+    testWidgets('tapping Forgot Password button navigates to OtpEmailScreen in forgotPassword mode', (tester) async {
+      await tester.pumpWidget(createTestWidget());
+
+      await tester.tap(find.byKey(const Key('login_forgot_password_button')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Forgot Password'), findsWidgets);
+      expect(find.byKey(const Key('otp_email_field')), findsOneWidget);
+      expect(find.byKey(const Key('otp_send_code_button')), findsOneWidget);
+    });
+
+    testWidgets('tapping Sign in with Email OTP button navigates to OtpEmailScreen in login mode', (tester) async {
+      await tester.pumpWidget(createTestWidget());
+
+      await tester.tap(find.byKey(const Key('login_sign_in_with_otp_button')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Sign in with OTP'), findsWidgets);
+      expect(find.byKey(const Key('otp_email_field')), findsOneWidget);
+      expect(find.byKey(const Key('otp_send_code_button')), findsOneWidget);
+    });
   });
 }

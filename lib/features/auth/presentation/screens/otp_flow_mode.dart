@@ -1,0 +1,4 @@
+enum OtpFlowMode {
+  login,
+  forgotPassword,
+}

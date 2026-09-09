@@ -112,6 +112,35 @@ class AuthController extends Notifier<AuthState> {
     }
   }
 
+  /// Perform login with email and OTP code
+  Future<void> loginWithOtp(String email, String otp) async {
+    if (email.trim().isEmpty || otp.trim().isEmpty) {
+      state = const AuthError('Please enter email and OTP code');
+      return;
+    }
+
+    state = const AuthLoading('Signing in with OTP...');
+    try {
+      final session = await _repository.loginWithOtp(
+        email: email.trim().toLowerCase(),
+        otp: otp.trim(),
+      );
+      _pendingPassword = null;
+      state = Authenticated(session);
+    } on AuthException catch (e) {
+      _pendingPassword = null;
+      state = AuthError(e.message, code: e.code);
+      rethrow;
+    } catch (_) {
+      _pendingPassword = null;
+      const err =
+          AuthError('An unexpected authentication error occurred. Please try again.');
+      state = err;
+      throw const AuthException(
+          'An unexpected authentication error occurred. Please try again.');
+    }
+  }
+
   /// Submit OTP code when challenge is requested
   Future<void> submitOtp(String otp) async {
     final currentState = state;

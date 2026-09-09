@@ -25,8 +25,13 @@ abstract class IAuthRepository {
   Future<void> logout();
 
   // OTP / TOTP flows (§2.1) — exposed for Phase 2 UI
-  Future<void> requestOtp(String username);
-  Future<UserSession> verifyOtp({required String username, required String otp});
+  Future<void> requestOtp({required String email, String purpose = 'LOGIN'});
+  Future<UserSession> loginWithOtp({required String email, required String otp});
+  Future<void> resetPasswordWithOtp({
+    required String email,
+    required String otp,
+    required String newPassword,
+  });
   Future<Map<String, dynamic>> setupTotp();
   Future<void> verifyTotp(String code);
 
@@ -173,19 +178,37 @@ class AuthRepository implements IAuthRepository {
   }
 
   @override
-  Future<void> requestOtp(String username) => _apiService.requestOtp(username);
+  Future<void> requestOtp({required String email, String purpose = 'LOGIN'}) =>
+      _apiService.requestOtp(email: email, purpose: purpose);
 
   @override
-  Future<UserSession> verifyOtp({required String username, required String otp}) async {
-    final tokens = await _apiService.verifyOtp(username: username, otp: otp);
+  Future<UserSession> loginWithOtp({
+    required String email,
+    required String otp,
+  }) async {
+    final tokens = await _apiService.loginWithOtp(email: email, otp: otp);
     if (tokens.refreshToken != null && tokens.refreshToken!.isNotEmpty) {
       await _secureStorage.saveRefreshToken(tokens.refreshToken!);
+    } else {
+      await _secureStorage.clearTokens();
     }
     _currentAccessToken = tokens.accessToken;
     _currentSession = UserSession.fromJwt(tokens.accessToken);
     await _bindCacheToSession(_currentSession!, previous: null);
     return _currentSession!;
   }
+
+  @override
+  Future<void> resetPasswordWithOtp({
+    required String email,
+    required String otp,
+    required String newPassword,
+  }) =>
+      _apiService.resetPasswordWithOtp(
+        email: email,
+        otp: otp,
+        newPassword: newPassword,
+      );
 
   @override
   Future<Map<String, dynamic>> setupTotp() => _apiService.setupTotp();

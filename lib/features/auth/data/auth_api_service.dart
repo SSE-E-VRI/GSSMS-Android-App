@@ -42,24 +42,66 @@ class AuthApiService {
     }
   }
 
-  /// OTP request/verify — POST /api/v1/auth/otp/request/ & /verify/
-  Future<void> requestOtp(String username) async {
+  /// Request OTP for LOGIN or password_reset — POST /api/v1/auth/otp/request/
+  Future<void> requestOtp({
+    required String email,
+    String purpose = 'LOGIN',
+  }) async {
     try {
-      await _dio.post('/api/v1/auth/otp/request/', data: {'username': username.trim()});
+      await _dio.post(
+        '/api/v1/auth/otp/request/',
+        data: {
+          'email': email.trim().toLowerCase(),
+          'purpose': purpose,
+        },
+      );
     } on DioException catch (e) {
       throw _parseDioError(e);
     }
   }
 
-  Future<AuthTokens> verifyOtp({required String username, required String otp}) async {
+  /// Sign in with email OTP — POST /api/v1/auth/otp/login/
+  Future<AuthTokens> loginWithOtp({
+    required String email,
+    required String otp,
+  }) async {
     try {
       final response = await _dio.post<Map<String, dynamic>>(
-        '/api/v1/auth/otp/verify/',
-        data: {'username': username.trim(), 'otp': otp.trim()},
+        '/api/v1/auth/otp/login/',
+        data: {
+          'email': email.trim().toLowerCase(),
+          'otp_code': otp.trim(),
+          'purpose': 'LOGIN',
+        },
       );
       final data = response.data;
-      if (data == null || data['access'] == null) throw const AuthException('Invalid OTP verify response');
-      return AuthTokens(accessToken: data['access'] as String, refreshToken: data['refresh'] as String?);
+      if (data == null || data['access'] == null) {
+        throw const AuthException('Invalid OTP login response structure');
+      }
+      return AuthTokens(
+        accessToken: data['access'] as String,
+        refreshToken: data['refresh'] as String?,
+      );
+    } on DioException catch (e) {
+      throw _parseDioError(e);
+    }
+  }
+
+  /// Reset password with verified OTP — POST /api/v1/auth/reset-password/
+  Future<void> resetPasswordWithOtp({
+    required String email,
+    required String otp,
+    required String newPassword,
+  }) async {
+    try {
+      await _dio.post(
+        '/api/v1/auth/reset-password/',
+        data: {
+          'email': email.trim().toLowerCase(),
+          'otp_code': otp.trim(),
+          'new_password': newPassword,
+        },
+      );
     } on DioException catch (e) {
       throw _parseDioError(e);
     }
@@ -182,11 +224,20 @@ class AuthApiService {
 
       String detail = 'Authentication failed';
       String? code;
+      int? attemptsRemaining;
 
       if (data is Map) {
-        detail = data['detail']?.toString() ?? data['message']?.toString() ?? detail;
+        detail = data['error']?.toString() ??
+            data['detail']?.toString() ??
+            data['message']?.toString() ??
+            detail;
         code = data['code']?.toString();
-        if (data['detail'] == null && data['message'] == null) {
+        if (data['attempts_remaining'] != null) {
+          attemptsRemaining = int.tryParse(data['attempts_remaining'].toString());
+        }
+        if (data['error'] == null &&
+            data['detail'] == null &&
+            data['message'] == null) {
           final parts = <String>[];
           for (final value in data.values) {
             if (value is List) {
@@ -206,13 +257,25 @@ class AuthApiService {
         return const TwoFactorRequiredException();
       }
       final lowerDetail = detail.toLowerCase();
-      if (code == 'INVALID_OTP' || lowerDetail.contains('invalid 2fa') || lowerDetail.contains('invalid otp')) {
-        return InvalidOtpException(detail);
+      if (code == 'OTP_LOCKED_OUT' ||
+          (statusCode == 429 && lowerDetail.contains('locked out'))) {
+        return OtpLockoutException(detail);
       }
-      if (code == 'RATE_LIMIT_EXCEEDED' || lowerDetail.contains('too many')) {
+      if (code == 'INVALID_OTP' ||
+          lowerDetail.contains('invalid 2fa') ||
+          lowerDetail.contains('invalid or expired otp') ||
+          lowerDetail.contains('invalid otp')) {
+        return InvalidOtpException(detail, attemptsRemaining);
+      }
+      if (code == 'RATE_LIMIT_EXCEEDED' || (statusCode == 429 && lowerDetail.contains('wait'))) {
         return RateLimitExceededException(detail);
       }
-      if (code == 'GUEST_EXPIRED' || lowerDetail.contains('demo access has expired')) {
+      if (statusCode == 502 || code == 'EMAIL_DELIVERY_FAILED') {
+        return AuthException(detail, code: 'EMAIL_DELIVERY_FAILED');
+      }
+      if (code == 'GUEST_EXPIRED' ||
+          lowerDetail.contains('demo access has expired') ||
+          lowerDetail.contains('account access has expired')) {
         return GuestExpiredException(detail);
       }
       if (lowerDetail.contains('account is disabled')) {
@@ -220,9 +283,9 @@ class AuthApiService {
       }
       if ((statusCode == 400 || statusCode == 401) &&
           (lowerDetail.contains('user not found') ||
-           lowerDetail.contains('invalid password') ||
-           lowerDetail.contains('no active account') ||
-           lowerDetail.contains('invalid credentials'))) {
+              lowerDetail.contains('invalid password') ||
+              lowerDetail.contains('no active account') ||
+              lowerDetail.contains('invalid credentials'))) {
         return InvalidCredentialsException(detail);
       }
       if (statusCode == 401) {

@@ -27,10 +27,22 @@ class TwoFactorRequiredException extends AuthException {
       : super(code: '2FA_REQUIRED');
 }
 
-/// Thrown when the submitted 2FA code is invalid.
+/// Thrown when the submitted 2FA or OTP code is invalid.
 class InvalidOtpException extends AuthException {
-  const InvalidOtpException([super.message = 'Invalid 2FA code'])
-      : super(code: 'INVALID_OTP');
+  const InvalidOtpException([
+    super.message = 'Invalid 2FA code',
+    this.attemptsRemaining,
+  ]) : super(code: 'INVALID_OTP');
+
+  final int? attemptsRemaining;
+}
+
+/// Thrown when maximum OTP verification attempts (5) are exceeded (HTTP 429 code: OTP_LOCKED_OUT).
+class OtpLockoutException extends AuthException {
+  const OtpLockoutException([
+    super.message =
+        'Too many incorrect attempts. Please request a new OTP and try again later.',
+  ]) : super(code: 'OTP_LOCKED_OUT');
 }
 
 /// Thrown when 2FA rate limit is exceeded.
