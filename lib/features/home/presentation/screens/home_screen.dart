@@ -256,7 +256,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Widget _buildMyWorkSection(BuildContext context, UserSession session) {
-    if (!sessionAllows(session, 'maintenance.view')) {
+    // "My Work" surfaces the record assigned to *this person as executor* --
+    // a technician concept. Every other role (Depot Incharge and above) works
+    // through the Maintenance/Work Orders module instead, so showing this
+    // banner there would point at a job that isn't theirs to execute.
+    if (!session.roles.contains(AuthRole.maintenanceStaff)) {
       return const SizedBox.shrink();
     }
 
