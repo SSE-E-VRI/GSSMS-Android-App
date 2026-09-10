@@ -59,7 +59,10 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
             OrgScopeAppBarFilter(
               scope: session.scope,
               selection: loaded?.orgScope ?? OrgScopeSelection.empty,
-              enableZoneDivision: false,
+              // register_report now accepts zone_id/division_id too
+              // (most-specific-wins with depot_id). Station stays disabled:
+              // it's already covered by the Infrastructure Type/Item filter
+              // (Type=Station + item) elsewhere on this screen.
               enableStation: false,
               onChanged: (selection) {
                 ref

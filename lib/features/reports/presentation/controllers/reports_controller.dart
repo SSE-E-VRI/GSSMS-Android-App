@@ -86,6 +86,8 @@ class ReportsController extends Notifier<ReportsState> {
       final entries = await _repository.fetchMaintenanceRegister(
         startDate: df.format(start),
         endDate: df.format(end),
+        zoneId: scope.zoneId,
+        divisionId: scope.divisionId,
         depotId: scope.depotId,
         infraType: type,
         infraId: id,
@@ -113,11 +115,11 @@ class ReportsController extends Notifier<ReportsState> {
     return loadRegister(infraId: id, clearInfraId: id == null);
   }
 
-  /// Depot filter, same server-side reasoning as the date range and infra
-  /// type/id filters. Used with `enableZoneDivision: false` (register_report
-  /// has no zone/division param) and `enableStation: false` — station-level
-  /// narrowing is already covered by the Infrastructure Type/Item filter
-  /// above (Type=Station + item), so the org-scope bar here only offers Depot.
+  /// Zone/Division/Depot filter, same server-side reasoning as the date
+  /// range and infra type/id filters — `register_report` now accepts
+  /// zone_id/division_id/depot_id (most-specific-wins). Still used with
+  /// `enableStation: false`: station-level narrowing is already covered by
+  /// the Infrastructure Type/Item filter above (Type=Station + item).
   Future<void> setOrgScope(OrgScopeSelection scope) {
     return loadRegister(orgScope: scope);
   }

@@ -32,15 +32,23 @@ class DashboardApiService {
 
   /// KPI counts, status donut segments and pending tasks.
   ///
-  /// `depot_id` is the only filter this read model accepts — see the
-  /// `summary` action, which threads it into every `Dash.scoped_*` call. It is
-  /// deliberately not given zone/division parameters here: offering levels the
-  /// endpoint ignores would leave the donut contradicting the attention card
-  /// beside it.
-  Future<DashboardSummary> getSummary({int? depotId}) async {
+  /// `zone_id`/`division_id`/`depot_id` (most-specific-wins, same precedence
+  /// as `getAttention`) — the `summary` action now threads all three into
+  /// every `Dash.scoped_*`/`Dash._apply_org_filter` call, so the donut no
+  /// longer contradicts the attention card beside it once zone/division
+  /// scoping is offered.
+  Future<DashboardSummary> getSummary({
+    int? zoneId,
+    int? divisionId,
+    int? depotId,
+  }) async {
+    final query = <String, dynamic>{};
+    if (zoneId != null) query['zone_id'] = zoneId;
+    if (divisionId != null) query['division_id'] = divisionId;
+    if (depotId != null) query['depot_id'] = depotId;
     final response = await _dio.get<Map<String, dynamic>>(
       '/api/v1/maintenance/dashboard/summary/',
-      queryParameters: depotId != null ? {'depot_id': depotId} : null,
+      queryParameters: query.isEmpty ? null : query,
     );
     final data = response.data ?? <String, dynamic>{};
     return DashboardSummary.fromJson(data);

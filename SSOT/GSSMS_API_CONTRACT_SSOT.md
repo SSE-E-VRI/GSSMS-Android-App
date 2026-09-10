@@ -1469,6 +1469,14 @@ Dashboard data is a read projection.
 
 The Android UI must not derive authoritative organisational counts from a subset of mobile records.
 
+## 32.1 Organisation-scope filter parameters
+
+`dashboard/summary/` accepts `zone_id`/`division_id`/`depot_id`, matching `maintenance/schedules/attention/`'s existing precedence — most-specific wins (`depot_id` > `division_id` > `zone_id`), sent as separate params, never combined into one AND'd filter. Previously this endpoint accepted `depot_id` only, which is why the Zone/Division filter did not appear for GLOBAL/ZONE-scoped roles (Super Admin/Zonal Admin) on the Dashboard and Maintenance Management screens — both screens' `OrgScopeAppBarFilter` are now `enableZoneDivision: true` (the default) to match.
+
+`maintenance/records/register_report/` (the Reports screen's Maintenance Register) similarly now accepts `zone_id`/`division_id` alongside its existing `depot_id`/`station_id`, with the same most-specific-wins precedence among the org-scope params; `station_id`/legacy infrastructure-type params remain a separate, independently-applied filter.
+
+`maintenance/work-orders/aging/`, `.../sla/`, `.../performance/`, `.../productivity/` similarly now accept `zone_id`/`division_id` alongside `depot_id`.
+
 ---
 
 # 33. API Versioning

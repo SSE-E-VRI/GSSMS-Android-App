@@ -62,7 +62,10 @@ class _MaintenanceScreenState extends ConsumerState<MaintenanceScreen> {
             OrgScopeAppBarFilter(
               scope: session.scope,
               selection: loaded?.orgScope ?? OrgScopeSelection.empty,
-              enableZoneDivision: false,
+              // Same as DashboardScreen (this screen reuses
+              // dashboardControllerProvider): `dashboard/summary/` now
+              // accepts zone_id/division_id. Station stays disabled: the
+              // endpoint has no station param.
               enableStation: false,
               onChanged: (selection) {
                 ref

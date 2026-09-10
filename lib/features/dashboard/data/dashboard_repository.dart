@@ -7,7 +7,11 @@ abstract class IDashboardRepository {
     int? divisionId,
     int? depotId,
   });
-  Future<DashboardSummary> fetchSummary({int? depotId});
+  Future<DashboardSummary> fetchSummary({
+    int? zoneId,
+    int? divisionId,
+    int? depotId,
+  });
 }
 
 /// Read-only: unlike [WorkOrderRepository], there is no local cache to fall
@@ -34,6 +38,10 @@ class DashboardRepository implements IDashboardRepository {
       );
 
   @override
-  Future<DashboardSummary> fetchSummary({int? depotId}) =>
-      _apiService.getSummary(depotId: depotId);
+  Future<DashboardSummary> fetchSummary({
+    int? zoneId,
+    int? divisionId,
+    int? depotId,
+  }) =>
+      _apiService.getSummary(zoneId: zoneId, divisionId: divisionId, depotId: depotId);
 }

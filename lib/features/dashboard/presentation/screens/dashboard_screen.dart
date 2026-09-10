@@ -16,6 +16,7 @@ import 'package:gssms_mobile/features/dashboard/presentation/controllers/dashboa
 import 'package:gssms_mobile/features/dashboard/presentation/controllers/dashboard_state.dart';
 import 'package:gssms_mobile/features/dashboard/presentation/widgets/status_donut_chart.dart';
 import 'package:gssms_mobile/features/inspections/presentation/screens/inspection_list_screen.dart';
+import 'package:gssms_mobile/features/pending_actions/presentation/screens/pending_actions_screen.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/screens/work_order_list_screen.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/work_order_navigation.dart';
 
@@ -62,7 +63,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             OrgScopeAppBarFilter(
               scope: session.scope,
               selection: loaded?.orgScope ?? OrgScopeSelection.empty,
-              enableZoneDivision: false,
+              // `dashboard/summary/` now accepts zone_id/division_id too
+              // (most-specific-wins, same as `attention`) — Zone/Division
+              // dropdowns show here for GLOBAL/ZONE-scoped users
+              // (Super Admin/Zonal Admin) same as Work Orders/Assets.
+              // Station stays disabled: neither endpoint has a station param.
               enableStation: false,
               onChanged: (selection) {
                 ref
@@ -414,12 +419,31 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Row(
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Icon(Icons.playlist_add_check_outlined, color: AppTheme.railwayBlue),
-                SizedBox(width: 8),
-                Text('Pending Actions',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.railwayBlue)),
+                const Expanded(
+                  child: Row(
+                    children: [
+                      Icon(Icons.playlist_add_check_outlined, color: AppTheme.railwayBlue),
+                      SizedBox(width: 8),
+                      Text('Pending Actions',
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.railwayBlue)),
+                    ],
+                  ),
+                ),
+                // Web-parity entry point: the full 4-tab breakdown (Scheduled
+                // Tasks/Complaints/Inspection Notes/Deficiencies) — this
+                // card only ever shows a flat glance-summary, same reasoning
+                // as web keeping its own tabbed section below the KPI cards
+                // rather than cramming all four lists in here at once.
+                if (sessionAllows(session, 'maintenance.view'))
+                  TextButton(
+                    key: const Key('open_pending_actions_button'),
+                    onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                        builder: (_) => const PendingActionsScreen())),
+                    child: const Text('View All'),
+                  ),
               ],
             ),
             const SizedBox(height: 12),
@@ -505,19 +529,50 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.railwayBlue),
         ),
         const SizedBox(height: 10),
-        GridView.count(
-          crossAxisCount: 2,
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          crossAxisSpacing: 10,
-          mainAxisSpacing: 10,
-          childAspectRatio: 1.6,
-          children: [
-            _buildKpiCard('Total Job Works', '${stats.totalWorkOrders}', Icons.assignment_outlined, AppTheme.railwayBlue),
-            _buildKpiCard('Compliance Rate', '${stats.complianceRate.toStringAsFixed(1)}%', Icons.check_circle_outline, AppTheme.railwayGreen),
-            _buildKpiCard('Pending Tasks', '${stats.pendingTaskCount}', Icons.hourglass_empty_outlined, AppTheme.warningAmber),
-            _buildKpiCard('Open Complaints', '${stats.openComplaintCount}', Icons.report_problem_outlined, AppTheme.errorRed),
-          ],
+        // Two rows of two `Expanded` cards, not `GridView.count` with a
+        // fixed `childAspectRatio` — a locked aspect ratio gives every tile
+        // a fixed *height* regardless of how much room its content actually
+        // needs, so anything that pushed the content taller than that
+        // (a larger system text-scale setting, a longer value like "100.0%"
+        // wrapping, a longer localized label) overflowed the tile with the
+        // classic yellow/black "BOTTOM OVERFLOWED BY n PIXELS" banner —
+        // exactly what was happening here. `IntrinsicHeight` still keeps
+        // the two cards in a row matched to each other's height, but that
+        // height is now whatever the taller card's content actually needs,
+        // never a number picked in advance that content can outgrow.
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: _buildKpiCard('Total Job Works', '${stats.totalWorkOrders}',
+                    Icons.assignment_outlined, AppTheme.railwayBlue),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _buildKpiCard('Compliance Rate',
+                    '${stats.complianceRate.toStringAsFixed(1)}%',
+                    Icons.check_circle_outline, AppTheme.railwayGreen),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Expanded(
+                child: _buildKpiCard('Pending Tasks', '${stats.pendingTaskCount}',
+                    Icons.hourglass_empty_outlined, AppTheme.warningAmber),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _buildKpiCard('Open Complaints', '${stats.openComplaintCount}',
+                    Icons.report_problem_outlined, AppTheme.errorRed),
+              ),
+            ],
+          ),
         ),
       ],
     );
@@ -531,15 +586,19 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
+          mainAxisSize: MainAxisSize.min,
           children: [
             Row(
               children: [
                 Icon(icon, size: 20, color: color),
                 const Spacer(),
-                Text(
-                  value,
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color),
+                Flexible(
+                  child: Text(
+                    value,
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ],
             ),
@@ -547,6 +606,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             Text(
               title,
               style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary, fontWeight: FontWeight.w500),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),

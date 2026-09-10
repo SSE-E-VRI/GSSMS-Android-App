@@ -6,6 +6,8 @@ abstract class IReportsRepository {
   Future<List<MaintenanceRegisterEntry>> fetchMaintenanceRegister({
     required String startDate,
     required String endDate,
+    int? zoneId,
+    int? divisionId,
     int? depotId,
     InfraFilterType infraType = InfraFilterType.all,
     int? infraId,
@@ -24,6 +26,8 @@ class ReportsRepository implements IReportsRepository {
   Future<List<MaintenanceRegisterEntry>> fetchMaintenanceRegister({
     required String startDate,
     required String endDate,
+    int? zoneId,
+    int? divisionId,
     int? depotId,
     InfraFilterType infraType = InfraFilterType.all,
     int? infraId,
@@ -31,6 +35,8 @@ class ReportsRepository implements IReportsRepository {
     return _apiService.getMaintenanceRegister(
       startDate: startDate,
       endDate: endDate,
+      zoneId: zoneId,
+      divisionId: divisionId,
       depotId: depotId,
       infraType: infraType,
       infraId: infraId,
