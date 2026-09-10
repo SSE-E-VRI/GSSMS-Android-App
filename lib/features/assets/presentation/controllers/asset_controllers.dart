@@ -4,10 +4,60 @@ import 'package:gssms_mobile/core/widgets/org_scope_filter_bar.dart';
 import 'package:gssms_mobile/features/assets/data/asset_api_service.dart';
 import 'package:gssms_mobile/features/assets/data/asset_repository.dart';
 import 'package:gssms_mobile/features/assets/domain/models/asset.dart';
+import 'package:gssms_mobile/features/assets/domain/models/asset_component.dart';
+import 'package:gssms_mobile/features/assets/domain/models/asset_maintenance_summary.dart';
+import 'package:gssms_mobile/features/assets/domain/models/asset_replacement_event.dart';
+import 'package:gssms_mobile/features/assets/domain/models/asset_specification.dart';
+import 'package:gssms_mobile/features/assets/domain/models/reliability_metrics.dart';
+import 'package:gssms_mobile/features/deficiencies/domain/models/deficiency.dart';
+import 'package:gssms_mobile/features/pending_actions/presentation/controllers/pending_actions_controllers.dart'
+    show deficiencyRepositoryProvider;
 
 final assetRepositoryProvider = Provider<IAssetRepository>((ref) {
   final api = ref.watch(assetApiServiceProvider);
   return AssetRepository(api);
+});
+
+// --- Asset Detail tabs: five lazy, independent data sources ---
+//
+// Each is a plain `FutureProvider.family<T, int>` keyed by assetId rather
+// than folded into `AssetDetailController`'s state — Riverpod providers are
+// lazy by construction, so a tab's fetch only actually runs the first time
+// that tab's widget watches its provider (opening Master Data never
+// triggers all five other tabs' network calls), and each tab's
+// loading/error/data states are handled independently rather than forcing
+// one shared "everything loaded or nothing did" state across six tabs.
+
+final assetMaintenanceSummaryProvider =
+    FutureProvider.family<AssetMaintenanceSummary, int>((ref, assetId) {
+  return ref.watch(assetRepositoryProvider).fetchMaintenanceSummary(assetId);
+});
+
+/// 30-day default window, matching the server's own default when
+/// `start_date`/`end_date` are both omitted (`calculate_reliability_metrics`).
+final assetReliabilityMetricsProvider =
+    FutureProvider.family<ReliabilityMetrics, int>((ref, assetId) {
+  return ref.watch(assetRepositoryProvider).fetchReliabilityMetrics(assetId);
+});
+
+final assetSpecificationsProvider =
+    FutureProvider.family<AssetSpecificationWorkspace, int>((ref, assetId) {
+  return ref.watch(assetRepositoryProvider).fetchSpecifications(assetId);
+});
+
+final assetComponentsProvider =
+    FutureProvider.family<List<AssetComponent>, int>((ref, assetId) {
+  return ref.watch(assetRepositoryProvider).fetchComponents(assetId);
+});
+
+final assetReplacementHistoryProvider =
+    FutureProvider.family<List<AssetReplacementEvent>, int>((ref, assetId) {
+  return ref.watch(assetRepositoryProvider).fetchReplacementHistory(assetId);
+});
+
+final assetDeficienciesProvider =
+    FutureProvider.family<List<Deficiency>, int>((ref, assetId) {
+  return ref.watch(deficiencyRepositoryProvider).fetchDeficienciesForAsset(assetId);
 });
 
 // --- Asset List State & Notifier ---

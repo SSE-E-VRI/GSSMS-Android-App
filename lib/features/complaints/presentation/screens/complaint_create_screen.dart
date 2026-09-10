@@ -16,6 +16,7 @@ import 'package:gssms_mobile/features/auth/presentation/widgets/permission_denie
 import 'package:gssms_mobile/features/complaints/presentation/controllers/complaint_controllers.dart';
 import 'package:gssms_mobile/features/reports/domain/models/infrastructure_option.dart';
 import 'package:gssms_mobile/features/reports/presentation/controllers/reports_controller.dart';
+import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_order_controllers.dart';
 
 const _infraTypes = [
   InfraFilterType.station,
@@ -269,7 +270,8 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to log complaint: $e'),
+            content:
+                Text('Failed to log complaint: ${workOrderReadableError(e)}'),
             backgroundColor: AppTheme.errorRed,
           ),
         );
@@ -292,10 +294,10 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Log New Complaint'),
-        backgroundColor: AppTheme.primaryDark,
-      ),
+      // No title here — the colored header below already carries it (as an
+      // accessible `Semantics(header: true)` region), so the AppBar isn't
+      // duplicating it back-to-back. Only the back button lives up top.
+      appBar: AppBar(backgroundColor: AppTheme.primaryDark),
       backgroundColor: _webLightBg,
       body: !_bootstrapped
           ? const Center(child: CircularProgressIndicator())
@@ -305,7 +307,7 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
                 key: _formKey,
                 child: Container(
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: AppTheme.surfaceCard,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: _border),
                     boxShadow: [
@@ -319,27 +321,39 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // Red header — mirrors web's "Log New Complaint" bar.
-                      Container(
-                        decoration: const BoxDecoration(
-                          color: _webRed,
-                          borderRadius: BorderRadius.vertical(
-                              top: Radius.circular(12)),
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 14),
-                        child: const Row(
-                          children: [
-                            Icon(Icons.campaign_outlined,
-                                color: Colors.white, size: 20),
-                            SizedBox(width: 8),
-                            Text(
-                              'Log New Complaint',
-                              style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold),
-                            ),
-                          ],
+                      // This is the screen's only title (the AppBar carries
+                      // no text of its own — see build() above), so it's
+                      // marked as an accessible header region rather than
+                      // decorative content screen readers would otherwise
+                      // skip.
+                      Semantics(
+                        header: true,
+                        label: 'Log New Complaint',
+                        // The Row's own Icon/Text would otherwise each add
+                        // their own semantics on top of this label.
+                        excludeSemantics: true,
+                        child: Container(
+                          decoration: const BoxDecoration(
+                            color: _webRed,
+                            borderRadius: BorderRadius.vertical(
+                                top: Radius.circular(12)),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 14),
+                          child: const Row(
+                            children: [
+                              Icon(Icons.campaign_outlined,
+                                  color: Colors.white, size: 20),
+                              SizedBox(width: 8),
+                              Text(
+                                'Log New Complaint',
+                                style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                       Padding(
@@ -375,7 +389,7 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
     );
   }
 
-  Widget _labelWithInfo(String label, {bool required = false}) {
+  Widget _labelWithInfo(String label, {bool required = false, required String tooltip}) {
     // Flexible text so long labels (e.g. "Specific Asset (Optional)") wrap
     // instead of overflowing their half-width column at 360dp.
     return Row(
@@ -400,8 +414,16 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
           ),
         ),
         const SizedBox(width: 4),
-        const Icon(Icons.info_outline,
-            size: 14, color: AppTheme.textSecondary),
+        // Was purely decorative — visually promised "tap for help" but had no
+        // handler. Tooltip makes it a real tap/long-press affordance, and its
+        // `message` doubles as the icon's accessible label instead of a
+        // silent, unlabeled glyph.
+        Tooltip(
+          message: tooltip,
+          triggerMode: TooltipTriggerMode.tap,
+          child: const Icon(Icons.info_outline,
+              size: 14, color: AppTheme.textSecondary),
+        ),
       ],
     );
   }
@@ -464,7 +486,9 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _labelWithInfo('Depot'),
+        _labelWithInfo('Depot',
+            tooltip:
+                'The depot this complaint is scoped to. Locked to your own depot unless you have multi-depot access.'),
         const SizedBox(height: 6),
         DropdownButtonFormField<int>(
           key: const Key('complaint_depot_dropdown'),
@@ -512,7 +536,9 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _labelWithInfo('Department Reporting', required: true),
+        _labelWithInfo('Department Reporting',
+            required: true,
+            tooltip: 'The department responsible for handling this complaint.'),
         const SizedBox(height: 6),
         DropdownButtonFormField<String>(
           key: const Key('complaint_department_dropdown'),
@@ -554,7 +580,9 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _labelWithInfo('Title / Subject', required: true),
+        _labelWithInfo('Title / Subject',
+            required: true,
+            tooltip: 'A short summary of the issue, shown in lists and notifications.'),
         const SizedBox(height: 6),
         TextFormField(
           key: const Key('complaint_title_field'),
@@ -575,7 +603,9 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _labelWithInfo('Description', required: true),
+        _labelWithInfo('Description',
+            required: true,
+            tooltip: "Full details of the issue — what's wrong, where, and any relevant context."),
         const SizedBox(height: 6),
         TextFormField(
           key: const Key('complaint_description_field'),
@@ -596,12 +626,19 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
   }
 
   Widget _locationAndAssetSection() {
+    // Neutral styling (not the errorLight/errorBorder red tint this used to
+    // carry): every field in this section is optional — no validator is
+    // attached to any of _infraTypeField/_locationField/_categoryField/
+    // _assetField — so a red-tinted card next to the genuinely required
+    // fields above it misread as "needs attention". "(Optional)" is spelled
+    // out in the header too, matching InspectionCreateScreen's equivalent
+    // card, so the user isn't left guessing whether this section is required.
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppTheme.errorLight,
+        color: AppTheme.surfaceCard,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppTheme.errorBorder),
+        border: Border.all(color: _border),
         boxShadow: [
           BoxShadow(
               color: Colors.black.withOpacity(0.03),
@@ -614,13 +651,13 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
         children: [
           const Row(
             children: [
-              Icon(Icons.location_on, color: _webRed, size: 16),
+              Icon(Icons.location_on, color: AppTheme.railwayBlue, size: 16),
               SizedBox(width: 6),
               Text(
-                'Location & Asset Details',
+                'Location & Asset Details (Optional)',
                 style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    color: _webRed,
+                    color: AppTheme.railwayBlue,
                     fontSize: 13),
               ),
             ],
@@ -693,7 +730,9 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _labelWithInfo('Infrastructure Type'),
+        _labelWithInfo('Infrastructure Type',
+            tooltip:
+                'Narrows the Location Name list below to Stations, LC Gates, Service Buildings, or Staff Quarters.'),
         const SizedBox(height: 6),
         DropdownButtonFormField<InfraFilterType>(
           key: const Key('complaint_infra_type_dropdown'),
@@ -728,7 +767,8 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _labelWithInfo('Location Name'),
+        _labelWithInfo('Location Name',
+            tooltip: 'The specific site this complaint applies to.'),
         const SizedBox(height: 6),
         DropdownButtonFormField<int>(
           key: const Key('complaint_location_dropdown'),
@@ -773,7 +813,8 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _labelWithInfo('Asset Category'),
+        _labelWithInfo('Asset Category',
+            tooltip: 'Filters the Specific Asset list below by category.'),
         const SizedBox(height: 6),
         DropdownButtonFormField<String>(
           key: const Key('complaint_asset_category_dropdown'),
@@ -817,7 +858,9 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _labelWithInfo('Specific Asset (Optional)'),
+        _labelWithInfo('Specific Asset (Optional)',
+            tooltip:
+                'Link this complaint to one exact asset, or leave blank for a general/location-level issue.'),
         const SizedBox(height: 6),
         DropdownButtonFormField<int>(
           key: const Key('complaint_asset_dropdown'),

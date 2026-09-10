@@ -83,6 +83,16 @@ class _WorkOrderListScreenState extends ConsumerState<WorkOrderListScreen> {
             OrgScopeAppBarFilter(
               scope: session.scope,
               selection: loaded?.orgScope ?? OrgScopeSelection.empty,
+              // Station-level narrowing is dropped here: the in-body
+              // "Infra Type / Infra Name" filter below the search bar
+              // already covers picking one Station (Infra Type = Station +
+              // a Location Name), so offering it a second time in this
+              // sheet — via a different mechanism (server re-query vs the
+              // in-body filter's client-side pass over the same depot-
+              // scoped page) — was pure duplication for the common
+              // depot-scoped user. Zone/Division/Depot stay: nothing else
+              // on this screen covers that axis for multi-depot roles.
+              enableStation: false,
               onChanged: (selection) {
                 ref
                     .read(workOrderListControllerProvider.notifier)
@@ -91,18 +101,32 @@ class _WorkOrderListScreenState extends ConsumerState<WorkOrderListScreen> {
             ),
         ],
       ),
-      body: Column(
-        children: [
-          const SyncStatusBadge(),
-          _buildSearchBar(),
-          _buildDateRange(listState),
-          _buildFilterChips(listState),
-          _buildTypeChips(listState),
-          _buildInfraFilter(listState),
-          Expanded(
-            child: _buildListBody(listState),
-          ),
-        ],
+      // The filter block (search/date/status/type/infra) used to sit in a
+      // fixed Column above an `Expanded` list, permanently eating ~40% of
+      // the screen on a typical phone. It's now the scrollable content's own
+      // leading slivers, so it scrolls away with the list instead of pinning
+      // in place — scroll down and the whole filter stack moves up and off
+      // screen, leaving the full viewport for work order cards; scroll back
+      // to the top and the filters are still there, unchanged, not reset.
+      body: RefreshIndicator(
+        onRefresh: () => ref
+            .read(workOrderListControllerProvider.notifier)
+            .fetchWorkOrders(forceRefresh: true),
+        child: CustomScrollView(
+          // Always scrollable so pull-to-refresh works even when the filter
+          // block plus a short (or empty) results list don't fill the
+          // viewport — same reasoning the old empty-state ListView had for
+          // setting this explicitly.
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            const SliverToBoxAdapter(child: SyncStatusBadge()),
+            SliverToBoxAdapter(child: _buildSearchBar()),
+            SliverToBoxAdapter(child: _buildDateRange(listState)),
+            SliverToBoxAdapter(child: _buildStatusTypeFilters(listState)),
+            SliverToBoxAdapter(child: _buildInfraFilter(listState)),
+            ..._buildListSlivers(listState),
+          ],
+        ),
       ),
       // Web "+ New Job Work". Unlike the complaint/inspection FABs,
       // `maintenance.create` alone is not enough here: the backend's
@@ -175,11 +199,19 @@ class _WorkOrderListScreenState extends ConsumerState<WorkOrderListScreen> {
     );
   }
 
-  Widget _buildFilterChips(WorkOrderListState state) {
-    final selectedFilter =
+  /// Status + Type filters, as a dropdown pair rather than two rows of
+  /// FilterChips. The chip rows wrapped/overflowed once every status
+  /// (Assigned/In Progress/Rework/Completed/New/On Hold) was on screen at
+  /// once — on a 360dp phone the last chip routinely got clipped mid-label
+  /// — and cost two extra scrollable rows of vertical space. Matches the
+  /// existing Infra Type/Infra Name dropdown row directly below it.
+  Widget _buildStatusTypeFilters(WorkOrderListState state) {
+    final selectedStatus =
         state is WorkOrderListLoaded ? state.selectedStatusFilter : null;
+    final selectedType =
+        state is WorkOrderListLoaded ? state.selectedTypeFilter : null;
 
-    final filterOptions = [
+    final statusOptions = [
       (null, 'All'),
       (WorkOrderStatus.assigned, 'Assigned'),
       (WorkOrderStatus.inProgress, 'In Progress'),
@@ -188,76 +220,73 @@ class _WorkOrderListScreenState extends ConsumerState<WorkOrderListScreen> {
       (WorkOrderStatus.newOrder, 'New'),
       (WorkOrderStatus.onHold, 'On Hold'),
     ];
-
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: Row(
-        children: filterOptions.map((opt) {
-          final isSelected = selectedFilter == opt.$1;
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: FilterChip(
-              key: Key('filter_chip_${opt.$2.toLowerCase().replaceAll(' ', '_')}'),
-              selected: isSelected,
-              label: Text(opt.$2),
-              labelStyle: TextStyle(
-                color: isSelected ? Colors.white : AppTheme.railwayBlue,
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-              ),
-              selectedColor: AppTheme.railwayBlue,
-              backgroundColor: Colors.white,
-              checkmarkColor: Colors.white,
-              onSelected: (_) {
-                ref.read(workOrderListControllerProvider.notifier).setStatusFilter(opt.$1);
-              },
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-
-  /// Web Job Works chips: All / Corrective / Preventive. "Closed" on web is
-  /// a status — covered by the status chips above — so only the two type
-  /// chips are added here.
-  Widget _buildTypeChips(WorkOrderListState state) {
-    final selected =
-        state is WorkOrderListLoaded ? state.selectedTypeFilter : null;
-    final options = [
+    // "Closed" on web is a status, covered by the status dropdown above, so
+    // only the two real type values plus "All Types" are offered here.
+    final typeOptions = [
       (null, 'All Types'),
       (WorkOrderType.corrective, 'Corrective'),
       (WorkOrderType.preventive, 'Preventive'),
     ];
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
       child: Row(
-        children: options.map((opt) {
-          final isSelected = selected == opt.$1;
-          return Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: FilterChip(
-              key: Key(
-                  'type_chip_${(opt.$2).toLowerCase().replaceAll(' ', '_')}'),
-              selected: isSelected,
-              label: Text(opt.$2, style: const TextStyle(fontSize: 12)),
-              labelStyle: TextStyle(
-                color: isSelected ? Colors.white : AppTheme.primaryBlue,
-                fontWeight:
-                    isSelected ? FontWeight.bold : FontWeight.normal,
+        children: [
+          Expanded(
+            flex: 5,
+            child: DropdownButtonFormField<WorkOrderStatus?>(
+              key: const Key('wo_status_filter_dropdown'),
+              isExpanded: true,
+              value: selectedStatus,
+              decoration: const InputDecoration(
+                labelText: 'Status',
+                contentPadding:
+                    EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                border: OutlineInputBorder(),
               ),
-              selectedColor: AppTheme.primaryBlue,
-              backgroundColor: Colors.white,
-              checkmarkColor: Colors.white,
-              onSelected: (_) {
+              items: statusOptions
+                  .map((opt) => DropdownMenuItem(
+                      value: opt.$1,
+                      child: Text(opt.$2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 13))))
+                  .toList(),
+              onChanged: (status) {
                 ref
                     .read(workOrderListControllerProvider.notifier)
-                    .setTypeFilter(opt.$1);
+                    .setStatusFilter(status);
               },
             ),
-          );
-        }).toList(),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            flex: 5,
+            child: DropdownButtonFormField<WorkOrderType?>(
+              key: const Key('wo_type_filter_dropdown'),
+              isExpanded: true,
+              value: selectedType,
+              decoration: const InputDecoration(
+                labelText: 'Type',
+                contentPadding:
+                    EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                border: OutlineInputBorder(),
+              ),
+              items: typeOptions
+                  .map((opt) => DropdownMenuItem(
+                      value: opt.$1,
+                      child: Text(opt.$2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(fontSize: 13))))
+                  .toList(),
+              onChanged: (type) {
+                ref
+                    .read(workOrderListControllerProvider.notifier)
+                    .setTypeFilter(type);
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -365,9 +394,17 @@ class _WorkOrderListScreenState extends ConsumerState<WorkOrderListScreen> {
     );
   }
 
-  Widget _buildListBody(WorkOrderListState state) {
+  /// Slivers for the scrollable body below the filter block (see build()).
+  /// One `RefreshIndicator` now wraps the whole `CustomScrollView` — filters
+  /// included — so none of these branches carry their own.
+  List<Widget> _buildListSlivers(WorkOrderListState state) {
     if (state is WorkOrderListLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      ];
     }
 
     if (state is WorkOrderListError) {
@@ -375,9 +412,9 @@ class _WorkOrderListScreenState extends ConsumerState<WorkOrderListScreen> {
       // keep showing the stale rows with an inline error and a retry.
       final previous = state.previousLoaded;
       if (previous != null) {
-        return Column(
-          children: [
-            Material(
+        return [
+          SliverToBoxAdapter(
+            child: Material(
               color: AppTheme.errorRed.withOpacity(0.08),
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -403,95 +440,98 @@ class _WorkOrderListScreenState extends ConsumerState<WorkOrderListScreen> {
                 ),
               ),
             ),
-            Expanded(child: _buildLoadedList(previous)),
-          ],
-        );
+          ),
+          ..._buildLoadedSlivers(previous),
+        ];
       }
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error_outline, size: 48, color: AppTheme.errorRed),
-              const SizedBox(height: 12),
-              Text(
-                state.message,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: AppTheme.textSecondary),
+      return [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_outline, size: 48, color: AppTheme.errorRed),
+                  const SizedBox(height: 12),
+                  Text(
+                    state.message,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: AppTheme.textSecondary),
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton.icon(
+                    onPressed: () => ref
+                        .read(workOrderListControllerProvider.notifier)
+                        .fetchWorkOrders(forceRefresh: true),
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Try Again'),
+                  ),
+                ],
               ),
-              const SizedBox(height: 16),
-              ElevatedButton.icon(
-                onPressed: () => ref
-                    .read(workOrderListControllerProvider.notifier)
-                    .fetchWorkOrders(forceRefresh: true),
-                icon: const Icon(Icons.refresh),
-                label: const Text('Try Again'),
-              ),
-            ],
+            ),
           ),
         ),
-      );
+      ];
     }
 
     if (state is WorkOrderListLoaded) {
-      return _buildLoadedList(state);
+      return _buildLoadedSlivers(state);
     }
 
-    return const SizedBox.shrink();
+    return const [SliverToBoxAdapter(child: SizedBox.shrink())];
   }
 
-  Widget _buildLoadedList(WorkOrderListLoaded state) {
+  List<Widget> _buildLoadedSlivers(WorkOrderListLoaded state) {
     final orders = state.filteredOrders;
-      if (orders.isEmpty) {
-        return RefreshIndicator(
-          onRefresh: () => ref
-              .read(workOrderListControllerProvider.notifier)
-              .fetchWorkOrders(forceRefresh: true),
-          child: ListView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            children: const [
-              SizedBox(height: 100),
-              Center(
-                child: Column(
-                  children: [
-                    Icon(Icons.assignment_outlined, size: 64, color: Colors.grey),
-                    SizedBox(height: 12),
-                    Text(
-                      'No work orders found.',
-                      style: TextStyle(fontSize: 16, color: AppTheme.textSecondary),
-                    ),
-                  ],
+    if (orders.isEmpty) {
+      return const [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.assignment_outlined, size: 64, color: Colors.grey),
+                SizedBox(height: 12),
+                Text(
+                  'No work orders found.',
+                  style: TextStyle(fontSize: 16, color: AppTheme.textSecondary),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        );
-      }
-
-      return RefreshIndicator(
-        onRefresh: () => ref
-            .read(workOrderListControllerProvider.notifier)
-            .fetchWorkOrders(forceRefresh: true),
-        child: ListView.separated(
-          padding: const EdgeInsets.all(16),
-          itemCount: orders.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 12),
-          itemBuilder: (context, index) {
-            final order = orders[index];
-            return _WorkOrderCard(
-              workOrder: order,
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => WorkOrderDetailScreen(workOrderId: order.id),
-                  ),
-                );
-              },
-            );
-          },
         ),
-      );
+      ];
+    }
+
+    return [
+      SliverPadding(
+        padding: const EdgeInsets.all(16),
+        sliver: SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (context, i) {
+              // Odd indices are the 12px separators between cards — same
+              // spacing the old ListView.separated used.
+              if (i.isOdd) return const SizedBox(height: 12);
+              final order = orders[i ~/ 2];
+              return _WorkOrderCard(
+                workOrder: order,
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => WorkOrderDetailScreen(workOrderId: order.id),
+                    ),
+                  );
+                },
+              );
+            },
+            childCount: orders.length * 2 - 1,
+          ),
+        ),
+      ),
+    ];
   }
 }
 

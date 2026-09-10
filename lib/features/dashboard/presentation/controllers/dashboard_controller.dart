@@ -42,19 +42,29 @@ class DashboardController extends Notifier<DashboardState> {
     await _load(previous?.orgScope ?? OrgScopeSelection.empty, previous);
   }
 
-  /// Server-side depot filter. Both endpoints AND it with the caller's own
-  /// scope, so this can only narrow what the user is already entitled to see.
+  /// Server-side zone/division/depot filter. Both endpoints AND it with the
+  /// caller's own scope, so this can only narrow what the user is already
+  /// entitled to see.
   Future<void> setOrgScope(OrgScopeSelection scope) =>
       _load(scope, _resolvePrevious());
 
   Future<void> _load(OrgScopeSelection scope, DashboardLoaded? previous) async {
     try {
       final results = await Future.wait([
-        // attention accepts zone/division/depot; summary accepts depot only.
-        // Passing the same depot to both is what keeps the attention card and
-        // the KPI donut describing one consistent set of work.
-        _repository.fetchAttention(depotId: scope.depotId),
-        _repository.fetchSummary(depotId: scope.depotId),
+        // attention and summary both now accept zone/division/depot
+        // (most-specific-wins) — passing the same selection to both is what
+        // keeps the attention card and the KPI donut describing one
+        // consistent set of work.
+        _repository.fetchAttention(
+          zoneId: scope.zoneId,
+          divisionId: scope.divisionId,
+          depotId: scope.depotId,
+        ),
+        _repository.fetchSummary(
+          zoneId: scope.zoneId,
+          divisionId: scope.divisionId,
+          depotId: scope.depotId,
+        ),
       ]);
 
       state = DashboardLoaded(

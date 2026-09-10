@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:gssms_mobile/core/network/paginated_fetch.dart';
 import 'package:gssms_mobile/core/utils/json_parsing.dart';
+import 'package:gssms_mobile/features/work_orders/domain/models/batch_convert_result.dart';
+import 'package:gssms_mobile/features/work_orders/domain/models/maintenance_master.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/maintenance_record.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/technician.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/verification_workspace.dart';
@@ -25,6 +27,7 @@ class WorkOrderApiService {
   static const String _workOrders = '/api/v1/maintenance/work-orders';
   static const String _records = '/api/v1/maintenance/records';
   static const String _staffWorkOrders = '/api/v1/staff-workorders';
+  static const String _masters = '/api/v1/maintenance/masters';
 
   Map<String, dynamic>? _asObject(dynamic data) {
     if (data is Map<String, dynamic>) return data;
@@ -84,8 +87,10 @@ class WorkOrderApiService {
 
   /// Creates a Job Work. Payload keys follow the complaint/inspection
   /// convention (`station`/`infrastructure`/`depot`/`asset` ids, `type`,
-  /// `priority`, `due_date` yyyy-MM-dd, `source: MOBILE`). The server owns
-  /// validation — 400/403 surface as DioException for the UI to render.
+  /// `priority`, `scheduled_date` yyyy-MM-dd). `source` is omitted so the
+  /// backend default (MANUAL_ENTRY) applies (SSOT §14); `due_date` is a
+  /// read-only derived field, never sent on create (SSOT §15). The server
+  /// owns validation — 400/403 surface as DioException for the UI to render.
   Future<WorkOrder> createWorkOrder(Map<String, dynamic> payload) async {
     final response = await _dio.post('$_workOrders/', data: payload);
     final data = _asObject(response.data);
@@ -98,6 +103,40 @@ class WorkOrderApiService {
       );
     }
     return WorkOrder.fromJson(data);
+  }
+
+  /// Batch-converts open Complaints into Work Orders in one all-or-nothing
+  /// request — POST /work-orders/create_from_complaints/ {ids}. Response
+  /// shape: `{work_order_ids, work_order_id, count, message}`.
+  Future<BatchConvertResult> createWorkOrdersFromComplaints(List<int> ids) async {
+    final response = await _dio.post(
+      '$_workOrders/create_from_complaints/',
+      data: {'ids': ids},
+    );
+    return BatchConvertResult.fromJson(_asObject(response.data) ?? const {});
+  }
+
+  /// Same as [createWorkOrdersFromComplaints] for Inspections — POST
+  /// /work-orders/create_from_inspections/ {ids}.
+  Future<BatchConvertResult> createWorkOrdersFromInspections(List<int> ids) async {
+    final response = await _dio.post(
+      '$_workOrders/create_from_inspections/',
+      data: {'ids': ids},
+    );
+    return BatchConvertResult.fromJson(_asObject(response.data) ?? const {});
+  }
+
+  /// Checklist templates available to attach to a Job Work at creation time
+  /// (`maintenance_master`). Mirrors the web client's `getMaintenanceMasters`
+  /// call — the endpoint has no server-side `schedule_type`/`template_kind`
+  /// filter today, so schedule/category filtering happens client-side over
+  /// this full list, same as `MaintenanceMasterList.jsx` does.
+  Future<List<MaintenanceMaster>> getMaintenanceMasters() async {
+    final response = await _dio.get('$_masters/');
+    return _asList(response.data)
+        .whereType<Map>()
+        .map((e) => MaintenanceMaster.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
   }
 
   Future<WorkOrder> getWorkOrder(int id) async {

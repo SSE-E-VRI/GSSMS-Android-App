@@ -746,9 +746,38 @@ class ChecklistController extends FamilyNotifier<ChecklistState, int> {
   String _readableError(Object error) => workOrderReadableError(error);
 }
 
-/// Surfaces the server's own validation message instead of a raw exception dump.
+/// Surfaces the server's own validation message instead of a raw exception
+/// dump (SSOT §6: Android must NOT display raw Dio exceptions such as
+/// "DioException [receive timeout]: ..." — production UI gets a concise
+/// message; the structured detail is for development logging only).
+///
+/// The previous version only handled the case where a server response body
+/// came back (`error.response?.data`) and fell through to `error.toString()`
+/// otherwise — which is exactly the raw Dio dump this function exists to
+/// prevent, and is what happens on every network-level failure (timeout,
+/// no connectivity, connection refused) since those never get a response at
+/// all. Those cases are handled explicitly first, before touching the
+/// response body.
 String workOrderReadableError(Object error) {
   if (error is DioException) {
+    switch (error.type) {
+      case DioExceptionType.connectionTimeout:
+      case DioExceptionType.sendTimeout:
+      case DioExceptionType.receiveTimeout:
+        return 'The server took too long to respond. Please check your connection and try again.';
+      case DioExceptionType.connectionError:
+        return 'Unable to reach the server. Please check your connection and try again.';
+      case DioExceptionType.cancel:
+        return 'The request was cancelled.';
+      case DioExceptionType.badCertificate:
+        return 'A secure connection to the server could not be established.';
+      case DioExceptionType.badResponse:
+      case DioExceptionType.unknown:
+        break; // Fall through to the response-body parsing below.
+      default:
+        break; // Other/future Dio exception types: same fallback.
+    }
+
     final data = error.response?.data;
     if (data is Map) {
       final detail = data['detail'] ?? data['error'];
@@ -761,7 +790,20 @@ String workOrderReadableError(Object error) {
     }
     if (data is List && data.isNotEmpty) return data.first.toString();
     if (data is String && data.isNotEmpty) return data;
+
+    // `unknown` with no response body — e.g. a SocketException surfaced
+    // outside the explicit connectionError case above. Still must not leak
+    // the raw DioException string.
+    if (error.response == null) {
+      return 'Unable to reach the server. Please check your connection and try again.';
+    }
+    return 'The server reported a problem (HTTP ${error.response?.statusCode ?? 'error'}). Please try again.';
   }
+  // Not a DioException — e.g. a repository-thrown business exception
+  // (`Exception('A technician must be assigned')`, `ArgumentError`, etc.)
+  // whose message is already human-authored, not a raw network/HTTP dump.
+  // SSOT §6 is specifically about not leaking raw *Dio* exceptions; a plain
+  // Dart exception's toString() is exactly what should reach the user here.
   return error.toString();
 }
 

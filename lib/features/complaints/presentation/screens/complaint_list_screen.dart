@@ -90,14 +90,24 @@ class _ComplaintListScreenState extends ConsumerState<ComplaintListScreen> {
             ),
         ],
       ),
-      body: Column(
-        children: [
-          const SyncStatusBadge(),
-          _buildSearchBar(),
-          _buildDateRange(listState),
-          _buildFilterChips(listState),
-          Expanded(child: _buildListBody(listState)),
-        ],
+      // Filters are leading slivers ahead of the card list, not a fixed
+      // Column above it, so the whole filter block (search/date/status)
+      // scrolls away with the list instead of permanently eating screen
+      // space — same change as WorkOrderListScreen.
+      body: RefreshIndicator(
+        onRefresh: () => ref
+            .read(complaintListControllerProvider.notifier)
+            .fetchComplaints(forceRefresh: true),
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            const SliverToBoxAdapter(child: SyncStatusBadge()),
+            SliverToBoxAdapter(child: _buildSearchBar()),
+            SliverToBoxAdapter(child: _buildDateRange(listState)),
+            SliverToBoxAdapter(child: _buildFilterChips(listState)),
+            ..._buildListSlivers(listState),
+          ],
+        ),
       ),
       // rbac/registry.py MODULES builds every permission code as
       // `{module}.{action}` from CRUD = ["view", "create", "edit", "delete"] —
@@ -180,6 +190,10 @@ class _ComplaintListScreenState extends ConsumerState<ComplaintListScreen> {
     );
   }
 
+  /// Status filter as a dropdown rather than a row of FilterChips — same
+  /// reasoning as WorkOrderListScreen's status/type dropdown pair: a chip
+  /// row costs a dedicated horizontally-wrapping band of screen space for
+  /// what's fundamentally a single-choice selection.
   Widget _buildFilterChips(ComplaintListState state) {
     final selected = state is ComplaintListLoaded ? state.selectedStatus : null;
 
@@ -192,54 +206,57 @@ class _ComplaintListScreenState extends ConsumerState<ComplaintListScreen> {
     final filterOptions = [
       (label: 'All (${countFor(null)})', status: null),
       (label: 'Open (${countFor(ComplaintStatus.open)})', status: ComplaintStatus.open),
-      (label: 'In Progress (${countFor(ComplaintStatus.inProgress)})', status: ComplaintStatus.inProgress),
-      (label: 'Resolved (${countFor(ComplaintStatus.resolved)})', status: ComplaintStatus.resolved),
+      (label: 'Converted (${countFor(ComplaintStatus.converted)})', status: ComplaintStatus.converted),
       (label: 'Closed (${countFor(ComplaintStatus.closed)})', status: ComplaintStatus.closed),
     ];
 
     return Container(
-      width: double.infinity,
-      color: Theme.of(context).cardColor,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: filterOptions.map((opt) {
-          final isSelected = selected == opt.status;
-          return FilterChip(
-            label: Text(
-              opt.label,
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    fontWeight:
-                        isSelected ? FontWeight.bold : FontWeight.normal,
-                    color: isSelected ? Colors.white : AppTheme.railwayBlue,
-                  ),
-            ),
-            selected: isSelected,
-            selectedColor: AppTheme.railwayBlue,
-            checkmarkColor: Colors.white,
-            onSelected: (_) {
-              ref
-                  .read(complaintListControllerProvider.notifier)
-                  .setStatusFilter(opt.status);
-            },
-          );
-        }).toList(),
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+      child: DropdownButtonFormField<ComplaintStatus?>(
+        key: const Key('complaint_status_filter_dropdown'),
+        isExpanded: true,
+        value: selected,
+        decoration: const InputDecoration(
+          labelText: 'Status',
+          contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          border: OutlineInputBorder(),
+        ),
+        items: filterOptions
+            .map((opt) => DropdownMenuItem(
+                value: opt.status,
+                child: Text(opt.label,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 13))))
+            .toList(),
+        onChanged: (status) {
+          ref
+              .read(complaintListControllerProvider.notifier)
+              .setStatusFilter(status);
+        },
       ),
     );
   }
 
-  Widget _buildListBody(ComplaintListState state) {
+  /// Slivers for the scrollable body below the filter block (see build()).
+  /// One `RefreshIndicator` wraps the whole `CustomScrollView` — filters
+  /// included — so none of these branches carry their own.
+  List<Widget> _buildListSlivers(ComplaintListState state) {
     if (state is ComplaintListLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      ];
     }
 
     if (state is ComplaintListError) {
       final previous = state.previousLoaded;
       if (previous != null) {
-        return Column(
-          children: [
-            Material(
+        return [
+          SliverToBoxAdapter(
+            child: Material(
               color: AppTheme.errorRed.withOpacity(0.08),
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -265,71 +282,73 @@ class _ComplaintListScreenState extends ConsumerState<ComplaintListScreen> {
                 ),
               ),
             ),
-            Expanded(child: _buildLoadedList(previous)),
-          ],
-        );
+          ),
+          ..._buildLoadedSlivers(previous),
+        ];
       }
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error_outline,
-                  size: 48, color: AppTheme.errorRed),
-              const SizedBox(height: 12),
-              Text(state.message, textAlign: TextAlign.center),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () => ref
-                    .read(complaintListControllerProvider.notifier)
-                    .fetchComplaints(forceRefresh: true),
-                child: const Text('Retry'),
+      return [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_outline,
+                      size: 48, color: AppTheme.errorRed),
+                  const SizedBox(height: 12),
+                  Text(state.message, textAlign: TextAlign.center),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () => ref
+                        .read(complaintListControllerProvider.notifier)
+                        .fetchComplaints(forceRefresh: true),
+                    child: const Text('Retry'),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
-      );
+      ];
     }
 
     if (state is ComplaintListLoaded) {
-      return _buildLoadedList(state);
+      return _buildLoadedSlivers(state);
     }
 
-    return const SizedBox.shrink();
+    return const [SliverToBoxAdapter(child: SizedBox.shrink())];
   }
 
-  Widget _buildLoadedList(ComplaintListLoaded state) {
+  List<Widget> _buildLoadedSlivers(ComplaintListLoaded state) {
     final complaints = state.filteredComplaints;
 
     if (complaints.isEmpty) {
-      return RefreshIndicator(
-        onRefresh: () => ref
-            .read(complaintListControllerProvider.notifier)
-            .fetchComplaints(forceRefresh: true),
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          children: const [
-            SizedBox(height: 100),
-            Center(child: Text('No complaints found matching criteria.')),
-          ],
+      return const [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: Center(child: Text('No complaints found matching criteria.')),
         ),
-      );
+      ];
     }
 
-      return RefreshIndicator(
-        onRefresh: () => ref
-            .read(complaintListControllerProvider.notifier)
-            .fetchComplaints(forceRefresh: true),
-        child: ListView.separated(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
-          itemCount: complaints.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 12),
-          itemBuilder: (context, index) {
-            return _ComplaintCard(complaint: complaints[index]);
-          },
+    return [
+      SliverPadding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
+        sliver: SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (context, i) {
+              // Odd indices are the 12px separators between cards — same
+              // spacing the old ListView.separated used.
+              if (i.isOdd) return const SizedBox(height: 12);
+              return _ComplaintCard(complaint: complaints[i ~/ 2]);
+            },
+            childCount: complaints.length * 2 - 1,
+          ),
         ),
-      );
+      ),
+    ];
   }
 }
 

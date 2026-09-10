@@ -21,11 +21,12 @@ enum AssetCriticality {
   }
 }
 
-/// Warranty state the server computes for an asset.
+/// Warranty state the server computes for an asset (SSOT §28).
 enum AssetWarrantyStatus {
   inWarranty('IN_WARRANTY', 'In Warranty'),
-  expiringSoon('EXPIRING_SOON', 'Expiring Soon'),
-  expired('EXPIRED', 'Expired'),
+  outOfWarranty('OUT_OF_WARRANTY', 'Out of Warranty'),
+  warrantyYearPrecision('WARRANTY_YEAR_PRECISION', 'Warranty valid through year-end'),
+  warrantyMonthPrecision('WARRANTY_MONTH_PRECISION', 'Warranty valid through month-end'),
   unknown('UNKNOWN', 'Unknown');
 
   const AssetWarrantyStatus(this.code, this.displayName);

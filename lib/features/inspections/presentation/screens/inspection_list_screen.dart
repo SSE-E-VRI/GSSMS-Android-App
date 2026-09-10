@@ -90,14 +90,24 @@ class _InspectionListScreenState extends ConsumerState<InspectionListScreen> {
             ),
         ],
       ),
-      body: Column(
-        children: [
-          const SyncStatusBadge(),
-          _buildSearchBar(),
-          _buildDateRange(listState),
-          _buildFilterChips(listState),
-          Expanded(child: _buildListBody(listState)),
-        ],
+      // Filters are leading slivers ahead of the card list, not a fixed
+      // Column above it, so the whole filter block (search/date/status)
+      // scrolls away with the list instead of permanently eating screen
+      // space — same change as WorkOrderListScreen.
+      body: RefreshIndicator(
+        onRefresh: () => ref
+            .read(inspectionListControllerProvider.notifier)
+            .fetchInspections(forceRefresh: true),
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            const SliverToBoxAdapter(child: SyncStatusBadge()),
+            SliverToBoxAdapter(child: _buildSearchBar()),
+            SliverToBoxAdapter(child: _buildDateRange(listState)),
+            SliverToBoxAdapter(child: _buildFilterChips(listState)),
+            ..._buildListSlivers(listState),
+          ],
+        ),
       ),
       // rbac/registry.py MODULES builds every permission code as
       // `{module}.{action}` from CRUD = ["view", "create", "edit", "delete"] —
@@ -174,58 +184,65 @@ class _InspectionListScreenState extends ConsumerState<InspectionListScreen> {
     );
   }
 
+  /// Status filter as a dropdown rather than a row of FilterChips — same
+  /// reasoning as WorkOrderListScreen's status/type dropdown pair: a chip
+  /// row costs a dedicated horizontally-scrolling band of screen space for
+  /// what's fundamentally a single-choice selection (and "Action Required"
+  /// was the one that routinely got clipped/scrolled off at 360dp).
   Widget _buildFilterChips(InspectionListState state) {
     final selected =
         state is InspectionListLoaded ? state.selectedStatus : null;
     final options = [
       (label: 'All', status: null),
-      (label: 'Pending', status: InspectionStatus.pending),
-      (label: 'In Progress', status: InspectionStatus.inProgress),
-      (label: 'Completed', status: InspectionStatus.completed),
+      (label: 'Open', status: InspectionStatus.open),
+      (label: 'Action Required', status: InspectionStatus.actionRequired),
       (label: 'Converted', status: InspectionStatus.converted),
+      (label: 'Closed', status: InspectionStatus.closed),
     ];
     return Container(
       color: Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: options.map((opt) {
-            final isSelected = selected == opt.status;
-            return Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: FilterChip(
-                label: Text(opt.label,
-                    style: TextStyle(
-                        fontSize: 12,
-                        fontWeight:
-                            isSelected ? FontWeight.bold : FontWeight.normal,
-                        color:
-                            isSelected ? Colors.white : AppTheme.railwayBlue)),
-                selected: isSelected,
-                selectedColor: AppTheme.railwayBlue,
-                checkmarkColor: Colors.white,
-                onSelected: (_) => ref
-                    .read(inspectionListControllerProvider.notifier)
-                    .setStatusFilter(opt.status),
-              ),
-            );
-          }).toList(),
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+      child: DropdownButtonFormField<InspectionStatus?>(
+        key: const Key('inspection_status_filter_dropdown'),
+        isExpanded: true,
+        value: selected,
+        decoration: const InputDecoration(
+          labelText: 'Status',
+          contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          border: OutlineInputBorder(),
         ),
+        items: options
+            .map((opt) => DropdownMenuItem(
+                value: opt.status,
+                child: Text(opt.label,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 13))))
+            .toList(),
+        onChanged: (status) => ref
+            .read(inspectionListControllerProvider.notifier)
+            .setStatusFilter(status),
       ),
     );
   }
 
-  Widget _buildListBody(InspectionListState state) {
+  /// Slivers for the scrollable body below the filter block (see build()).
+  /// One `RefreshIndicator` wraps the whole `CustomScrollView` — filters
+  /// included — so none of these branches carry their own.
+  List<Widget> _buildListSlivers(InspectionListState state) {
     if (state is InspectionListLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      ];
     }
     if (state is InspectionListError) {
       final previous = state.previousLoaded;
       if (previous != null) {
-        return Column(
-          children: [
-            Material(
+        return [
+          SliverToBoxAdapter(
+            child: Material(
               color: AppTheme.errorRed.withOpacity(0.08),
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -251,80 +268,86 @@ class _InspectionListScreenState extends ConsumerState<InspectionListScreen> {
                 ),
               ),
             ),
-            Expanded(child: _buildLoadedList(previous)),
-          ],
-        );
+          ),
+          ..._buildLoadedSlivers(previous),
+        ];
       }
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-            const Icon(Icons.error_outline, size: 48, color: AppTheme.errorRed),
-            const SizedBox(height: 12),
-            Text(state.message, textAlign: TextAlign.center),
-            const SizedBox(height: 16),
-            ElevatedButton(
-                onPressed: () => ref
-                    .read(inspectionListControllerProvider.notifier)
-                    .fetchInspections(forceRefresh: true),
-                child: const Text('Retry')),
-          ]),
+      return [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                const Icon(Icons.error_outline, size: 48, color: AppTheme.errorRed),
+                const SizedBox(height: 12),
+                Text(state.message, textAlign: TextAlign.center),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                    onPressed: () => ref
+                        .read(inspectionListControllerProvider.notifier)
+                        .fetchInspections(forceRefresh: true),
+                    child: const Text('Retry')),
+              ]),
+            ),
+          ),
         ),
-      );
+      ];
     }
     if (state is InspectionListLoaded) {
-      return _buildLoadedList(state);
+      return _buildLoadedSlivers(state);
     }
-    return const SizedBox.shrink();
+    return const [SliverToBoxAdapter(child: SizedBox.shrink())];
   }
 
-  Widget _buildLoadedList(InspectionListLoaded state) {
-      final inspections = state.filteredInspections;
-      if (inspections.isEmpty) {
-        return RefreshIndicator(
-          onRefresh: () => ref
-              .read(inspectionListControllerProvider.notifier)
-              .fetchInspections(forceRefresh: true),
-          child: ListView(
-            physics: const AlwaysScrollableScrollPhysics(),
-            children: const [
-              SizedBox(height: 100),
-              Center(child: Text('No inspections found matching criteria.')),
-            ],
-          ),
-        );
-      }
-      return RefreshIndicator(
-        onRefresh: () => ref
-            .read(inspectionListControllerProvider.notifier)
-            .fetchInspections(forceRefresh: true),
-        child: ListView.separated(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
-          itemCount: inspections.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 12),
-          itemBuilder: (context, index) => _InspectionCard(
-            inspection: inspections[index],
-            onTap: () async {
-              // The detail screen stays open after a successful convert
-              // (so its own "View Linked Job Work" link is reachable)
-              // rather than popping with a result, so refresh unconditionally
-              // whenever the user comes back — cheap, and the alternative is
-              // plumbing a return value through the screen's back button too.
-              await Navigator.of(context).push<void>(
-                MaterialPageRoute(
-                  builder: (_) =>
-                      InspectionDetailScreen(inspection: inspections[index]),
-                ),
+  List<Widget> _buildLoadedSlivers(InspectionListLoaded state) {
+    final inspections = state.filteredInspections;
+    if (inspections.isEmpty) {
+      return const [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: Center(child: Text('No inspections found matching criteria.')),
+        ),
+      ];
+    }
+    return [
+      SliverPadding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
+        sliver: SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (context, i) {
+              // Odd indices are the 12px separators between cards — same
+              // spacing the old ListView.separated used.
+              if (i.isOdd) return const SizedBox(height: 12);
+              final index = i ~/ 2;
+              return _InspectionCard(
+                inspection: inspections[index],
+                onTap: () async {
+                  // The detail screen stays open after a successful convert
+                  // (so its own "View Linked Job Work" link is reachable)
+                  // rather than popping with a result, so refresh
+                  // unconditionally whenever the user comes back — cheap,
+                  // and the alternative is plumbing a return value through
+                  // the screen's back button too.
+                  await Navigator.of(context).push<void>(
+                    MaterialPageRoute(
+                      builder: (_) => InspectionDetailScreen(
+                          inspection: inspections[index]),
+                    ),
+                  );
+                  if (mounted) {
+                    unawaited(ref
+                        .read(inspectionListControllerProvider.notifier)
+                        .fetchInspections(forceRefresh: true));
+                  }
+                },
               );
-              if (mounted) {
-                unawaited(ref
-                    .read(inspectionListControllerProvider.notifier)
-                    .fetchInspections(forceRefresh: true));
-              }
             },
+            childCount: inspections.length * 2 - 1,
           ),
         ),
-      );
+      ),
+    ];
   }
 }
 
@@ -387,10 +410,10 @@ class _InspectionCard extends StatelessWidget {
               Text(inspection.title,
                   style: const TextStyle(
                       fontSize: 16, fontWeight: FontWeight.bold)),
-              if (inspection.description != null &&
-                  inspection.description!.isNotEmpty) ...[
+              if (inspection.notes != null &&
+                  inspection.notes!.isNotEmpty) ...[
                 const SizedBox(height: 4),
-                Text(inspection.description!,
+                Text(inspection.notes!,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(

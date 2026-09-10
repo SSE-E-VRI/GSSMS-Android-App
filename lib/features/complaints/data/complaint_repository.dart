@@ -2,9 +2,10 @@ import 'package:gssms_mobile/features/complaints/data/complaint_api_service.dart
 import 'package:gssms_mobile/features/complaints/domain/models/complaint.dart';
 
 abstract class IComplaintRepository {
+  // Note: no `severity` filter — per SSOT §10.6 the backend Complaint API
+  // has no severity field/filter to send.
   Future<List<Complaint>> fetchComplaints({
     String? status,
-    String? severity,
     int? zoneId,
     int? divisionId,
     int? depotId,
@@ -22,6 +23,8 @@ abstract class IComplaintRepository {
     int? infrastructureId,
     int? assetId,
   });
+
+  Future<Map<String, dynamic>> convertToWorkOrder(int complaintId);
 }
 
 class ComplaintRepository implements IComplaintRepository {
@@ -32,7 +35,6 @@ class ComplaintRepository implements IComplaintRepository {
   @override
   Future<List<Complaint>> fetchComplaints({
     String? status,
-    String? severity,
     int? zoneId,
     int? divisionId,
     int? depotId,
@@ -41,7 +43,6 @@ class ComplaintRepository implements IComplaintRepository {
   }) async {
     return _apiService.getComplaints(
       status: status,
-      severity: severity,
       zoneId: zoneId,
       divisionId: divisionId,
       depotId: depotId,
@@ -69,7 +70,6 @@ class ComplaintRepository implements IComplaintRepository {
       'title': title,
       'description': description,
       'department': department,
-      'source': 'MOBILE',
       if (depotId != null) 'depot': depotId,
       if (stationId != null) 'station': stationId,
       if (infrastructureId != null) 'infrastructure': infrastructureId,
@@ -77,4 +77,8 @@ class ComplaintRepository implements IComplaintRepository {
     };
     return _apiService.createComplaint(payload);
   }
+
+  @override
+  Future<Map<String, dynamic>> convertToWorkOrder(int complaintId) =>
+      _apiService.convertToWorkOrder(complaintId);
 }

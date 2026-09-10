@@ -8,11 +8,13 @@
 
     <!--
       Proof-of-execution capture goes through image_picker, which hands off to
-      the device camera/gallery app. From Android 11 (API 30) package
-      visibility rules mean those intents do not resolve unless they are
-      declared here, so the picker would silently return nothing.
-      No CAMERA permission is declared: image_picker uses the system camera
-      app via intent, and declaring CAMERA would oblige us to request it.
+      the device camera/gallery app via an intent, not the CAMERA permission
+      above — that permission exists for mobile_scanner's embedded QR preview
+      (see qr_scanner_dialog.dart), which does need live camera access, unlike
+      image_picker's intent-forwarding approach.
+      From Android 11 (API 30) package visibility rules mean the intents below
+      do not resolve unless they are declared here, so the picker would
+      silently return nothing without them.
     -->
     <queries>
         <intent>

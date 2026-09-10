@@ -21,10 +21,17 @@ class InspectionApiService {
     int? depotId,
     String? dateFrom,
     String? dateTo,
+    bool? pendingConversion,
   }) async {
     final query = <String, dynamic>{};
     if (status != null && status.isNotEmpty) query['status'] = status;
     if (priority != null && priority.isNotEmpty) query['priority'] = priority;
+    // SSOT §11.4 canonical filter — server-side "not yet converted" filter,
+    // distinct from `status` (OPEN/ACTION_REQUIRED inspections can both be
+    // pending conversion).
+    if (pendingConversion != null) {
+      query['pending_conversion'] = pendingConversion.toString();
+    }
     // depot/division/zone are mutually exclusive server-side
     // (InspectionViewSet.get_queryset), no `_id` suffix.
     if (depotId != null) {

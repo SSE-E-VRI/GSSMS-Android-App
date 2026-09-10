@@ -10,6 +10,8 @@ class ReportsApiService {
   Future<List<MaintenanceRegisterEntry>> getMaintenanceRegister({
     required String startDate,
     required String endDate,
+    int? zoneId,
+    int? divisionId,
     int? depotId,
     InfraFilterType infraType = InfraFilterType.all,
     int? infraId,
@@ -18,10 +20,16 @@ class ReportsApiService {
       'start_date': startDate,
       'end_date': endDate,
     };
-    // depot_id and the infra_type/id filter below are independent, separately
-    // applied `if` statements server-side (register_report), not mutually
-    // exclusive — both can be sent together.
-    if (depotId != null) query['depot_id'] = depotId;
+    // zone_id/division_id/depot_id (most-specific-wins) and the infra_type/id
+    // filter below are independent, separately applied server-side
+    // (register_report), not mutually exclusive — both can be sent together.
+    if (depotId != null) {
+      query['depot_id'] = depotId;
+    } else if (divisionId != null) {
+      query['division_id'] = divisionId;
+    } else if (zoneId != null) {
+      query['zone_id'] = zoneId;
+    }
     // Send infra_type whenever a type is chosen — the server only reads it as
     // a fallback when no specific item id is present ("All LC Gates" has no
     // id to filter on), so omitting it left a type-only selection filtering

@@ -81,7 +81,7 @@ class _InspectionDetailScreenState
           id: _inspection.id,
           inspectionNumber: _inspection.inspectionNumber,
           title: _inspection.title,
-          description: _inspection.description,
+          notes: _inspection.notes,
           status: InspectionStatus.converted,
           priority: _inspection.priority,
           stationId: _inspection.stationId,
@@ -90,7 +90,7 @@ class _InspectionDetailScreenState
           depotName: _inspection.depotName,
           assetId: _inspection.assetId,
           assetName: _inspection.assetName,
-          scheduledDate: _inspection.scheduledDate,
+          inspectionDate: _inspection.inspectionDate,
           completedDate: _inspection.completedDate,
           createdAt: _inspection.createdAt,
           reportedByName: _inspection.reportedByName,
@@ -164,8 +164,8 @@ class _InspectionDetailScreenState
               _field('Reference ID', '#${inspection.id}'),
               _field(
                 'Date',
-                inspection.scheduledDate != null
-                    ? dateFormat.format(inspection.scheduledDate!)
+                inspection.inspectionDate != null
+                    ? dateFormat.format(inspection.inspectionDate!)
                     : (inspection.createdAt != null
                         ? dateFormat.format(inspection.createdAt!)
                         : '—'),
@@ -187,10 +187,10 @@ class _InspectionDetailScreenState
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  (inspection.description == null ||
-                          inspection.description!.isEmpty)
+                  (inspection.notes == null ||
+                          inspection.notes!.isEmpty)
                       ? 'No notes provided.'
-                      : inspection.description!,
+                      : inspection.notes!,
                   style: const TextStyle(
                       fontSize: 14, color: AppTheme.textPrimary),
                 ),
@@ -352,20 +352,19 @@ class _InspectionDetailScreenState
     }
   }
 
-  // Mirrors the list screen's chip colours: converted grey, completed green,
-  // in-progress blue, pending amber.
+  // Mirrors the list screen's chip colours: converted/closed grey, action
+  // required amber, open blue.
   Color _statusColor(Inspection inspection) {
     if (inspection.isConverted) return AppTheme.textSecondary;
     switch (inspection.status) {
-      case InspectionStatus.pending:
-        return AppTheme.warningAmber;
-      case InspectionStatus.inProgress:
+      case InspectionStatus.open:
         return AppTheme.railwayBlue;
-      case InspectionStatus.completed:
-        return AppTheme.railwayGreen;
+      case InspectionStatus.actionRequired:
+        return AppTheme.warningAmber;
       case InspectionStatus.converted:
         return AppTheme.textSecondary;
-      case InspectionStatus.cancelled:
+      case InspectionStatus.closed:
+        return AppTheme.textSecondary;
       case InspectionStatus.unknown:
         return AppTheme.textSecondary;
     }

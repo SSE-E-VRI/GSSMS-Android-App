@@ -382,6 +382,15 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
   }
 }
 
+/// Subsystem filter as a dropdown rather than a wrapping row of ChoiceChips
+/// — same reasoning as the list screens' status/type/category dropdowns: a
+/// chip Wrap grows to N rows for N subsystems (a multi-panel station easily
+/// has 5+), eating a variable, unpredictable amount of the pinned header's
+/// height above the checklist itself. A dropdown is always exactly one row.
+/// Stays a *pinned* sliver header (unlike the list screens' filters, which
+/// scroll away with their content) — a technician re-checks/changes this
+/// filter continuously while working through a long checklist, so keeping
+/// it reachable without scrolling back up is the right call here.
 class _SubsystemChipsDelegate extends SliverPersistentHeaderDelegate {
   _SubsystemChipsDelegate({
     required this.categories,
@@ -397,41 +406,40 @@ class _SubsystemChipsDelegate extends SliverPersistentHeaderDelegate {
   final int totalLines;
   final ValueChanged<String?> onSelected;
 
-  @override
-  double get minExtent => _calculateHeight();
+  static const double _height = 64.0;
 
   @override
-  double get maxExtent => _calculateHeight();
+  double get minExtent => _height;
 
-  double _calculateHeight() {
-    final totalChips = categories.length + 1;
-    if (totalChips <= 3) return 48.0;
-    final rows = (totalChips / 3.0).ceil();
-    return rows * 42.0 + 8.0;
-  }
+  @override
+  double get maxExtent => _height;
 
   @override
   Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
     return Container(
       color: Theme.of(context).scaffoldBackgroundColor,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      alignment: Alignment.centerLeft,
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: [
-          ChoiceChip(
-            label: Text('All Subsystems ($totalLines)'),
-            selected: activeCategory == null,
-            onSelected: (_) => onSelected(null),
-          ),
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
+      alignment: Alignment.center,
+      child: DropdownButtonFormField<String?>(
+        key: const Key('checklist_subsystem_filter_dropdown'),
+        isExpanded: true,
+        value: activeCategory,
+        decoration: const InputDecoration(
+          labelText: 'Subsystem',
+          contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          border: OutlineInputBorder(),
+        ),
+        items: [
+          DropdownMenuItem<String?>(
+              value: null, child: Text('All Subsystems ($totalLines)')),
           for (final cat in categories)
-            ChoiceChip(
-              label: Text('$cat (${lineCounts[cat] ?? 0})'),
-              selected: activeCategory == cat,
-              onSelected: (_) => onSelected(cat),
-            ),
+            DropdownMenuItem(
+                value: cat,
+                child: Text('$cat (${lineCounts[cat] ?? 0})',
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 13))),
         ],
+        onChanged: onSelected,
       ),
     );
   }

@@ -69,7 +69,7 @@ void main() {
       expect(find.byKey(const Key('action_scan_qr')), findsOneWidget);
     });
 
-    testWidgets('AssetDetailScreen renders technical details and complaint log button', (tester) async {
+    testWidgets('AssetDetailScreen renders technical details without the complaint log button', (tester) async {
       when(() => mockRepo.fetchAssetById(42)).thenAnswer((_) async => testAssets[0]);
 
       await tester.pumpWidget(
@@ -96,7 +96,9 @@ void main() {
       expect(find.text('CLS Panels'), findsOneWidget);
       expect(find.text('Main Panel'), findsOneWidget);
       expect(find.text('SUNTRON'), findsOneWidget);
-      expect(find.byKey(const Key('action_log_asset_complaint')), findsOneWidget);
+      // "Log Complaint for Asset" was removed — creating a complaint now
+      // lives only in the Complaints module's own list screen.
+      expect(find.byKey(const Key('action_log_asset_complaint')), findsNothing);
     });
 
     testWidgets('AssetDetailScreen falls back to the asset id while loading',

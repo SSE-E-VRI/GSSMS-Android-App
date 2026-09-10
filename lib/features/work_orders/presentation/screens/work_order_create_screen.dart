@@ -13,6 +13,7 @@ import 'package:gssms_mobile/features/auth/presentation/controllers/auth_control
 import 'package:gssms_mobile/features/auth/presentation/widgets/permission_denied_view.dart';
 import 'package:gssms_mobile/features/reports/domain/models/infrastructure_option.dart';
 import 'package:gssms_mobile/features/reports/presentation/controllers/reports_controller.dart';
+import 'package:gssms_mobile/features/work_orders/domain/models/maintenance_master.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/work_order.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_order_controllers.dart';
 import 'package:intl/intl.dart';
@@ -57,6 +58,26 @@ class _WorkOrderCreateScreenState
   List<String> _categories = const [];
   String? _selectedCategory;
   int? _selectedAssetId;
+
+  // Template / Checklist (maintenance_master) — optional, mirrors web's
+  // "Template / Checklist" picker plus its schedule_type column filter and
+  // Asset/Station template split (MaintenanceMasterList.jsx).
+  List<MaintenanceMaster> _templates = const [];
+  bool _loadingTemplates = false;
+  MaintenanceScheduleType? _templateScheduleFilter;
+  MaintenanceTemplateKind _templateKindFilter = MaintenanceTemplateKind.assetTemplate;
+  int? _selectedMaintenanceMasterId;
+
+  List<MaintenanceMaster> get _filteredTemplates {
+    return _templates.where((t) {
+      if (t.templateKind != _templateKindFilter) return false;
+      if (_templateScheduleFilter != null &&
+          t.scheduleType != _templateScheduleFilter) {
+        return false;
+      }
+      return true;
+    }).toList();
+  }
 
   static const _webBlue = AppTheme.railwayBlue;
   static const _webLightBg = AppTheme.backgroundLight;
@@ -115,6 +136,22 @@ class _WorkOrderCreateScreenState
           zoneId: scope.zone?.id, divisionId: scope.division?.id));
     }
     unawaited(_loadLocations());
+    unawaited(_loadTemplates());
+  }
+
+  Future<void> _loadTemplates() async {
+    setState(() => _loadingTemplates = true);
+    try {
+      final templates =
+          await ref.read(workOrderRepositoryProvider).fetchMaintenanceMasters();
+      if (mounted) setState(() => _templates = templates);
+    } catch (_) {
+      // Optional field — a failed template fetch must not block Job Work
+      // creation. The dropdown simply stays empty/unfiltered.
+      if (mounted) setState(() => _templates = const []);
+    } finally {
+      if (mounted) setState(() => _loadingTemplates = false);
+    }
   }
 
   Future<void> _loadDepots({int? zoneId, int? divisionId}) async {
@@ -231,9 +268,12 @@ class _WorkOrderCreateScreenState
             stationId: _resolvedStationId,
             infrastructureId: _resolvedInfraId,
             assetId: _selectedAssetId,
-            dueDate: _dueDate == null
+            // Creation uses `scheduled_date` — `due_date` is a read-only
+            // server-derived field (SSOT §15), not a creation field.
+            scheduledDate: _dueDate == null
                 ? null
                 : DateFormat('yyyy-MM-dd').format(_dueDate!),
+            maintenanceMasterId: _selectedMaintenanceMasterId,
           );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -271,10 +311,10 @@ class _WorkOrderCreateScreenState
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('New Job Work'),
-        backgroundColor: AppTheme.primaryDark,
-      ),
+      // No title here — the colored header below already carries it (as an
+      // accessible `Semantics(header: true)` region), so the AppBar isn't
+      // duplicating it back-to-back. Only the back button lives up top.
+      appBar: AppBar(backgroundColor: AppTheme.primaryDark),
       backgroundColor: _webLightBg,
       body: !_bootstrapped
           ? const Center(child: CircularProgressIndicator())
@@ -297,25 +337,37 @@ class _WorkOrderCreateScreenState
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        decoration: const BoxDecoration(
-                          color: _webBlue,
-                          borderRadius: BorderRadius.vertical(
-                              top: Radius.circular(12)),
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 14),
-                        child: const Row(
-                          children: [
-                            Icon(Icons.add_task_outlined,
-                                color: Colors.white, size: 20),
-                            SizedBox(width: 8),
-                            Text('New Job Work',
-                                style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold)),
-                          ],
+                      // This is the screen's only title (the AppBar carries
+                      // no text of its own — see build() above), so it's
+                      // marked as an accessible header region rather than
+                      // decorative content screen readers would otherwise
+                      // skip.
+                      Semantics(
+                        header: true,
+                        label: 'New Job Work',
+                        // The Row's own Icon/Text would otherwise each add
+                        // their own semantics on top of this label.
+                        excludeSemantics: true,
+                        child: Container(
+                          decoration: const BoxDecoration(
+                            color: _webBlue,
+                            borderRadius: BorderRadius.vertical(
+                                top: Radius.circular(12)),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 14),
+                          child: const Row(
+                            children: [
+                              Icon(Icons.add_task_outlined,
+                                  color: Colors.white, size: 20),
+                              SizedBox(width: 8),
+                              Text('New Job Work',
+                                  style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold)),
+                            ],
+                          ),
                         ),
                       ),
                       Padding(
@@ -323,11 +375,15 @@ class _WorkOrderCreateScreenState
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _label('Depot'),
+                            _label('Depot',
+                                tooltip:
+                                    'The depot this Job Work is scoped to. Locked to your own depot unless you have multi-depot access.'),
                             const SizedBox(height: 6),
                             _depotField(),
                             const SizedBox(height: 14),
-                            _label('Title / Subject', required: true),
+                            _label('Title / Subject',
+                                required: true,
+                                tooltip: 'A short summary of the work to be done.'),
                             const SizedBox(height: 6),
                             TextFormField(
                               key: const Key('wo_title_field'),
@@ -347,7 +403,9 @@ class _WorkOrderCreateScreenState
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      _label('Type'),
+                                      _label('Type',
+                                          tooltip:
+                                              'The nature of the work — preventive, corrective, breakdown, etc.'),
                                       const SizedBox(height: 6),
                                       DropdownButtonFormField<WorkOrderType>(
                                         key: const Key('wo_type_dropdown'),
@@ -385,7 +443,8 @@ class _WorkOrderCreateScreenState
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      _label('Priority'),
+                                      _label('Priority',
+                                          tooltip: 'How urgently this Job Work should be actioned.'),
                                       const SizedBox(height: 6),
                                       DropdownButtonFormField<
                                           WorkOrderPriority>(
@@ -416,7 +475,10 @@ class _WorkOrderCreateScreenState
                             const SizedBox(height: 16),
                             _locationCard(),
                             const SizedBox(height: 14),
-                            _label('Due Date (Optional)'),
+                            _templateCard(),
+                            const SizedBox(height: 14),
+                            _label('Due Date (Optional)',
+                                tooltip: 'The date this work is scheduled to be completed by.'),
                             const SizedBox(height: 6),
                             InkWell(
                               key: const Key('wo_due_date_field'),
@@ -453,7 +515,9 @@ class _WorkOrderCreateScreenState
                               ),
                             ),
                             const SizedBox(height: 14),
-                            _label('Description'),
+                            _label('Description',
+                                tooltip:
+                                    'Scope of work, symptoms, or access notes for the assigned technician.'),
                             const SizedBox(height: 6),
                             TextFormField(
                               key: const Key('wo_description_field'),
@@ -478,7 +542,7 @@ class _WorkOrderCreateScreenState
     );
   }
 
-  Widget _label(String t, {bool required = false}) {
+  Widget _label(String t, {bool required = false, required String tooltip}) {
     return Row(
       children: [
         Flexible(
@@ -501,8 +565,16 @@ class _WorkOrderCreateScreenState
           ),
         ),
         const SizedBox(width: 4),
-        const Icon(Icons.info_outline,
-            size: 14, color: AppTheme.textSecondary),
+        // Was purely decorative — visually promised "tap for help" but had no
+        // handler. Tooltip makes it a real tap/long-press affordance, and its
+        // `message` doubles as the icon's accessible label instead of a
+        // silent, unlabeled glyph.
+        Tooltip(
+          message: tooltip,
+          triggerMode: TooltipTriggerMode.tap,
+          child: const Icon(Icons.info_outline,
+              size: 14, color: AppTheme.textSecondary),
+        ),
       ],
     );
   }
@@ -580,7 +652,9 @@ class _WorkOrderCreateScreenState
             ],
           ),
           const SizedBox(height: 12),
-          _label('Infrastructure Type'),
+          _label('Infrastructure Type',
+              tooltip:
+                  'Narrows the Location Name list below to Stations, LC Gates, Service Buildings, or Staff Quarters.'),
           const SizedBox(height: 6),
           DropdownButtonFormField<InfraFilterType>(
             key: const Key('wo_infra_type_dropdown'),
@@ -606,7 +680,7 @@ class _WorkOrderCreateScreenState
             },
           ),
           const SizedBox(height: 12),
-          _label('Location Name'),
+          _label('Location Name', tooltip: 'The specific site this Job Work applies to.'),
           const SizedBox(height: 6),
           DropdownButtonFormField<int>(
             key: const Key('wo_location_dropdown'),
@@ -640,7 +714,7 @@ class _WorkOrderCreateScreenState
                   },
           ),
           const SizedBox(height: 12),
-          _label('Asset Category'),
+          _label('Asset Category', tooltip: 'Filters the Specific Asset list below by category.'),
           const SizedBox(height: 6),
           DropdownButtonFormField<String>(
             key: const Key('wo_asset_category_dropdown'),
@@ -667,7 +741,9 @@ class _WorkOrderCreateScreenState
                     }),
           ),
           const SizedBox(height: 12),
-          _label('Specific Asset (Optional)'),
+          _label('Specific Asset (Optional)',
+              tooltip:
+                  'Link this Job Work to one exact asset, or leave blank for a general/location-level task.'),
           const SizedBox(height: 6),
           DropdownButtonFormField<int>(
             key: const Key('wo_asset_dropdown'),
@@ -699,6 +775,129 @@ class _WorkOrderCreateScreenState
             onChanged: _selectedLocationId == null
                 ? null
                 : (id) => setState(() => _selectedAssetId = id),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _templateCard() {
+    final filtered = _filteredTemplates;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceCard,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: _border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.checklist, color: AppTheme.railwayBlue, size: 16),
+              SizedBox(width: 6),
+              Text('Template / Checklist (Optional)',
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.railwayBlue,
+                      fontSize: 13)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _label('Category',
+              tooltip:
+                  'Asset Template applies to one specific asset; Station / Batch Template applies broadly across a station.'),
+          const SizedBox(height: 6),
+          // Web splits templates into Asset Templates / Station Templates
+          // tables (MaintenanceMasterList.jsx `template_kind`); here that's a
+          // segmented toggle instead of two lists. "Station / Batch" is the
+          // scoped-across-a-station template kind ("batch job work").
+          SegmentedButton<MaintenanceTemplateKind>(
+            key: const Key('wo_template_kind_segment'),
+            segments: const [
+              ButtonSegment(
+                value: MaintenanceTemplateKind.assetTemplate,
+                label: Text('Asset', style: TextStyle(fontSize: 12)),
+              ),
+              ButtonSegment(
+                value: MaintenanceTemplateKind.stationTemplate,
+                label: Text('Station / Batch', style: TextStyle(fontSize: 12)),
+              ),
+            ],
+            selected: {_templateKindFilter},
+            onSelectionChanged: (s) {
+              setState(() {
+                _templateKindFilter = s.first;
+                if (_selectedMaintenanceMasterId != null &&
+                    !_filteredTemplates
+                        .any((t) => t.id == _selectedMaintenanceMasterId)) {
+                  _selectedMaintenanceMasterId = null;
+                }
+              });
+            },
+          ),
+          const SizedBox(height: 12),
+          _label('Schedule Type', tooltip: 'How often this checklist template is meant to run.'),
+          const SizedBox(height: 6),
+          DropdownButtonFormField<MaintenanceScheduleType?>(
+            key: const Key('wo_template_schedule_dropdown'),
+            isExpanded: true,
+            value: _templateScheduleFilter,
+            decoration: _input('-- All Schedule Types --'),
+            items: [
+              const DropdownMenuItem<MaintenanceScheduleType?>(
+                  value: null, child: Text('-- All Schedule Types --')),
+              ...MaintenanceScheduleType.values
+                  .where((s) => s != MaintenanceScheduleType.unknown)
+                  .map((s) => DropdownMenuItem(
+                      value: s,
+                      child: Text(s.displayName,
+                          style: const TextStyle(fontSize: 13)))),
+            ],
+            onChanged: (s) {
+              setState(() {
+                _templateScheduleFilter = s;
+                if (_selectedMaintenanceMasterId != null &&
+                    !_filteredTemplates
+                        .any((t) => t.id == _selectedMaintenanceMasterId)) {
+                  _selectedMaintenanceMasterId = null;
+                }
+              });
+            },
+          ),
+          const SizedBox(height: 12),
+          _label('Template',
+              tooltip:
+                  'Attach a checklist template so the technician has a structured checklist during execution.'),
+          const SizedBox(height: 6),
+          DropdownButtonFormField<int>(
+            key: const Key('wo_template_dropdown'),
+            isExpanded: true,
+            value: filtered.any((t) => t.id == _selectedMaintenanceMasterId)
+                ? _selectedMaintenanceMasterId
+                : null,
+            decoration: _input('-- No Template --').copyWith(
+              suffixIcon: _loadingTemplates
+                  ? const Padding(
+                      padding: EdgeInsets.all(10),
+                      child: SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2)))
+                  : null,
+            ),
+            items: [
+              const DropdownMenuItem<int>(
+                  value: null, child: Text('-- No Template --')),
+              ...filtered.map((t) => DropdownMenuItem(
+                  value: t.id,
+                  child: Text('${t.name} (${t.scheduleType.displayName})',
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 13)))),
+            ],
+            onChanged: (id) =>
+                setState(() => _selectedMaintenanceMasterId = id),
           ),
         ],
       ),

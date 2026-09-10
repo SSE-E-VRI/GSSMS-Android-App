@@ -133,20 +133,32 @@ class _AssetListScreenState extends ConsumerState<AssetListScreen> {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          const SyncStatusBadge(),
-          if (_isLookingUp)
-            const LinearProgressIndicator(
-              key: Key('asset_lookup_progress'),
-              minHeight: 2,
-            ),
-          _buildSearchBar(),
-          if (listState is AssetListLoaded && listState.truncated)
-            _buildTruncationNotice(),
-          _buildCategoryChips(listState),
-          Expanded(child: _buildListBody(listState)),
-        ],
+      // Filters are leading slivers ahead of the card list, not a fixed
+      // Column above it, so the whole filter block scrolls away with the
+      // list instead of permanently eating screen space — same change as
+      // WorkOrderListScreen/ComplaintListScreen/InspectionListScreen.
+      body: RefreshIndicator(
+        onRefresh: () => ref
+            .read(assetListControllerProvider.notifier)
+            .fetchAssets(forceRefresh: true),
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            const SliverToBoxAdapter(child: SyncStatusBadge()),
+            if (_isLookingUp)
+              const SliverToBoxAdapter(
+                child: LinearProgressIndicator(
+                  key: Key('asset_lookup_progress'),
+                  minHeight: 2,
+                ),
+              ),
+            SliverToBoxAdapter(child: _buildSearchBar()),
+            if (listState is AssetListLoaded && listState.truncated)
+              SliverToBoxAdapter(child: _buildTruncationNotice()),
+            SliverToBoxAdapter(child: _buildCategoryFilter(listState)),
+            ..._buildListSlivers(listState),
+          ],
+        ),
       ),
     );
   }
@@ -228,7 +240,13 @@ class _AssetListScreenState extends ConsumerState<AssetListScreen> {
     );
   }
 
-  Widget _buildCategoryChips(AssetListState state) {
+  /// Category filter as a dropdown rather than a wrapping row of
+  /// ChoiceChips — same reasoning as the other list screens' status/type
+  /// dropdowns: with 11 real categories (AC Plants, CLS Panels, DG Sets,
+  /// Escalators, HT Structure & Switch Yard, LT Panel Boards, Lifts,
+  /// Submersible Pump, Substations, Transformers, Water Coolers) a chip
+  /// Wrap ran to five full rows before the list even started.
+  Widget _buildCategoryFilter(AssetListState state) {
     if (state is! AssetListLoaded) return const SizedBox.shrink();
 
     final categories = state.availableCategories;
@@ -237,100 +255,119 @@ class _AssetListScreenState extends ConsumerState<AssetListScreen> {
     final selected = state.selectedCategory;
     final totalCount = state.assets.length;
 
+    int countFor(String cat) =>
+        state.assets.where((a) => a.assetCategoryName == cat).length;
+
     return Container(
-      width: double.infinity,
-      color: Theme.of(context).cardColor,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: [
-          ChoiceChip(
-            label: Text('All Categories ($totalCount)'),
-            selected: selected == null,
-            onSelected: (_) => ref
-                .read(assetListControllerProvider.notifier)
-                .setCategoryFilter(null),
-          ),
-          ...categories.map((cat) {
-            final isSelected = selected == cat;
-            final count =
-                state.assets.where((a) => a.assetCategoryName == cat).length;
-            return ChoiceChip(
-              label: Text('$cat ($count)'),
-              selected: isSelected,
-              onSelected: (_) => ref
-                  .read(assetListControllerProvider.notifier)
-                  .setCategoryFilter(cat),
-            );
-          }),
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+      child: DropdownButtonFormField<String?>(
+        key: const Key('asset_category_filter_dropdown'),
+        isExpanded: true,
+        value: selected,
+        decoration: const InputDecoration(
+          labelText: 'Category',
+          contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          border: OutlineInputBorder(),
+        ),
+        items: [
+          DropdownMenuItem<String?>(
+              value: null, child: Text('All Categories ($totalCount)')),
+          ...categories.map((cat) => DropdownMenuItem(
+              value: cat,
+              child: Text('$cat (${countFor(cat)})',
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 13)))),
         ],
+        onChanged: (cat) => ref
+            .read(assetListControllerProvider.notifier)
+            .setCategoryFilter(cat),
       ),
     );
   }
 
-  Widget _buildListBody(AssetListState state) {
+  /// Slivers for the scrollable body below the filter block (see build()).
+  /// One `RefreshIndicator` wraps the whole `CustomScrollView` — filters
+  /// included — so none of these branches carry their own.
+  List<Widget> _buildListSlivers(AssetListState state) {
     if (state is AssetListLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: Center(child: CircularProgressIndicator()),
+        ),
+      ];
     }
 
     if (state is AssetListError) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error_outline, size: 48, color: AppTheme.errorRed),
-              const SizedBox(height: 12),
-              Text(state.message, textAlign: TextAlign.center),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () => ref
-                    .read(assetListControllerProvider.notifier)
-                    .fetchAssets(forceRefresh: true),
-                child: const Text('Retry'),
+      return [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_outline, size: 48, color: AppTheme.errorRed),
+                  const SizedBox(height: 12),
+                  Text(state.message, textAlign: TextAlign.center),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () => ref
+                        .read(assetListControllerProvider.notifier)
+                        .fetchAssets(forceRefresh: true),
+                    child: const Text('Retry'),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
-      );
+      ];
     }
 
     if (state is AssetListLoaded) {
       final assets = state.filteredAssets;
 
       if (assets.isEmpty) {
-        return const Center(
-          child: Text('No assets found matching criteria.'),
-        );
+        return const [
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: Center(child: Text('No assets found matching criteria.')),
+          ),
+        ];
       }
 
-      return RefreshIndicator(
-        onRefresh: () => ref
-            .read(assetListControllerProvider.notifier)
-            .fetchAssets(forceRefresh: true),
-        child: ListView.separated(
+      return [
+        SliverPadding(
           padding: const EdgeInsets.all(16),
-          itemCount: assets.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 12),
-          itemBuilder: (context, index) {
-            return _AssetCard(
-              asset: assets[index],
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => AssetDetailScreen(assetId: assets[index].id),
-                  ),
+          sliver: SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, i) {
+                // Odd indices are the 12px separators between cards — same
+                // spacing the old ListView.separated used.
+                if (i.isOdd) return const SizedBox(height: 12);
+                final asset = assets[i ~/ 2];
+                return _AssetCard(
+                  asset: asset,
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => AssetDetailScreen(assetId: asset.id),
+                      ),
+                    );
+                  },
                 );
               },
-            );
-          },
+              childCount: assets.length * 2 - 1,
+            ),
+          ),
         ),
-      );
+      ];
     }
 
-    return const SizedBox.shrink();
+    return const [SliverToBoxAdapter(child: SizedBox.shrink())];
   }
 }
 

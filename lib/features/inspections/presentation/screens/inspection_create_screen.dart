@@ -12,6 +12,7 @@ import 'package:gssms_mobile/features/auth/presentation/widgets/permission_denie
 import 'package:gssms_mobile/features/inspections/presentation/controllers/inspection_controllers.dart';
 import 'package:gssms_mobile/features/reports/domain/models/infrastructure_option.dart';
 import 'package:gssms_mobile/features/reports/presentation/controllers/reports_controller.dart';
+import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_order_controllers.dart';
 import 'package:intl/intl.dart';
 
 /// Mirrors web `Add Inspection Note` (gssms.share.zrok.io/inspections/new)
@@ -242,21 +243,17 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
     try {
       // Recompute effective points for the payload (legacy fallback included).
       final computedPoints = effectivePoints.isNotEmpty ? effectivePoints : points;
-      final description = computedPoints.join('\n');
+      final notes = computedPoints.join('\n');
       final apiDate = DateFormat('yyyy-MM-dd').format(_selectedDate);
+      // Per SSOT §11.3 the backend Inspection model has no asset/priority
+      // field on creation — only title/notes/inspection_date/relations.
       await ref.read(inspectionRepositoryProvider).createInspection(
             title: _titleController.text.trim(),
-            description: description,
-            // Web has no priority field — keep server constant and don't
-            // surface a client control for a field the backend doesn't expose
-            // on this form.
-            priority: 'MEDIUM',
-            assetId: widget.initialAssetId,
+            notes: notes,
             depotId: _selectedDepotId,
             stationId: _resolvedStationId,
             infrastructureId: _resolvedInfrastructureId,
-            scheduledDate: apiDate,
-            inspectionPoints: computedPoints,
+            inspectionDate: apiDate,
           );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -267,7 +264,9 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to log inspection: $e'), backgroundColor: AppTheme.errorRed),
+          SnackBar(
+              content: Text('Failed to log inspection: ${workOrderReadableError(e)}'),
+              backgroundColor: AppTheme.errorRed),
         );
       }
     } finally {
@@ -288,10 +287,10 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Add Inspection Note'),
-        backgroundColor: AppTheme.primaryDark,
-      ),
+      // No title here — the colored header below already carries it (as an
+      // accessible `Semantics(header: true)` region), so the AppBar isn't
+      // duplicating it back-to-back. Only the back button lives up top.
+      appBar: AppBar(backgroundColor: AppTheme.primaryDark),
       backgroundColor: _webLightBg,
       body: !_bootstrapped
           ? const Center(child: CircularProgressIndicator())
@@ -312,21 +311,33 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // Blue header — mirrors web's "Add Inspection Note" bar.
-                      Container(
-                        decoration: const BoxDecoration(
-                          color: _webBlue,
-                          borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
-                        ),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                        child: const Row(
-                          children: [
-                            Icon(Icons.note_add_outlined, color: Colors.white, size: 20),
-                            SizedBox(width: 8),
-                            Text(
-                              'Add Inspection Note',
-                              style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                            ),
-                          ],
+                      // This is the screen's only title (the AppBar carries
+                      // no text of its own — see build() above), so it's
+                      // marked as an accessible header region rather than
+                      // decorative content screen readers would otherwise
+                      // skip.
+                      Semantics(
+                        header: true,
+                        label: 'Add Inspection Note',
+                        // The Row's own Icon/Text would otherwise each add
+                        // their own semantics on top of this label.
+                        excludeSemantics: true,
+                        child: Container(
+                          decoration: const BoxDecoration(
+                            color: _webBlue,
+                            borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+                          ),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          child: const Row(
+                            children: [
+                              Icon(Icons.note_add_outlined, color: Colors.white, size: 20),
+                              SizedBox(width: 8),
+                              Text(
+                                'Add Inspection Note',
+                                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                       Padding(
@@ -382,7 +393,7 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
     );
   }
 
-  Widget _labelWithInfo(String label, {bool required = false}) {
+  Widget _labelWithInfo(String label, {bool required = false, required String tooltip}) {
     // Flexible text so labels wrap instead of overflowing half-width columns.
     return Row(
       children: [
@@ -399,7 +410,15 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
           ),
         ),
         const SizedBox(width: 4),
-        const Icon(Icons.info_outline, size: 14, color: AppTheme.textSecondary),
+        // Was purely decorative — visually promised "tap for help" but had no
+        // handler. Tooltip makes it a real tap/long-press affordance, and its
+        // `message` doubles as the icon's accessible label instead of a
+        // silent, unlabeled glyph.
+        Tooltip(
+          message: tooltip,
+          triggerMode: TooltipTriggerMode.tap,
+          child: const Icon(Icons.info_outline, size: 14, color: AppTheme.textSecondary),
+        ),
       ],
     );
   }
@@ -409,7 +428,9 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _labelWithInfo('Depot'),
+        _labelWithInfo('Depot',
+            tooltip:
+                'The depot this inspection is scoped to. Locked to your own depot unless you have multi-depot access.'),
         const SizedBox(height: 6),
         DropdownButtonFormField<int>(
           key: const Key('inspection_depot_dropdown'),
@@ -445,7 +466,9 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _labelWithInfo('Title / Subject', required: true),
+        _labelWithInfo('Title / Subject',
+            required: true,
+            tooltip: 'A short summary of this inspection, shown in lists and notifications.'),
         const SizedBox(height: 6),
         TextFormField(
           key: const Key('inspection_title_field'),
@@ -480,7 +503,8 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _labelWithInfo('Date of Inspection'),
+        _labelWithInfo('Date of Inspection',
+            tooltip: 'The date this inspection was actually carried out.'),
         const SizedBox(height: 6),
         InkWell(
           key: const Key('inspection_date_field'),
@@ -551,7 +575,9 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _labelWithInfo('Infrastructure Type'),
+        _labelWithInfo('Infrastructure Type',
+            tooltip:
+                'Narrows the Location Name list below to Stations, LC Gates, Service Buildings, or Staff Quarters.'),
         const SizedBox(height: 6),
         DropdownButtonFormField<InfraFilterType>(
           key: const Key('inspection_infra_type_dropdown'),
@@ -587,7 +613,8 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _labelWithInfo('Location Name'),
+        _labelWithInfo('Location Name',
+            tooltip: 'The specific site this inspection applies to.'),
         const SizedBox(height: 6),
         DropdownButtonFormField<int>(
           key: const Key('inspection_location_dropdown'),
@@ -621,7 +648,9 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _labelWithInfo('Inspection Points', required: true),
+        _labelWithInfo('Inspection Points',
+            required: true,
+            tooltip: 'One line per observation. Add a point for each thing you inspected.'),
         const SizedBox(height: 8),
         ...List.generate(_pointControllers.length, (index) {
           return Padding(
