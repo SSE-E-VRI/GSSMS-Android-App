@@ -74,10 +74,10 @@ void main() {
       expect(find.text('Work Orders'), findsOneWidget);
       expect(find.byKey(const Key('date_range_from')), findsOneWidget);
       expect(find.byKey(const Key('date_range_to')), findsOneWidget);
-      expect(find.byKey(const Key('filter_chip_assigned')), findsOneWidget);
-      // Web-parity P0a: type chips + infra filter row.
-      expect(find.byKey(const Key('type_chip_corrective')), findsOneWidget);
-      expect(find.byKey(const Key('type_chip_preventive')), findsOneWidget);
+      // Status/Type are a dropdown pair, not FilterChip rows (avoids the
+      // chip row wrapping/clipping on narrow phones).
+      expect(find.byKey(const Key('wo_status_filter_dropdown')), findsOneWidget);
+      expect(find.byKey(const Key('wo_type_filter_dropdown')), findsOneWidget);
       expect(find.byKey(const Key('wo_infra_type_dropdown')), findsOneWidget);
       expect(find.byKey(const Key('wo_infra_name_dropdown')), findsOneWidget);
       expect(find.text('WO #101'), findsOneWidget);
@@ -124,14 +124,18 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Type chip filters client-side.
-      await tester.tap(find.byKey(const Key('type_chip_corrective')));
+      // Type dropdown filters client-side.
+      await tester.tap(find.byKey(const Key('wo_type_filter_dropdown')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Corrective').last);
       await tester.pumpAndSettle();
       expect(find.text('WO #2'), findsOneWidget);
       expect(find.text('WO #1'), findsNothing);
 
       // Back to all types, then infra name narrows to one row.
-      await tester.tap(find.byKey(const Key('type_chip_all_types')));
+      await tester.tap(find.byKey(const Key('wo_type_filter_dropdown')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('All Types').last);
       await tester.pumpAndSettle();
       expect(find.text('WO #1'), findsOneWidget);
       expect(find.text('WO #2'), findsOneWidget);
