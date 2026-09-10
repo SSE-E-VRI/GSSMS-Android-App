@@ -77,6 +77,27 @@ bool canConvertComplaint(UserSession? session) {
   return session.roles.any(_complaintConvertRoles.contains);
 }
 
+/// Batch complaint/inspection → work-order conversion
+/// (`create_from_complaints`/`create_from_inspections`) maps to
+/// `maintenance.create` server-side (`WorkOrderViewSet.permission_by_action`)
+/// — same permission and same DEPOT_INCHARGE/DEPOT_USER role gate as the
+/// plain "New Job Work" create action, so this is deliberately just
+/// [canCreateWorkOrder] under another name for callers in the Pending
+/// Actions screen, not a separate check.
+bool canBatchConvertToWorkOrder(UserSession? session) => canCreateWorkOrder(session);
+
+/// Roles `MaintenanceScheduleViewSet.create_batch_work_orders` accepts —
+/// gated server-side on `maintenance.edit` (not `.create`, unlike the other
+/// two batch-convert actions above) plus the same in-body DEPOT_INCHARGE/
+/// DEPOT_USER role check.
+const _scheduleBatchConvertRoles = {AuthRole.depotIncharge, AuthRole.depotUser};
+
+bool canBatchConvertSchedules(UserSession? session) {
+  if (session == null) return false;
+  if (!sessionAllows(session, 'maintenance.edit')) return false;
+  return session.roles.any(_scheduleBatchConvertRoles.contains);
+}
+
 /// Record-write policy on `MaintenanceRecordViewSet`: SUPER_ADMIN / DIV_ADMIN /
 /// ZR_ADMIN, or assigned MAINTENANCE_STAFF. DEPOT_INCHARGE / DEPOT_USER and
 /// HQ users hold `maintenance.edit` but are read-only for checklist records.

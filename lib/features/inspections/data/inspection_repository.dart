@@ -10,6 +10,7 @@ abstract class IInspectionRepository {
     int? depotId,
     String? dateFrom,
     String? dateTo,
+    bool? pendingConversion,
   });
   Future<Inspection> fetchInspectionById(int id);
 
@@ -41,6 +42,7 @@ class InspectionRepository implements IInspectionRepository {
     int? depotId,
     String? dateFrom,
     String? dateTo,
+    bool? pendingConversion,
   }) {
     return _apiService.getInspections(
       status: status,
@@ -50,6 +52,7 @@ class InspectionRepository implements IInspectionRepository {
       depotId: depotId,
       dateFrom: dateFrom,
       dateTo: dateTo,
+      pendingConversion: pendingConversion,
     );
   }
 

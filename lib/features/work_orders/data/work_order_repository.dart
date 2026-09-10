@@ -5,6 +5,7 @@ import 'package:gssms_mobile/core/database/local_cache_service.dart';
 import 'package:gssms_mobile/core/sync/outbox_command.dart';
 import 'package:gssms_mobile/core/sync/sync_manager.dart';
 import 'package:gssms_mobile/features/work_orders/data/work_order_api_service.dart';
+import 'package:gssms_mobile/features/work_orders/domain/models/batch_convert_result.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/maintenance_master.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/maintenance_record.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/technician.dart';
@@ -63,6 +64,8 @@ abstract class IWorkOrderRepository {
     int? maintenanceMasterId,
   });
   Future<List<MaintenanceMaster>> fetchMaintenanceMasters();
+  Future<BatchConvertResult> createWorkOrdersFromComplaints(List<int> complaintIds);
+  Future<BatchConvertResult> createWorkOrdersFromInspections(List<int> inspectionIds);
   Future<WorkOrderActionSet> fetchAllowedActions(int workOrderId);
   Future<WorkOrderAudit> fetchAudit(int workOrderId);
   Future<List<Technician>> fetchAssignableTechnicians({int? depotId});
@@ -246,6 +249,16 @@ class WorkOrderRepository implements IWorkOrderRepository {
   @override
   Future<List<MaintenanceMaster>> fetchMaintenanceMasters() {
     return _apiService.getMaintenanceMasters();
+  }
+
+  @override
+  Future<BatchConvertResult> createWorkOrdersFromComplaints(List<int> complaintIds) {
+    return _apiService.createWorkOrdersFromComplaints(complaintIds);
+  }
+
+  @override
+  Future<BatchConvertResult> createWorkOrdersFromInspections(List<int> inspectionIds) {
+    return _apiService.createWorkOrdersFromInspections(inspectionIds);
   }
 
   /// Transitions the server permits right now. These are deliberately not

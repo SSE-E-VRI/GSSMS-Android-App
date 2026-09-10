@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:gssms_mobile/core/network/paginated_fetch.dart';
 import 'package:gssms_mobile/core/utils/json_parsing.dart';
+import 'package:gssms_mobile/features/work_orders/domain/models/batch_convert_result.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/maintenance_master.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/maintenance_record.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/technician.dart';
@@ -102,6 +103,27 @@ class WorkOrderApiService {
       );
     }
     return WorkOrder.fromJson(data);
+  }
+
+  /// Batch-converts open Complaints into Work Orders in one all-or-nothing
+  /// request — POST /work-orders/create_from_complaints/ {ids}. Response
+  /// shape: `{work_order_ids, work_order_id, count, message}`.
+  Future<BatchConvertResult> createWorkOrdersFromComplaints(List<int> ids) async {
+    final response = await _dio.post(
+      '$_workOrders/create_from_complaints/',
+      data: {'ids': ids},
+    );
+    return BatchConvertResult.fromJson(_asObject(response.data) ?? const {});
+  }
+
+  /// Same as [createWorkOrdersFromComplaints] for Inspections — POST
+  /// /work-orders/create_from_inspections/ {ids}.
+  Future<BatchConvertResult> createWorkOrdersFromInspections(List<int> ids) async {
+    final response = await _dio.post(
+      '$_workOrders/create_from_inspections/',
+      data: {'ids': ids},
+    );
+    return BatchConvertResult.fromJson(_asObject(response.data) ?? const {});
   }
 
   /// Checklist templates available to attach to a Job Work at creation time
