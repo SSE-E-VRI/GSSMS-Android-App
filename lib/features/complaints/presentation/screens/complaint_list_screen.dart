@@ -192,8 +192,7 @@ class _ComplaintListScreenState extends ConsumerState<ComplaintListScreen> {
     final filterOptions = [
       (label: 'All (${countFor(null)})', status: null),
       (label: 'Open (${countFor(ComplaintStatus.open)})', status: ComplaintStatus.open),
-      (label: 'In Progress (${countFor(ComplaintStatus.inProgress)})', status: ComplaintStatus.inProgress),
-      (label: 'Resolved (${countFor(ComplaintStatus.resolved)})', status: ComplaintStatus.resolved),
+      (label: 'Converted (${countFor(ComplaintStatus.converted)})', status: ComplaintStatus.converted),
       (label: 'Closed (${countFor(ComplaintStatus.closed)})', status: ComplaintStatus.closed),
     ];
 

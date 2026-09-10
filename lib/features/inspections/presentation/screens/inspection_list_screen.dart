@@ -179,10 +179,10 @@ class _InspectionListScreenState extends ConsumerState<InspectionListScreen> {
         state is InspectionListLoaded ? state.selectedStatus : null;
     final options = [
       (label: 'All', status: null),
-      (label: 'Pending', status: InspectionStatus.pending),
-      (label: 'In Progress', status: InspectionStatus.inProgress),
-      (label: 'Completed', status: InspectionStatus.completed),
+      (label: 'Open', status: InspectionStatus.open),
+      (label: 'Action Required', status: InspectionStatus.actionRequired),
       (label: 'Converted', status: InspectionStatus.converted),
+      (label: 'Closed', status: InspectionStatus.closed),
     ];
     return Container(
       color: Colors.white,
@@ -387,10 +387,10 @@ class _InspectionCard extends StatelessWidget {
               Text(inspection.title,
                   style: const TextStyle(
                       fontSize: 16, fontWeight: FontWeight.bold)),
-              if (inspection.description != null &&
-                  inspection.description!.isNotEmpty) ...[
+              if (inspection.notes != null &&
+                  inspection.notes!.isNotEmpty) ...[
                 const SizedBox(height: 4),
-                Text(inspection.description!,
+                Text(inspection.notes!,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(

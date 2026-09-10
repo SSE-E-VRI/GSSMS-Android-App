@@ -242,21 +242,17 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
     try {
       // Recompute effective points for the payload (legacy fallback included).
       final computedPoints = effectivePoints.isNotEmpty ? effectivePoints : points;
-      final description = computedPoints.join('\n');
+      final notes = computedPoints.join('\n');
       final apiDate = DateFormat('yyyy-MM-dd').format(_selectedDate);
+      // Per SSOT §11.3 the backend Inspection model has no asset/priority
+      // field on creation — only title/notes/inspection_date/relations.
       await ref.read(inspectionRepositoryProvider).createInspection(
             title: _titleController.text.trim(),
-            description: description,
-            // Web has no priority field — keep server constant and don't
-            // surface a client control for a field the backend doesn't expose
-            // on this form.
-            priority: 'MEDIUM',
-            assetId: widget.initialAssetId,
+            notes: notes,
             depotId: _selectedDepotId,
             stationId: _resolvedStationId,
             infrastructureId: _resolvedInfrastructureId,
-            scheduledDate: apiDate,
-            inspectionPoints: computedPoints,
+            inspectionDate: apiDate,
           );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

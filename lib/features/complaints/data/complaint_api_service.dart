@@ -16,7 +16,6 @@ class ComplaintApiService {
 
   Future<List<Complaint>> getComplaints({
     String? status,
-    String? severity,
     int? zoneId,
     int? divisionId,
     int? depotId,
@@ -25,7 +24,8 @@ class ComplaintApiService {
   }) async {
     final query = <String, dynamic>{};
     if (status != null && status.isNotEmpty) query['status'] = status;
-    if (severity != null && severity.isNotEmpty) query['severity'] = severity;
+    // No `severity` filter — per SSOT §10.6 the backend Complaint API has no
+    // severity field/filter.
     // depot/division/zone are mutually exclusive server-side (ComplaintViewSet
     // .get_queryset: depot wins over division wins over zone) — no `_id`
     // suffix here, unlike WorkOrderViewSet's zone_id/division_id/depot_id.
@@ -84,5 +84,16 @@ class ComplaintApiService {
       );
     }
     return Complaint.fromJson(data);
+  }
+
+  /// Convert complaint to work order — POST
+  /// /api/v1/complaints/{id}/convert_to_work_order/. Same ConversionService
+  /// backing (and response shape: `{message, work_order_id}`) as the
+  /// inspection conversion endpoint.
+  Future<Map<String, dynamic>> convertToWorkOrder(int complaintId) async {
+    final response =
+        await _dio.post('/api/v1/complaints/$complaintId/convert_to_work_order/');
+    final data = _asObject(response.data);
+    return data ?? const {};
   }
 }

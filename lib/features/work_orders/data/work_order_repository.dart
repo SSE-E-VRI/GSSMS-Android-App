@@ -5,6 +5,7 @@ import 'package:gssms_mobile/core/database/local_cache_service.dart';
 import 'package:gssms_mobile/core/sync/outbox_command.dart';
 import 'package:gssms_mobile/core/sync/sync_manager.dart';
 import 'package:gssms_mobile/features/work_orders/data/work_order_api_service.dart';
+import 'package:gssms_mobile/features/work_orders/domain/models/maintenance_master.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/maintenance_record.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/technician.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/verification_workspace.dart';
@@ -58,8 +59,10 @@ abstract class IWorkOrderRepository {
     int? stationId,
     int? infrastructureId,
     int? assetId,
-    String? dueDate,
+    String? scheduledDate,
+    int? maintenanceMasterId,
   });
+  Future<List<MaintenanceMaster>> fetchMaintenanceMasters();
   Future<WorkOrderActionSet> fetchAllowedActions(int workOrderId);
   Future<WorkOrderAudit> fetchAudit(int workOrderId);
   Future<List<Technician>> fetchAssignableTechnicians({int? depotId});
@@ -213,7 +216,8 @@ class WorkOrderRepository implements IWorkOrderRepository {
     int? stationId,
     int? infrastructureId,
     int? assetId,
-    String? dueDate,
+    String? scheduledDate,
+    int? maintenanceMasterId,
   }) async {
     final payload = <String, dynamic>{
       'title': title,
@@ -221,16 +225,27 @@ class WorkOrderRepository implements IWorkOrderRepository {
         'description': description.trim(),
       'type': type,
       'priority': priority,
-      'source': 'MOBILE',
+      // No `source` — omit so the backend default (MANUAL_ENTRY) applies
+      // (SSOT §14). `scheduled_date` is the creation field; `due_date` is a
+      // read-only server-derived field (SSOT §15) and must not be sent here.
       if (depotId != null) 'depot': depotId,
       if (stationId != null) 'station': stationId,
       if (infrastructureId != null) 'infrastructure': infrastructureId,
       if (assetId != null) 'asset': assetId,
-      if (dueDate != null) 'due_date': dueDate,
+      if (scheduledDate != null) 'scheduled_date': scheduledDate,
+      // Optional checklist template — `maintenance_master` is a plain
+      // writable FK on WorkOrderSerializer (not in read_only_fields), same
+      // field the web "New Job Work" template picker sends.
+      if (maintenanceMasterId != null) 'maintenance_master': maintenanceMasterId,
     };
     final order = await _apiService.createWorkOrder(payload);
     await _cacheService.cacheWorkOrderDetail(order);
     return order;
+  }
+
+  @override
+  Future<List<MaintenanceMaster>> fetchMaintenanceMasters() {
+    return _apiService.getMaintenanceMasters();
   }
 
   /// Transitions the server permits right now. These are deliberately not

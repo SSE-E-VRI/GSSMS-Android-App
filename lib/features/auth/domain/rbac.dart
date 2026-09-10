@@ -65,6 +65,18 @@ bool canConvertInspection(UserSession? session) {
   return session.roles.any(_inspectionConvertRoles.contains);
 }
 
+/// Same `ConversionService._validate_scope` gate as [canConvertInspection] —
+/// Complaint and Inspection conversion share one service method, hard-
+/// rejecting every role except DEPOT_INCHARGE/DEPOT_USER regardless of who
+/// else holds `complaints.edit`.
+const _complaintConvertRoles = {AuthRole.depotIncharge, AuthRole.depotUser};
+
+bool canConvertComplaint(UserSession? session) {
+  if (session == null) return false;
+  if (!sessionAllows(session, 'complaints.edit')) return false;
+  return session.roles.any(_complaintConvertRoles.contains);
+}
+
 /// Record-write policy on `MaintenanceRecordViewSet`: SUPER_ADMIN / DIV_ADMIN /
 /// ZR_ADMIN, or assigned MAINTENANCE_STAFF. DEPOT_INCHARGE / DEPOT_USER and
 /// HQ users hold `maintenance.edit` but are read-only for checklist records.

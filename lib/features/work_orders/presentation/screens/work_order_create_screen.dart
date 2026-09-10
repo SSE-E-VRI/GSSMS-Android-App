@@ -13,6 +13,7 @@ import 'package:gssms_mobile/features/auth/presentation/controllers/auth_control
 import 'package:gssms_mobile/features/auth/presentation/widgets/permission_denied_view.dart';
 import 'package:gssms_mobile/features/reports/domain/models/infrastructure_option.dart';
 import 'package:gssms_mobile/features/reports/presentation/controllers/reports_controller.dart';
+import 'package:gssms_mobile/features/work_orders/domain/models/maintenance_master.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/work_order.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_order_controllers.dart';
 import 'package:intl/intl.dart';
@@ -57,6 +58,26 @@ class _WorkOrderCreateScreenState
   List<String> _categories = const [];
   String? _selectedCategory;
   int? _selectedAssetId;
+
+  // Template / Checklist (maintenance_master) — optional, mirrors web's
+  // "Template / Checklist" picker plus its schedule_type column filter and
+  // Asset/Station template split (MaintenanceMasterList.jsx).
+  List<MaintenanceMaster> _templates = const [];
+  bool _loadingTemplates = false;
+  MaintenanceScheduleType? _templateScheduleFilter;
+  MaintenanceTemplateKind _templateKindFilter = MaintenanceTemplateKind.assetTemplate;
+  int? _selectedMaintenanceMasterId;
+
+  List<MaintenanceMaster> get _filteredTemplates {
+    return _templates.where((t) {
+      if (t.templateKind != _templateKindFilter) return false;
+      if (_templateScheduleFilter != null &&
+          t.scheduleType != _templateScheduleFilter) {
+        return false;
+      }
+      return true;
+    }).toList();
+  }
 
   static const _webBlue = AppTheme.railwayBlue;
   static const _webLightBg = AppTheme.backgroundLight;
@@ -115,6 +136,22 @@ class _WorkOrderCreateScreenState
           zoneId: scope.zone?.id, divisionId: scope.division?.id));
     }
     unawaited(_loadLocations());
+    unawaited(_loadTemplates());
+  }
+
+  Future<void> _loadTemplates() async {
+    setState(() => _loadingTemplates = true);
+    try {
+      final templates =
+          await ref.read(workOrderRepositoryProvider).fetchMaintenanceMasters();
+      if (mounted) setState(() => _templates = templates);
+    } catch (_) {
+      // Optional field — a failed template fetch must not block Job Work
+      // creation. The dropdown simply stays empty/unfiltered.
+      if (mounted) setState(() => _templates = const []);
+    } finally {
+      if (mounted) setState(() => _loadingTemplates = false);
+    }
   }
 
   Future<void> _loadDepots({int? zoneId, int? divisionId}) async {
@@ -231,9 +268,12 @@ class _WorkOrderCreateScreenState
             stationId: _resolvedStationId,
             infrastructureId: _resolvedInfraId,
             assetId: _selectedAssetId,
-            dueDate: _dueDate == null
+            // Creation uses `scheduled_date` — `due_date` is a read-only
+            // server-derived field (SSOT §15), not a creation field.
+            scheduledDate: _dueDate == null
                 ? null
                 : DateFormat('yyyy-MM-dd').format(_dueDate!),
+            maintenanceMasterId: _selectedMaintenanceMasterId,
           );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
@@ -415,6 +455,8 @@ class _WorkOrderCreateScreenState
                             ),
                             const SizedBox(height: 16),
                             _locationCard(),
+                            const SizedBox(height: 14),
+                            _templateCard(),
                             const SizedBox(height: 14),
                             _label('Due Date (Optional)'),
                             const SizedBox(height: 6),
@@ -699,6 +741,125 @@ class _WorkOrderCreateScreenState
             onChanged: _selectedLocationId == null
                 ? null
                 : (id) => setState(() => _selectedAssetId = id),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _templateCard() {
+    final filtered = _filteredTemplates;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.surfaceCard,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: _border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.checklist, color: AppTheme.railwayBlue, size: 16),
+              SizedBox(width: 6),
+              Text('Template / Checklist (Optional)',
+                  style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.railwayBlue,
+                      fontSize: 13)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _label('Category'),
+          const SizedBox(height: 6),
+          // Web splits templates into Asset Templates / Station Templates
+          // tables (MaintenanceMasterList.jsx `template_kind`); here that's a
+          // segmented toggle instead of two lists. "Station / Batch" is the
+          // scoped-across-a-station template kind ("batch job work").
+          SegmentedButton<MaintenanceTemplateKind>(
+            key: const Key('wo_template_kind_segment'),
+            segments: const [
+              ButtonSegment(
+                value: MaintenanceTemplateKind.assetTemplate,
+                label: Text('Asset', style: TextStyle(fontSize: 12)),
+              ),
+              ButtonSegment(
+                value: MaintenanceTemplateKind.stationTemplate,
+                label: Text('Station / Batch', style: TextStyle(fontSize: 12)),
+              ),
+            ],
+            selected: {_templateKindFilter},
+            onSelectionChanged: (s) {
+              setState(() {
+                _templateKindFilter = s.first;
+                if (_selectedMaintenanceMasterId != null &&
+                    !_filteredTemplates
+                        .any((t) => t.id == _selectedMaintenanceMasterId)) {
+                  _selectedMaintenanceMasterId = null;
+                }
+              });
+            },
+          ),
+          const SizedBox(height: 12),
+          _label('Schedule Type'),
+          const SizedBox(height: 6),
+          DropdownButtonFormField<MaintenanceScheduleType?>(
+            key: const Key('wo_template_schedule_dropdown'),
+            isExpanded: true,
+            value: _templateScheduleFilter,
+            decoration: _input('-- All Schedule Types --'),
+            items: [
+              const DropdownMenuItem<MaintenanceScheduleType?>(
+                  value: null, child: Text('-- All Schedule Types --')),
+              ...MaintenanceScheduleType.values
+                  .where((s) => s != MaintenanceScheduleType.unknown)
+                  .map((s) => DropdownMenuItem(
+                      value: s,
+                      child: Text(s.displayName,
+                          style: const TextStyle(fontSize: 13)))),
+            ],
+            onChanged: (s) {
+              setState(() {
+                _templateScheduleFilter = s;
+                if (_selectedMaintenanceMasterId != null &&
+                    !_filteredTemplates
+                        .any((t) => t.id == _selectedMaintenanceMasterId)) {
+                  _selectedMaintenanceMasterId = null;
+                }
+              });
+            },
+          ),
+          const SizedBox(height: 12),
+          _label('Template'),
+          const SizedBox(height: 6),
+          DropdownButtonFormField<int>(
+            key: const Key('wo_template_dropdown'),
+            isExpanded: true,
+            value: filtered.any((t) => t.id == _selectedMaintenanceMasterId)
+                ? _selectedMaintenanceMasterId
+                : null,
+            decoration: _input('-- No Template --').copyWith(
+              suffixIcon: _loadingTemplates
+                  ? const Padding(
+                      padding: EdgeInsets.all(10),
+                      child: SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2)))
+                  : null,
+            ),
+            items: [
+              const DropdownMenuItem<int>(
+                  value: null, child: Text('-- No Template --')),
+              ...filtered.map((t) => DropdownMenuItem(
+                  value: t.id,
+                  child: Text('${t.name} (${t.scheduleType.displayName})',
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 13)))),
+            ],
+            onChanged: (id) =>
+                setState(() => _selectedMaintenanceMasterId = id),
           ),
         ],
       ),

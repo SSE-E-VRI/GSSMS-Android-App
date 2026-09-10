@@ -2,11 +2,10 @@ import 'package:equatable/equatable.dart';
 import 'package:gssms_mobile/core/utils/json_parsing.dart';
 
 enum InspectionStatus {
-  pending('PENDING', 'Pending'),
-  inProgress('IN_PROGRESS', 'In Progress'),
-  completed('COMPLETED', 'Completed'),
+  open('OPEN', 'Open'),
+  actionRequired('ACTION_REQUIRED', 'Action Required'),
   converted('CONVERTED', 'Converted to Work Order'),
-  cancelled('CANCELLED', 'Cancelled'),
+  closed('CLOSED', 'Closed'),
   unknown('UNKNOWN', 'Unknown');
 
   const InspectionStatus(this.code, this.displayName);
@@ -48,8 +47,8 @@ class Inspection extends Equatable {
     required this.id,
     required this.inspectionNumber,
     required this.title,
-    this.description,
-    this.status = InspectionStatus.pending,
+    this.notes,
+    this.status = InspectionStatus.open,
     this.priority = InspectionPriority.medium,
     this.stationId,
     this.stationName,
@@ -57,7 +56,7 @@ class Inspection extends Equatable {
     this.depotName,
     this.assetId,
     this.assetName,
-    this.scheduledDate,
+    this.inspectionDate,
     this.completedDate,
     this.createdAt,
     this.reportedByName,
@@ -68,7 +67,7 @@ class Inspection extends Equatable {
   final int id;
   final String inspectionNumber;
   final String title;
-  final String? description;
+  final String? notes;
   final InspectionStatus status;
   final InspectionPriority priority;
   final int? stationId;
@@ -77,7 +76,7 @@ class Inspection extends Equatable {
   final String? depotName;
   final int? assetId;
   final String? assetName;
-  final DateTime? scheduledDate;
+  final DateTime? inspectionDate;
   final DateTime? completedDate;
   final DateTime? createdAt;
   final String? reportedByName;
@@ -106,7 +105,7 @@ class Inspection extends Equatable {
           asJsonString(json['ticket_number']) ??
           'INSP-${json['id']}',
       title: asJsonString(json['title']) ?? 'Untitled Inspection',
-      description: asJsonString(json['description']),
+      notes: asJsonString(json['notes']),
       status: InspectionStatus.fromString(asJsonString(json['status'])),
       priority: InspectionPriority.fromString(
           asJsonString(json['priority']) ?? asJsonString(json['severity'])),
@@ -116,7 +115,7 @@ class Inspection extends Equatable {
       depotName: asJsonString(json['depot_name']),
       assetId: fkId(json['asset']),
       assetName: asJsonString(json['asset_name']),
-      scheduledDate: parseDate(json['scheduled_date']),
+      inspectionDate: parseDate(json['inspection_date']),
       completedDate: parseDate(json['completed_date'] ?? json['resolved_at']),
       createdAt: parseDate(json['created_at']),
       reportedByName: asJsonString(json['reported_by_name']) ??
@@ -132,7 +131,7 @@ class Inspection extends Equatable {
         id,
         inspectionNumber,
         title,
-        description,
+        notes,
         status,
         priority,
         stationId,
@@ -141,7 +140,7 @@ class Inspection extends Equatable {
         depotName,
         assetId,
         assetName,
-        scheduledDate,
+        inspectionDate,
         completedDate,
         createdAt,
         reportedByName,

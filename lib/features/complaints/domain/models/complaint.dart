@@ -1,12 +1,15 @@
 import 'package:equatable/equatable.dart';
 import 'package:gssms_mobile/core/utils/json_parsing.dart';
 
+// Canonical values per API contract SSOT §10.3 — the backend
+// Complaint.STATUS_CHOICES is only OPEN/CONVERTED/CLOSED. Do not invent
+// IN_PROGRESS/RESOLVED/REJECTED; once converted, effective operational
+// status is derived from the linked Work Order (see `isConverted`/
+// `workOrderId` below), not a Complaint status value.
 enum ComplaintStatus {
   open('OPEN', 'Open'),
-  inProgress('IN_PROGRESS', 'In Progress'),
-  resolved('RESOLVED', 'Resolved'),
+  converted('CONVERTED', 'Converted'),
   closed('CLOSED', 'Closed'),
-  rejected('REJECTED', 'Rejected'),
   unknown('UNKNOWN', 'Unknown');
 
   const ComplaintStatus(this.code, this.displayName);
@@ -60,6 +63,8 @@ class Complaint extends Equatable {
     this.reportedByName,
     this.createdAt,
     this.resolvedAt,
+    this.isConverted = false,
+    this.workOrderId,
   });
 
   final int id;
@@ -77,6 +82,14 @@ class Complaint extends Equatable {
   final String? reportedByName;
   final DateTime? createdAt;
   final DateTime? resolvedAt;
+
+  /// From ComplaintSerializer's `is_converted` — whether a Work Order has
+  /// already been migrated from this complaint. Authoritative independent of
+  /// [status] (SSOT §10.1/§10.3).
+  final bool isConverted;
+
+  /// From `wo_id` — the linked Work Order's id, when [isConverted] is true.
+  final int? workOrderId;
 
   factory Complaint.fromJson(Map<String, dynamic> json) {
     DateTime? parseDate(dynamic d) {
@@ -104,6 +117,8 @@ class Complaint extends Equatable {
           asJsonString(json['created_by_name']),
       createdAt: parseDate(json['created_at']),
       resolvedAt: parseDate(json['resolved_at']),
+      isConverted: asJsonBool(json['is_converted']) ?? false,
+      workOrderId: asJsonInt(json['wo_id'] ?? json['work_order_id']),
     );
   }
 
@@ -124,5 +139,7 @@ class Complaint extends Equatable {
         reportedByName,
         createdAt,
         resolvedAt,
+        isConverted,
+        workOrderId,
       ];
 }

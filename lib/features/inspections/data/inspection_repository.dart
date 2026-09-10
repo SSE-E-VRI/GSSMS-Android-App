@@ -12,16 +12,18 @@ abstract class IInspectionRepository {
     String? dateTo,
   });
   Future<Inspection> fetchInspectionById(int id);
+
+  /// Builds the canonical Inspection creation payload — per SSOT §11.1/§11.3
+  /// the backend Inspection model has exactly: title, notes, inspection_date,
+  /// station, infrastructure, depot (plus server-owned fields). It has no
+  /// description/priority/source/asset/scheduled_date/inspection_points.
   Future<Inspection> createInspection({
     required String title,
-    required String description,
-    String priority = 'MEDIUM',
-    int? assetId,
+    required String notes,
+    required String inspectionDate,
     int? stationId,
     int? infrastructureId,
     int? depotId,
-    String? scheduledDate,
-    List<String>? inspectionPoints,
   });
   Future<Map<String, dynamic>> convertToWorkOrder(int inspectionId);
 }
@@ -57,26 +59,19 @@ class InspectionRepository implements IInspectionRepository {
   @override
   Future<Inspection> createInspection({
     required String title,
-    required String description,
-    String priority = 'MEDIUM',
-    int? assetId,
+    required String notes,
+    required String inspectionDate,
     int? stationId,
     int? infrastructureId,
     int? depotId,
-    String? scheduledDate,
-    List<String>? inspectionPoints,
   }) async {
     final payload = <String, dynamic>{
       'title': title,
-      'description': description,
-      'priority': priority,
-      'source': 'MOBILE',
-      if (assetId != null) 'asset': assetId,
+      'notes': notes,
+      'inspection_date': inspectionDate,
+      if (depotId != null) 'depot': depotId,
       if (stationId != null) 'station': stationId,
       if (infrastructureId != null) 'infrastructure': infrastructureId,
-      if (depotId != null) 'depot': depotId,
-      if (scheduledDate != null) 'scheduled_date': scheduledDate,
-      if (inspectionPoints != null && inspectionPoints.isNotEmpty) 'inspection_points': inspectionPoints,
     };
     return _apiService.createInspection(payload);
   }
