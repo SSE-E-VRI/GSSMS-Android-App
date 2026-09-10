@@ -609,8 +609,40 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
   }
 
   Future<void> _handleCapture(EvidenceKind kind, ImageSource source) async {
+    if (widget.onCapturePhoto != null) {
+      try {
+        await widget.onCapturePhoto!(kind, source);
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to capture photo: ${workOrderReadableError(e)}'),
+              backgroundColor: AppTheme.errorRed,
+            ),
+          );
+        }
+      }
+      return;
+    }
+
+    if (widget.recordId == null) return;
+
+    // Everything ref/widget-derived is read *before* the long await below —
+    // `evidenceService.capture()` hands off to the external system camera
+    // app, a real multi-second gap this State can be disposed during (e.g.
+    // the underlying record list rebuilds while the camera is in the
+    // foreground). `ref.read` throws once disposed, so it must happen now,
+    // not after. Losing the ability to show a SnackBar is fine; silently
+    // dropping an already-captured, already-saved-to-disk photo is not —
+    // that was the actual bug here: `if (!mounted) return` used to abandon
+    // the upload entirely with no error, after the camera had already
+    // succeeded, leaving the photo orphaned on disk forever.
+    final evidenceService = ref.read(evidenceServiceProvider);
+    final controller =
+        ref.read(checklistControllerProvider(widget.recordId!).notifier);
+    final lineId = widget.line.id;
+
     try {
-      final evidenceService = ref.read(evidenceServiceProvider);
       final nearCap = await evidenceService.isStorageNearCap();
       if (nearCap && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -624,29 +656,20 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
         );
       }
 
-      if (widget.onCapturePhoto != null) {
-        await widget.onCapturePhoto!(kind, source);
-        return;
-      }
-
-      if (widget.recordId == null) return;
-
       final evidence = await evidenceService.capture(kind: kind, source: source);
-      if (evidence == null || !mounted) return;
+      if (evidence == null) return; // User cancelled — nothing was captured.
 
-      await ref
-          .read(checklistControllerProvider(widget.recordId!).notifier)
-          .uploadLineAttachment(
-            lineId: widget.line.id,
-            kind: kind.name.toUpperCase(),
-            imagePath: evidence.path,
-            capturedAt: DateTime.now(),
-          );
+      await controller.uploadLineAttachment(
+        lineId: lineId,
+        kind: kind.name.toUpperCase(),
+        imagePath: evidence.path,
+        capturedAt: DateTime.now(),
+      );
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to capture photo: $e'),
+            content: Text('Failed to capture photo: ${workOrderReadableError(e)}'),
             backgroundColor: AppTheme.errorRed,
           ),
         );
