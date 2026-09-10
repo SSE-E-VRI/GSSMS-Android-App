@@ -311,10 +311,10 @@ class _WorkOrderCreateScreenState
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('New Job Work'),
-        backgroundColor: AppTheme.primaryDark,
-      ),
+      // No title here — the colored header below already carries it (as an
+      // accessible `Semantics(header: true)` region), so the AppBar isn't
+      // duplicating it back-to-back. Only the back button lives up top.
+      appBar: AppBar(backgroundColor: AppTheme.primaryDark),
       backgroundColor: _webLightBg,
       body: !_bootstrapped
           ? const Center(child: CircularProgressIndicator())
@@ -337,25 +337,37 @@ class _WorkOrderCreateScreenState
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        decoration: const BoxDecoration(
-                          color: _webBlue,
-                          borderRadius: BorderRadius.vertical(
-                              top: Radius.circular(12)),
-                        ),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 14),
-                        child: const Row(
-                          children: [
-                            Icon(Icons.add_task_outlined,
-                                color: Colors.white, size: 20),
-                            SizedBox(width: 8),
-                            Text('New Job Work',
-                                style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold)),
-                          ],
+                      // This is the screen's only title (the AppBar carries
+                      // no text of its own — see build() above), so it's
+                      // marked as an accessible header region rather than
+                      // decorative content screen readers would otherwise
+                      // skip.
+                      Semantics(
+                        header: true,
+                        label: 'New Job Work',
+                        // The Row's own Icon/Text would otherwise each add
+                        // their own semantics on top of this label.
+                        excludeSemantics: true,
+                        child: Container(
+                          decoration: const BoxDecoration(
+                            color: _webBlue,
+                            borderRadius: BorderRadius.vertical(
+                                top: Radius.circular(12)),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 14),
+                          child: const Row(
+                            children: [
+                              Icon(Icons.add_task_outlined,
+                                  color: Colors.white, size: 20),
+                              SizedBox(width: 8),
+                              Text('New Job Work',
+                                  style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold)),
+                            ],
+                          ),
                         ),
                       ),
                       Padding(
@@ -363,11 +375,15 @@ class _WorkOrderCreateScreenState
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _label('Depot'),
+                            _label('Depot',
+                                tooltip:
+                                    'The depot this Job Work is scoped to. Locked to your own depot unless you have multi-depot access.'),
                             const SizedBox(height: 6),
                             _depotField(),
                             const SizedBox(height: 14),
-                            _label('Title / Subject', required: true),
+                            _label('Title / Subject',
+                                required: true,
+                                tooltip: 'A short summary of the work to be done.'),
                             const SizedBox(height: 6),
                             TextFormField(
                               key: const Key('wo_title_field'),
@@ -387,7 +403,9 @@ class _WorkOrderCreateScreenState
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      _label('Type'),
+                                      _label('Type',
+                                          tooltip:
+                                              'The nature of the work — preventive, corrective, breakdown, etc.'),
                                       const SizedBox(height: 6),
                                       DropdownButtonFormField<WorkOrderType>(
                                         key: const Key('wo_type_dropdown'),
@@ -425,7 +443,8 @@ class _WorkOrderCreateScreenState
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      _label('Priority'),
+                                      _label('Priority',
+                                          tooltip: 'How urgently this Job Work should be actioned.'),
                                       const SizedBox(height: 6),
                                       DropdownButtonFormField<
                                           WorkOrderPriority>(
@@ -458,7 +477,8 @@ class _WorkOrderCreateScreenState
                             const SizedBox(height: 14),
                             _templateCard(),
                             const SizedBox(height: 14),
-                            _label('Due Date (Optional)'),
+                            _label('Due Date (Optional)',
+                                tooltip: 'The date this work is scheduled to be completed by.'),
                             const SizedBox(height: 6),
                             InkWell(
                               key: const Key('wo_due_date_field'),
@@ -495,7 +515,9 @@ class _WorkOrderCreateScreenState
                               ),
                             ),
                             const SizedBox(height: 14),
-                            _label('Description'),
+                            _label('Description',
+                                tooltip:
+                                    'Scope of work, symptoms, or access notes for the assigned technician.'),
                             const SizedBox(height: 6),
                             TextFormField(
                               key: const Key('wo_description_field'),
@@ -520,7 +542,7 @@ class _WorkOrderCreateScreenState
     );
   }
 
-  Widget _label(String t, {bool required = false}) {
+  Widget _label(String t, {bool required = false, required String tooltip}) {
     return Row(
       children: [
         Flexible(
@@ -543,8 +565,16 @@ class _WorkOrderCreateScreenState
           ),
         ),
         const SizedBox(width: 4),
-        const Icon(Icons.info_outline,
-            size: 14, color: AppTheme.textSecondary),
+        // Was purely decorative — visually promised "tap for help" but had no
+        // handler. Tooltip makes it a real tap/long-press affordance, and its
+        // `message` doubles as the icon's accessible label instead of a
+        // silent, unlabeled glyph.
+        Tooltip(
+          message: tooltip,
+          triggerMode: TooltipTriggerMode.tap,
+          child: const Icon(Icons.info_outline,
+              size: 14, color: AppTheme.textSecondary),
+        ),
       ],
     );
   }
@@ -622,7 +652,9 @@ class _WorkOrderCreateScreenState
             ],
           ),
           const SizedBox(height: 12),
-          _label('Infrastructure Type'),
+          _label('Infrastructure Type',
+              tooltip:
+                  'Narrows the Location Name list below to Stations, LC Gates, Service Buildings, or Staff Quarters.'),
           const SizedBox(height: 6),
           DropdownButtonFormField<InfraFilterType>(
             key: const Key('wo_infra_type_dropdown'),
@@ -648,7 +680,7 @@ class _WorkOrderCreateScreenState
             },
           ),
           const SizedBox(height: 12),
-          _label('Location Name'),
+          _label('Location Name', tooltip: 'The specific site this Job Work applies to.'),
           const SizedBox(height: 6),
           DropdownButtonFormField<int>(
             key: const Key('wo_location_dropdown'),
@@ -682,7 +714,7 @@ class _WorkOrderCreateScreenState
                   },
           ),
           const SizedBox(height: 12),
-          _label('Asset Category'),
+          _label('Asset Category', tooltip: 'Filters the Specific Asset list below by category.'),
           const SizedBox(height: 6),
           DropdownButtonFormField<String>(
             key: const Key('wo_asset_category_dropdown'),
@@ -709,7 +741,9 @@ class _WorkOrderCreateScreenState
                     }),
           ),
           const SizedBox(height: 12),
-          _label('Specific Asset (Optional)'),
+          _label('Specific Asset (Optional)',
+              tooltip:
+                  'Link this Job Work to one exact asset, or leave blank for a general/location-level task.'),
           const SizedBox(height: 6),
           DropdownButtonFormField<int>(
             key: const Key('wo_asset_dropdown'),
@@ -771,7 +805,9 @@ class _WorkOrderCreateScreenState
             ],
           ),
           const SizedBox(height: 12),
-          _label('Category'),
+          _label('Category',
+              tooltip:
+                  'Asset Template applies to one specific asset; Station / Batch Template applies broadly across a station.'),
           const SizedBox(height: 6),
           // Web splits templates into Asset Templates / Station Templates
           // tables (MaintenanceMasterList.jsx `template_kind`); here that's a
@@ -802,7 +838,7 @@ class _WorkOrderCreateScreenState
             },
           ),
           const SizedBox(height: 12),
-          _label('Schedule Type'),
+          _label('Schedule Type', tooltip: 'How often this checklist template is meant to run.'),
           const SizedBox(height: 6),
           DropdownButtonFormField<MaintenanceScheduleType?>(
             key: const Key('wo_template_schedule_dropdown'),
@@ -831,7 +867,9 @@ class _WorkOrderCreateScreenState
             },
           ),
           const SizedBox(height: 12),
-          _label('Template'),
+          _label('Template',
+              tooltip:
+                  'Attach a checklist template so the technician has a structured checklist during execution.'),
           const SizedBox(height: 6),
           DropdownButtonFormField<int>(
             key: const Key('wo_template_dropdown'),
