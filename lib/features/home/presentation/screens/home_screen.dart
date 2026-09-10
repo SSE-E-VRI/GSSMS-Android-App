@@ -10,13 +10,11 @@ import '../../../auth/domain/rbac.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../../../auth/presentation/controllers/auth_state.dart';
 import '../../../auth/presentation/screens/user_profile_screen.dart';
-import '../../../complaints/presentation/screens/complaint_create_screen.dart';
 import '../../../complaints/presentation/screens/complaint_list_screen.dart';
 import '../../../dashboard/presentation/controllers/dashboard_controller.dart';
 import '../../../dashboard/presentation/controllers/dashboard_state.dart';
 import '../../../dashboard/presentation/screens/dashboard_screen.dart';
 import '../../../energy/presentation/screens/energy_placeholder_screen.dart';
-import '../../../inspections/presentation/screens/inspection_create_screen.dart';
 import '../../../inspections/presentation/screens/inspection_list_screen.dart';
 import '../../../maintenance/presentation/screens/maintenance_screen.dart';
 import '../../../more/presentation/screens/more_screen.dart';
@@ -555,36 +553,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 );
               },
             ),
-            if (sessionAllows(session, 'complaints.create') ||
-                sessionAllows(session, 'complaints.view'))
-              ActionChip(
-                key: const Key('quick_action_complaint'),
-                avatar: const Icon(Icons.report_problem_outlined,
-                    size: 18, color: AppTheme.accentOrange),
-                label: const Text('Log Complaint'),
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const ComplaintCreateScreen(),
-                    ),
-                  );
-                },
-              ),
-            if (sessionAllows(session, 'inspections.create') ||
-                sessionAllows(session, 'inspections.view'))
-              ActionChip(
-                key: const Key('quick_action_inspection'),
-                avatar: const Icon(Icons.fact_check_outlined,
-                    size: 18, color: AppTheme.moduleInspections),
-                label: const Text('Inspection'),
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const InspectionCreateScreen(),
-                    ),
-                  );
-                },
-              ),
+            // "Log Complaint"/"Inspection" quick actions were removed from
+            // here — creating a complaint or inspection now lives only in
+            // its own module (the FAB on ComplaintListScreen/
+            // InspectionListScreen), not duplicated as a Home shortcut too.
             if (sessionAllows(session, 'maintenance.view'))
               ActionChip(
                 key: const Key('quick_action_work_orders'),

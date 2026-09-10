@@ -324,6 +324,9 @@ void main() {
     });
 
     testWidgets('Quick Actions row respects permissions', (tester) async {
+      // Complaint/Inspection creation lives only in their own module's list
+      // screen FAB now, not duplicated as a Home quick action — so this row
+      // only ever carries Scan Asset + Work Orders.
       // Super admin sees all quick action chips
       const superSession = UserSession(
         accessToken: 't',
@@ -335,8 +338,6 @@ void main() {
       await tester.pumpWidget(createTestWidget(superSession));
 
       expect(find.byKey(const Key('quick_action_scan_asset')), findsOneWidget);
-      expect(find.byKey(const Key('quick_action_complaint')), findsOneWidget);
-      expect(find.byKey(const Key('quick_action_inspection')), findsOneWidget);
       expect(find.byKey(const Key('quick_action_work_orders')), findsOneWidget);
 
       // Restricted guest sees only scan asset quick action
@@ -350,8 +351,6 @@ void main() {
       await tester.pumpWidget(createTestWidget(guestSession));
 
       expect(find.byKey(const Key('quick_action_scan_asset')), findsOneWidget);
-      expect(find.byKey(const Key('quick_action_complaint')), findsNothing);
-      expect(find.byKey(const Key('quick_action_inspection')), findsNothing);
       expect(find.byKey(const Key('quick_action_work_orders')), findsNothing);
     });
 
