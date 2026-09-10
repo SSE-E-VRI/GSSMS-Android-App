@@ -3,6 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gssms_mobile/core/network/dio_client.dart';
 import 'package:gssms_mobile/core/network/paginated_fetch.dart';
 import 'package:gssms_mobile/features/assets/domain/models/asset.dart';
+import 'package:gssms_mobile/features/assets/domain/models/asset_component.dart';
+import 'package:gssms_mobile/features/assets/domain/models/asset_maintenance_summary.dart';
+import 'package:gssms_mobile/features/assets/domain/models/asset_replacement_event.dart';
+import 'package:gssms_mobile/features/assets/domain/models/asset_specification.dart';
+import 'package:gssms_mobile/features/assets/domain/models/reliability_metrics.dart';
 
 final assetApiServiceProvider = Provider<AssetApiService>((ref) {
   final dio = ref.watch(authenticatedDioProvider);
@@ -64,6 +69,72 @@ class AssetApiService {
   Future<Asset> getAsset(int id) async {
     final response = await _dio.get('/api/v1/assets/$id/');
     return Asset.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  Map<String, dynamic>? _asObject(dynamic data) {
+    if (data is Map<String, dynamic>) return data;
+    if (data is Map) return Map<String, dynamic>.from(data);
+    return null;
+  }
+
+  List<dynamic> _asList(dynamic data) {
+    if (data is List) return data;
+    if (data is Map && data['results'] is List) return data['results'] as List<dynamic>;
+    return const [];
+  }
+
+  /// "Asset Maintenance Status" panel + the Maintenance tab —
+  /// `AssetViewSet.maintenance_summary`.
+  Future<AssetMaintenanceSummary> getMaintenanceSummary(int assetId) async {
+    final response = await _dio.get('/api/v1/assets/$assetId/maintenance-summary/');
+    return AssetMaintenanceSummary.fromJson(_asObject(response.data) ?? const {});
+  }
+
+  /// "Reliability Analysis (ISO 55000)" panel — note this lives under the
+  /// maintenance work-orders router, not `/assets/`
+  /// (`WorkOrderViewSet.reliability_metrics`), scoped to one asset via
+  /// `asset_id`. [startDate]/[endDate] are `yyyy-MM-dd`; omitting both
+  /// matches the server's own default (last 30 days).
+  Future<ReliabilityMetrics> getReliabilityMetrics(
+    int assetId, {
+    String? startDate,
+    String? endDate,
+  }) async {
+    final query = <String, dynamic>{'asset_id': assetId};
+    if (startDate != null) query['start_date'] = startDate;
+    if (endDate != null) query['end_date'] = endDate;
+    final response = await _dio.get(
+      '/api/v1/maintenance/work-orders/reliability_metrics/',
+      queryParameters: query,
+    );
+    return ReliabilityMetrics.fromJson(_asObject(response.data) ?? const {});
+  }
+
+  /// Specifications tab — `AssetViewSet.specifications` (read-only on mobile;
+  /// see [AssetSpecificationWorkspace]'s doc comment).
+  Future<AssetSpecificationWorkspace> getSpecifications(int assetId) async {
+    final response = await _dio.get('/api/v1/assets/$assetId/specifications/');
+    return AssetSpecificationWorkspace.fromJson(_asObject(response.data) ?? const {});
+  }
+
+  /// Components tab — `AssetViewSet.components`. `include_history=false`
+  /// (the server default) matches web's own default view: active
+  /// components only, not the full replace/remove history for each slot.
+  Future<List<AssetComponent>> getComponents(int assetId) async {
+    final response = await _dio.get('/api/v1/assets/$assetId/components/');
+    return _asList(response.data)
+        .whereType<Map>()
+        .map((e) => AssetComponent.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+
+  /// Replacement History tab — `AssetViewSet.replacement_history`.
+  Future<List<AssetReplacementEvent>> getReplacementHistory(int assetId) async {
+    final response = await _dio.get('/api/v1/assets/$assetId/replacement-history/');
+    return _asList(response.data)
+        .whereType<Map>()
+        .map((e) => AssetReplacementEvent.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
   }
 
   /// Resolves a scanned or typed code to a single asset.
