@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'package:gssms_mobile/core/network/api_error.dart';
 import 'package:gssms_mobile/core/network/dio_client.dart';
 import 'package:gssms_mobile/core/widgets/org_scope_filter_bar.dart';
 import 'package:gssms_mobile/features/reports/data/infrastructure_options_service.dart';
@@ -103,7 +104,7 @@ class ReportsController extends Notifier<ReportsState> {
         orgScope: scope,
       );
     } catch (e) {
-      state = ReportsError('Failed to load register report: $e', previousLoaded: previous);
+      state = ReportsError(userFacingError(e), previousLoaded: previous);
     }
   }
 

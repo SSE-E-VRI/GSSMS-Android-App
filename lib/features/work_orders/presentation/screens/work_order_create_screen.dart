@@ -79,9 +79,12 @@ class _WorkOrderCreateScreenState
     }).toList();
   }
 
-  static const _webBlue = AppTheme.railwayBlue;
-  static const _webLightBg = AppTheme.backgroundLight;
-  static const _border = AppTheme.borderGrey;
+  /// Header band + submit button: a solid/on-solid pair so the text stays
+  /// readable in both themes.
+  Color get _band => Theme.of(context).colorScheme.primary;
+  Color get _onBand => Theme.of(context).colorScheme.onPrimary;
+  Color get _webLightBg => context.gssms.surfaceInset;
+  Color get _border => context.gssms.border;
 
   @override
   void initState() {
@@ -250,9 +253,9 @@ class _WorkOrderCreateScreenState
     }
     if (!(_formKey.currentState?.validate() ?? false)) return;
     if (_canSelectDepot && _selectedDepotId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Please select a Depot'),
-          backgroundColor: AppTheme.errorRed));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: const Text('Please select a Depot'),
+          backgroundColor: context.gssms.danger.solid));
       return;
     }
     setState(() => _isSubmitting = true);
@@ -276,9 +279,9 @@ class _WorkOrderCreateScreenState
             maintenanceMasterId: _selectedMaintenanceMasterId,
           );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('Job Work created successfully!'),
-            backgroundColor: AppTheme.railwayGreen));
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+            content: const Text('Job Work created successfully!'),
+            backgroundColor: context.gssms.success.solid));
         Navigator.of(context).pop(true);
       }
     } catch (e) {
@@ -286,7 +289,7 @@ class _WorkOrderCreateScreenState
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text(
                 'Failed to create Job Work: ${workOrderReadableError(e)}'),
-            backgroundColor: AppTheme.errorRed));
+            backgroundColor: context.gssms.danger.solid));
       }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
@@ -304,7 +307,6 @@ class _WorkOrderCreateScreenState
       return Scaffold(
         appBar: AppBar(
           title: const Text('New Job Work'),
-          backgroundColor: AppTheme.primaryDark,
         ),
         body: const PermissionDeniedView(),
       );
@@ -314,7 +316,7 @@ class _WorkOrderCreateScreenState
       // No title here — the colored header below already carries it (as an
       // accessible `Semantics(header: true)` region), so the AppBar isn't
       // duplicating it back-to-back. Only the back button lives up top.
-      appBar: AppBar(backgroundColor: AppTheme.primaryDark),
+      appBar: AppBar(),
       backgroundColor: _webLightBg,
       body: !_bootstrapped
           ? const Center(child: CircularProgressIndicator())
@@ -324,7 +326,7 @@ class _WorkOrderCreateScreenState
                 key: _formKey,
                 child: Container(
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: Theme.of(context).cardTheme.color,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: _border),
                     boxShadow: [
@@ -349,21 +351,21 @@ class _WorkOrderCreateScreenState
                         // their own semantics on top of this label.
                         excludeSemantics: true,
                         child: Container(
-                          decoration: const BoxDecoration(
-                            color: _webBlue,
-                            borderRadius: BorderRadius.vertical(
+                          decoration: BoxDecoration(
+                            color: _band,
+                            borderRadius: const BorderRadius.vertical(
                                 top: Radius.circular(12)),
                           ),
                           padding: const EdgeInsets.symmetric(
                               horizontal: 16, vertical: 14),
-                          child: const Row(
+                          child: Row(
                             children: [
                               Icon(Icons.add_task_outlined,
-                                  color: Colors.white, size: 20),
-                              SizedBox(width: 8),
+                                  color: _onBand, size: 20),
+                              const SizedBox(width: 8),
                               Text('New Job Work',
                                   style: TextStyle(
-                                      color: Colors.white,
+                                      color: _onBand,
                                       fontSize: 16,
                                       fontWeight: FontWeight.bold)),
                             ],
@@ -487,10 +489,10 @@ class _WorkOrderCreateScreenState
                               child: InputDecorator(
                                 decoration: _input().copyWith(
                                   suffixIcon: _dueDate == null
-                                      ? const Icon(
+                                      ? Icon(
                                           Icons.calendar_today_outlined,
                                           size: 18,
-                                          color: AppTheme.textSecondary)
+                                          color: context.gssms.textSecondary)
                                       : IconButton(
                                           key: const Key(
                                               'wo_due_date_clear'),
@@ -509,8 +511,8 @@ class _WorkOrderCreateScreenState
                                   style: TextStyle(
                                       fontSize: 14,
                                       color: _dueDate == null
-                                          ? AppTheme.textSecondary
-                                          : AppTheme.textPrimary),
+                                          ? context.gssms.textSecondary
+                                          : context.gssms.textPrimary),
                                 ),
                               ),
                             ),
@@ -528,7 +530,7 @@ class _WorkOrderCreateScreenState
                               minLines: 3,
                             ),
                             const SizedBox(height: 16),
-                            const Divider(height: 1, color: _border),
+                            Divider(height: 1, color: _border),
                             const SizedBox(height: 16),
                             _actions(),
                           ],
@@ -546,19 +548,19 @@ class _WorkOrderCreateScreenState
     return Row(
       children: [
         Flexible(
-          child: RichText(
-            text: TextSpan(
+          child: Text.rich(
+            TextSpan(
               text: t,
-              style: const TextStyle(
+              style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: AppTheme.textPrimary),
+                  color: context.gssms.textPrimary),
               children: [
                 if (required)
-                  const TextSpan(
+                  TextSpan(
                       text: ' *',
                       style: TextStyle(
-                          color: AppTheme.errorRed,
+                          color: context.gssms.danger.foreground,
                           fontWeight: FontWeight.bold)),
               ],
             ),
@@ -572,8 +574,8 @@ class _WorkOrderCreateScreenState
         Tooltip(
           message: tooltip,
           triggerMode: TooltipTriggerMode.tap,
-          child: const Icon(Icons.info_outline,
-              size: 14, color: AppTheme.textSecondary),
+          child: Icon(Icons.info_outline,
+              size: 14, color: context.gssms.textSecondary),
         ),
       ],
     );
@@ -582,17 +584,17 @@ class _WorkOrderCreateScreenState
   InputDecoration _input([String? hint]) => InputDecoration(
         hintText: hint,
         hintStyle:
-            const TextStyle(color: AppTheme.textSecondary, fontSize: 14),
+            TextStyle(color: context.gssms.textSecondary, fontSize: 14),
         filled: true,
-        fillColor: Colors.white,
+        fillColor: Theme.of(context).inputDecorationTheme.fillColor,
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: _border)),
+            borderSide: BorderSide(color: _border)),
         enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: _border)),
+            borderSide: BorderSide(color: _border)),
       );
 
   Widget _depotField() {
@@ -632,22 +634,22 @@ class _WorkOrderCreateScreenState
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppTheme.surfaceCard,
+        color: Theme.of(context).cardTheme.color,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: _border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
               Icon(Icons.location_on,
-                  color: AppTheme.railwayBlue, size: 16),
-              SizedBox(width: 6),
+                  color: context.gssms.link, size: 16),
+              const SizedBox(width: 6),
               Text('Location & Asset (Optional)',
                   style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      color: AppTheme.railwayBlue,
+                      color: context.gssms.link,
                       fontSize: 13)),
             ],
           ),
@@ -786,21 +788,21 @@ class _WorkOrderCreateScreenState
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppTheme.surfaceCard,
+        color: Theme.of(context).cardTheme.color,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: _border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              Icon(Icons.checklist, color: AppTheme.railwayBlue, size: 16),
-              SizedBox(width: 6),
+              Icon(Icons.checklist, color: context.gssms.link, size: 16),
+              const SizedBox(width: 6),
               Text('Template / Checklist (Optional)',
                   style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      color: AppTheme.railwayBlue,
+                      color: context.gssms.link,
                       fontSize: 13)),
             ],
           ),
@@ -911,8 +913,8 @@ class _WorkOrderCreateScreenState
         OutlinedButton.icon(
           key: const Key('cancel_wo_button'),
           style: OutlinedButton.styleFrom(
-            foregroundColor: AppTheme.textMuted,
-            side: const BorderSide(color: AppTheme.borderGrey),
+            foregroundColor: context.gssms.textSecondary,
+            side: BorderSide(color: context.gssms.border),
             padding:
                 const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
             shape: RoundedRectangleBorder(
@@ -930,25 +932,25 @@ class _WorkOrderCreateScreenState
         ElevatedButton.icon(
           key: const Key('submit_wo_button'),
           style: ElevatedButton.styleFrom(
-            backgroundColor: AppTheme.railwayBlue,
-            foregroundColor: Colors.white,
+            backgroundColor: _band,
+            foregroundColor: _onBand,
             padding:
                 const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8)),
             elevation: 2,
-            minimumSize: const Size(0, 44),
+            minimumSize: const Size(0, GssmsSize.touchTarget),
             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
           onPressed: _isSubmitting ? null : _submit,
           icon: _isSubmitting
-              ? const SizedBox(
+              ? SizedBox(
                   width: 16,
                   height: 16,
                   child: CircularProgressIndicator(
-                      color: Colors.white, strokeWidth: 2))
+                      color: _onBand, strokeWidth: 2))
               : const Icon(Icons.add_task_outlined,
-                  size: 16, color: Colors.white),
+                  size: 16),
           label: Text(_isSubmitting ? 'Creating...' : 'Create Job Work',
               style:
                   const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),

@@ -1,54 +1,57 @@
 import 'package:flutter/material.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
 
-/// Inline error strip for the stale-data-with-banner pattern.
+/// Inline error strip for the stale-data-with-banner pattern: keep the
+/// last-good list visible and show this banner above it with Retry.
 ///
-/// Extracted from `complaint_list_screen.dart` (error state when
-/// `previousLoaded != null`): keep the last-good list visible and show this
-/// banner above it with Retry.
-///
-/// Uses [AppTheme.statusCritical] (darker than [AppTheme.errorRed]) for text
-/// and icon so 12sp metadata copy holds outdoor contrast.
+/// [message] must already be user-facing (see `userFacingError`).
 class ErrorBanner extends StatelessWidget {
   const ErrorBanner({
     super.key,
     required this.message,
     required this.onRetry,
+    this.icon = Icons.cloud_off,
   });
 
   final String message;
   final VoidCallback onRetry;
+  final IconData icon;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: AppTheme.statusCritical.withOpacity(0.08),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-          horizontal: GssmsSpacing.s16,
-          vertical: GssmsSpacing.s8,
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.cloud_off,
-                size: 18, color: AppTheme.statusCritical),
-            const SizedBox(width: GssmsSpacing.s8),
-            Expanded(
-              child: Text(
-                message,
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: AppTheme.statusCritical,
-                      fontWeight: FontWeight.w600,
-                    ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+    final palette = context.gssms.danger;
+    return Semantics(
+      liveRegion: true,
+      child: Material(
+        color: palette.background,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            GssmsSpacing.s16,
+            GssmsSpacing.s4,
+            GssmsSpacing.s4,
+            GssmsSpacing.s4,
+          ),
+          child: Row(
+            children: [
+              Icon(icon, size: 18, color: palette.foreground),
+              const SizedBox(width: GssmsSpacing.s8),
+              Expanded(
+                child: Text(
+                  message,
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        color: palette.foreground,
+                      ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-            ),
-            TextButton(
-              onPressed: onRetry,
-              child: const Text('Retry'),
-            ),
-          ],
+              TextButton(
+                onPressed: onRetry,
+                style: TextButton.styleFrom(foregroundColor: palette.foreground),
+                child: const Text('Retry'),
+              ),
+            ],
+          ),
         ),
       ),
     );

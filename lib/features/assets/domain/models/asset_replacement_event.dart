@@ -59,7 +59,7 @@ class AssetReplacementEvent extends Equatable {
     return AssetReplacementEvent(
       sourceType: asJsonString(json['source_type']) ?? 'REPLACEMENT',
       date: asJsonString(json['date']) != null
-          ? DateTime.tryParse(json['date'].toString())
+          ? asJsonDateTime(json['date'])
           : null,
       oldIdentity: json['old_identity'] is Map
           ? Map<String, dynamic>.from(json['old_identity'] as Map)

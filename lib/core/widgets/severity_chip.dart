@@ -1,8 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
+import 'package:gssms_mobile/core/widgets/status_chip.dart';
 
-/// Critical / High / Medium / Low severity badge (non-interactive metadata).
-enum GssmsSeverity { critical, high, medium, low }
+/// Critical / High / Medium / Low badge (non-interactive metadata).
+///
+/// Only for entities whose API actually carries a priority (Work Orders —
+/// SSOT §13). Complaints and Inspections have no severity/priority field.
+enum GssmsSeverity {
+  critical(GssmsTone.danger, Icons.keyboard_double_arrow_up, 'Critical'),
+  high(GssmsTone.accent, Icons.keyboard_arrow_up, 'High'),
+  medium(GssmsTone.warning, Icons.drag_handle, 'Medium'),
+  low(GssmsTone.neutral, Icons.keyboard_arrow_down, 'Low');
+
+  const GssmsSeverity(this.tone, this.icon, this.defaultLabel);
+  final GssmsTone tone;
+  final IconData icon;
+  final String defaultLabel;
+}
 
 class SeverityChip extends StatelessWidget {
   const SeverityChip({
@@ -14,52 +28,13 @@ class SeverityChip extends StatelessWidget {
   final GssmsSeverity severity;
   final String? label;
 
-  Color get _color {
-    switch (severity) {
-      case GssmsSeverity.critical:
-        return AppTheme.statusCritical;
-      case GssmsSeverity.high:
-        return AppTheme.statusHigh;
-      case GssmsSeverity.medium:
-        return AppTheme.statusMedium;
-      case GssmsSeverity.low:
-        return AppTheme.statusLow;
-    }
-  }
-
-  String get _defaultLabel {
-    switch (severity) {
-      case GssmsSeverity.critical:
-        return 'Critical';
-      case GssmsSeverity.high:
-        return 'High';
-      case GssmsSeverity.medium:
-        return 'Medium';
-      case GssmsSeverity.low:
-        return 'Low';
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    final color = _color;
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: GssmsSpacing.s8,
-        vertical: GssmsSpacing.s4,
-      ),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(GssmsRadius.r12),
-        border: Border.all(color: color),
-      ),
-      child: Text(
-        label ?? _defaultLabel,
-        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-              color: color,
-              fontWeight: FontWeight.w700,
-            ),
-      ),
+    return StatusChip(
+      label: label ?? severity.defaultLabel,
+      tone: severity.tone,
+      icon: severity.icon,
+      semanticPrefix: 'Priority',
     );
   }
 }

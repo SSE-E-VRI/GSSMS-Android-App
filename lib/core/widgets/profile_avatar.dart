@@ -102,8 +102,8 @@ class _ProfileAvatarState extends ConsumerState<ProfileAvatar> {
 
   Widget _buildInitials() {
     final initials = _getInitials(widget.displayName);
-    final bg = widget.backgroundColor ?? AppTheme.primaryBlue;
-    final fg = widget.foregroundColor ?? Colors.white;
+    final bg = widget.backgroundColor ?? Theme.of(context).colorScheme.primary;
+    final fg = widget.foregroundColor ?? Theme.of(context).colorScheme.onPrimary;
     final fontSize = (widget.radius * 0.85).clamp(11.0, 36.0);
 
     return Container(
@@ -159,7 +159,7 @@ class _ProfileAvatarState extends ConsumerState<ProfileAvatar> {
       height: widget.radius * 2,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: widget.backgroundColor ?? AppTheme.surfaceCard,
+        color: widget.backgroundColor ?? context.gssms.surfaceInset,
       ),
       clipBehavior: Clip.antiAlias,
       child: _buildImageContent(),

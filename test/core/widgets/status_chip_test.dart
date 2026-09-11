@@ -4,19 +4,61 @@ import 'package:gssms_mobile/core/theme/app_theme.dart';
 import 'package:gssms_mobile/core/widgets/status_chip.dart';
 
 void main() {
-  testWidgets('StatusChip renders label with the success token colour',
+  Future<void> pump(WidgetTester tester, ThemeData theme, Widget child) {
+    return tester.pumpWidget(
+      MaterialApp(theme: theme, home: Scaffold(body: Center(child: child))),
+    );
+  }
+
+  testWidgets('StatusChip uses the success tone foreground in light theme',
       (tester) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: AppTheme.lightTheme,
-        home: const Scaffold(
-          body: StatusChip(label: 'Verified', tone: GssmsStatusTone.success),
-        ),
+    await pump(
+      tester,
+      AppTheme.lightTheme,
+      const StatusChip(label: 'Verified', tone: GssmsTone.success),
+    );
+
+    final text = tester.widget<Text>(find.text('Verified'));
+    expect(text.style?.color, GssmsColors.light.success.foreground);
+  });
+
+  testWidgets('StatusChip resolves tone colours for the dark theme',
+      (tester) async {
+    await pump(
+      tester,
+      AppTheme.darkTheme,
+      const StatusChip(label: 'Verified', tone: GssmsTone.success),
+    );
+
+    final text = tester.widget<Text>(find.text('Verified'));
+    expect(text.style?.color, GssmsColors.dark.success.foreground);
+  });
+
+  testWidgets('StatusChip shows its icon so meaning is not colour-only',
+      (tester) async {
+    await pump(
+      tester,
+      AppTheme.lightTheme,
+      const StatusChip(
+        label: 'Rework Required',
+        tone: GssmsTone.danger,
+        icon: Icons.replay,
+        semanticPrefix: 'Status',
       ),
     );
 
-    expect(find.text('Verified'), findsOneWidget);
-    final text = tester.widget<Text>(find.text('Verified'));
-    expect(text.style?.color, AppTheme.statusSuccess);
+    expect(find.byIcon(Icons.replay), findsOneWidget);
+    expect(find.bySemanticsLabel('Status: Rework Required'), findsOneWidget);
+  });
+
+  testWidgets('filled StatusChip uses the solid/onSolid pair', (tester) async {
+    await pump(
+      tester,
+      AppTheme.lightTheme,
+      const StatusChip(label: 'Open', tone: GssmsTone.warning, filled: true),
+    );
+
+    final text = tester.widget<Text>(find.text('Open'));
+    expect(text.style?.color, GssmsColors.light.warning.onSolid);
   });
 }

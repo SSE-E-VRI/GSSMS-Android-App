@@ -93,12 +93,12 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.error_outline, size: 48, color: AppTheme.errorRed),
+              Icon(Icons.error_outline, size: 48, color: context.gssms.danger.foreground),
               const SizedBox(height: 12),
               Text(
                 state.message,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: AppTheme.textSecondary),
+                style: TextStyle(color: context.gssms.textSecondary),
               ),
               const SizedBox(height: 16),
               ElevatedButton(
@@ -120,10 +120,10 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
           const Divider(height: 1),
           Expanded(
             child: entries.isEmpty
-                ? const Center(
+                ? Center(
                     child: Padding(
-                      padding: EdgeInsets.all(24),
-                      child: Text('No maintenance register entries found for selected date range.', textAlign: TextAlign.center, style: TextStyle(color: AppTheme.textSecondary)),
+                      padding: const EdgeInsets.all(24),
+                      child: Text('No maintenance register entries found for selected date range.', textAlign: TextAlign.center, style: TextStyle(color: context.gssms.textSecondary)),
                     ),
                   )
                 : ListView.builder(
@@ -146,7 +146,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   Widget _buildFilters(ReportsLoaded state) {
     return Container(
       width: double.infinity,
-      color: Colors.white,
+      color: context.gssms.surfaceRaised,
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
       child: Column(
         children: [
@@ -233,8 +233,8 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
       child: ListTile(
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         leading: CircleAvatar(
-          backgroundColor: AppTheme.railwayBlue.withOpacity(0.12),
-          child: Text('#$slNo', style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.railwayBlue, fontSize: 12)),
+          backgroundColor: context.gssms.info.background,
+          child: Text('#$slNo', style: TextStyle(fontWeight: FontWeight.bold, color: context.gssms.link, fontSize: 12)),
         ),
         title: Text(
           entry.masterName,
@@ -244,12 +244,12 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 4),
-            Text('Completed: $dateStr · ${entry.stationName ?? "Not specified"}', style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+            Text('Completed: $dateStr · ${entry.stationName ?? "Not specified"}', style: TextStyle(fontSize: 12, color: context.gssms.textSecondary)),
             if (entry.technician != null)
-              Text('Technician: ${entry.technician}', style: const TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+              Text('Technician: ${entry.technician}', style: TextStyle(fontSize: 11, color: context.gssms.textSecondary)),
           ],
         ),
-        trailing: const Icon(Icons.arrow_forward_ios, size: 16, color: AppTheme.textSecondary),
+        trailing: Icon(Icons.arrow_forward_ios, size: 16, color: context.gssms.textSecondary),
         onTap: () {
           Navigator.of(context).push(
             MaterialPageRoute<void>(

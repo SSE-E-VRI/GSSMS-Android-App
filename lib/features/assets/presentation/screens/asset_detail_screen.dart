@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
+import 'package:gssms_mobile/core/widgets/section_card.dart';
 import 'package:gssms_mobile/features/assets/domain/models/asset.dart';
 import 'package:gssms_mobile/features/assets/domain/models/asset_component.dart';
 import 'package:gssms_mobile/features/assets/domain/models/asset_maintenance_summary.dart';
@@ -119,7 +120,7 @@ class _AssetDetailScreenState extends ConsumerState<AssetDetailScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.error_outline, size: 48, color: AppTheme.errorRed),
+              Icon(Icons.error_outline, size: 48, color: context.gssms.danger.foreground),
               const SizedBox(height: 12),
               Text(state.message, textAlign: TextAlign.center),
               const SizedBox(height: 16),
@@ -174,23 +175,8 @@ Widget _sectionCard({required String title, required List<Widget> children}) {
   );
 }
 
-Widget _infoRow(String label, String value) {
-  return Padding(
-    padding: const EdgeInsets.symmetric(vertical: 4),
-    child: Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: 140,
-          child: Text(label, style: const TextStyle(color: AppTheme.textSecondary)),
-        ),
-        Expanded(
-          child: Text(value, style: const TextStyle(fontWeight: FontWeight.w500)),
-        ),
-      ],
-    ),
-  );
-}
+Widget _infoRow(String label, String value) =>
+    InfoRow(label: label, value: value);
 
 /// Generic error/loading wrapper for a tab whose data comes from one
 /// `FutureProvider` — every tab past Master Data follows this same shape.
@@ -219,7 +205,7 @@ class _TabAsyncBody<T> extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.error_outline, size: 40, color: AppTheme.errorRed),
+              Icon(Icons.error_outline, size: 40, color: context.gssms.danger.foreground),
               const SizedBox(height: 10),
               Text('$err', textAlign: TextAlign.center, style: const TextStyle(fontSize: 13)),
               const SizedBox(height: 12),
@@ -231,7 +217,7 @@ class _TabAsyncBody<T> extends StatelessWidget {
       data: (data) {
         if (emptyCheck != null && emptyCheck!(data)) {
           return Center(
-            child: Text(emptyLabel, style: const TextStyle(color: AppTheme.textSecondary)),
+            child: Text(emptyLabel, style: TextStyle(color: context.gssms.textSecondary)),
           );
         }
         return builder(context, data);
@@ -256,7 +242,7 @@ class _MasterDataTab extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildHeaderCard(asset),
+          _buildHeaderCard(context, asset),
           const SizedBox(height: 16),
           _sectionCard(title: 'Location & Installation', children: [
             _infoRow('Station', asset.stationName ?? 'N/A'),
@@ -288,7 +274,7 @@ class _MasterDataTab extends ConsumerWidget {
     );
   }
 
-  Widget _buildHeaderCard(Asset asset) {
+  Widget _buildHeaderCard(BuildContext context, Asset asset) {
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
@@ -298,10 +284,10 @@ class _MasterDataTab extends ConsumerWidget {
           children: [
             Text(
               asset.uniqueId,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.bold,
-                color: AppTheme.railwayBlue,
+                color: context.gssms.link,
               ),
             ),
             const SizedBox(height: 8),
@@ -313,7 +299,7 @@ class _MasterDataTab extends ConsumerWidget {
               const SizedBox(height: 4),
               Text(
                 'Category: ${asset.assetCategoryName}',
-                style: const TextStyle(color: AppTheme.textSecondary),
+                style: TextStyle(color: context.gssms.textSecondary),
               ),
             ],
           ],
@@ -354,7 +340,7 @@ class _MasterDataTab extends ConsumerWidget {
                       Text(
                         'Last done: ${status?.lastDoneDate != null ? dateFormat.format(status!.lastDoneDate!) : '—'}   '
                         'Next due: ${status?.nextDueDate != null ? dateFormat.format(status!.nextDueDate!) : '—'}',
-                        style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                        style: TextStyle(fontSize: 12, color: context.gssms.textSecondary),
                       ),
                     ],
                   ),
@@ -385,18 +371,18 @@ class _MasterDataTab extends ConsumerWidget {
                     padding: const EdgeInsets.only(bottom: 10),
                     child: Text(
                       'Last 30 days: ${DateFormat('dd MMM').format(data.periodStart!)} – ${DateFormat('dd MMM yyyy').format(data.periodEnd!)}',
-                      style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                      style: TextStyle(fontSize: 12, color: context.gssms.textSecondary),
                     ),
                   ),
                 Row(
                   children: [
                     Expanded(
-                      child: _metricTile('MTBF', data.displayMtbf, AppTheme.railwayBlue,
+                      child: _metricTile(context, 'MTBF', data.displayMtbf, GssmsTone.info,
                           'Avg uptime between failures'),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: _metricTile('MTTR', data.displayMttr, AppTheme.errorRed,
+                      child: _metricTile(context, 'MTTR', data.displayMttr, GssmsTone.danger,
                           'Avg downtime per failure'),
                     ),
                   ],
@@ -405,12 +391,12 @@ class _MasterDataTab extends ConsumerWidget {
                 Row(
                   children: [
                     Expanded(
-                      child: _metricTile('Availability', data.displayAvailability,
-                          AppTheme.railwayGreen, 'Target 99.5%'),
+                      child: _metricTile(context, 'Availability', data.displayAvailability,
+                          GssmsTone.success, 'Target 99.5%'),
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: _metricTile('Failures', '${data.failures}', AppTheme.railwayBlue,
+                      child: _metricTile(context, 'Failures', '${data.failures}', GssmsTone.neutral,
                           '${data.completedFailures} done / ${data.failures - data.completedFailures} open'),
                     ),
                   ],
@@ -427,28 +413,32 @@ class _MasterDataTab extends ConsumerWidget {
     );
   }
 
-  Widget _metricTile(String label, String value, Color color, String caption) {
+  Widget _metricTile(BuildContext context, String label, String value, GssmsTone tone, String caption) {
+    final palette = context.gssms.tone(tone);
+    final textTheme = Theme.of(context).textTheme;
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(GssmsSpacing.s12),
       decoration: BoxDecoration(
-        color: color,
-        borderRadius: BorderRadius.circular(10),
+        color: palette.background,
+        border: Border.all(color: palette.border),
+        borderRadius: BorderRadius.circular(GssmsRadius.r8),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(label,
-              style: const TextStyle(
-                  color: Colors.white70, fontSize: 11, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 4),
+              style: textTheme.labelSmall?.copyWith(
+                  color: palette.foreground, fontWeight: FontWeight.bold)),
+          const SizedBox(height: GssmsSpacing.s4),
           Text(value,
-              style: const TextStyle(
-                  color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+              style: textTheme.titleMedium?.copyWith(
+                  color: palette.foreground, fontWeight: FontWeight.bold),
               maxLines: 1,
               overflow: TextOverflow.ellipsis),
-          const SizedBox(height: 2),
+          const SizedBox(height: GssmsSpacing.s2),
           Text(caption,
-              style: const TextStyle(color: Colors.white70, fontSize: 10),
+              style: textTheme.labelSmall?.copyWith(
+                  color: context.gssms.textSecondary, fontWeight: FontWeight.w400),
               maxLines: 2,
               overflow: TextOverflow.ellipsis),
         ],
@@ -489,7 +479,7 @@ class _SpecificationsTab extends ConsumerWidget {
                     title: Text(f.label),
                     subtitle: f.notAvailableReason != null && f.notAvailableReason!.isNotEmpty
                         ? Text('Not available: ${f.notAvailableReason}',
-                            style: const TextStyle(color: AppTheme.errorRed, fontSize: 12))
+                            style: TextStyle(color: context.gssms.danger.foreground, fontSize: 12))
                         : null,
                     trailing: Text(
                       [
@@ -533,7 +523,7 @@ class _ComponentsTab extends ConsumerWidget {
             return Card(
               child: ListTile(
                 leading: Icon(Icons.memory,
-                    color: c.isActive ? AppTheme.railwayBlue : AppTheme.textSecondary),
+                    color: c.isActive ? context.gssms.link : context.gssms.textSecondary),
                 title: Text(c.name, style: const TextStyle(fontWeight: FontWeight.bold)),
                 subtitle: Text([
                   if (c.make != null) c.make!,
@@ -660,17 +650,17 @@ class _DeficienciesTab extends ConsumerWidget {
                       width: double.infinity,
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                       decoration: BoxDecoration(
-                        color: AppTheme.errorLight,
+                        color: context.gssms.danger.background,
                         borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: AppTheme.errorBorder),
+                        border: Border.all(color: context.gssms.danger.border),
                       ),
                       child: Text(d.displayFinding,
-                          style: const TextStyle(fontSize: 12, color: AppTheme.errorRed)),
+                          style: TextStyle(fontSize: 12, color: context.gssms.danger.foreground)),
                     ),
                     if (d.detectedAt != null) ...[
                       const SizedBox(height: 6),
                       Text(dateFormat.format(d.detectedAt!),
-                          style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary)),
+                          style: TextStyle(fontSize: 11, color: context.gssms.textSecondary)),
                     ],
                   ],
                 ),
@@ -710,7 +700,7 @@ class _ReplacementHistoryTab extends ConsumerWidget {
             final e = data[i];
             return Card(
               child: ListTile(
-                leading: const Icon(Icons.swap_horiz, color: AppTheme.railwayBlue),
+                leading: Icon(Icons.swap_horiz, color: context.gssms.link),
                 title: Text(e.displayLabel, style: const TextStyle(fontWeight: FontWeight.bold)),
                 subtitle: Text([
                   if (e.oldIdentitySummary != null || e.newIdentitySummary != null)

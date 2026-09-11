@@ -4,7 +4,6 @@ import 'package:gssms_mobile/features/inspections/domain/models/inspection.dart'
 abstract class IInspectionRepository {
   Future<List<Inspection>> fetchInspections({
     String? status,
-    String? priority,
     int? zoneId,
     int? divisionId,
     int? depotId,
@@ -36,7 +35,6 @@ class InspectionRepository implements IInspectionRepository {
   @override
   Future<List<Inspection>> fetchInspections({
     String? status,
-    String? priority,
     int? zoneId,
     int? divisionId,
     int? depotId,
@@ -46,7 +44,6 @@ class InspectionRepository implements IInspectionRepository {
   }) {
     return _apiService.getInspections(
       status: status,
-      priority: priority,
       zoneId: zoneId,
       divisionId: divisionId,
       depotId: depotId,

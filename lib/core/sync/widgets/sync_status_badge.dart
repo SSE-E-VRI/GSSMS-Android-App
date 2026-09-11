@@ -23,12 +23,13 @@ class SyncStatusBadge extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final syncState = ref.watch(syncManagerProvider);
+    final tokens = context.gssms;
 
     if (syncState.attentionCount > 0) {
       return _Strip(
         badgeKey: const Key('sync_status_badge_attention'),
-        background: AppTheme.errorRed,
-        foreground: Colors.white,
+        background: tokens.danger.solid,
+        foreground: tokens.danger.onSolid,
         icon: Icons.error_outline,
         message:
             '${_changes(syncState.attentionCount)} need attention — tap to retry',
@@ -55,20 +56,29 @@ class SyncStatusBadge extends ConsumerWidget {
     }
 
     final syncing = syncState.mode == SyncConnectivityMode.syncing;
+    final offline = syncState.mode == SyncConnectivityMode.offline;
+    final changes = _changes(syncState.pendingCount);
+    // Online with work still queued (e.g. just after a restart, before the
+    // resume drain finishes) is not "Offline" — say what is actually true.
     final message = syncing
-        ? 'Syncing — ${_changes(syncState.pendingCount)} queued'
-        : 'Offline — ${_changes(syncState.pendingCount)} queued';
+        ? 'Syncing — $changes queued'
+        : offline
+            ? 'Offline — $changes queued'
+            : '$changes waiting to sync — tap to sync now';
+    final palette = offline ? tokens.warning : tokens.info;
 
     return _Strip(
       badgeKey: const Key('sync_status_badge'),
-      background: AppTheme.warningAmber,
-      foreground: Colors.black87,
-      icon: Icons.cloud_off_outlined,
+      background: palette.solid,
+      foreground: palette.onSolid,
+      icon: offline ? Icons.cloud_off_outlined : Icons.cloud_upload_outlined,
       showSpinner: syncing,
       message: message,
       semanticLabel: syncing
-          ? 'Syncing ${_changes(syncState.pendingCount)}.'
-          : 'Offline. ${_changes(syncState.pendingCount)} queued. Activate to retry now.',
+          ? 'Syncing $changes.'
+          : offline
+              ? 'Offline. $changes saved on this device. Activate to retry now.'
+              : '$changes saved on this device, waiting to sync. Activate to sync now.',
       onTap: () async {
         final messenger = ScaffoldMessenger.of(context);
         await ref.read(syncManagerProvider.notifier).drainOutbox();
@@ -137,13 +147,8 @@ class _Strip extends StatelessWidget {
                   child: Text(
                     message,
                     style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                              color: foreground,
-                              fontWeight: FontWeight.bold,
-                            ) ??
-                        TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
                           color: foreground,
+                          fontWeight: FontWeight.bold,
                         ),
                   ),
                 ),

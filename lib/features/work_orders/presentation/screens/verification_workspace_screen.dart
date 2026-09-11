@@ -123,7 +123,7 @@ class _VerificationWorkspaceScreenState
         if (!workspace.canVerify) ...[
           _banner(
             key: const Key('verify_blocked_banner'),
-            color: AppTheme.errorRed,
+            color: context.gssms.danger.foreground,
             title: 'Verification is blocked',
             lines: workspace.disabledReasons.isEmpty
                 ? const ['The server will not allow this work order to be verified.']
@@ -134,28 +134,28 @@ class _VerificationWorkspaceScreenState
         if (workspace.deficiencyCount > 0) ...[
           _banner(
             key: const Key('deficiency_banner'),
-            color: Colors.orange.shade800,
+            color: context.gssms.accent.foreground,
             title: '${workspace.deficiencyCount} deficienc${workspace.deficiencyCount == 1 ? 'y' : 'ies'} recorded',
             lines: workspace.deficiencies,
           ),
           const SizedBox(height: 12),
         ],
-        const Text(
+        Text(
           'Checklist',
           style: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 16,
-            color: AppTheme.railwayBlue,
+            color: context.gssms.link,
           ),
         ),
         const SizedBox(height: 10),
         if (lines.isEmpty)
-          const Card(
+          Card(
             child: Padding(
-              padding: EdgeInsets.all(16),
+              padding: const EdgeInsets.all(16),
               child: Text(
                 'No checklist lines on this record.',
-                style: TextStyle(color: AppTheme.textSecondary),
+                style: TextStyle(color: context.gssms.textSecondary),
               ),
             ),
           )
@@ -175,16 +175,16 @@ class _VerificationWorkspaceScreenState
         Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: Colors.amber.shade50,
+            color: context.gssms.warning.background,
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.amber.shade300),
+            border: Border.all(color: context.gssms.warning.border),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  Icon(Icons.verified_user, size: 18, color: Colors.amber.shade800),
+                  Icon(Icons.verified_user, size: 18, color: context.gssms.warning.foreground),
                   const SizedBox(width: 6),
                   const Text(
                     'High-risk transition',
@@ -193,9 +193,9 @@ class _VerificationWorkspaceScreenState
                 ],
               ),
               const SizedBox(height: 6),
-              const Text(
+              Text(
                 'Verify records you as the supervisor on this work order. Confirm you have reviewed the checklist.',
-                style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                style: TextStyle(fontSize: 11, color: context.gssms.textSecondary),
               ),
               InkWell(
                 onTap: () => setState(() => _highRiskConfirmed = !_highRiskConfirmed),
@@ -298,7 +298,7 @@ class _VerificationWorkspaceScreenState
             const SizedBox(height: 4),
             Text(
               'Equipment: ${line.itemName}',
-              style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+              style: TextStyle(fontSize: 12, color: context.gssms.textSecondary),
             ),
             if (reading.isNotEmpty)
               Text(
@@ -309,7 +309,7 @@ class _VerificationWorkspaceScreenState
                 line.observationAction!.trim().isNotEmpty)
               Text(
                 'Remarks: ${line.observationAction}',
-                style: const TextStyle(fontSize: 11, color: AppTheme.textMuted),
+                style: TextStyle(fontSize: 11, color: context.gssms.textSecondary),
               ),
           ],
         ),
@@ -335,15 +335,15 @@ class _VerificationWorkspaceScreenState
   Color _statusColor(MaintenanceRecordLine line) {
     final lower = line.status.toLowerCase();
     if (line.deficiency != null && line.deficiency!.trim().isNotEmpty) {
-      return AppTheme.errorRed;
+      return context.gssms.danger.foreground;
     }
     if (lower.contains('fail') ||
         lower.contains('defect') ||
         lower.contains('abnormal') ||
         lower.contains('dirty')) {
-      return AppTheme.errorRed;
+      return context.gssms.danger.foreground;
     }
-    return AppTheme.railwayGreen;
+    return context.gssms.success.foreground;
   }
 
   Widget _buildActions({
@@ -355,7 +355,8 @@ class _VerificationWorkspaceScreenState
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: context.gssms.surfaceRaised,
+          border: Border(top: BorderSide(color: context.gssms.border)),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.06),
@@ -373,8 +374,8 @@ class _VerificationWorkspaceScreenState
                     ? null
                     : () => _showReturnDialog(returnAction),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: AppTheme.errorRed,
-                  side: const BorderSide(color: AppTheme.errorRed),
+                  foregroundColor: context.gssms.danger.foreground,
+                  side: BorderSide(color: context.gssms.danger.foreground),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
                 child: const Text('Return to Technician', textAlign: TextAlign.center),
@@ -386,8 +387,8 @@ class _VerificationWorkspaceScreenState
                 key: const Key('verify_confirm_button'),
                 onPressed: (!canVerify || submitting) ? null : _confirmVerify,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.railwayGreen,
-                  foregroundColor: Colors.white,
+                  backgroundColor: context.gssms.success.solid,
+                  foregroundColor: context.gssms.success.onSolid,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
                 child: const Text('Verify'),
@@ -402,9 +403,9 @@ class _VerificationWorkspaceScreenState
   Future<void> _confirmVerify() async {
     if (!_highRiskConfirmed) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please confirm this verification'),
-          backgroundColor: AppTheme.errorRed,
+        SnackBar(
+          content: const Text('Please confirm this verification'),
+          backgroundColor: context.gssms.danger.solid,
         ),
       );
       return;
@@ -499,7 +500,7 @@ class _VerificationWorkspaceScreenState
       _ => 'The request failed. Please try again.',
     };
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: AppTheme.errorRed),
+      SnackBar(content: Text(message), backgroundColor: context.gssms.danger.solid),
     );
   }
 }

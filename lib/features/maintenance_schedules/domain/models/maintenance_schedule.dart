@@ -71,7 +71,7 @@ class MaintenanceSchedule extends Equatable {
       depotName: asJsonString(json['depot_name']),
       status: ScheduleStatus.fromString(asJsonString(json['status'])),
       dueDate: asJsonString(json['due_date']) != null
-          ? DateTime.tryParse(json['due_date'].toString())
+          ? asJsonDateTime(json['due_date'])
           : null,
       workOrderId: asJsonInt(json['work_order_id']),
       workOrderTicket: asJsonString(json['work_order_ticket']),

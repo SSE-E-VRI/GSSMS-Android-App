@@ -4,7 +4,8 @@ import 'package:gssms_mobile/core/theme/app_theme.dart';
 import 'package:gssms_mobile/core/widgets/severity_chip.dart';
 
 void main() {
-  testWidgets('SeverityChip maps Critical to statusCritical', (tester) async {
+  testWidgets('SeverityChip maps Critical to the danger tone with an icon',
+      (tester) async {
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.lightTheme,
@@ -13,9 +14,10 @@ void main() {
         ),
       ),
     );
-
     expect(find.text('Critical'), findsOneWidget);
     final text = tester.widget<Text>(find.text('Critical'));
-    expect(text.style?.color, AppTheme.statusCritical);
+    expect(text.style?.color, GssmsColors.light.danger.foreground);
+    expect(find.byIcon(GssmsSeverity.critical.icon), findsOneWidget);
+    expect(find.bySemanticsLabel('Priority: Critical'), findsOneWidget);
   });
 }

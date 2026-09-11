@@ -118,7 +118,7 @@ class MaintenanceRegisterEntry extends Equatable {
     return MaintenanceRegisterEntry(
       id: json['id'] as int? ?? 0,
       masterName: asJsonString(json['master']) ?? asJsonString(json['master_name']) ?? 'Maintenance Schedule',
-      date: json['date'] != null ? DateTime.tryParse(json['date'].toString()) : null,
+      date: json['date'] != null ? asJsonDateTime(json['date']) : null,
       railwayName: asJsonString(org?['railway_name']),
       divisionName: asJsonString(org?['division_name']),
       depotName: asJsonString(org?['depot_name']) ?? asJsonString(json['depot_name']),

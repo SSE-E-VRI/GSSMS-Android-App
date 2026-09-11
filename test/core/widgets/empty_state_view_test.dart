@@ -35,4 +35,27 @@ void main() {
     await tester.tap(find.text('Clear filters'));
     expect(tapped, isTrue);
   });
+
+  testWidgets('EmptyStateView body stays readable in the dark theme',
+      (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.lightTheme,
+        darkTheme: AppTheme.darkTheme,
+        themeMode: ThemeMode.dark,
+        home: const Scaffold(
+          body: EmptyStateView(
+            icon: Icon(Icons.inbox_outlined, size: 48),
+            title: 'No complaints found matching criteria.',
+            body: 'Try clearing filters or widening the date range.',
+          ),
+        ),
+      ),
+    );
+
+    final body = tester.widget<Text>(
+      find.text('Try clearing filters or widening the date range.'),
+    );
+    expect(body.style?.color, AppTheme.textMutedDark);
+  });
 }

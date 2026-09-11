@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:gssms_mobile/core/network/api_error.dart';
 import 'package:gssms_mobile/core/network/dio_client.dart';
 import 'package:gssms_mobile/core/widgets/org_scope_filter_bar.dart';
 import 'package:gssms_mobile/features/dashboard/data/dashboard_api_service.dart';
@@ -74,7 +75,7 @@ class DashboardController extends Notifier<DashboardState> {
       );
     } catch (e) {
       state = DashboardError(
-        'Failed to load dashboard data: $e',
+        userFacingError(e),
         previousLoaded: previous?.copyWith(orgScope: scope),
       );
     }

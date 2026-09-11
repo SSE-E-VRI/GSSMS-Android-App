@@ -25,42 +25,42 @@ class EnergyPlaceholderScreen extends StatelessWidget {
               width: 96,
               height: 96,
               decoration: BoxDecoration(
-                color: Colors.indigo.withOpacity(0.1),
+                color: context.gssms.info.background,
                 borderRadius: BorderRadius.circular(48),
               ),
-              child: const Icon(Icons.solar_power_outlined, size: 56, color: Colors.indigo),
+              child: Icon(Icons.solar_power_outlined, size: 56, color: context.gssms.info.foreground),
             ),
             const SizedBox(height: 24),
-            const Text(
+            Text(
               'Energy Module — Coming Soon',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppTheme.textDark),
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: context.gssms.textPrimary),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 12),
-            const Text(
+            Text(
               'Meter photography, bill upload and consumption trends are planned for Phase 5. '
               'They depend on backend work that has not yet shipped:',
-              style: TextStyle(fontSize: 14, color: AppTheme.textSecondary),
+              style: TextStyle(fontSize: 14, color: context.gssms.textSecondary),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.amber.shade50,
+                color: context.gssms.warning.background,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.amber.shade200),
+                border: Border.all(color: context.gssms.warning.border),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.info_outline, size: 18, color: Colors.amber.shade800),
+                      Icon(Icons.info_outline, size: 18, color: context.gssms.warning.foreground),
                       const SizedBox(width: 8),
                       Text(
                         'Pending backend prerequisites',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.amber.shade900),
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: context.gssms.warning.foreground),
                       ),
                     ],
                   ),
@@ -69,7 +69,7 @@ class EnergyPlaceholderScreen extends StatelessWidget {
                     '• GAP-04 — Attachment model for meter/bill photos\n'
                     '• GAP-06 — Conflict signal for offline energy readings\n'
                     'Until these land, energy data remains read-only on the web dashboard.',
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade800, height: 1.4),
+                    style: TextStyle(fontSize: 12, color: context.gssms.textPrimary, height: 1.4),
                   ),
                 ],
               ),
@@ -86,7 +86,7 @@ class EnergyPlaceholderScreen extends StatelessWidget {
             const SizedBox(height: 12),
             Text(
               'If you need to record a meter reading urgently, please use the web portal.',
-              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              style: TextStyle(fontSize: 12, color: context.gssms.textSecondary),
               textAlign: TextAlign.center,
             ),
           ],

@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:gssms_mobile/core/database/local_cache_service.dart';
+import 'package:gssms_mobile/core/sync/mutation_outcome.dart';
 import 'package:gssms_mobile/core/sync/outbox_command.dart';
 import 'package:gssms_mobile/core/sync/sync_manager.dart';
 import 'package:gssms_mobile/features/work_orders/data/work_order_api_service.dart';
@@ -82,20 +83,24 @@ abstract class IWorkOrderRepository {
   });
 
   Future<MaintenanceRecord> fetchMaintenanceRecord(int recordId);
-  Future<void> submitChecklistLine(int recordId, Map<String, dynamic> lineData);
+  Future<MutationOutcome> submitChecklistLine(
+      int recordId, Map<String, dynamic> lineData);
 
-  Future<void> uploadEvidence(
+  Future<MutationOutcome> uploadEvidence(
     int recordId, {
     String? proofJpegPath,
     String? remarks,
     String? otherStaff,
   });
 
-  Future<void> completeMaintenanceRecord(
+  /// [queueOnly] enqueues without trying the network first — used when the
+  /// record's evidence was itself queued, so completion replays after it.
+  Future<MutationOutcome> completeMaintenanceRecord(
     int recordId, {
     required String technicianName,
     required String remarks,
     String? supervisorName,
+    bool queueOnly = false,
   });
 
   Future<LineAttachment> uploadLineAttachment(
@@ -401,9 +406,11 @@ class WorkOrderRepository implements IWorkOrderRepository {
   }
 
   @override
-  Future<void> submitChecklistLine(int recordId, Map<String, dynamic> lineData) async {
+  Future<MutationOutcome> submitChecklistLine(
+      int recordId, Map<String, dynamic> lineData) async {
     try {
       await _apiService.submitLine(recordId, lineData);
+      return MutationOutcome.synced;
     } catch (e) {
       if (_isNetworkException(e) && _syncManager != null) {
         final lineId = lineData['line_id'] ?? 0;
@@ -415,7 +422,7 @@ class WorkOrderRepository implements IWorkOrderRepository {
           createdAt: DateTime.now(),
         );
         await _syncManager.enqueueCommand(cmd);
-        return;
+        return MutationOutcome.queued;
       }
       rethrow;
     }
@@ -428,7 +435,7 @@ class WorkOrderRepository implements IWorkOrderRepository {
   /// already lives in the app's documents directory, so the outbox stays small
   /// and the image survives until the upload succeeds.
   @override
-  Future<void> uploadEvidence(
+  Future<MutationOutcome> uploadEvidence(
     int recordId, {
     String? proofJpegPath,
     String? remarks,
@@ -441,6 +448,7 @@ class WorkOrderRepository implements IWorkOrderRepository {
         remarks: remarks,
         otherStaff: otherStaff,
       );
+      return MutationOutcome.synced;
     } catch (e) {
       if (_isNetworkException(e) && _syncManager != null) {
         await _syncManager.enqueueCommand(OutboxCommand(
@@ -454,19 +462,37 @@ class WorkOrderRepository implements IWorkOrderRepository {
           },
           createdAt: DateTime.now(),
         ));
-        return;
+        return MutationOutcome.queued;
       }
       rethrow;
     }
   }
 
   @override
-  Future<void> completeMaintenanceRecord(
+  Future<MutationOutcome> completeMaintenanceRecord(
     int recordId, {
     required String technicianName,
     required String remarks,
     String? supervisorName,
+    bool queueOnly = false,
   }) async {
+    final syncManager = _syncManager;
+    Future<MutationOutcome> enqueue(SyncManager sync) async {
+      await sync.enqueueCommand(OutboxCommand(
+        idempotencyKey: 'complete_${recordId}_${DateTime.now().millisecondsSinceEpoch}',
+        type: OutboxCommandType.completeRecord,
+        entityId: recordId,
+        payload: {
+          'technician_name': technicianName,
+          'remarks': remarks,
+          if (supervisorName != null) 'supervisor_name': supervisorName,
+        },
+        createdAt: DateTime.now(),
+      ));
+      return MutationOutcome.queued;
+    }
+
+    if (queueOnly && syncManager != null) return enqueue(syncManager);
     try {
       await _apiService.completeRecord(
         recordId,
@@ -474,21 +500,9 @@ class WorkOrderRepository implements IWorkOrderRepository {
         remarks: remarks,
         supervisorName: supervisorName,
       );
+      return MutationOutcome.synced;
     } catch (e) {
-      if (_isNetworkException(e) && _syncManager != null) {
-        await _syncManager.enqueueCommand(OutboxCommand(
-          idempotencyKey: 'complete_${recordId}_${DateTime.now().millisecondsSinceEpoch}',
-          type: OutboxCommandType.completeRecord,
-          entityId: recordId,
-          payload: {
-            'technician_name': technicianName,
-            'remarks': remarks,
-            if (supervisorName != null) 'supervisor_name': supervisorName,
-          },
-          createdAt: DateTime.now(),
-        ));
-        return;
-      }
+      if (_isNetworkException(e) && syncManager != null) return enqueue(syncManager);
       rethrow;
     }
   }

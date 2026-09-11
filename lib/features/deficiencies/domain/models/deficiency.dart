@@ -111,7 +111,7 @@ class Deficiency extends Equatable {
       workOrderId: asJsonInt(json['work_order_id']),
       workOrderTicket: asJsonString(json['work_order_ticket']),
       detectedAt: asJsonString(json['detected_at']) != null
-          ? DateTime.tryParse(json['detected_at'].toString())
+          ? asJsonDateTime(json['detected_at'])
           : null,
     );
   }

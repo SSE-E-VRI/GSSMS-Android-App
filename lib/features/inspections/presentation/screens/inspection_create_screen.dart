@@ -59,9 +59,13 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
   final List<FocusNode> _pointFocusNodes = [FocusNode()];
   String? _pointsError;
 
-  static const _webBlue = AppTheme.primaryBlue;
-  static const _webLightBg = AppTheme.backgroundLight;
-  static const _webCardBg = AppTheme.surfaceCard;
+  /// Header band + submit button: a solid/on-solid pair so the text stays
+  /// readable in both themes.
+  Color get _band => Theme.of(context).colorScheme.primary;
+  Color get _onBand => Theme.of(context).colorScheme.onPrimary;
+  Color get _webBlue => context.gssms.link;
+  Color get _webLightBg => context.gssms.surfaceInset;
+  Color? get _webCardBg => Theme.of(context).cardTheme.color;
 
   @override
   void initState() {
@@ -234,7 +238,7 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
 
     if (_canSelectDepot && _selectedDepotId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select a Depot'), backgroundColor: AppTheme.errorRed),
+        SnackBar(content: const Text('Please select a Depot'), backgroundColor: context.gssms.danger.solid),
       );
       return;
     }
@@ -257,7 +261,7 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
           );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Inspection logged successfully!'), backgroundColor: AppTheme.railwayGreen),
+          SnackBar(content: const Text('Inspection logged successfully!'), backgroundColor: context.gssms.success.solid),
         );
         Navigator.of(context).pop(true);
       }
@@ -266,7 +270,7 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content: Text('Failed to log inspection: ${workOrderReadableError(e)}'),
-              backgroundColor: AppTheme.errorRed),
+              backgroundColor: context.gssms.danger.solid),
         );
       }
     } finally {
@@ -280,7 +284,6 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
       return Scaffold(
         appBar: AppBar(
           title: const Text('Add Inspection Note'),
-          backgroundColor: AppTheme.primaryDark,
         ),
         body: const PermissionDeniedView(),
       );
@@ -290,7 +293,7 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
       // No title here — the colored header below already carries it (as an
       // accessible `Semantics(header: true)` region), so the AppBar isn't
       // duplicating it back-to-back. Only the back button lives up top.
-      appBar: AppBar(backgroundColor: AppTheme.primaryDark),
+      appBar: AppBar(),
       backgroundColor: _webLightBg,
       body: !_bootstrapped
           ? const Center(child: CircularProgressIndicator())
@@ -302,7 +305,7 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
                   decoration: BoxDecoration(
                     color: _webCardBg,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppTheme.borderGrey),
+                    border: Border.all(color: context.gssms.border),
                     boxShadow: [
                       BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 12, offset: const Offset(0, 4)),
                     ],
@@ -323,18 +326,18 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
                         // their own semantics on top of this label.
                         excludeSemantics: true,
                         child: Container(
-                          decoration: const BoxDecoration(
-                            color: _webBlue,
-                            borderRadius: BorderRadius.vertical(top: Radius.circular(12)),
+                          decoration: BoxDecoration(
+                            color: _band,
+                            borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
                           ),
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                          child: const Row(
+                          child: Row(
                             children: [
-                              Icon(Icons.note_add_outlined, color: Colors.white, size: 20),
-                              SizedBox(width: 8),
+                              Icon(Icons.note_add_outlined, color: _onBand, size: 20),
+                              const SizedBox(width: 8),
                               Text(
                                 'Add Inspection Note',
-                                style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+                                style: TextStyle(color: _onBand, fontSize: 16, fontWeight: FontWeight.bold),
                               ),
                             ],
                           ),
@@ -349,18 +352,18 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
                               Container(
                                 padding: const EdgeInsets.all(12),
                                 decoration: BoxDecoration(
-                                  color: AppTheme.railwayBlue.withOpacity(0.08),
+                                  color: context.gssms.info.background,
                                   borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: AppTheme.railwayBlue.withOpacity(0.3)),
+                                  border: Border.all(color: context.gssms.info.border),
                                 ),
                                 child: Row(
                                   children: [
-                                    const Icon(Icons.build_circle_outlined, color: AppTheme.railwayBlue, size: 18),
+                                    Icon(Icons.build_circle_outlined, color: context.gssms.link, size: 18),
                                     const SizedBox(width: 8),
                                     Expanded(
                                       child: Text(
                                         'Target Asset: ${widget.initialAssetName}',
-                                        style: const TextStyle(fontWeight: FontWeight.bold, color: AppTheme.railwayBlue, fontSize: 13),
+                                        style: TextStyle(fontWeight: FontWeight.bold, color: context.gssms.link, fontSize: 13),
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ),
@@ -379,7 +382,7 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
                             const SizedBox(height: 16),
                             _inspectionPointsSection(),
                             const SizedBox(height: 16),
-                            const Divider(height: 1, color: AppTheme.borderGrey),
+                            Divider(height: 1, color: context.gssms.border),
                             const SizedBox(height: 16),
                             _actionRow(),
                           ],
@@ -398,13 +401,13 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
     return Row(
       children: [
         Flexible(
-          child: RichText(
-            text: TextSpan(
+          child: Text.rich(
+            TextSpan(
               text: label,
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: context.gssms.textPrimary),
               children: [
                 if (required)
-                  const TextSpan(text: ' *', style: TextStyle(color: AppTheme.errorRed, fontWeight: FontWeight.bold)),
+                  TextSpan(text: ' *', style: TextStyle(color: context.gssms.danger.foreground, fontWeight: FontWeight.bold)),
               ],
             ),
           ),
@@ -417,7 +420,7 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
         Tooltip(
           message: tooltip,
           triggerMode: TooltipTriggerMode.tap,
-          child: const Icon(Icons.info_outline, size: 14, color: AppTheme.textSecondary),
+          child: Icon(Icons.info_outline, size: 14, color: context.gssms.textSecondary),
         ),
       ],
     );
@@ -438,12 +441,12 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
           value: safeValue,
           decoration: InputDecoration(
             hintText: '-- Select Depot --',
-            hintStyle: const TextStyle(color: AppTheme.textSecondary, fontSize: 14),
+            hintStyle: TextStyle(color: context.gssms.textSecondary, fontSize: 14),
             filled: true,
-            fillColor: Colors.white,
+            fillColor: Theme.of(context).inputDecorationTheme.fillColor,
             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppTheme.borderGrey)),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppTheme.borderGrey)),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: context.gssms.border)),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: context.gssms.border)),
             suffixIcon: _loadingDepots
                 ? const Padding(padding: EdgeInsets.all(12), child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)))
                 : null,
@@ -475,12 +478,12 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
           controller: _titleController,
           decoration: InputDecoration(
             hintText: 'e.g. Monthly Station Inspection',
-            hintStyle: const TextStyle(color: AppTheme.textSecondary, fontSize: 14),
+            hintStyle: TextStyle(color: context.gssms.textSecondary, fontSize: 14),
             filled: true,
-            fillColor: Colors.white,
+            fillColor: Theme.of(context).inputDecorationTheme.fillColor,
             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppTheme.borderGrey)),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppTheme.borderGrey)),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: context.gssms.border)),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: context.gssms.border)),
           ),
           validator: (val) => val == null || val.trim().isEmpty ? 'Please enter a title' : null,
         ),
@@ -513,13 +516,13 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
           child: InputDecorator(
             decoration: InputDecoration(
               filled: true,
-              fillColor: Colors.white,
+              fillColor: Theme.of(context).inputDecorationTheme.fillColor,
               contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppTheme.borderGrey)),
-              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppTheme.borderGrey)),
-              suffixIcon: const Icon(Icons.calendar_today_outlined, size: 18, color: AppTheme.textSecondary),
+              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: context.gssms.border)),
+              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: context.gssms.border)),
+              suffixIcon: Icon(Icons.calendar_today_outlined, size: 18, color: context.gssms.textSecondary),
             ),
-            child: Text(display, style: const TextStyle(fontSize: 14, color: AppTheme.textPrimary)),
+            child: Text(display, style: TextStyle(fontSize: 14, color: context.gssms.textPrimary)),
           ),
         ),
       ],
@@ -534,19 +537,19 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
   Widget _locationDetailsCard() {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: Theme.of(context).cardTheme.color,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppTheme.borderGrey),
+        border: Border.all(color: context.gssms.border),
         boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 2))],
       ),
       padding: const EdgeInsets.all(14),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
               Icon(Icons.location_on, color: _webBlue, size: 16),
-              SizedBox(width: 6),
+              const SizedBox(width: 6),
               Text('Location Details (Optional)', style: TextStyle(fontWeight: FontWeight.bold, color: _webBlue, fontSize: 13)),
             ],
           ),
@@ -585,10 +588,10 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
           value: _infraType,
           decoration: InputDecoration(
             filled: true,
-            fillColor: AppTheme.surfaceCard,
+            fillColor: context.gssms.surfaceInset,
             contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppTheme.borderGrey)),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppTheme.borderGrey)),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: context.gssms.border)),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: context.gssms.border)),
           ),
           items: infraOptions
               .map((t) => DropdownMenuItem(
@@ -622,12 +625,12 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
           value: safeValue,
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: const TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+            hintStyle: TextStyle(color: context.gssms.textSecondary, fontSize: 13),
             filled: true,
-            fillColor: isGeneral ? AppTheme.surfaceMuted : Colors.white,
+            fillColor: isGeneral ? context.gssms.surfaceInset : Theme.of(context).inputDecorationTheme.fillColor,
             contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppTheme.borderGrey)),
-            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppTheme.borderGrey)),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: context.gssms.border)),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: context.gssms.border)),
             suffixIcon: _loadingLocations
                 ? const Padding(padding: EdgeInsets.all(10), child: SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2)))
                 : null,
@@ -638,7 +641,7 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
           onChanged: isGeneral || _loadingLocations
               ? null
               : (id) => setState(() => _selectedLocationId = id),
-          disabledHint: Text(hint, style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
+          disabledHint: Text(hint, style: TextStyle(color: context.gssms.textSecondary, fontSize: 13)),
         ),
       ],
     );
@@ -660,7 +663,7 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
               children: [
                 SizedBox(
                   width: 20,
-                  child: Text('${index + 1}.', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
+                  child: Text('${index + 1}.', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: context.gssms.textPrimary)),
                 ),
                 const SizedBox(width: 6),
                 Expanded(
@@ -670,12 +673,12 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
                     focusNode: _pointFocusNodes[index],
                     decoration: InputDecoration(
                       hintText: 'Enter observation / point...',
-                      hintStyle: const TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                      hintStyle: TextStyle(color: context.gssms.textSecondary, fontSize: 13),
                       filled: true,
-                      fillColor: Colors.white,
+                      fillColor: Theme.of(context).inputDecorationTheme.fillColor,
                       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppTheme.borderGrey)),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppTheme.borderGrey)),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: context.gssms.border)),
+                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: context.gssms.border)),
                     ),
                     onChanged: (_) {
                       if (_pointsError != null) setState(() => _pointsError = null);
@@ -688,9 +691,9 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
                   child: OutlinedButton(
                     key: Key('remove_inspection_point_$index'),
                     style: OutlinedButton.styleFrom(
-                      foregroundColor: AppTheme.errorRed,
-                      side: const BorderSide(color: AppTheme.errorBorder),
-                      backgroundColor: AppTheme.errorLight,
+                      foregroundColor: context.gssms.danger.foreground,
+                      side: BorderSide(color: context.gssms.danger.border),
+                      backgroundColor: context.gssms.danger.background,
                       padding: const EdgeInsets.symmetric(horizontal: 10),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       minimumSize: const Size(0, 48),
@@ -699,10 +702,10 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.delete_outline, size: 16, color: _pointControllers.length <= 1 ? Colors.grey.shade400 : AppTheme.errorRed),
+                        Icon(Icons.delete_outline, size: 16, color: _pointControllers.length <= 1 ? context.gssms.textTertiary : context.gssms.danger.foreground),
                         const SizedBox(height: 1),
                         Text('Remove',
-                            style: TextStyle(fontSize: 10, color: _pointControllers.length <= 1 ? Colors.grey.shade400 : AppTheme.errorRed, fontWeight: FontWeight.w600)),
+                            style: TextStyle(fontSize: 10, color: _pointControllers.length <= 1 ? context.gssms.textTertiary : context.gssms.danger.foreground, fontWeight: FontWeight.w600)),
                       ],
                     ),
                   ),
@@ -713,7 +716,7 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
         }),
         if (_pointsError != null) ...[
           const SizedBox(height: 6),
-          Text(_pointsError!, style: const TextStyle(color: AppTheme.errorRed, fontSize: 12)),
+          Text(_pointsError!, style: TextStyle(color: context.gssms.danger.foreground, fontSize: 12)),
         ],
         const SizedBox(height: 10),
         Align(
@@ -722,7 +725,7 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
             key: const Key('add_inspection_point_button'),
             style: OutlinedButton.styleFrom(
               foregroundColor: _webBlue,
-              side: const BorderSide(color: _webBlue),
+              side: BorderSide(color: _webBlue),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
@@ -751,8 +754,8 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
         OutlinedButton.icon(
           key: const Key('cancel_inspection_button'),
           style: OutlinedButton.styleFrom(
-            foregroundColor: AppTheme.textMuted,
-            side: const BorderSide(color: AppTheme.borderGrey),
+            foregroundColor: context.gssms.textSecondary,
+            side: BorderSide(color: context.gssms.border),
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             minimumSize: const Size(0, 48),
@@ -766,18 +769,18 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
         ElevatedButton.icon(
           key: const Key('submit_inspection_button'),
           style: ElevatedButton.styleFrom(
-            backgroundColor: _webBlue,
-            foregroundColor: Colors.white,
+            backgroundColor: _band,
+            foregroundColor: _onBand,
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             elevation: 2,
-            minimumSize: const Size(0, 44),
+            minimumSize: const Size(0, GssmsSize.touchTarget),
             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
           onPressed: _isSubmitting ? null : _submit,
           icon: _isSubmitting
-              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-              : const Icon(Icons.save_alt_outlined, size: 16, color: Colors.white),
+              ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(color: _onBand, strokeWidth: 2))
+              : const Icon(Icons.save_alt_outlined, size: 16),
           label: Text(_isSubmitting ? 'Saving...' : 'Save Inspection', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
         ),
         // Alias key for tests that may look for the old submit key on a different

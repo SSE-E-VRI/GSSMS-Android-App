@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gssms_mobile/core/database/local_cache_service.dart';
+import 'package:gssms_mobile/core/sync/outbox_command.dart';
 import 'package:gssms_mobile/core/sync/sync_manager.dart';
 import 'package:gssms_mobile/features/auth/data/auth_repository.dart';
 import 'package:gssms_mobile/features/auth/domain/models/auth_role.dart';
@@ -146,7 +147,7 @@ void main() {
       expect(find.byKey(const Key('home_notifications_button')), findsNothing);
     });
 
-    testWidgets('tapping logout button triggers repository logout', (tester) async {
+    testWidgets('logout asks for confirmation, then signs out', (tester) async {
       when(() => mockRepository.logout()).thenAnswer((_) async {});
 
       const guestSession = UserSession(
@@ -161,8 +162,70 @@ void main() {
 
       await tester.tap(find.byKey(const Key('home_logout_button')));
       await tester.pumpAndSettle();
+      verifyNever(() => mockRepository.logout());
+      expect(find.byKey(const Key('sign_out_unsynced_warning')), findsNothing);
+
+      await tester.tap(find.byKey(const Key('sign_out_confirm_button')));
+      await tester.pumpAndSettle();
 
       verify(() => mockRepository.logout()).called(1);
+    });
+
+    testWidgets('cancelling the sign-out dialog keeps the session', (tester) async {
+      const guestSession = UserSession(
+        accessToken: 'guest_token',
+        username: 'guest_user',
+        primaryRole: AuthRole.guest,
+        roles: [AuthRole.guest],
+        permissions: [],
+      );
+
+      await tester.pumpWidget(createTestWidget(guestSession));
+      await tester.tap(find.byKey(const Key('home_logout_button')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('sign_out_cancel_button')));
+      await tester.pumpAndSettle();
+
+      verifyNever(() => mockRepository.logout());
+    });
+
+    // Regression B3: sign-out wipes the offline outbox; an accidental tap
+    // used to discard queued checklist readings/photos without warning.
+    testWidgets('sign-out warns how many unsynced changes will be discarded',
+        (tester) async {
+      final cache = InMemoryLocalCacheService();
+      await cache.saveOutboxCommands([
+        for (var i = 0; i < 2; i++)
+          OutboxCommand(
+            idempotencyKey: 'k$i',
+            type: OutboxCommandType.submitLine,
+            entityId: 7,
+            payload: const {'line_id': 1},
+            createdAt: DateTime(2026, 9, 11),
+          ),
+      ]);
+      const guestSession = UserSession(
+        accessToken: 'guest_token',
+        username: 'guest_user',
+        primaryRole: AuthRole.guest,
+        roles: [AuthRole.guest],
+        permissions: [],
+      );
+
+      await tester.pumpWidget(ProviderScope(
+        overrides: [
+          localCacheServiceProvider.overrideWithValue(cache),
+          authRepositoryProvider.overrideWithValue(mockRepository),
+        ],
+        child: const MaterialApp(home: HomeScreen(session: guestSession)),
+      ));
+      await tester.tap(find.byKey(const Key('home_logout_button')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('sign_out_unsynced_warning')), findsOneWidget);
+      expect(find.textContaining('2 changes saved on this device'), findsOneWidget);
+      expect(find.text('Discard and sign out'), findsOneWidget);
+      verifyNever(() => mockRepository.logout());
     });
 
     testWidgets('tapping header profile opens the editable profile screen', (tester) async {
@@ -340,7 +403,8 @@ void main() {
       expect(find.byKey(const Key('quick_action_scan_asset')), findsOneWidget);
       expect(find.byKey(const Key('quick_action_work_orders')), findsOneWidget);
 
-      // Restricted guest sees only scan asset quick action
+      // Scan Asset resolves the code against the asset register, which needs
+      // assets.view — a guest without it would only ever get a 403.
       const guestSession = UserSession(
         accessToken: 't',
         username: 'guest',
@@ -349,6 +413,18 @@ void main() {
         permissions: [],
       );
       await tester.pumpWidget(createTestWidget(guestSession));
+
+      expect(find.byKey(const Key('quick_action_scan_asset')), findsNothing);
+      expect(find.byKey(const Key('quick_action_work_orders')), findsNothing);
+
+      const assetViewer = UserSession(
+        accessToken: 't',
+        username: 'viewer',
+        primaryRole: AuthRole.viewer,
+        roles: [AuthRole.viewer],
+        permissions: ['assets.view'],
+      );
+      await tester.pumpWidget(createTestWidget(assetViewer));
 
       expect(find.byKey(const Key('quick_action_scan_asset')), findsOneWidget);
       expect(find.byKey(const Key('quick_action_work_orders')), findsNothing);

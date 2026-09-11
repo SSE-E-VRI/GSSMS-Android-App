@@ -70,11 +70,9 @@ void main() {
     const testInspections = [
       Inspection(
         id: 1,
-        inspectionNumber: 'INSP-001',
         title: 'EB Bunk Monthly Check',
-        description: 'Earth resistance and cleaning',
-        priority: InspectionPriority.high,
-        status: InspectionStatus.pending,
+        notes: 'Earth resistance and cleaning',
+        status: InspectionStatus.open,
         stationName: 'Thalanallur',
       ),
     ];
@@ -108,8 +106,10 @@ void main() {
       expect(find.text('Inspections'), findsOneWidget);
       expect(find.byKey(const Key('date_range_from')), findsOneWidget);
       expect(find.text('EB Bunk Monthly Check'), findsOneWidget);
-      expect(find.text('INSP-001'), findsOneWidget);
-      expect(find.text('High'), findsOneWidget);
+      expect(find.text('#1'), findsOneWidget);
+      // Inspections carry no priority in the API — no fabricated badge.
+      expect(find.text('High'), findsNothing);
+      expect(find.text('Medium'), findsNothing);
       expect(find.byKey(const Key('fab_create_inspection')), findsOneWidget);
     });
 
@@ -139,7 +139,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(InspectionDetailScreen), findsOneWidget);
-      expect(find.text('INSP-001'), findsOneWidget);
+      expect(find.text('Inspection #1'), findsOneWidget);
       expect(find.text('Earth resistance and cleaning'), findsOneWidget);
       // DEPOT_INCHARGE holding inspections.edit on an unconverted inspection
       // is exactly who ConversionService allows to convert.
@@ -207,12 +207,13 @@ void main() {
 
       await tester.tap(find.byKey(const Key('convert_to_work_order_button')));
       await tester.pumpAndSettle();
-      // Confirmation dialog.
-      await tester.tap(find.text('Convert'));
+      // Confirmation dialog states the consequence before converting.
+      expect(find.textContaining('A Job Work will be created'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('confirm_convert_button')));
       await tester.pumpAndSettle();
 
       verify(() => mockRepo.convertToWorkOrder(1)).called(1);
-      expect(find.text('Converted successfully. Job Work created.'),
+      expect(find.text('Converted. A Job Work has been created.'),
           findsOneWidget);
       // Off the initial viewport below the Location card — scroll to it like
       // a real user would rather than asserting on unpainted content.
@@ -228,10 +229,8 @@ void main() {
         (tester) async {
       const converted = Inspection(
         id: 1,
-        inspectionNumber: 'INSP-001',
         title: 'EB Bunk Monthly Check',
         status: InspectionStatus.converted,
-        priority: InspectionPriority.high,
         isConverted: true,
         workOrderId: 42,
       );
@@ -266,14 +265,11 @@ void main() {
         (tester) async {
       when(() => mockRepo.createInspection(
             title: any(named: 'title'),
-            description: any(named: 'description'),
-            priority: any(named: 'priority'),
-            assetId: any(named: 'assetId'),
+            notes: any(named: 'notes'),
+            inspectionDate: any(named: 'inspectionDate'),
             depotId: any(named: 'depotId'),
             stationId: any(named: 'stationId'),
             infrastructureId: any(named: 'infrastructureId'),
-            scheduledDate: any(named: 'scheduledDate'),
-            inspectionPoints: any(named: 'inspectionPoints'),
           )).thenAnswer((_) async => testInspections[0]);
 
       await tester.pumpWidget(
@@ -315,34 +311,26 @@ void main() {
 
       final captured = verify(() => mockRepo.createInspection(
             title: captureAny(named: 'title'),
-            description: captureAny(named: 'description'),
-            priority: captureAny(named: 'priority'),
-            assetId: captureAny(named: 'assetId'),
+            notes: captureAny(named: 'notes'),
+            inspectionDate: captureAny(named: 'inspectionDate'),
             depotId: captureAny(named: 'depotId'),
             stationId: captureAny(named: 'stationId'),
             infrastructureId: captureAny(named: 'infrastructureId'),
-            scheduledDate: captureAny(named: 'scheduledDate'),
-            inspectionPoints: captureAny(named: 'inspectionPoints'),
           )).captured;
-      // captured is [title, description, priority, assetId, depotId, stationId, infraId, scheduledDate, inspectionPoints]
+      // captured is [title, notes, inspectionDate, depotId, stationId, infraId]
       expect(captured[0], 'Test Title');
-      expect(captured[1], 'Detailed findings');
-      expect(captured[2], 'MEDIUM');
-      expect(captured[8], contains('Detailed findings'));
+      expect(captured[1], contains('Detailed findings'));
     });
 
     testWidgets('InspectionCreateScreen mirrors web Add Inspection Note layout',
         (tester) async {
       when(() => mockRepo.createInspection(
             title: any(named: 'title'),
-            description: any(named: 'description'),
-            priority: any(named: 'priority'),
-            assetId: any(named: 'assetId'),
+            notes: any(named: 'notes'),
+            inspectionDate: any(named: 'inspectionDate'),
             depotId: any(named: 'depotId'),
             stationId: any(named: 'stationId'),
             infrastructureId: any(named: 'infrastructureId'),
-            scheduledDate: any(named: 'scheduledDate'),
-            inspectionPoints: any(named: 'inspectionPoints'),
           )).thenAnswer((_) async => testInspections[0]);
 
       await tester.pumpWidget(
@@ -408,14 +396,11 @@ void main() {
 
       verify(() => mockRepo.createInspection(
             title: 'Web Title',
-            description: 'Point A',
-            priority: any(named: 'priority'),
-            assetId: any(named: 'assetId'),
+            notes: 'Point A',
+            inspectionDate: any(named: 'inspectionDate'),
             depotId: any(named: 'depotId'),
             stationId: any(named: 'stationId'),
             infrastructureId: any(named: 'infrastructureId'),
-            scheduledDate: any(named: 'scheduledDate'),
-            inspectionPoints: any(named: 'inspectionPoints'),
           )).called(1);
     });
   });

@@ -17,12 +17,12 @@ class PermissionDeniedView extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.lock_outline, size: 48, color: AppTheme.textMuted),
+            Icon(Icons.lock_outline, size: 48, color: context.gssms.textSecondary),
             const SizedBox(height: 12),
             Text(
               message,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 14, color: AppTheme.textSecondary),
+              style: TextStyle(fontSize: 14, color: context.gssms.textSecondary),
             ),
           ],
         ),
@@ -38,7 +38,7 @@ void showPermissionDeniedSnackBar(
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(
       content: Text(message),
-      backgroundColor: AppTheme.errorRed,
+      backgroundColor: context.gssms.danger.solid,
     ),
   );
 }

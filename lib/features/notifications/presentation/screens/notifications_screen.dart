@@ -135,12 +135,12 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.error_outline, size: 48, color: AppTheme.errorRed),
+              Icon(Icons.error_outline, size: 48, color: context.gssms.danger.foreground),
               const SizedBox(height: 12),
               Text(
                 listState.message,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: AppTheme.textSecondary),
+                style: TextStyle(color: context.gssms.textSecondary),
               ),
               const SizedBox(height: 16),
               ElevatedButton(
@@ -159,16 +159,16 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
         onRefresh: () => ref.read(notificationsListProvider.notifier).refresh(),
         child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          children: const [
-            SizedBox(height: 120),
+          children: [
+            const SizedBox(height: 120),
             Center(
               child: Column(
                 children: [
-                  Icon(Icons.notifications_none, size: 64, color: Colors.grey),
-                  SizedBox(height: 12),
+                  const Icon(Icons.notifications_none, size: 64, color: Colors.grey),
+                  const SizedBox(height: 12),
                   Text(
                     'No active notifications.',
-                    style: TextStyle(fontSize: 16, color: AppTheme.textSecondary),
+                    style: TextStyle(fontSize: 16, color: context.gssms.textSecondary),
                   ),
                 ],
               ),
@@ -191,22 +191,23 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
             key: Key('notification_item_${item.id}'),
             elevation: item.isRead ? 1 : 3,
             color: item.isRead
-                ? Colors.white
-                : AppTheme.primaryBlue.withOpacity(0.06),
+                ? Theme.of(context).cardTheme.color
+                : context.gssms.info.background,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
               side: BorderSide(
                 color: item.isRead
                     ? Colors.transparent
-                    : AppTheme.railwayBlue.withOpacity(0.3),
+                    : context.gssms.info.border,
               ),
             ),
             child: ListTile(
               contentPadding:
                   const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               leading: CircleAvatar(
-                backgroundColor: _getIconBgColor(item.type),
-                child: Icon(_getIconData(item.type), color: Colors.white, size: 20),
+                backgroundColor: _iconTone(item.type).solid,
+                child: Icon(_getIconData(item.type),
+                    color: _iconTone(item.type).onSolid, size: 20),
               ),
               title: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -223,8 +224,8 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                   ),
                   Text(
                     dateFormat.format(item.timestamp),
-                    style: const TextStyle(
-                        fontSize: 11, color: AppTheme.textSecondary),
+                    style: TextStyle(
+                        fontSize: 11, color: context.gssms.textSecondary),
                   ),
                 ],
               ),
@@ -232,8 +233,8 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                 padding: const EdgeInsets.only(top: 4),
                 child: Text(
                   item.message,
-                  style: const TextStyle(
-                      fontSize: 13, color: AppTheme.textSecondary),
+                  style: TextStyle(
+                      fontSize: 13, color: context.gssms.textSecondary),
                 ),
               ),
               onTap: () {
@@ -273,22 +274,21 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     }
   }
 
-  Color _getIconBgColor(NotificationType type) {
+  GssmsTonePalette _iconTone(NotificationType type) {
+    final tokens = context.gssms;
     switch (type) {
       case NotificationType.assignment:
-        return AppTheme.railwayBlue;
-      case NotificationType.rework:
-        return AppTheme.errorRed;
-      case NotificationType.overdue:
-        return Colors.deepOrange;
-      case NotificationType.slaBreach:
-        return AppTheme.warningAmber;
-      case NotificationType.complaint:
-        return AppTheme.accentOrange;
-      case NotificationType.schedule:
-        return Colors.teal;
       case NotificationType.alert:
-        return Colors.indigo;
+        return tokens.info;
+      case NotificationType.rework:
+        return tokens.danger;
+      case NotificationType.overdue:
+      case NotificationType.complaint:
+        return tokens.accent;
+      case NotificationType.slaBreach:
+        return tokens.warning;
+      case NotificationType.schedule:
+        return tokens.success;
     }
   }
 }

@@ -15,10 +15,8 @@ void main() {
   const complaints = [
     Complaint(
       id: 1,
-      complaintNumber: 'CMP-001',
       title: 'Leak',
       description: 'Oil',
-      severity: ComplaintSeverity.high,
       status: ComplaintStatus.open,
     ),
   ];

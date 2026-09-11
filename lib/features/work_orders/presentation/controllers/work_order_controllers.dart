@@ -1,7 +1,8 @@
 import 'dart:async';
-import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:gssms_mobile/core/network/api_error.dart';
 import 'package:gssms_mobile/core/network/dio_client.dart';
+import 'package:gssms_mobile/core/sync/mutation_outcome.dart';
 import 'package:gssms_mobile/core/sync/outbox_command.dart';
 import 'package:gssms_mobile/core/sync/sync_manager.dart';
 import 'package:gssms_mobile/core/widgets/date_range_filter_bar.dart';
@@ -53,30 +54,64 @@ class WorkOrderListController extends Notifier<WorkOrderListState> {
     return null;
   }
 
+  /// Incremented per server fetch so a slow response for an older filter
+  /// (e.g. the user changed the date range twice quickly) cannot overwrite
+  /// the result of the newer one.
+  int _requestSeq = 0;
+
+  /// Fetches from the server with the current filters. Every call hits the
+  /// server; [forceRefresh] is kept so call sites still read as intent.
   Future<void> fetchWorkOrders({bool forceRefresh = false}) async {
     final previous = _resolvePrevious();
-    if (previous == null || forceRefresh) {
+    // Stale-while-refresh: a pull-to-refresh or post-mutation reload keeps the
+    // current rows on screen (the refresh indicator shows progress) instead of
+    // blanking the list; only a first load has nothing to show.
+    if (previous == null) {
       state = const WorkOrderListLoading();
     }
+    await _load(
+      base: previous,
+      dateFrom: previous?.dateFrom,
+      dateTo: previous?.dateTo,
+      scope: previous?.orgScope ?? OrgScopeSelection.empty,
+    );
+  }
 
+  /// Fetches with the given server-side filters and applies the result on top
+  /// of [base], so every client-side filter (status, type, infra, search)
+  /// survives the reload instead of silently resetting while its dropdown
+  /// still shows the old selection.
+  Future<void> _load({
+    required WorkOrderListLoaded? base,
+    required DateTime? dateFrom,
+    required DateTime? dateTo,
+    required OrgScopeSelection scope,
+  }) async {
+    final seq = ++_requestSeq;
     try {
-      final scope = previous?.orgScope ?? OrgScopeSelection.empty;
       final orders = await _repository.fetchWorkOrders(
-        dateFrom: formatApiDate(previous?.dateFrom),
-        dateTo: formatApiDate(previous?.dateTo),
+        dateFrom: formatApiDate(dateFrom),
+        dateTo: formatApiDate(dateTo),
         zoneId: scope.zoneId,
         divisionId: scope.divisionId,
         depotId: scope.depotId,
         stationId: scope.stationId,
       );
-      // Carry the active filter and search term across the refresh. Rebuilding
-      // the state from scratch would clear them while the search field on screen
-      // still shows the query, leaving the list contradicting the visible filter.
-      state = previous != null
-          ? previous.copyWith(workOrders: orders)
-          : WorkOrderListLoaded(workOrders: orders);
+      if (seq != _requestSeq) return;
+      state = WorkOrderListLoaded(
+        workOrders: orders,
+        selectedStatusFilter: base?.selectedStatusFilter,
+        selectedTypeFilter: base?.selectedTypeFilter,
+        searchQuery: base?.searchQuery ?? '',
+        dateFrom: dateFrom,
+        dateTo: dateTo,
+        orgScope: scope,
+        infraType: base?.infraType ?? InfraFilterType.all,
+        infraName: base?.infraName,
+      );
     } catch (e) {
-      state = WorkOrderListError(e.toString(), previousLoaded: previous);
+      if (seq != _requestSeq) return;
+      state = WorkOrderListError(userFacingError(e), previousLoaded: base);
     }
   }
 
@@ -170,56 +205,29 @@ class WorkOrderListController extends Notifier<WorkOrderListState> {
   }
 
   /// Server-side date filter. Unlike status chips this is not applied in memory:
-  /// the list can be unbounded, so the range is sent as `date_from`/`date_to`.
+  /// the list can be unbounded, so the range is sent as `date_from`/`date_to`
+  /// (main register) or `start_date`/`end_date` (staff-scoped "My Work" —
+  /// see WorkOrderApiService.getWorkOrders).
   Future<void> setDateRange(DateTime? from, DateTime? to) async {
     final previous = _resolvePrevious();
-    final scope = previous?.orgScope ?? OrgScopeSelection.empty;
-    try {
-      final orders = await _repository.fetchWorkOrders(
-        dateFrom: formatApiDate(from),
-        dateTo: formatApiDate(to),
-        zoneId: scope.zoneId,
-        divisionId: scope.divisionId,
-        depotId: scope.depotId,
-        stationId: scope.stationId,
-      );
-      state = WorkOrderListLoaded(
-        workOrders: orders,
-        selectedStatusFilter: previous?.selectedStatusFilter,
-        searchQuery: previous?.searchQuery ?? '',
-        dateFrom: from,
-        dateTo: to,
-        orgScope: scope,
-      );
-    } catch (e) {
-      state = WorkOrderListError(e.toString(), previousLoaded: previous);
-    }
+    await _load(
+      base: previous,
+      dateFrom: from,
+      dateTo: to,
+      scope: previous?.orgScope ?? OrgScopeSelection.empty,
+    );
   }
 
   /// Server-side Zone/Division/Depot/Station filter, same reasoning as
   /// [setDateRange] — not an in-memory filter, sent as query params.
   Future<void> setOrgScope(OrgScopeSelection scope) async {
     final previous = _resolvePrevious();
-    try {
-      final orders = await _repository.fetchWorkOrders(
-        dateFrom: formatApiDate(previous?.dateFrom),
-        dateTo: formatApiDate(previous?.dateTo),
-        zoneId: scope.zoneId,
-        divisionId: scope.divisionId,
-        depotId: scope.depotId,
-        stationId: scope.stationId,
-      );
-      state = WorkOrderListLoaded(
-        workOrders: orders,
-        selectedStatusFilter: previous?.selectedStatusFilter,
-        searchQuery: previous?.searchQuery ?? '',
-        dateFrom: previous?.dateFrom,
-        dateTo: previous?.dateTo,
-        orgScope: scope,
-      );
-    } catch (e) {
-      state = WorkOrderListError(e.toString(), previousLoaded: previous);
-    }
+    await _load(
+      base: previous,
+      dateFrom: previous?.dateFrom,
+      dateTo: previous?.dateTo,
+      scope: scope,
+    );
   }
 }
 
@@ -247,7 +255,7 @@ class WorkOrderDetailController extends FamilyNotifier<WorkOrderDetailState, int
       // audit access) must not turn a readable detail page into an error.
       await loadActionsAndAudit();
     } catch (e) {
-      state = WorkOrderDetailError(e.toString());
+      state = WorkOrderDetailError(userFacingError(e));
     }
   }
 
@@ -415,7 +423,7 @@ class ChecklistController extends FamilyNotifier<ChecklistState, int> {
       final record = await _repository.fetchMaintenanceRecord(arg);
       state = ChecklistLoaded(record: record);
     } catch (e) {
-      state = ChecklistError('Failed to load checklist: $e');
+      state = ChecklistError(userFacingError(e));
     }
   }
 
@@ -482,7 +490,7 @@ class ChecklistController extends FamilyNotifier<ChecklistState, int> {
     };
 
     try {
-      await _repository.submitChecklistLine(arg, payload);
+      final outcome = await _repository.submitChecklistLine(arg, payload);
 
       // Re-read state now, not the pre-await `current`: another line's save
       // (an immediate one, or a debounced one on a different card) may have
@@ -508,13 +516,16 @@ class ChecklistController extends FamilyNotifier<ChecklistState, int> {
 
       state = latest.copyWith(
         record: latest.record.copyWith(lines: updatedLines),
-        successMessage: 'Saved',
+        successMessage: outcome == MutationOutcome.synced
+            ? 'Saved'
+            : 'Saved on this device. Will sync when a connection is available.',
       );
       return true;
     } catch (e) {
       final latest = state;
       if (latest is! ChecklistLoaded) return false;
-      state = latest.copyWith(errorMessage: 'Failed to save observation: $e');
+      state = latest.copyWith(
+          errorMessage: 'Could not save the reading: ${userFacingError(e)}');
       return false;
     }
   }
@@ -545,8 +556,9 @@ class ChecklistController extends FamilyNotifier<ChecklistState, int> {
 
     state = current.copyWith(isSubmitting: true);
     try {
+      var evidenceOutcome = MutationOutcome.synced;
       if (proofJpegPath != null || otherStaff != null) {
-        await _repository.uploadEvidence(
+        evidenceOutcome = await _repository.uploadEvidence(
           arg,
           proofJpegPath: proofJpegPath,
           remarks: remarks.trim(),
@@ -554,13 +566,19 @@ class ChecklistController extends FamilyNotifier<ChecklistState, int> {
         );
       }
 
-      await _repository.completeMaintenanceRecord(
+      // If the proof is waiting in the outbox, completion must wait behind
+      // it (the outbox replays in order) — completing online now would leave
+      // the record completed without its proof until the photo syncs.
+      final completeOutcome = await _repository.completeMaintenanceRecord(
         arg,
         technicianName: technicianName,
         remarks: remarks.trim(),
         supervisorName: supervisorName,
+        queueOnly: evidenceOutcome == MutationOutcome.queued,
       );
-      state = const ChecklistCompleted();
+      state = ChecklistCompleted(
+        queued: completeOutcome == MutationOutcome.queued,
+      );
       return true;
     } catch (e) {
       state = current.copyWith(
@@ -746,64 +764,8 @@ class ChecklistController extends FamilyNotifier<ChecklistState, int> {
   String _readableError(Object error) => workOrderReadableError(error);
 }
 
-/// Surfaces the server's own validation message instead of a raw exception
-/// dump (SSOT §6: Android must NOT display raw Dio exceptions such as
-/// "DioException [receive timeout]: ..." — production UI gets a concise
-/// message; the structured detail is for development logging only).
-///
-/// The previous version only handled the case where a server response body
-/// came back (`error.response?.data`) and fell through to `error.toString()`
-/// otherwise — which is exactly the raw Dio dump this function exists to
-/// prevent, and is what happens on every network-level failure (timeout,
-/// no connectivity, connection refused) since those never get a response at
-/// all. Those cases are handled explicitly first, before touching the
-/// response body.
-String workOrderReadableError(Object error) {
-  if (error is DioException) {
-    switch (error.type) {
-      case DioExceptionType.connectionTimeout:
-      case DioExceptionType.sendTimeout:
-      case DioExceptionType.receiveTimeout:
-        return 'The server took too long to respond. Please check your connection and try again.';
-      case DioExceptionType.connectionError:
-        return 'Unable to reach the server. Please check your connection and try again.';
-      case DioExceptionType.cancel:
-        return 'The request was cancelled.';
-      case DioExceptionType.badCertificate:
-        return 'A secure connection to the server could not be established.';
-      case DioExceptionType.badResponse:
-      case DioExceptionType.unknown:
-        break; // Fall through to the response-body parsing below.
-      default:
-        break; // Other/future Dio exception types: same fallback.
-    }
-
-    final data = error.response?.data;
-    if (data is Map) {
-      final detail = data['detail'] ?? data['error'];
-      if (detail != null) return detail.toString();
-      if (data.values.isNotEmpty) {
-        final first = data.values.first;
-        if (first is List && first.isNotEmpty) return first.first.toString();
-        if (first != null) return first.toString();
-      }
-    }
-    if (data is List && data.isNotEmpty) return data.first.toString();
-    if (data is String && data.isNotEmpty) return data;
-
-    // `unknown` with no response body — e.g. a SocketException surfaced
-    // outside the explicit connectionError case above. Still must not leak
-    // the raw DioException string.
-    if (error.response == null) {
-      return 'Unable to reach the server. Please check your connection and try again.';
-    }
-    return 'The server reported a problem (HTTP ${error.response?.statusCode ?? 'error'}). Please try again.';
-  }
-  // Not a DioException — e.g. a repository-thrown business exception
-  // (`Exception('A technician must be assigned')`, `ArgumentError`, etc.)
-  // whose message is already human-authored, not a raw network/HTTP dump.
-  // SSOT §6 is specifically about not leaking raw *Dio* exceptions; a plain
-  // Dart exception's toString() is exactly what should reach the user here.
-  return error.toString();
-}
+/// User-facing text for any work-order failure (SSOT §6/§42). Kept as a named
+/// entry point because several screens import it; the mapping lives in
+/// [userFacingError].
+String workOrderReadableError(Object error) => userFacingError(error);
 

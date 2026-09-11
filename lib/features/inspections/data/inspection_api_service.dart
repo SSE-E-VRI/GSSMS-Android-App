@@ -15,7 +15,6 @@ class InspectionApiService {
 
   Future<List<Inspection>> getInspections({
     String? status,
-    String? priority,
     int? zoneId,
     int? divisionId,
     int? depotId,
@@ -25,7 +24,10 @@ class InspectionApiService {
   }) async {
     final query = <String, dynamic>{};
     if (status != null && status.isNotEmpty) query['status'] = status;
-    if (priority != null && priority.isNotEmpty) query['priority'] = priority;
+    // No `priority` filter — per SSOT §11.1/§11.3 (FIX-003) the backend
+    // Inspection model has no priority column, so InspectionViewSet ignores
+    // it. Status/date/scope filtering is server-side; anything finer stays
+    // client-side in InspectionListLoaded.filteredInspections.
     // SSOT §11.4 canonical filter — server-side "not yet converted" filter,
     // distinct from `status` (OPEN/ACTION_REQUIRED inspections can both be
     // pending conversion).

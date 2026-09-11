@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gssms_mobile/core/sync/mutation_outcome.dart';
 import 'package:gssms_mobile/features/work_orders/data/work_order_api_service.dart';
 import 'package:gssms_mobile/features/work_orders/data/work_order_repository.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/maintenance_record.dart';
@@ -130,6 +131,39 @@ void main() {
       expect(audit.eventsNewestFirst.first.eventId, 'b');
       expect(audit.eventsNewestFirst.first.reason, 'Execution started');
     });
+
+    test('staff-scoped list uses start_date/end_date (SSOT §20 FIX-007)', () async {
+      dio.httpClientAdapter = MockAdapter((options) async {
+        expect(options.path, '/api/v1/staff-workorders/');
+        expect(options.queryParameters['start_date'], '2026-09-01');
+        expect(options.queryParameters['end_date'], '2026-09-07');
+        expect(options.queryParameters.containsKey('date_from'), isFalse);
+        expect(options.queryParameters.containsKey('date_to'), isFalse);
+        return _json([], 200);
+      });
+
+      await api.getWorkOrders(
+        dateFrom: '2026-09-01',
+        dateTo: '2026-09-07',
+        assignedToMe: true,
+      );
+    });
+
+    test('main register list keeps date_from/date_to', () async {
+      dio.httpClientAdapter = MockAdapter((options) async {
+        expect(options.path, '/api/v1/maintenance/work-orders/');
+        expect(options.queryParameters['date_from'], '2026-09-01');
+        expect(options.queryParameters['date_to'], '2026-09-07');
+        expect(options.queryParameters.containsKey('start_date'), isFalse);
+        expect(options.queryParameters.containsKey('end_date'), isFalse);
+        return _json([], 200);
+      });
+
+      await api.getWorkOrders(
+        dateFrom: '2026-09-01',
+        dateTo: '2026-09-07',
+      );
+    });
   });
 
   group('Checklist line submission payload', () {
@@ -168,7 +202,7 @@ void main() {
       when(() => mockRepo.fetchMaintenanceRecord(22))
           .thenAnswer((_) async => record);
       when(() => mockRepo.submitChecklistLine(any(), any()))
-          .thenAnswer((_) async {});
+          .thenAnswer((_) async => MutationOutcome.synced);
       container = ProviderContainer(
         overrides: [workOrderRepositoryProvider.overrideWithValue(mockRepo)],
       );

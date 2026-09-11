@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:gssms_mobile/core/network/api_error.dart';
 import 'package:gssms_mobile/core/widgets/org_scope_filter_bar.dart';
 import 'package:gssms_mobile/features/assets/data/asset_api_service.dart';
 import 'package:gssms_mobile/features/assets/data/asset_repository.dart';
@@ -230,7 +231,7 @@ class AssetListController extends Notifier<AssetListState> {
       );
     } catch (e) {
       state = AssetListError(
-        'Failed to load assets: $e',
+        userFacingError(e),
         previousLoaded: previous?.copyWith(orgScope: scope),
       );
     }
@@ -312,7 +313,7 @@ class AssetDetailController extends FamilyNotifier<AssetDetailState, int> {
       final asset = await _repository.fetchAssetById(arg);
       state = AssetDetailLoaded(asset);
     } catch (e) {
-      state = AssetDetailError('Failed to load asset details: $e');
+      state = AssetDetailError(userFacingError(e));
     }
   }
 }

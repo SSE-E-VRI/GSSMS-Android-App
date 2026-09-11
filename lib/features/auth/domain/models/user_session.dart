@@ -3,6 +3,7 @@ import 'package:jwt_decoder/jwt_decoder.dart';
 import 'auth_exceptions.dart';
 import 'auth_role.dart';
 import 'org_scope.dart';
+import 'package:gssms_mobile/core/utils/json_parsing.dart';
 
 /// Immutable authenticated user session reconstructed from server-issued JWT claims.
 class UserSession extends Equatable {
@@ -176,7 +177,7 @@ class UserSession extends Equatable {
     // Parse validUntil
     DateTime? validUntil;
     if (claims['valid_until'] != null) {
-      validUntil = DateTime.tryParse(claims['valid_until'].toString());
+      validUntil = asJsonDateTime(claims['valid_until']);
     }
     if (validUntil != null &&
         DateTime.now().toUtc().isAfter(validUntil.toUtc())) {

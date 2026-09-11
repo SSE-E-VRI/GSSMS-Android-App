@@ -111,7 +111,7 @@ class _OtpEmailScreenState extends ConsumerState<OtpEmailScreen> {
                         width: 64,
                         height: 64,
                         decoration: BoxDecoration(
-                          color: AppTheme.primaryBlue.withOpacity(0.1),
+                          color: context.gssms.info.background,
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
@@ -119,7 +119,7 @@ class _OtpEmailScreenState extends ConsumerState<OtpEmailScreen> {
                               ? Icons.mark_email_read_outlined
                               : Icons.lock_reset_rounded,
                           size: 32,
-                          color: AppTheme.primaryBlue,
+                          color: context.gssms.link,
                         ),
                       ),
                     ),
@@ -128,10 +128,10 @@ class _OtpEmailScreenState extends ConsumerState<OtpEmailScreen> {
                     // Title & Subtitle
                     Text(
                       title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
-                        color: AppTheme.textDark,
+                        color: context.gssms.textPrimary,
                         letterSpacing: -0.5,
                       ),
                       textAlign: TextAlign.center,
@@ -139,9 +139,9 @@ class _OtpEmailScreenState extends ConsumerState<OtpEmailScreen> {
                     const SizedBox(height: 8),
                     Text(
                       subtitle,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
-                        color: AppTheme.textMuted,
+                        color: context.gssms.textSecondary,
                         height: 1.4,
                       ),
                       textAlign: TextAlign.center,
@@ -186,13 +186,12 @@ class _OtpEmailScreenState extends ConsumerState<OtpEmailScreen> {
                       key: const Key('otp_send_code_button'),
                       onPressed: _isLoading ? null : _onSubmit,
                       child: _isLoading
-                          ? const SizedBox(
+                          ? SizedBox(
                               width: 24,
                               height: 24,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2.5,
-                                valueColor:
-                                    AlwaysStoppedAnimation<Color>(Colors.white),
+                                color: Theme.of(context).colorScheme.onPrimary,
                               ),
                             )
                           : const Text('Send Verification Code'),
@@ -224,20 +223,20 @@ class _OtpEmailScreenState extends ConsumerState<OtpEmailScreen> {
         key: const Key('otp_email_error_banner'),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: AppTheme.errorRed.withOpacity(0.08),
+          color: context.gssms.danger.background,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppTheme.errorRed.withOpacity(0.3)),
+          border: Border.all(color: context.gssms.danger.border),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.error_outline, color: AppTheme.errorRed, size: 20),
+            Icon(Icons.error_outline, color: context.gssms.danger.foreground, size: 20),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
                 message,
-                style: const TextStyle(
-                  color: AppTheme.errorRed,
+                style: TextStyle(
+                  color: context.gssms.danger.foreground,
                   fontSize: 13.5,
                   fontWeight: FontWeight.w500,
                 ),

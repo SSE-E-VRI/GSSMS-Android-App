@@ -205,7 +205,7 @@ void main() {
 
     // Delete dialog appears
     expect(find.text('Delete Photo'), findsOneWidget);
-    expect(find.text('Are you sure you want to delete this before photo?'), findsOneWidget);
+    expect(find.textContaining('Delete this before photo?'), findsOneWidget);
 
     // Confirm deletion
     await tester.tap(find.text('Delete'));
