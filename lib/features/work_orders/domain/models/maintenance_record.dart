@@ -693,6 +693,6 @@ int? _asInt(dynamic value) {
 }
 
 DateTime? _asDate(dynamic value) {
-  if (value is String && value.isNotEmpty) return DateTime.tryParse(value);
+  if (value is String && value.isNotEmpty) return asJsonDateTime(value);
   return null;
 }

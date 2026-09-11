@@ -70,10 +70,8 @@ void main() {
     const testInspections = [
       Inspection(
         id: 1,
-        inspectionNumber: 'INSP-001',
         title: 'EB Bunk Monthly Check',
         notes: 'Earth resistance and cleaning',
-        priority: InspectionPriority.high,
         status: InspectionStatus.open,
         stationName: 'Thalanallur',
       ),
@@ -108,8 +106,10 @@ void main() {
       expect(find.text('Inspections'), findsOneWidget);
       expect(find.byKey(const Key('date_range_from')), findsOneWidget);
       expect(find.text('EB Bunk Monthly Check'), findsOneWidget);
-      expect(find.text('INSP-001'), findsOneWidget);
-      expect(find.text('High'), findsOneWidget);
+      expect(find.text('#1'), findsOneWidget);
+      // Inspections carry no priority in the API — no fabricated badge.
+      expect(find.text('High'), findsNothing);
+      expect(find.text('Medium'), findsNothing);
       expect(find.byKey(const Key('fab_create_inspection')), findsOneWidget);
     });
 
@@ -139,7 +139,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(InspectionDetailScreen), findsOneWidget);
-      expect(find.text('INSP-001'), findsOneWidget);
+      expect(find.text('Inspection #1'), findsOneWidget);
       expect(find.text('Earth resistance and cleaning'), findsOneWidget);
       // DEPOT_INCHARGE holding inspections.edit on an unconverted inspection
       // is exactly who ConversionService allows to convert.
@@ -207,12 +207,13 @@ void main() {
 
       await tester.tap(find.byKey(const Key('convert_to_work_order_button')));
       await tester.pumpAndSettle();
-      // Confirmation dialog.
-      await tester.tap(find.text('Convert'));
+      // Confirmation dialog states the consequence before converting.
+      expect(find.textContaining('A Job Work will be created'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('confirm_convert_button')));
       await tester.pumpAndSettle();
 
       verify(() => mockRepo.convertToWorkOrder(1)).called(1);
-      expect(find.text('Converted successfully. Job Work created.'),
+      expect(find.text('Converted. A Job Work has been created.'),
           findsOneWidget);
       // Off the initial viewport below the Location card — scroll to it like
       // a real user would rather than asserting on unpainted content.
@@ -228,10 +229,8 @@ void main() {
         (tester) async {
       const converted = Inspection(
         id: 1,
-        inspectionNumber: 'INSP-001',
         title: 'EB Bunk Monthly Check',
         status: InspectionStatus.converted,
-        priority: InspectionPriority.high,
         isConverted: true,
         workOrderId: 42,
       );

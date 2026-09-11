@@ -71,7 +71,7 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      expect(find.text('Work Orders'), findsOneWidget);
+      expect(find.text('Job Works'), findsOneWidget);
       expect(find.byKey(const Key('date_range_from')), findsOneWidget);
       expect(find.byKey(const Key('date_range_to')), findsOneWidget);
       // Status/Type are a dropdown pair, not FilterChip rows (avoids the
@@ -195,10 +195,15 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      expect(find.text('Work Order #101'), findsOneWidget);
+      expect(find.text('Job Work'), findsOneWidget);
+      expect(find.text('WO #101'), findsOneWidget);
       expect(find.text('Asset & Location Details'), findsOneWidget);
       expect(find.text('TR-01'), findsOneWidget);
       expect(find.byKey(const Key('action_start_execution')), findsOneWidget);
+      // Start Execution performs IN_PROGRESS via the execute endpoint (which
+      // creates the maintenance record); the raw server transition must not
+      // be offered as a second, record-less "Start" path.
+      expect(find.byKey(const Key('action_in_progress')), findsNothing);
       // The transition offered comes from the server, not from the viewer's role.
       expect(find.byKey(const Key('action_on_hold')), findsOneWidget);
       expect(find.byKey(const Key('work_order_audit_timeline')), findsOneWidget);

@@ -1,60 +1,43 @@
 import 'package:flutter/material.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
 
-/// Semantic operational-status chip (non-interactive metadata).
-enum GssmsStatusTone { critical, high, medium, low, success }
-
+/// Compact, non-interactive status/priority badge.
+///
+/// Meaning is carried by the [icon] and [label]; the tone colour is
+/// supplementary (never colour alone). Colours come from [GssmsColors], so the
+/// chip reads correctly in light and dark themes.
 class StatusChip extends StatelessWidget {
   const StatusChip({
     super.key,
     required this.label,
-    this.tone = GssmsStatusTone.low,
-    this.glyph,
-    this.showGlyph = true,
+    this.tone = GssmsTone.neutral,
+    this.icon,
+    this.filled = false,
+    this.semanticPrefix,
   });
 
   final String label;
-  final GssmsStatusTone tone;
-  final String? glyph;
-  final bool showGlyph;
+  final GssmsTone tone;
+  final IconData? icon;
 
-  String get _glyph {
-    if (glyph != null) return glyph!;
-    switch (tone) {
-      case GssmsStatusTone.critical:
-        return '✕';
-      case GssmsStatusTone.high:
-      case GssmsStatusTone.medium:
-        return '!';
-      case GssmsStatusTone.low:
-        return '•';
-      case GssmsStatusTone.success:
-        return '✓';
-    }
-  }
+  /// Solid background for the one badge that must dominate (e.g. the detail
+  /// header's current status). Tinted otherwise.
+  final bool filled;
 
-  Color get _color {
-    switch (tone) {
-      case GssmsStatusTone.critical:
-        return AppTheme.statusCritical;
-      case GssmsStatusTone.high:
-        return AppTheme.statusHigh;
-      case GssmsStatusTone.medium:
-        return AppTheme.statusMedium;
-      case GssmsStatusTone.low:
-        return AppTheme.statusLow;
-      case GssmsStatusTone.success:
-        return AppTheme.statusSuccess;
-    }
-  }
+  /// Spoken before the label, e.g. `'Status'` → "Status: In Progress".
+  final String? semanticPrefix;
 
   @override
   Widget build(BuildContext context) {
-    final color = _color;
-    final activeGlyph = _glyph;
+    final palette = context.gssms.tone(tone);
+    final fg = filled ? palette.onSolid : palette.foreground;
+    final textStyle = Theme.of(context).textTheme.labelSmall?.copyWith(
+          color: fg,
+          fontWeight: FontWeight.w700,
+        );
+
     return Semantics(
-      label: showGlyph ? '$activeGlyph $label' : label,
-      // Inner texts would otherwise merge into this label and announce twice.
+      label: semanticPrefix == null ? label : '$semanticPrefix: $label',
       excludeSemantics: true,
       child: Container(
         padding: const EdgeInsets.symmetric(
@@ -62,29 +45,24 @@ class StatusChip extends StatelessWidget {
           vertical: GssmsSpacing.s4,
         ),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.15),
+          color: filled ? palette.solid : palette.background,
           borderRadius: BorderRadius.circular(GssmsRadius.r12),
-          border: Border.all(color: color.withOpacity(0.4)),
+          border: Border.all(color: filled ? palette.solid : palette.border),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (showGlyph) ...[
-              Text(
-                activeGlyph,
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: color,
-                      fontWeight: FontWeight.w700,
-                    ),
-              ),
-              const SizedBox(width: 4),
+            if (icon != null) ...[
+              Icon(icon, size: 14, color: fg),
+              const SizedBox(width: GssmsSpacing.s4),
             ],
-            Text(
-              label,
-              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: color,
-                    fontWeight: FontWeight.w600,
-                  ),
+            Flexible(
+              child: Text(
+                label,
+                style: textStyle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           ],
         ),

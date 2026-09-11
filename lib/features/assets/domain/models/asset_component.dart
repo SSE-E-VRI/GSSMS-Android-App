@@ -41,7 +41,7 @@ class AssetComponent extends Equatable {
       serialNumber: asJsonString(json['serial_number']),
       status: asJsonString(json['status']),
       installedOn: asJsonString(json['installed_on']) != null
-          ? DateTime.tryParse(json['installed_on'].toString())
+          ? asJsonDateTime(json['installed_on'])
           : null,
     );
   }

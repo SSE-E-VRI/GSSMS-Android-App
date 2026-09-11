@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'package:gssms_mobile/core/utils/json_parsing.dart';
 
 /// Criticality grades used across the asset register.
 enum AssetCriticality {
@@ -143,7 +144,7 @@ class Asset extends Equatable {
   factory Asset.fromJson(Map<String, dynamic> json) {
     DateTime? parseDate(dynamic d) {
       if (d == null || d == '') return null;
-      return DateTime.tryParse(d.toString());
+      return asJsonDateTime(d);
     }
 
     return Asset(

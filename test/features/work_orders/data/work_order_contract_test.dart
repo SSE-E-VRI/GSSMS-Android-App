@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gssms_mobile/core/sync/mutation_outcome.dart';
 import 'package:gssms_mobile/features/work_orders/data/work_order_api_service.dart';
 import 'package:gssms_mobile/features/work_orders/data/work_order_repository.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/maintenance_record.dart';
@@ -201,7 +202,7 @@ void main() {
       when(() => mockRepo.fetchMaintenanceRecord(22))
           .thenAnswer((_) async => record);
       when(() => mockRepo.submitChecklistLine(any(), any()))
-          .thenAnswer((_) async {});
+          .thenAnswer((_) async => MutationOutcome.synced);
       container = ProviderContainer(
         overrides: [workOrderRepositoryProvider.overrideWithValue(mockRepo)],
       );

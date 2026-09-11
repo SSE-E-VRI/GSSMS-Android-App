@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:equatable/equatable.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gssms_mobile/core/database/local_cache_service.dart';
+import 'package:gssms_mobile/core/network/api_error.dart';
 import 'package:gssms_mobile/core/sync/outbox_command.dart';
 import 'package:gssms_mobile/features/work_orders/data/evidence_service.dart';
 import 'package:gssms_mobile/features/work_orders/data/work_order_api_service.dart';
@@ -273,24 +274,26 @@ class SyncManager extends Notifier<SyncState> {
               break;
             }
 
+            // lastError is shown to the user (per-photo sync badge), so it
+            // gets the same user-facing text as every other error — never the
+            // raw response body, which can be an HTML proxy page.
             final statusCode = dioErr.response?.statusCode;
             if (statusCode == 409) {
-              // Conflict
               remainingCommands.add(cmd.copyWith(
                 status: OutboxCommandStatus.conflict,
-                lastError: 'Conflict: ${dioErr.response?.data}',
+                lastError: userFacingError(dioErr),
               ));
             } else {
               // Unrecoverable validation or server error
               remainingCommands.add(cmd.copyWith(
                 status: OutboxCommandStatus.failed,
-                lastError: 'Failed (${dioErr.response?.statusCode}): ${dioErr.response?.data}',
+                lastError: userFacingError(dioErr),
               ));
             }
           } catch (e) {
             remainingCommands.add(cmd.copyWith(
               status: OutboxCommandStatus.failed,
-              lastError: e.toString(),
+              lastError: userFacingError(e),
             ));
           }
         }
@@ -335,6 +338,23 @@ class SyncManager extends Notifier<SyncState> {
         _isDraining = false;
       }
     });
+  }
+
+  /// Opportunistic drain for app start, sign-in and resume-from-background.
+  ///
+  /// Without it, work queued before a restart (or while the phone was out of
+  /// coverage) sat in the outbox until the user happened to create another
+  /// mutation or tapped the sync strip. Only PENDING commands replay —
+  /// FAILED/CONFLICT still wait for the user — and every command carries its
+  /// idempotency key, so an extra drain cannot duplicate a server mutation.
+  Future<void> resumePendingSync() async {
+    try {
+      await refreshPendingCount();
+      if (state.pendingCount == 0) return;
+      await drainOutbox();
+    } catch (_) {
+      // Storage unavailable (tests, early start-up): the next trigger retries.
+    }
   }
 
   /// Retries a previously failed or conflicting command by resetting it to pending.

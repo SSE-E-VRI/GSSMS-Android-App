@@ -31,7 +31,7 @@ class WorkScreen extends ConsumerWidget {
 
     if (sessionAllows(effectiveSession, 'maintenance.view')) {
       tabs.add(const Tab(
-        text: 'Work Orders',
+        text: 'Job Works',
         icon: Icon(Icons.assignment_outlined),
       ));
       views.add(const WorkOrderListScreen(isEmbedded: true));

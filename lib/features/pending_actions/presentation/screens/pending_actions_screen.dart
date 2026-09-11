@@ -140,7 +140,7 @@ class _PendingActionsScreenState extends ConsumerState<PendingActionsScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline, size: 48, color: AppTheme.errorRed),
+            Icon(Icons.error_outline, size: 48, color: context.gssms.danger.foreground),
             const SizedBox(height: 12),
             Text(message, textAlign: TextAlign.center),
             const SizedBox(height: 16),
@@ -187,9 +187,9 @@ class _ConvertibleListScaffold extends ConsumerWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.check_circle_outline, size: 56, color: AppTheme.railwayGreen),
+            Icon(Icons.check_circle_outline, size: 56, color: context.gssms.success.foreground),
             const SizedBox(height: 12),
-            Text(emptyLabel, style: const TextStyle(color: AppTheme.textSecondary)),
+            Text(emptyLabel, style: TextStyle(color: context.gssms.textSecondary)),
           ],
         ),
       );
@@ -207,7 +207,7 @@ class _ConvertibleListScaffold extends ConsumerWidget {
         if (canConvert && selectedCount > 0)
           Material(
             elevation: 8,
-            color: Colors.white,
+            color: context.gssms.surfaceRaised,
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
               child: SizedBox(
@@ -245,7 +245,7 @@ class _ConvertibleListScaffold extends ConsumerWidget {
                               SnackBar(
                                 content: Text(message),
                                 backgroundColor:
-                                    ok ? AppTheme.railwayGreen : AppTheme.errorRed,
+                                    ok ? context.gssms.success.foreground : context.gssms.danger.foreground,
                               ),
                             );
                           }
@@ -261,8 +261,8 @@ class _ConvertibleListScaffold extends ConsumerWidget {
                       ? 'Creating...'
                       : 'Create $selectedCount Job Work${selectedCount == 1 ? '' : 's'}'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.railwayBlue,
-                    foregroundColor: Colors.white,
+                    backgroundColor: Theme.of(context).colorScheme.primary,
+                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                   ),
                 ),
@@ -304,7 +304,7 @@ class _SchedulesTab extends ConsumerWidget {
                         .read(pendingActionsControllerProvider.notifier)
                         .toggleSelection(PendingActionTab.schedules, s.id),
                   )
-                : const Icon(Icons.event_repeat, color: AppTheme.railwayBlue),
+                : Icon(Icons.event_repeat, color: context.gssms.link),
             title: Text(s.templateName,
                 style: const TextStyle(fontWeight: FontWeight.bold)),
             subtitle: Text([
@@ -312,7 +312,7 @@ class _SchedulesTab extends ConsumerWidget {
               if (s.dueDate != null) 'Due ${dateFormat.format(s.dueDate!)}',
             ].join(' • ')),
             trailing: s.isConverted
-                ? const Icon(Icons.link, color: AppTheme.railwayGreen, size: 18)
+                ? Icon(Icons.link, color: context.gssms.success.foreground, size: 18)
                 : Chip(
                     label: Text(s.status.displayName,
                         style: const TextStyle(fontSize: 11)),
@@ -354,10 +354,10 @@ class _ComplaintsTab extends ConsumerWidget {
                         .read(pendingActionsControllerProvider.notifier)
                         .toggleSelection(PendingActionTab.complaints, c.id),
                   )
-                : const Icon(Icons.campaign_outlined, color: AppTheme.errorRed),
+                : Icon(Icons.campaign_outlined, color: context.gssms.danger.foreground),
             title: Text(c.title, style: const TextStyle(fontWeight: FontWeight.bold)),
             subtitle: Text(
-                '${c.complaintNumber} • ${c.stationName ?? c.depotName ?? 'Location N/A'}'),
+                '${c.reference} • ${c.locationLabel ?? c.depotName ?? 'Location not set'}'),
             onTap: () => Navigator.of(context).push(MaterialPageRoute(
                 builder: (_) => ComplaintDetailScreen(complaint: c))),
           ),
@@ -396,11 +396,11 @@ class _InspectionsTab extends ConsumerWidget {
                         .read(pendingActionsControllerProvider.notifier)
                         .toggleSelection(PendingActionTab.inspections, insp.id),
                   )
-                : const Icon(Icons.note_add_outlined, color: AppTheme.railwayBlue),
+                : Icon(Icons.note_add_outlined, color: context.gssms.link),
             title:
                 Text(insp.title, style: const TextStyle(fontWeight: FontWeight.bold)),
             subtitle: Text(
-                '${insp.inspectionNumber} • ${insp.stationName ?? insp.depotName ?? 'Location N/A'}'),
+                '${insp.reference} • ${insp.locationLabel ?? insp.depotName ?? 'Location not set'}'),
             onTap: () => Navigator.of(context).push(MaterialPageRoute(
                 builder: (_) => InspectionDetailScreen(inspection: insp))),
           ),
@@ -417,16 +417,16 @@ class _InspectionsTab extends ConsumerWidget {
 /// RESOLVED/CLOSED green, everything else amber — same two-bucket logic as
 /// web's `deficiencyStatusBadgeClass` (OPEN/ASSIGNED/IN_PROGRESS all read
 /// amber there too, not a distinct colour per status).
-Color _deficiencyStatusColor(DeficiencyStatus status) {
+Color _deficiencyStatusColor(BuildContext context, DeficiencyStatus status) {
   switch (status) {
     case DeficiencyStatus.resolved:
     case DeficiencyStatus.closed:
-      return AppTheme.railwayGreen;
+      return context.gssms.success.foreground;
     case DeficiencyStatus.open:
     case DeficiencyStatus.assigned:
     case DeficiencyStatus.inProgress:
     case DeficiencyStatus.unknown:
-      return AppTheme.warningAmberDark;
+      return context.gssms.warning.foreground;
   }
 }
 
@@ -449,7 +449,7 @@ class _DeficienciesTab extends ConsumerWidget {
       emptyLabel: 'No pending deficiencies.',
       itemBuilder: (context, index) {
         final Deficiency d = state.deficiencies[index];
-        final statusColor = _deficiencyStatusColor(d.status);
+        final statusColor = _deficiencyStatusColor(context, d.status);
         // Same priority web's `openDeficiency`/"View report" use: the
         // linked Job Work first (there's no mobile "Reports" screen to open
         // a report by work-order id the way web's `/reports?work_order=`
@@ -509,27 +509,27 @@ class _DeficienciesTab extends ConsumerWidget {
                   if (d.workOrderTicket != null) ...[
                     Row(
                       children: [
-                        const Icon(Icons.assignment_outlined,
-                            size: 14, color: AppTheme.railwayBlue),
+                        Icon(Icons.assignment_outlined,
+                            size: 14, color: context.gssms.link),
                         const SizedBox(width: 4),
                         Text(d.workOrderTicket!,
-                            style: const TextStyle(
+                            style: TextStyle(
                                 fontSize: 13,
                                 fontWeight: FontWeight.w700,
-                                color: AppTheme.railwayBlue)),
+                                color: context.gssms.link)),
                       ],
                     ),
                     const SizedBox(height: 4),
                   ],
                   Row(
                     children: [
-                      const Icon(Icons.build_outlined,
-                          size: 14, color: AppTheme.textSecondary),
+                      Icon(Icons.build_outlined,
+                          size: 14, color: context.gssms.textSecondary),
                       const SizedBox(width: 4),
                       Expanded(
                         child: Text(d.displayAssetEquipment,
-                            style: const TextStyle(
-                                fontSize: 13, color: AppTheme.textSecondary),
+                            style: TextStyle(
+                                fontSize: 13, color: context.gssms.textSecondary),
                             overflow: TextOverflow.ellipsis),
                       ),
                     ],
@@ -543,22 +543,22 @@ class _DeficienciesTab extends ConsumerWidget {
                     width: double.infinity,
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                     decoration: BoxDecoration(
-                      color: AppTheme.errorLight,
+                      color: context.gssms.danger.background,
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: AppTheme.errorBorder),
+                      border: Border.all(color: context.gssms.danger.border),
                     ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(Icons.warning_amber_rounded,
-                            size: 16, color: AppTheme.errorRed),
+                        Icon(Icons.warning_amber_rounded,
+                            size: 16, color: context.gssms.danger.foreground),
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(d.displayFinding,
-                              style: const TextStyle(
+                              style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
-                                  color: AppTheme.errorRed)),
+                                  color: context.gssms.danger.foreground)),
                         ),
                       ],
                     ),
@@ -566,8 +566,8 @@ class _DeficienciesTab extends ConsumerWidget {
                   if (d.detectedAt != null) ...[
                     const SizedBox(height: 6),
                     Text(dateFormat.format(d.detectedAt!),
-                        style: const TextStyle(
-                            fontSize: 11, color: AppTheme.textSecondary)),
+                        style: TextStyle(
+                            fontSize: 11, color: context.gssms.textSecondary)),
                   ],
                 ],
               ),

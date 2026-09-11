@@ -99,12 +99,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.error_outline, size: 48, color: AppTheme.errorRed),
+              Icon(Icons.error_outline, size: 48, color: context.gssms.danger.foreground),
               const SizedBox(height: 12),
               Text(
                 state.message,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: AppTheme.textSecondary),
+                style: TextStyle(color: context.gssms.textSecondary),
               ),
               const SizedBox(height: 16),
               ElevatedButton(
@@ -162,22 +162,22 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           children: [
             Row(
               children: [
-                const Icon(Icons.warning_amber_rounded, color: AppTheme.errorRed),
+                Icon(Icons.warning_amber_rounded, color: context.gssms.danger.foreground),
                 const SizedBox(width: 8),
-                const Text(
+                Text(
                   'Attention Required',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.railwayBlue),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: context.gssms.link),
                 ),
                 const Spacer(),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: AppTheme.errorRed.withOpacity(0.12),
+                    color: context.gssms.danger.background,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
                     '${attention.overdue.length} Overdue',
-                    style: const TextStyle(color: AppTheme.errorRed, fontSize: 11, fontWeight: FontWeight.bold),
+                    style: TextStyle(color: context.gssms.danger.foreground, fontSize: 11, fontWeight: FontWeight.bold),
                   ),
                 ),
                 if (attention.dueSoon.isNotEmpty) ...[
@@ -186,12 +186,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     key: const Key('attention_due_soon_badge'),
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                     decoration: BoxDecoration(
-                      color: AppTheme.warningAmber.withOpacity(0.15),
+                      color: context.gssms.warning.background,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
                       '${attention.dueSoon.length} Due soon',
-                      style: const TextStyle(color: AppTheme.warningAmber, fontSize: 11, fontWeight: FontWeight.bold),
+                      style: TextStyle(color: context.gssms.warning.foreground, fontSize: 11, fontWeight: FontWeight.bold),
                     ),
                   ),
                 ],
@@ -199,19 +199,19 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             ),
             const SizedBox(height: 12),
             if (!hasOverdue && !hasDueSoon)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 8),
-                child: Text('No urgent items requiring attention.', style: TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text('No urgent items requiring attention.', style: TextStyle(color: context.gssms.textSecondary, fontSize: 13)),
               )
             else ...[
               if (hasOverdue) ...[
-                const Text('Overdue Schedules', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.errorRed)),
+                Text('Overdue Schedules', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: context.gssms.danger.foreground)),
                 const SizedBox(height: 6),
                 ...attention.overdue.map((item) => _buildAttentionTile(item, isOverdue: true)),
                 const SizedBox(height: 10),
               ],
               if (hasDueSoon) ...[
-                const Text('Due in 7 Days', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.warningAmber)),
+                Text('Due in 7 Days', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: context.gssms.warning.foreground)),
                 const SizedBox(height: 6),
                 ...attention.dueSoon.map((item) => _buildAttentionTile(item, isOverdue: false)),
               ],
@@ -223,16 +223,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   }
 
   Widget _buildAttentionTile(AttentionItem item, {required bool isOverdue}) {
-    final color = isOverdue ? AppTheme.errorRed : AppTheme.warningAmber;
+    final palette = isOverdue ? context.gssms.danger : context.gssms.warning;
     final dateStr = item.dueDate != null ? DateFormat('dd/MM/yyyy').format(item.dueDate!) : 'Pending';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withOpacity(0.3)),
+        color: palette.background,
+        borderRadius: BorderRadius.circular(GssmsRadius.r8),
+        border: Border.all(color: palette.border),
       ),
       child: Row(
         children: [
@@ -247,7 +247,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 if (item.stationName != null && item.stationName!.isNotEmpty)
                   Text(
                     item.stationName!,
-                    style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                    style: TextStyle(fontSize: 11, color: context.gssms.textSecondary),
                   ),
               ],
             ),
@@ -256,14 +256,17 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
-              color: color,
-              borderRadius: BorderRadius.circular(4),
+              color: palette.solid,
+              borderRadius: BorderRadius.circular(GssmsRadius.r4),
             ),
             child: Text(
               isOverdue
                   ? '${item.daysOverdue ?? 1}d Overdue'
                   : 'Due: $dateStr',
-              style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: palette.onSolid,
+                    fontWeight: FontWeight.bold,
+                  ),
             ),
           ),
         ],
@@ -283,9 +286,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            Text(
               'Work by Type',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.railwayBlue),
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: context.gssms.link),
             ),
             const SizedBox(height: 10),
             Wrap(
@@ -295,15 +298,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 return Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
-                    color: AppTheme.railwayBlue.withOpacity(0.08),
+                    color: context.gssms.info.background,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppTheme.railwayBlue.withOpacity(0.25)),
+                    border: Border.all(color: context.gssms.info.border),
                   ),
                   child: Text(
                     t.percentage > 0
                         ? '${t.label}: ${t.count} (${t.percentage.toStringAsFixed(0)}%)'
                         : '${t.label}: ${t.count}',
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.railwayBlue),
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: context.gssms.link),
                   ),
                 );
               }).toList(),
@@ -366,7 +369,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         rows.add(Padding(
           padding: const EdgeInsets.only(top: 4),
           child: Text('+${tasks.length - 8} more in the work queues',
-              style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+              style: TextStyle(fontSize: 12, color: context.gssms.textSecondary)),
         ));
       }
     } else {
@@ -375,7 +378,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       if (stats.pendingVerificationCount > 0 && canWorkOrders) {
         rows.add(_pendingRow(
           icon: Icons.verified_outlined,
-          color: AppTheme.railwayGreen,
+          color: context.gssms.success.foreground,
           title: '${stats.pendingVerificationCount} awaiting verification',
           subtitle: 'Review and verify completed Job Works',
           onTap: () => openList(const WorkOrderListScreen()),
@@ -384,7 +387,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       if (stats.pendingTaskCount > 0 && canWorkOrders) {
         rows.add(_pendingRow(
           icon: Icons.hourglass_empty_outlined,
-          color: AppTheme.warningAmber,
+          color: context.gssms.warning.foreground,
           title: '${stats.pendingTaskCount} pending tasks',
           subtitle: 'Open assignments needing execution',
           onTap: () => openList(const WorkOrderListScreen()),
@@ -393,7 +396,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       if (stats.openComplaintCount > 0 && canComplaints) {
         rows.add(_pendingRow(
           icon: Icons.report_problem_outlined,
-          color: AppTheme.errorRed,
+          color: context.gssms.danger.foreground,
           title: '${stats.openComplaintCount} open complaints',
           subtitle: 'Triage the complaint queue',
           onTap: () => openList(const ComplaintListScreen()),
@@ -402,7 +405,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       if (stats.inspectionCount > 0 && canInspections) {
         rows.add(_pendingRow(
           icon: Icons.fact_check_outlined,
-          color: AppTheme.railwayBlue,
+          color: context.gssms.link,
           title: '${stats.inspectionCount} recorded notes',
           subtitle: 'Review inspections, convert where needed',
           onTap: () => openList(const InspectionListScreen()),
@@ -422,13 +425,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Expanded(
+                Expanded(
                   child: Row(
                     children: [
-                      Icon(Icons.playlist_add_check_outlined, color: AppTheme.railwayBlue),
-                      SizedBox(width: 8),
+                      Icon(Icons.playlist_add_check_outlined, color: context.gssms.link),
+                      const SizedBox(width: 8),
                       Text('Pending Actions',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.railwayBlue)),
+                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: context.gssms.link)),
                     ],
                   ),
                 ),
@@ -448,8 +451,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             ),
             const SizedBox(height: 12),
             if (rows.isEmpty)
-              const Text('All clear — nothing needs your action.',
-                  style: TextStyle(fontSize: 13, color: AppTheme.textSecondary))
+              Text('All clear — nothing needs your action.',
+                  style: TextStyle(fontSize: 13, color: context.gssms.textSecondary))
             else
               ...rows,
           ],
@@ -477,16 +480,16 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   Color _pendingColor(PendingActionKind kind) {
     switch (kind) {
       case PendingActionKind.verification:
-        return AppTheme.railwayGreen;
+        return context.gssms.success.foreground;
       case PendingActionKind.assignment:
-        return AppTheme.railwayBlue;
+        return context.gssms.link;
       case PendingActionKind.complaint:
-        return AppTheme.errorRed;
+        return context.gssms.danger.foreground;
       case PendingActionKind.inspection:
         return Colors.teal;
       case PendingActionKind.task:
       case PendingActionKind.unknown:
-        return AppTheme.warningAmber;
+        return context.gssms.warning.foreground;
     }
   }
 
@@ -501,14 +504,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       padding: const EdgeInsets.only(bottom: 8),
       child: ListTile(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        tileColor: AppTheme.backgroundLight,
+        tileColor: context.gssms.surfaceInset,
         leading: CircleAvatar(
             backgroundColor: color.withOpacity(0.12),
             child: Icon(icon, color: color, size: 20)),
         title: Text(title,
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
         subtitle: Text(subtitle,
-            style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+            style: TextStyle(fontSize: 11, color: context.gssms.textSecondary),
             maxLines: 2,
             overflow: TextOverflow.ellipsis),
         trailing: const Icon(Icons.arrow_forward_ios, size: 14),
@@ -524,9 +527,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Operational Metrics',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.railwayBlue),
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: context.gssms.link),
         ),
         const SizedBox(height: 10),
         // Two rows of two `Expanded` cards, not `GridView.count` with a
@@ -546,13 +549,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             children: [
               Expanded(
                 child: _buildKpiCard('Total Job Works', '${stats.totalWorkOrders}',
-                    Icons.assignment_outlined, AppTheme.railwayBlue),
+                    Icons.assignment_outlined, context.gssms.link),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: _buildKpiCard('Compliance Rate',
                     '${stats.complianceRate.toStringAsFixed(1)}%',
-                    Icons.check_circle_outline, AppTheme.railwayGreen),
+                    Icons.check_circle_outline, context.gssms.success.foreground),
               ),
             ],
           ),
@@ -564,12 +567,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             children: [
               Expanded(
                 child: _buildKpiCard('Pending Tasks', '${stats.pendingTaskCount}',
-                    Icons.hourglass_empty_outlined, AppTheme.warningAmber),
+                    Icons.hourglass_empty_outlined, context.gssms.warning.foreground),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: _buildKpiCard('Open Complaints', '${stats.openComplaintCount}',
-                    Icons.report_problem_outlined, AppTheme.errorRed),
+                    Icons.report_problem_outlined, context.gssms.danger.foreground),
               ),
             ],
           ),
@@ -605,7 +608,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             const SizedBox(height: 8),
             Text(
               title,
-              style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary, fontWeight: FontWeight.w500),
+              style: TextStyle(fontSize: 12, color: context.gssms.textSecondary, fontWeight: FontWeight.w500),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),

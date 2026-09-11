@@ -345,12 +345,12 @@ class _OrgScopeFilterBarState extends ConsumerState<OrgScopeFilterBar> {
         labelText: label,
         isDense: true,
         suffixIcon: loading
-            ? const Padding(
-                padding: EdgeInsets.all(10),
+            ? Padding(
+                padding: const EdgeInsets.all(10),
                 child: SizedBox(
                   width: 12,
                   height: 12,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.railwayBlue),
+                  child: CircularProgressIndicator(strokeWidth: 2, color: context.gssms.link),
                 ),
               )
             : null,

@@ -135,7 +135,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('Work Order Assigned'), findsOneWidget);
+      expect(find.text('Job Work Assigned'), findsOneWidget);
       expect(find.text('Rework Required'), findsOneWidget);
       expect(find.byKey(const Key('notification_item_ASSIGNMENT_101')), findsOneWidget);
       expect(find.byKey(const Key('notification_item_REWORK_102')), findsOneWidget);

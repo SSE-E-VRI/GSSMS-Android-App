@@ -3,7 +3,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
+import 'package:gssms_mobile/core/widgets/feedback.dart';
 import 'package:gssms_mobile/features/auth/domain/rbac.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:gssms_mobile/features/work_orders/data/evidence_service.dart';
@@ -227,10 +229,12 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
 
     return Card(
       key: Key('checklist_line_${line.id}'),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      margin: EdgeInsets.zero,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(
+          horizontal: GssmsSpacing.s12,
+          vertical: GssmsSpacing.s8,
+        ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -247,6 +251,7 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
 
   Widget _buildHeader(BuildContext context, MaintenanceRecordLine line) {
     final textTheme = Theme.of(context).textTheme;
+    final tokens = context.gssms;
     final hasPoint = line.inspectionPoint != null &&
         line.inspectionPoint!.trim().isNotEmpty;
     final hasObservations =
@@ -268,7 +273,7 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
                 Text(
                   line.itemName,
                   style: textTheme.labelSmall?.copyWith(
-                    color: AppTheme.textSecondary,
+                    color: tokens.textSecondary,
                   ),
                 ),
               ],
@@ -281,7 +286,7 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
             child: Text(
               'Required',
               style: textTheme.labelSmall?.copyWith(
-                color: AppTheme.errorRed,
+                color: tokens.danger.foreground,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -296,16 +301,16 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
                   line.isSaved ? Icons.check : Icons.sync,
                   size: 14,
                   color: line.isSaved
-                      ? AppTheme.successGreen
-                      : AppTheme.warningAmber,
+                      ? tokens.success.foreground
+                      : tokens.warning.foreground,
                 ),
                 const SizedBox(width: 3),
                 Text(
-                  line.isSaved ? 'saved' : 'queued',
+                  line.isSaved ? 'Saved' : 'Saving…',
                   style: textTheme.labelSmall?.copyWith(
                     color: line.isSaved
-                        ? AppTheme.successGreen
-                        : AppTheme.warningAmber,
+                        ? tokens.success.foreground
+                        : tokens.warning.foreground,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -313,19 +318,21 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
             ),
           ),
         ],
-        Container(
-          width: 24,
-          height: 24,
-          decoration: BoxDecoration(
-            color: line.isCompleted
-                ? AppTheme.successGreen
-                : AppTheme.borderGrey,
-            borderRadius: BorderRadius.circular(4),
-          ),
-          child: Icon(
-            Icons.check,
-            color: line.isCompleted ? Colors.white : Colors.transparent,
-            size: 16,
+        Semantics(
+          label: line.isCompleted ? 'Line recorded' : 'Line not recorded',
+          child: Container(
+            width: 24,
+            height: 24,
+            decoration: BoxDecoration(
+              color: line.isCompleted ? tokens.success.solid : Colors.transparent,
+              border: line.isCompleted
+                  ? null
+                  : Border.all(color: tokens.borderStrong, width: 1.5),
+              borderRadius: BorderRadius.circular(GssmsRadius.r4),
+            ),
+            child: line.isCompleted
+                ? Icon(Icons.check, color: tokens.success.onSolid, size: 16)
+                : null,
           ),
         ),
       ],
@@ -378,16 +385,19 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
     );
   }
 
+  /// Phase colours (R/Y/B) follow the electrical convention, resolved for
+  /// the active theme so the labels stay readable on dark surfaces.
   Color _getComponentColor(String key) {
+    final tokens = context.gssms;
     switch (key.toUpperCase()) {
       case 'R':
-        return AppTheme.errorRed;
+        return tokens.danger.foreground;
       case 'Y':
-        return AppTheme.warningAmber;
+        return tokens.warning.foreground;
       case 'B':
-        return AppTheme.primaryBlue;
+        return tokens.info.foreground;
       default:
-        return AppTheme.railwayBlue;
+        return tokens.link;
     }
   }
 
@@ -433,7 +443,7 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
             '(${line.unit!})',
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
                   fontWeight: FontWeight.bold,
-                  color: AppTheme.textSecondary,
+                  color: context.gssms.textSecondary,
                 ),
           ),
         ],
@@ -533,14 +543,18 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
                       Text(
                         _statusOptionGlyph(opt),
                         style: TextStyle(
-                          color: opt.isDeficiency ? AppTheme.errorRed : null,
+                          color: opt.isDeficiency
+                              ? context.gssms.danger.foreground
+                              : null,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       Text(
                         opt.label,
                         style: TextStyle(
-                          color: opt.isDeficiency ? AppTheme.errorRed : null,
+                          color: opt.isDeficiency
+                              ? context.gssms.danger.foreground
+                              : null,
                         ),
                       ),
                     ],
@@ -555,20 +569,26 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
         const SizedBox(height: 6),
         Container(
           width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          padding: const EdgeInsets.symmetric(
+            horizontal: GssmsSpacing.s12,
+            vertical: GssmsSpacing.s6,
+          ),
           decoration: BoxDecoration(
-            color: AppTheme.warningAmber,
-            borderRadius: BorderRadius.circular(4),
+            color: context.gssms.warning.background,
+            border: Border.all(color: context.gssms.warning.border),
+            borderRadius: BorderRadius.circular(GssmsRadius.r4),
           ),
           child: Row(
             children: [
-              const Text('! ', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87)),
+              Icon(Icons.flag_outlined,
+                  size: 16, color: context.gssms.warning.foreground),
+              const SizedBox(width: GssmsSpacing.s6),
               Expanded(
                 child: Text(
-                  'Deficiency flagged - pending severity review',
+                  'Deficiency flagged — pending severity review',
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
                         fontWeight: FontWeight.bold,
-                        color: Colors.black87,
+                        color: context.gssms.warning.foreground,
                       ),
                 ),
               ),
@@ -594,7 +614,9 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
                     child: Text(
                       opt.label,
                       style: TextStyle(
-                        color: opt.isDeficiency ? AppTheme.errorRed : null,
+                        color: opt.isDeficiency
+                            ? context.gssms.danger.foreground
+                            : null,
                       ),
                     ),
                   ))
@@ -614,11 +636,10 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
         await widget.onCapturePhoto!(kind, source);
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Failed to capture photo: ${workOrderReadableError(e)}'),
-              backgroundColor: AppTheme.errorRed,
-            ),
+          showGssmsSnackBar(
+            context,
+            'Could not capture photo. ${workOrderReadableError(e)}',
+            tone: GssmsTone.danger,
           );
         }
       }
@@ -645,14 +666,11 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
     try {
       final nearCap = await evidenceService.isStorageNearCap();
       if (nearCap && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Storage warning: Pending evidence photos exceed 200MB. Consider syncing before taking more photos.',
-            ),
-            backgroundColor: AppTheme.warningAmber,
-            duration: Duration(seconds: 4),
-          ),
+        showGssmsSnackBar(
+          context,
+          'Photos waiting to sync are using over 200 MB. Sync before taking '
+          'more photos.',
+          tone: GssmsTone.warning,
         );
       }
 
@@ -667,11 +685,10 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
       );
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to capture photo: ${workOrderReadableError(e)}'),
-            backgroundColor: AppTheme.errorRed,
-          ),
+        showGssmsSnackBar(
+          context,
+          'Could not capture photo. ${workOrderReadableError(e)}',
+          tone: GssmsTone.danger,
         );
       }
     }
@@ -679,11 +696,10 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
 
   Future<void> _handleDelete(LineAttachment attachment) async {
     if (widget.isPastTechCompleted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Cannot delete attachments after technician completion.'),
-          backgroundColor: AppTheme.errorRed,
-        ),
+      showGssmsSnackBar(
+        context,
+        'Cannot delete attachments after technician completion.',
+        tone: GssmsTone.danger,
       );
       return;
     }
@@ -693,16 +709,20 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
       builder: (dialogCtx) => AlertDialog(
         title: const Text('Delete Photo'),
         content: Text(
-          'Are you sure you want to delete this ${attachment.kind.toLowerCase()} photo?',
+          'Delete this ${attachment.kind.toLowerCase()} photo? It is removed '
+          'from this checklist line${attachment.url.isNotEmpty ? ' and from the server' : ''}.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogCtx).pop(false),
             child: const Text('Cancel'),
           ),
-          TextButton(
+          FilledButton(
             onPressed: () => Navigator.of(dialogCtx).pop(true),
-            style: TextButton.styleFrom(foregroundColor: AppTheme.errorRed),
+            style: FilledButton.styleFrom(
+              backgroundColor: dialogCtx.gssms.danger.solid,
+              foregroundColor: dialogCtx.gssms.danger.onSolid,
+            ),
             child: const Text('Delete'),
           ),
         ],
@@ -750,7 +770,7 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
           children: [
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              color: AppTheme.primaryDark,
+              color: Theme.of(ctx).appBarTheme.backgroundColor,
               child: Row(
                 children: [
                   Text(
@@ -774,24 +794,12 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
                 maxHeight: MediaQuery.of(ctx).size.height * 0.65,
               ),
               child: InteractiveViewer(
-                child: attachment.localPath != null &&
-                        File(attachment.localPath!).existsSync()
-                    ? Image.file(
-                        File(attachment.localPath!),
-                        fit: BoxFit.contain,
-                      )
-                    : attachment.url.isNotEmpty
-                        ? Image.network(
-                            attachment.url,
-                            headers: _authHeaders(),
-                            fit: BoxFit.contain,
-                            errorBuilder: (_, __, ___) => const Center(
-                              child: Icon(Icons.broken_image, size: 64, color: AppTheme.textSecondary),
-                            ),
-                          )
-                        : const Center(
-                            child: Icon(Icons.image_not_supported, size: 64, color: AppTheme.textSecondary),
-                          ),
+                child: _AttachmentImage(
+                  attachment: attachment,
+                  headers: _authHeaders(),
+                  fit: BoxFit.contain,
+                  placeholderSize: 64,
+                ),
               ),
             ),
             if (attachment.capturedAt != null || attachment.uploadedBy != null)
@@ -802,16 +810,16 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
                   children: [
                     if (attachment.capturedAt != null)
                       Text(
-                        'Captured: ${attachment.capturedAt!.toLocal().toString().split('.').first}',
+                        'Captured: ${DateFormat('dd MMM yyyy, hh:mm a').format(attachment.capturedAt!.toLocal())}',
                         style: Theme.of(ctx).textTheme.labelSmall?.copyWith(
-                              color: AppTheme.textSecondary,
+                              color: ctx.gssms.textSecondary,
                             ),
                       ),
                     if (attachment.uploadedBy != null)
                       Text(
                         'By: ${attachment.uploadedBy}',
                         style: Theme.of(ctx).textTheme.labelSmall?.copyWith(
-                              color: AppTheme.textSecondary,
+                              color: ctx.gssms.textSecondary,
                             ),
                       ),
                   ],
@@ -832,20 +840,22 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
         ? 'Before ${beforeAtts.length} · After ${afterAtts.length}'
         : 'Before ${beforeAtts.length} · During ${duringAtts.length} · After ${afterAtts.length}';
 
+    final tokens = context.gssms;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 6),
+        const SizedBox(height: GssmsSpacing.s6),
         InkWell(
           key: Key('line_${line.id}_attachments_toggle'),
           onTap: () => setState(() => _attachmentsExpanded = !_attachmentsExpanded),
-          borderRadius: BorderRadius.circular(6),
+          borderRadius: BorderRadius.circular(GssmsRadius.r8),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            constraints: const BoxConstraints(minHeight: GssmsSize.touchTarget),
+            padding: const EdgeInsets.symmetric(horizontal: GssmsSpacing.s8),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.4),
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: AppTheme.borderGrey.withOpacity(0.5)),
+              color: tokens.surfaceInset,
+              borderRadius: BorderRadius.circular(GssmsRadius.r8),
+              border: Border.all(color: tokens.border),
             ),
             child: Row(
               children: [
@@ -853,8 +863,8 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
                   Icons.photo_camera_outlined,
                   size: 18,
                   color: (beforeAtts.isNotEmpty || afterAtts.isNotEmpty || duringAtts.isNotEmpty)
-                      ? AppTheme.railwayBlue
-                      : AppTheme.textSecondary,
+                      ? tokens.link
+                      : tokens.textSecondary,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
@@ -863,7 +873,6 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           fontWeight: FontWeight.w600,
-                          color: AppTheme.textPrimary,
                         ),
                   ),
                 ),
@@ -871,7 +880,8 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
                 Icon(
                   _attachmentsExpanded ? Icons.expand_less : Icons.expand_more,
                   size: 20,
-                  color: AppTheme.textSecondary,
+                  color: tokens.textSecondary,
+                  semanticLabel: _attachmentsExpanded ? 'Hide photos' : 'Show photos',
                 ),
               ],
             ),
@@ -910,12 +920,12 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
   }) {
     final canAdd = attachments.length < 3 && !widget.isPastTechCompleted;
 
+    final tokens = context.gssms;
     return Container(
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.all(GssmsSpacing.s8),
       decoration: BoxDecoration(
-        color: Colors.grey.withOpacity(0.04),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppTheme.borderGrey.withOpacity(0.3)),
+        borderRadius: BorderRadius.circular(GssmsRadius.r8),
+        border: Border.all(color: tokens.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -926,7 +936,6 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
                 '$title (${attachments.length}/3)',
                 style: Theme.of(context).textTheme.labelLarge?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: AppTheme.textPrimary,
                     ),
               ),
               const Spacer(),
@@ -969,7 +978,7 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
               child: Text(
                 'No photos captured yet.',
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: AppTheme.textSecondary,
+                      color: tokens.textSecondary,
                       fontStyle: FontStyle.italic,
                     ),
               ),
@@ -998,22 +1007,22 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
     IconData badgeIcon;
     String badgeText;
 
+    final tokens = context.gssms;
+    final GssmsTonePalette badge;
     if (attachment.isFailed) {
-      badgeColor = AppTheme.errorRed;
+      badge = tokens.danger;
       badgeIcon = Icons.warning_amber_rounded;
       badgeText = 'failed';
     } else if (attachment.isPending) {
-      badgeColor = AppTheme.warningAmber;
+      badge = tokens.warning;
       badgeIcon = Icons.sync;
       badgeText = 'queued';
     } else {
-      badgeColor = AppTheme.successGreen;
+      badge = tokens.success;
       badgeIcon = Icons.check_circle;
       badgeText = 'uploaded';
     }
-
-    final hasLocal = attachment.localPath != null &&
-        File(attachment.localPath!).existsSync();
+    badgeColor = badge.solid;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -1034,26 +1043,16 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
                 child: Container(
                   width: 76,
                   height: 76,
-                  color: AppTheme.borderGrey.withOpacity(0.3),
-                  child: hasLocal
-                      ? Image.file(
-                          File(attachment.localPath!),
-                          fit: BoxFit.cover,
-                        )
-                      : attachment.url.isNotEmpty
-                          ? Image.network(
-                              attachment.url,
-                              headers: _authHeaders(),
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => const Icon(
-                                Icons.broken_image,
-                                color: AppTheme.textSecondary,
-                              ),
-                            )
-                          : const Icon(
-                              Icons.image,
-                              color: AppTheme.textSecondary,
-                            ),
+                  color: tokens.surfaceInset,
+                  child: _AttachmentImage(
+                    attachment: attachment,
+                    headers: _authHeaders(),
+                    fit: BoxFit.cover,
+                    // Decode at thumbnail size: camera photos are 12+ MP, and
+                    // decoding them in full for a 76 px tile is a large
+                    // memory spike per photo on a long checklist.
+                    decodeWidth: 76 * MediaQuery.devicePixelRatioOf(context).ceil(),
+                  ),
                 ),
               ),
               // Icon-only sync badge: glyph + colour (never colour alone),
@@ -1069,7 +1068,7 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
                       color: badgeColor,
                       borderRadius: BorderRadius.circular(4),
                     ),
-                    child: Icon(badgeIcon, size: 12, color: Colors.white),
+                    child: Icon(badgeIcon, size: 12, color: badge.onSolid),
                   ),
                 ),
               ),
@@ -1078,27 +1077,70 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
         ),
         if (attachment.isFailed) ...[
           const SizedBox(height: 4),
-          SizedBox(
-            height: 28,
-            child: TextButton.icon(
-              key: Key('retry_attachment_${attachment.idempotencyKey ?? attachment.id}'),
-              icon: const Icon(Icons.refresh, size: 13, color: AppTheme.errorRed),
-              label: Text(
-                'Retry',
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      color: AppTheme.errorRed,
-                      fontWeight: FontWeight.bold,
-                    ),
-              ),
-              style: TextButton.styleFrom(
-                padding: const EdgeInsets.symmetric(horizontal: 6),
-                minimumSize: const Size(48, 28),
-              ),
-              onPressed: () => _handleRetry(attachment),
+          TextButton.icon(
+            key: Key('retry_attachment_${attachment.idempotencyKey ?? attachment.id}'),
+            icon: Icon(Icons.refresh, size: 16, color: tokens.danger.foreground),
+            label: Text(
+              'Retry',
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: tokens.danger.foreground,
+                    fontWeight: FontWeight.bold,
+                  ),
             ),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: GssmsSpacing.s8),
+              minimumSize: const Size(76, GssmsSize.touchTarget),
+            ),
+            onPressed: () => _handleRetry(attachment),
           ),
         ],
       ],
+    );
+  }
+}
+
+/// Local file first (queued photos), then the server copy, then a placeholder
+/// — without a synchronous `File.existsSync()` in `build` (disk I/O on the UI
+/// thread for every thumbnail on every rebuild).
+class _AttachmentImage extends StatelessWidget {
+  const _AttachmentImage({
+    required this.attachment,
+    required this.headers,
+    required this.fit,
+    this.decodeWidth,
+    this.placeholderSize = 24,
+  });
+
+  final LineAttachment attachment;
+  final Map<String, String>? headers;
+  final BoxFit fit;
+  final int? decodeWidth;
+  final double placeholderSize;
+
+  @override
+  Widget build(BuildContext context) {
+    final color = context.gssms.textSecondary;
+    Widget placeholder(IconData icon) =>
+        Center(child: Icon(icon, size: placeholderSize, color: color));
+
+    Widget network() => attachment.url.isNotEmpty
+        ? Image.network(
+            attachment.url,
+            headers: headers,
+            fit: fit,
+            cacheWidth: decodeWidth,
+            errorBuilder: (_, __, ___) => placeholder(Icons.broken_image),
+          )
+        : placeholder(Icons.image_not_supported);
+
+    final localPath = attachment.localPath;
+    if (localPath == null) return network();
+    return Image.file(
+      File(localPath),
+      fit: fit,
+      cacheWidth: decodeWidth,
+      // The local copy is discarded once uploaded; fall back to the server.
+      errorBuilder: (_, __, ___) => network(),
     );
   }
 }

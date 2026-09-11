@@ -37,15 +37,20 @@ import 'package:mocktail/mocktail.dart';
 import '../helpers/fake_auth.dart';
 
 class MockAuthRepository extends Mock implements IAuthRepository {}
+
 class MockWorkOrderRepository extends Mock implements IWorkOrderRepository {}
+
 class MockComplaintRepository extends Mock implements IComplaintRepository {}
+
 class MockInspectionRepository extends Mock implements IInspectionRepository {}
+
 class MockAssetRepository extends Mock implements IAssetRepository {}
 
 /// Text-scale layout-tolerance harness (P1-8).
 ///
-/// Tests all seven main screens across textScaler 1.0, 1.3, and 1.5
-/// to ensure no RenderFlex layout overflows occur even at maximum accessibility scales.
+/// Tests all seven main screens across textScaler 1.0, 1.3, and 1.5, in both
+/// the light and dark theme, to ensure no RenderFlex layout overflows occur
+/// even at maximum accessibility scales.
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -105,24 +110,40 @@ void main() {
   const testComplaints = [
     Complaint(
       id: 1,
-      complaintNumber: 'CMP-001',
       title: 'Transformer Leakage',
       description: 'Oil leaking near base valve',
-      severity: ComplaintSeverity.high,
       status: ComplaintStatus.open,
       stationName: 'VRI',
+    ),
+    // Long, realistic values: catches overflow that short fixtures hide.
+    Complaint(
+      id: 1024,
+      title: 'Platform lighting failure across the entire eastern approach '
+          'and foot-over-bridge',
+      description: 'Multiple luminaires not functioning since the storm.',
+      status: ComplaintStatus.converted,
+      stationName: 'Vriddhachalam Junction Traction Sub-Station East Yard',
+      assetUniqueId: 'VRI-SS01-HTSTR-2POLE-001',
+      isConverted: true,
+      workOrderStatus: 'REWORK_REQUIRED',
     ),
   ];
 
   const testInspections = [
     Inspection(
       id: 1,
-      inspectionNumber: 'INSP-001',
       title: 'EB Bunk Monthly Check',
       notes: 'Earth resistance and cleaning',
-      priority: InspectionPriority.high,
       status: InspectionStatus.open,
       stationName: 'Thalanallur',
+    ),
+    Inspection(
+      id: 2048,
+      title: 'Quarterly earthing resistance and relay panel inspection with '
+          'thermal imaging',
+      status: InspectionStatus.actionRequired,
+      serviceBuildingName: 'Divisional Electrical Maintenance Depot Building',
+      createdByName: 'Venkatasubramanian Ramachandran',
     ),
   ];
 
@@ -138,159 +159,179 @@ void main() {
     ),
   ];
 
-  group('HomeScreen layout scaling', () {
-    for (final scale in scales) {
-      testWidgets('home_screen textScaler $scale', (tester) async {
-        await _setSurface(tester, const Size(400, 800));
-        await _pumpHome(tester, scale);
-        expect(tester.takeException(), isNull);
-      });
-    }
-  });
+  for (final dark in const [false, true]) {
+    group('${dark ? 'dark' : 'light'} HomeScreen layout scaling', () {
+      for (final scale in scales) {
+        testWidgets('home_screen textScaler $scale', (tester) async {
+          await _setSurface(tester, const Size(400, 800));
+          await _pumpHome(tester, scale, dark: dark);
+          expect(tester.takeException(), isNull);
+        });
+      }
+    });
 
-  group('ChecklistScreen layout scaling', () {
-    for (final scale in scales) {
-      testWidgets('checklist_screen textScaler $scale', (tester) async {
-        await _setSurface(tester, const Size(400, 800));
-        final mockRepo = MockWorkOrderRepository();
-        when(() => mockRepo.fetchMaintenanceRecord(23))
-            .thenAnswer((_) async => testRecord);
+    group('${dark ? 'dark' : 'light'} ChecklistScreen layout scaling', () {
+      for (final scale in scales) {
+        testWidgets('checklist_screen textScaler $scale', (tester) async {
+          await _setSurface(tester, const Size(400, 800));
+          final mockRepo = MockWorkOrderRepository();
+          when(() => mockRepo.fetchMaintenanceRecord(23))
+              .thenAnswer((_) async => testRecord);
 
-        await _pumpChecklist(tester, scale, mockRepo: mockRepo);
-        await tester.pumpAndSettle();
-        expect(tester.takeException(), isNull);
-      });
-    }
-  });
+          await _pumpChecklist(tester, scale, mockRepo: mockRepo, dark: dark);
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+        });
+      }
+    });
 
-  group('WorkOrderListScreen layout scaling', () {
-    for (final scale in scales) {
-      testWidgets('work_order_list_screen textScaler $scale', (tester) async {
-        await _setSurface(tester, const Size(400, 800));
-        final mockRepo = MockWorkOrderRepository();
-        when(() => mockRepo.fetchWorkOrders()).thenAnswer((_) async => testOrders);
+    group('${dark ? 'dark' : 'light'} WorkOrderListScreen layout scaling', () {
+      for (final scale in scales) {
+        testWidgets('work_order_list_screen textScaler $scale', (tester) async {
+          await _setSurface(tester, const Size(400, 800));
+          final mockRepo = MockWorkOrderRepository();
+          when(() => mockRepo.fetchWorkOrders())
+              .thenAnswer((_) async => testOrders);
 
-        await _pumpWithScaler(
-          tester,
-          scale: scale,
-          overrides: [
-            workOrderRepositoryProvider.overrideWithValue(mockRepo),
-            authControllerProvider.overrideWith(
-              () => FakeAuthenticatedController(fakeSession(permissions: const ['*'])),
-            ),
-          ],
-          child: const WorkOrderListScreen(),
-        );
-        await tester.pumpAndSettle();
-        expect(tester.takeException(), isNull);
-      });
-    }
-  });
+          await _pumpWithScaler(
+            tester,
+            scale: scale,
+            dark: dark,
+            overrides: [
+              workOrderRepositoryProvider.overrideWithValue(mockRepo),
+              authControllerProvider.overrideWith(
+                () => FakeAuthenticatedController(
+                    fakeSession(permissions: const ['*'])),
+              ),
+            ],
+            child: const WorkOrderListScreen(),
+          );
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+        });
+      }
+    });
 
-  group('WorkOrderDetailScreen layout scaling', () {
-    for (final scale in scales) {
-      testWidgets('work_order_detail_screen textScaler $scale', (tester) async {
-        await _setSurface(tester, const Size(400, 800));
-        final mockRepo = MockWorkOrderRepository();
-        when(() => mockRepo.fetchWorkOrderById(101)).thenAnswer((_) async => testOrders.first);
-        when(() => mockRepo.fetchAllowedActions(101)).thenAnswer((_) async => testActionSet);
-        when(() => mockRepo.fetchAudit(101)).thenAnswer((_) async => testAudit);
+    group('${dark ? 'dark' : 'light'} WorkOrderDetailScreen layout scaling',
+        () {
+      for (final scale in scales) {
+        testWidgets('work_order_detail_screen textScaler $scale',
+            (tester) async {
+          await _setSurface(tester, const Size(400, 800));
+          final mockRepo = MockWorkOrderRepository();
+          when(() => mockRepo.fetchWorkOrderById(101))
+              .thenAnswer((_) async => testOrders.first);
+          when(() => mockRepo.fetchAllowedActions(101))
+              .thenAnswer((_) async => testActionSet);
+          when(() => mockRepo.fetchAudit(101))
+              .thenAnswer((_) async => testAudit);
 
-        await _pumpWithScaler(
-          tester,
-          scale: scale,
-          overrides: [
-            workOrderRepositoryProvider.overrideWithValue(mockRepo),
-            authControllerProvider.overrideWith(
-              () => FakeAuthenticatedController(fakeSession(permissions: const ['*'])),
-            ),
-          ],
-          child: const WorkOrderDetailScreen(workOrderId: 101),
-        );
-        await tester.pumpAndSettle();
-        expect(tester.takeException(), isNull);
-      });
-    }
-  });
+          await _pumpWithScaler(
+            tester,
+            scale: scale,
+            dark: dark,
+            overrides: [
+              workOrderRepositoryProvider.overrideWithValue(mockRepo),
+              authControllerProvider.overrideWith(
+                () => FakeAuthenticatedController(
+                    fakeSession(permissions: const ['*'])),
+              ),
+            ],
+            child: const WorkOrderDetailScreen(workOrderId: 101),
+          );
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+        });
+      }
+    });
 
-  group('ComplaintListScreen layout scaling', () {
-    for (final scale in scales) {
-      testWidgets('complaint_list_screen textScaler $scale', (tester) async {
-        await _setSurface(tester, const Size(400, 800));
-        final mockRepo = MockComplaintRepository();
-        when(() => mockRepo.fetchComplaints()).thenAnswer((_) async => testComplaints);
+    group('${dark ? 'dark' : 'light'} ComplaintListScreen layout scaling', () {
+      for (final scale in scales) {
+        testWidgets('complaint_list_screen textScaler $scale', (tester) async {
+          await _setSurface(tester, const Size(400, 800));
+          final mockRepo = MockComplaintRepository();
+          when(() => mockRepo.fetchComplaints())
+              .thenAnswer((_) async => testComplaints);
 
-        await _pumpWithScaler(
-          tester,
-          scale: scale,
-          overrides: [
-            complaintRepositoryProvider.overrideWithValue(mockRepo),
-            authControllerProvider.overrideWith(
-              () => FakeAuthenticatedController(fakeSession(permissions: const ['*'])),
-            ),
-          ],
-          child: const ComplaintListScreen(),
-        );
-        await tester.pumpAndSettle();
-        expect(tester.takeException(), isNull);
-      });
-    }
-  });
+          await _pumpWithScaler(
+            tester,
+            scale: scale,
+            dark: dark,
+            overrides: [
+              complaintRepositoryProvider.overrideWithValue(mockRepo),
+              authControllerProvider.overrideWith(
+                () => FakeAuthenticatedController(
+                    fakeSession(permissions: const ['*'])),
+              ),
+            ],
+            child: const ComplaintListScreen(),
+          );
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+        });
+      }
+    });
 
-  group('InspectionListScreen layout scaling', () {
-    for (final scale in scales) {
-      testWidgets('inspection_list_screen textScaler $scale', (tester) async {
-        await _setSurface(tester, const Size(400, 800));
-        final mockRepo = MockInspectionRepository();
-        when(() => mockRepo.fetchInspections()).thenAnswer((_) async => testInspections);
+    group('${dark ? 'dark' : 'light'} InspectionListScreen layout scaling', () {
+      for (final scale in scales) {
+        testWidgets('inspection_list_screen textScaler $scale', (tester) async {
+          await _setSurface(tester, const Size(400, 800));
+          final mockRepo = MockInspectionRepository();
+          when(() => mockRepo.fetchInspections())
+              .thenAnswer((_) async => testInspections);
 
-        await _pumpWithScaler(
-          tester,
-          scale: scale,
-          overrides: [
-            inspectionRepositoryProvider.overrideWithValue(mockRepo),
-            authControllerProvider.overrideWith(
-              () => FakeAuthenticatedController(fakeSession(permissions: const ['*'])),
-            ),
-          ],
-          child: const InspectionListScreen(),
-        );
-        await tester.pumpAndSettle();
-        expect(tester.takeException(), isNull);
-      });
-    }
-  });
+          await _pumpWithScaler(
+            tester,
+            scale: scale,
+            dark: dark,
+            overrides: [
+              inspectionRepositoryProvider.overrideWithValue(mockRepo),
+              authControllerProvider.overrideWith(
+                () => FakeAuthenticatedController(
+                    fakeSession(permissions: const ['*'])),
+              ),
+            ],
+            child: const InspectionListScreen(),
+          );
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+        });
+      }
+    });
 
-  group('AssetListScreen layout scaling', () {
-    for (final scale in scales) {
-      testWidgets('asset_list_screen textScaler $scale', (tester) async {
-        await _setSurface(tester, const Size(400, 800));
-        final mockRepo = MockAssetRepository();
-        when(() => mockRepo.fetchAssets(
-          zoneId: any(named: 'zoneId'),
-          divisionId: any(named: 'divisionId'),
-          depotId: any(named: 'depotId'),
-          stationId: any(named: 'stationId'),
-        )).thenAnswer(
-          (_) async => const AssetPage(assets: testAssets, truncated: false),
-        );
+    group('${dark ? 'dark' : 'light'} AssetListScreen layout scaling', () {
+      for (final scale in scales) {
+        testWidgets('asset_list_screen textScaler $scale', (tester) async {
+          await _setSurface(tester, const Size(400, 800));
+          final mockRepo = MockAssetRepository();
+          when(() => mockRepo.fetchAssets(
+                zoneId: any(named: 'zoneId'),
+                divisionId: any(named: 'divisionId'),
+                depotId: any(named: 'depotId'),
+                stationId: any(named: 'stationId'),
+              )).thenAnswer(
+            (_) async => const AssetPage(assets: testAssets, truncated: false),
+          );
 
-        await _pumpWithScaler(
-          tester,
-          scale: scale,
-          overrides: [
-            assetRepositoryProvider.overrideWithValue(mockRepo),
-            authControllerProvider.overrideWith(
-              () => FakeAuthenticatedController(fakeSession(permissions: const ['*'])),
-            ),
-          ],
-          child: const AssetListScreen(),
-        );
-        await tester.pumpAndSettle();
-        expect(tester.takeException(), isNull);
-      });
-    }
-  });
+          await _pumpWithScaler(
+            tester,
+            scale: scale,
+            dark: dark,
+            overrides: [
+              assetRepositoryProvider.overrideWithValue(mockRepo),
+              authControllerProvider.overrideWith(
+                () => FakeAuthenticatedController(
+                    fakeSession(permissions: const ['*'])),
+              ),
+            ],
+            child: const AssetListScreen(),
+          );
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+        });
+      }
+    });
+  }
 }
 
 Future<void> _setSurface(WidgetTester tester, Size size) async {
@@ -304,16 +345,20 @@ Future<void> _pumpWithScaler(
   WidgetTester tester, {
   required Widget child,
   required double scale,
+  bool dark = false,
   List<Override> overrides = const [],
 }) async {
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
-        localCacheServiceProvider.overrideWithValue(InMemoryLocalCacheService()),
+        localCacheServiceProvider
+            .overrideWithValue(InMemoryLocalCacheService()),
         ...overrides,
       ],
       child: MaterialApp(
         theme: AppTheme.lightTheme,
+        darkTheme: AppTheme.darkTheme,
+        themeMode: dark ? ThemeMode.dark : ThemeMode.light,
         builder: (context, c) {
           return MediaQuery(
             data: MediaQuery.of(context).copyWith(
@@ -328,7 +373,8 @@ Future<void> _pumpWithScaler(
   );
 }
 
-Future<void> _pumpHome(WidgetTester tester, double scale) async {
+Future<void> _pumpHome(WidgetTester tester, double scale,
+    {bool dark = false}) async {
   const session = UserSession(
     accessToken: 'super_token',
     username: 'super_admin_user',
@@ -345,17 +391,18 @@ Future<void> _pumpHome(WidgetTester tester, double scale) async {
   when(() => mockWorkOrderRepo.fetchWorkOrders())
       .thenAnswer((_) async => const <WorkOrder>[]);
   when(() => mockAssetRepo.fetchAssets(
-    zoneId: any(named: 'zoneId'),
-    divisionId: any(named: 'divisionId'),
-    depotId: any(named: 'depotId'),
-    stationId: any(named: 'stationId'),
-  )).thenAnswer(
+        zoneId: any(named: 'zoneId'),
+        divisionId: any(named: 'divisionId'),
+        depotId: any(named: 'depotId'),
+        stationId: any(named: 'stationId'),
+      )).thenAnswer(
     (_) async => const AssetPage(assets: [], truncated: false),
   );
 
   await _pumpWithScaler(
     tester,
     scale: scale,
+    dark: dark,
     overrides: [
       authRepositoryProvider.overrideWithValue(MockAuthRepository()),
       workOrderRepositoryProvider.overrideWithValue(mockWorkOrderRepo),
@@ -373,15 +420,18 @@ Future<void> _pumpChecklist(
   WidgetTester tester,
   double scale, {
   required MockWorkOrderRepository mockRepo,
+  bool dark = false,
 }) async {
   await _pumpWithScaler(
     tester,
     scale: scale,
+    dark: dark,
     overrides: [
       workOrderRepositoryProvider.overrideWithValue(mockRepo),
       authControllerProvider.overrideWith(
         () => FakeAuthenticatedController(
-          fakeSession(role: AuthRole.maintenanceStaff, permissions: const ['*']),
+          fakeSession(
+              role: AuthRole.maintenanceStaff, permissions: const ['*']),
         ),
       ),
     ],

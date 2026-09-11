@@ -5,7 +5,7 @@ enum WorkOrderStatus {
   newOrder('NEW', 'New'),
   assigned('ASSIGNED', 'Assigned'),
   inProgress('IN_PROGRESS', 'In Progress'),
-  techCompleted('TECH_COMPLETED', 'Tech Completed'),
+  techCompleted('TECH_COMPLETED', 'Technician Completed'),
   verified('VERIFIED', 'Verified'),
   reworkRequired('REWORK_REQUIRED', 'Rework Required'),
   onHold('ON_HOLD', 'On Hold'),
@@ -97,7 +97,7 @@ class WorkOrderEventSummary extends Equatable {
     DateTime? dt;
     final ts = json['created_at'] ?? json['timestamp'];
     if (ts is String && ts.isNotEmpty) {
-      dt = DateTime.tryParse(ts);
+      dt = asJsonDateTime(ts);
     }
     return WorkOrderEventSummary(
       eventType: asJsonString(json['event_type']) ?? 'EVENT',
@@ -258,7 +258,7 @@ class WorkOrder extends Equatable {
   factory WorkOrder.fromJson(Map<String, dynamic> json) {
     DateTime? parseDate(dynamic value) {
       if (value is String && value.isNotEmpty) {
-        return DateTime.tryParse(value);
+        return asJsonDateTime(value);
       }
       return null;
     }

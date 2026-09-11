@@ -24,6 +24,22 @@ int? asJsonInt(dynamic value) {
   return int.tryParse(value.toString());
 }
 
+/// Parses an API date/datetime into **device-local** time.
+///
+/// The backend runs with `USE_TZ = True` and serializes datetimes with an
+/// offset (`2026-09-09T14:30:00+05:30`). `DateTime.parse` turns an
+/// offset-bearing string into a *UTC* `DateTime`, and `DateFormat` formats the
+/// fields it is given — so without `toLocal()` every timestamp displayed
+/// 5h30m early for IST users. Date-only values (`2026-09-09`) parse as local
+/// midnight and are returned unchanged. Empty/invalid input returns null.
+DateTime? asJsonDateTime(dynamic value) {
+  if (value == null) return null;
+  if (value is DateTime) return value.toLocal();
+  final text = value.toString().trim();
+  if (text.isEmpty) return null;
+  return DateTime.tryParse(text)?.toLocal();
+}
+
 /// Defensively coerces a decoded JSON value to a bool.
 ///
 /// Handles the common non-bool encodings of a boolean a server might send

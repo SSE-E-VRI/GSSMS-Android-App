@@ -331,7 +331,14 @@ class ChecklistLoaded extends ChecklistState {
 }
 
 class ChecklistCompleted extends ChecklistState {
-  const ChecklistCompleted();
+  const ChecklistCompleted({this.queued = false});
+
+  /// True when completion is only saved on this device (outbox) and has not
+  /// reached the server yet — the UI must not call it "completed".
+  final bool queued;
+
+  @override
+  List<Object?> get props => [queued];
 }
 
 class ChecklistError extends ChecklistState {

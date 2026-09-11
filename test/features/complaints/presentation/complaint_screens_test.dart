@@ -61,10 +61,8 @@ void main() {
     const testComplaints = [
       Complaint(
         id: 1,
-        complaintNumber: 'CMP-001',
         title: 'Transformer Leakage',
         description: 'Oil leaking near base valve',
-        severity: ComplaintSeverity.high,
         status: ComplaintStatus.open,
         stationName: 'VRI',
       ),
@@ -97,8 +95,12 @@ void main() {
       expect(find.text('Complaints & Issues'), findsOneWidget);
       expect(find.byKey(const Key('date_range_from')), findsOneWidget);
       expect(find.text('Transformer Leakage'), findsOneWidget);
-      expect(find.text('CMP-001'), findsOneWidget);
-      expect(find.text('High'), findsOneWidget);
+      expect(find.text('#1'), findsOneWidget);
+      // Status is always visible on the card (B7); there is no complaint
+      // severity in the API, so no fabricated priority badge either.
+      expect(find.text('Open'), findsWidgets);
+      expect(find.text('High'), findsNothing);
+      expect(find.text('Medium'), findsNothing);
       expect(find.byKey(const Key('fab_create_complaint')), findsOneWidget);
     });
 
@@ -125,7 +127,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(ComplaintDetailScreen), findsOneWidget);
-      expect(find.text('CMP-001'), findsOneWidget);
+      expect(find.text('Complaint #1'), findsOneWidget);
       expect(find.text('Oil leaking near base valve'), findsOneWidget);
       expect(find.text('Open'), findsOneWidget);
     });

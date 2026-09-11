@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:printing/printing.dart';
+import 'package:gssms_mobile/core/network/api_error.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
 import 'package:gssms_mobile/features/auth/domain/rbac.dart';
 import 'package:gssms_mobile/features/auth/presentation/widgets/permission_denied_view.dart';
@@ -39,7 +40,7 @@ class _RegisterEntryDetailScreenState
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to generate PDF: $e')),
+        SnackBar(content: Text('Could not generate the PDF. ${userFacingError(e)}')),
       );
     } finally {
       if (mounted) setState(() => _generatingPdf = false);
@@ -95,7 +96,7 @@ class _RegisterEntryDetailScreenState
                 children: [
                   Text(
                     entry.masterName,
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.railwayBlue),
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: context.gssms.link),
                   ),
                   const SizedBox(height: 8),
                   _buildMetaRow('Date of Completion', dateStr),
@@ -110,16 +111,16 @@ class _RegisterEntryDetailScreenState
             ),
           ),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'Checklist Register Items',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.railwayBlue),
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: context.gssms.link),
           ),
           const SizedBox(height: 10),
           if (entry.items.isEmpty)
-            const Card(
+            Card(
               child: Padding(
-                padding: EdgeInsets.all(16),
-                child: Text('No recorded line items found for this entry.', style: TextStyle(color: AppTheme.textSecondary)),
+                padding: const EdgeInsets.all(16),
+                child: Text('No recorded line items found for this entry.', style: TextStyle(color: context.gssms.textSecondary)),
               ),
             )
           else
@@ -139,13 +140,13 @@ class _RegisterEntryDetailScreenState
             width: 140,
             child: Text(
               '$label:',
-              style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary, fontWeight: FontWeight.bold),
+              style: TextStyle(fontSize: 12, color: context.gssms.textSecondary, fontWeight: FontWeight.bold),
             ),
           ),
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.textPrimary),
+              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: context.gssms.textPrimary),
             ),
           ),
         ],
@@ -168,11 +169,11 @@ class _RegisterEntryDetailScreenState
         children: [
           Container(
             width: double.infinity,
-            color: AppTheme.backgroundLight,
+            color: context.gssms.surfaceInset,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Text(
               group.assetName,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.railwayBlue),
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: context.gssms.link),
             ),
           ),
           _buildChecklistTable(group.items),
@@ -189,11 +190,11 @@ class _RegisterEntryDetailScreenState
         2: FlexColumnWidth(1.8),
       },
       border: TableBorder(
-        horizontalInside: BorderSide(color: Colors.grey.shade300),
+        horizontalInside: BorderSide(color: context.gssms.border),
       ),
       children: [
         TableRow(
-          decoration: BoxDecoration(color: Colors.grey.shade100),
+          decoration: BoxDecoration(color: context.gssms.surfaceInset),
           children: const [
             _HeaderCell('Checkpoint/Parameter'),
             _HeaderCell('Status'),
@@ -222,12 +223,12 @@ class _RegisterEntryDetailScreenState
   }
 
   Color _statusColor(String? status) {
-    if (status == null) return AppTheme.railwayGreen;
+    if (status == null) return context.gssms.success.foreground;
     final lower = status.toLowerCase();
     if (lower.contains('dirty') || lower.contains('defect') || lower.contains('fail') || lower.contains('abnormal')) {
-      return AppTheme.errorRed;
+      return context.gssms.danger.foreground;
     }
-    return AppTheme.railwayGreen;
+    return context.gssms.success.foreground;
   }
 }
 
@@ -241,7 +242,7 @@ class _HeaderCell extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       child: Text(
         text,
-        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.textSecondary),
+        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: context.gssms.textSecondary),
       ),
     );
   }
@@ -262,11 +263,11 @@ class _BodyCell extends StatelessWidget {
         children: [
           Text(
             text,
-            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color ?? AppTheme.textPrimary),
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: color ?? context.gssms.textPrimary),
           ),
           if (subtitle != null) ...[
             const SizedBox(height: 2),
-            Text(subtitle!, style: const TextStyle(fontSize: 10, color: AppTheme.textMuted)),
+            Text(subtitle!, style: TextStyle(fontSize: 10, color: context.gssms.textSecondary)),
           ],
         ],
       ),

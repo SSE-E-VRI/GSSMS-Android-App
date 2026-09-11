@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:gssms_mobile/core/network/api_error.dart';
 import 'package:gssms_mobile/core/widgets/date_range_filter_bar.dart';
 import 'package:gssms_mobile/core/widgets/org_scope_filter_bar.dart';
 import 'package:gssms_mobile/features/complaints/data/complaint_api_service.dart';
@@ -52,13 +53,15 @@ class ComplaintListLoaded extends ComplaintListState {
       }
       if (searchQuery.isNotEmpty) {
         final q = searchQuery.toLowerCase();
-        final matchTitle = c.title.toLowerCase().contains(q);
-        final matchNumber = c.complaintNumber.toLowerCase().contains(q);
-        final matchStation = c.stationName?.toLowerCase().contains(q) ?? false;
-        final matchAsset = c.assetName?.toLowerCase().contains(q) ?? false;
-        if (!matchTitle && !matchNumber && !matchStation && !matchAsset) {
-          return false;
-        }
+        bool has(String? v) => v != null && v.toLowerCase().contains(q);
+        final matches = has(c.title) ||
+            has(c.reference) ||
+            has(c.id.toString()) ||
+            has(c.description) ||
+            has(c.locationLabel) ||
+            has(c.assetUniqueId) ||
+            has(c.workOrderTicketNumber);
+        if (!matches) return false;
       }
       return true;
     }).toList();
@@ -123,55 +126,31 @@ class ComplaintListController extends Notifier<ComplaintListState> {
     return null;
   }
 
+  /// Guards against an older, slower response overwriting a newer filter's.
+  int _requestSeq = 0;
+
   Future<void> fetchComplaints({bool forceRefresh = false}) async {
     final previous = _resolvePrevious();
     if (!forceRefresh && previous != null) return;
 
-    state = const ComplaintListLoading();
-    final scope = previous?.orgScope ?? OrgScopeSelection.empty;
-    try {
-      final complaints = await _repository.fetchComplaints(
-        dateFrom: formatApiDate(previous?.dateFrom),
-        dateTo: formatApiDate(previous?.dateTo),
-        zoneId: scope.zoneId,
-        divisionId: scope.divisionId,
-        depotId: scope.depotId,
-      );
-      state = ComplaintListLoaded(
-        complaints: complaints,
-        selectedStatus: previous?.selectedStatus,
-        searchQuery: previous?.searchQuery ?? '',
-        dateFrom: previous?.dateFrom,
-        dateTo: previous?.dateTo,
-        orgScope: scope,
-      );
-    } catch (e) {
-      state = ComplaintListError('Failed to load complaints: $e', previousLoaded: previous);
-    }
+    // Stale-while-refresh: keep rows visible during a pull-to-refresh.
+    if (previous == null) state = const ComplaintListLoading();
+    await _load(
+      base: previous,
+      dateFrom: previous?.dateFrom,
+      dateTo: previous?.dateTo,
+      scope: previous?.orgScope ?? OrgScopeSelection.empty,
+    );
   }
 
   Future<void> setDateRange(DateTime? from, DateTime? to) async {
     final previous = _resolvePrevious();
-    final scope = previous?.orgScope ?? OrgScopeSelection.empty;
-    try {
-      final complaints = await _repository.fetchComplaints(
-        dateFrom: formatApiDate(from),
-        dateTo: formatApiDate(to),
-        zoneId: scope.zoneId,
-        divisionId: scope.divisionId,
-        depotId: scope.depotId,
-      );
-      state = ComplaintListLoaded(
-        complaints: complaints,
-        selectedStatus: previous?.selectedStatus,
-        searchQuery: previous?.searchQuery ?? '',
-        dateFrom: from,
-        dateTo: to,
-        orgScope: scope,
-      );
-    } catch (e) {
-      state = ComplaintListError('Failed to load complaints: $e', previousLoaded: previous);
-    }
+    await _load(
+      base: previous,
+      dateFrom: from,
+      dateTo: to,
+      scope: previous?.orgScope ?? OrgScopeSelection.empty,
+    );
   }
 
   /// Server-side Zone/Division/Depot filter (Complaints has no station-level
@@ -179,24 +158,58 @@ class ComplaintListController extends Notifier<ComplaintListState> {
   /// used with `enableStation: false`).
   Future<void> setOrgScope(OrgScopeSelection scope) async {
     final previous = _resolvePrevious();
+    await _load(
+      base: previous,
+      dateFrom: previous?.dateFrom,
+      dateTo: previous?.dateTo,
+      scope: scope,
+    );
+  }
+
+  /// Clears status, search and date range (org scope is kept — it is the
+  /// user's working context, set from the app bar).
+  Future<void> clearFilters() async {
+    final previous = _resolvePrevious();
+    await _load(
+      base: previous == null
+          ? null
+          : ComplaintListLoaded(
+              complaints: previous.complaints,
+              orgScope: previous.orgScope,
+            ),
+      dateFrom: null,
+      dateTo: null,
+      scope: previous?.orgScope ?? OrgScopeSelection.empty,
+    );
+  }
+
+  Future<void> _load({
+    required ComplaintListLoaded? base,
+    required DateTime? dateFrom,
+    required DateTime? dateTo,
+    required OrgScopeSelection scope,
+  }) async {
+    final seq = ++_requestSeq;
     try {
       final complaints = await _repository.fetchComplaints(
-        dateFrom: formatApiDate(previous?.dateFrom),
-        dateTo: formatApiDate(previous?.dateTo),
+        dateFrom: formatApiDate(dateFrom),
+        dateTo: formatApiDate(dateTo),
         zoneId: scope.zoneId,
         divisionId: scope.divisionId,
         depotId: scope.depotId,
       );
+      if (seq != _requestSeq) return;
       state = ComplaintListLoaded(
         complaints: complaints,
-        selectedStatus: previous?.selectedStatus,
-        searchQuery: previous?.searchQuery ?? '',
-        dateFrom: previous?.dateFrom,
-        dateTo: previous?.dateTo,
+        selectedStatus: base?.selectedStatus,
+        searchQuery: base?.searchQuery ?? '',
+        dateFrom: dateFrom,
+        dateTo: dateTo,
         orgScope: scope,
       );
     } catch (e) {
-      state = ComplaintListError('Failed to load complaints: $e', previousLoaded: previous);
+      if (seq != _requestSeq) return;
+      state = ComplaintListError(userFacingError(e), previousLoaded: base);
     }
   }
 

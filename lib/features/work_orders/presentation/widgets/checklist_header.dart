@@ -25,8 +25,10 @@ class ChecklistHeader extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      decoration: const BoxDecoration(
-        color: AppTheme.primaryDark,
+      // Same colour as the app bar above it, in either theme, so the header
+      // reads as one identity band.
+      decoration: BoxDecoration(
+        color: Theme.of(context).appBarTheme.backgroundColor ?? AppTheme.primaryDark,
       ),
       child: SafeArea(
         bottom: false,
@@ -97,6 +99,7 @@ class ChecklistHeader extends StatelessWidget {
           ),
           TextSpan(
             text: value,
+            // Amber on the navy band: ≈7.8:1, readable in sunlight.
             style: const TextStyle(
               fontWeight: FontWeight.bold,
               color: AppTheme.warningAmber,

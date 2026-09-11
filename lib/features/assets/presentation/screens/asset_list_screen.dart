@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gssms_mobile/core/sync/widgets/sync_status_badge.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
+import 'package:gssms_mobile/core/widgets/severity_chip.dart';
 import 'package:gssms_mobile/core/widgets/org_scope_app_bar_filter.dart';
 import 'package:gssms_mobile/core/widgets/org_scope_filter_bar.dart';
 import 'package:gssms_mobile/features/assets/domain/models/asset.dart';
@@ -14,7 +15,11 @@ import 'package:gssms_mobile/features/auth/presentation/controllers/auth_control
 import 'package:gssms_mobile/features/auth/presentation/widgets/permission_denied_view.dart';
 
 class AssetListScreen extends ConsumerStatefulWidget {
-  const AssetListScreen({super.key});
+  const AssetListScreen({super.key, this.initialSearch});
+
+  /// Pre-fills the search (e.g. a scanned code that matched no asset exactly,
+  /// opened from the Home "Scan Asset" action).
+  final String? initialSearch;
 
   @override
   ConsumerState<AssetListScreen> createState() => _AssetListScreenState();
@@ -29,14 +34,22 @@ class _AssetListScreenState extends ConsumerState<AssetListScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    final initial = widget.initialSearch?.trim();
+    if (initial != null && initial.isNotEmpty) {
+      _searchController.text = initial;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
       if (!sessionAllows(
           sessionFromAuth(ref.read(authControllerProvider)),
           'assets.view')) {
         return;
       }
-      ref.read(assetListControllerProvider.notifier).fetchAssets();
+      final controller = ref.read(assetListControllerProvider.notifier);
+      await controller.fetchAssets();
+      if (mounted && initial != null && initial.isNotEmpty) {
+        controller.setSearchQuery(initial);
+      }
     });
   }
 
@@ -92,7 +105,7 @@ class _AssetListScreenState extends ConsumerState<AssetListScreen> {
               ? 'Could not look up "$code". Showing search results instead.'
               : 'No asset matches "$code". Showing search results instead.',
         ),
-        backgroundColor: failure != null ? AppTheme.errorRed : null,
+        backgroundColor: failure != null ? context.gssms.danger.foreground : null,
       ),
     );
   }
@@ -173,20 +186,20 @@ class _AssetListScreenState extends ConsumerState<AssetListScreen> {
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: AppTheme.warningAmber.withOpacity(0.12),
+        color: context.gssms.warning.background,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppTheme.warningAmber.withOpacity(0.5)),
+        border: Border.all(color: context.gssms.warning.border),
       ),
-      child: const Row(
+      child: Row(
         children: [
-          Icon(Icons.info_outline, size: 16, color: AppTheme.warningAmber),
-          SizedBox(width: 8),
+          Icon(Icons.info_outline, size: 16, color: context.gssms.warning.foreground),
+          const SizedBox(width: 8),
           Expanded(
             child: Text(
               'Showing part of the register. Narrow by depot or station to see '
               'the rest — search and category filters only apply to what is '
               'listed here.',
-              style: TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+              style: TextStyle(fontSize: 11, color: context.gssms.textSecondary),
             ),
           ),
         ],
@@ -197,13 +210,13 @@ class _AssetListScreenState extends ConsumerState<AssetListScreen> {
 
   Widget _buildSearchBar() {
     return Container(
-      color: Colors.white,
+      color: context.gssms.surfaceRaised,
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       child: TextField(
         controller: _searchController,
         decoration: InputDecoration(
           hintText: 'Search asset code, name, serial #...',
-          prefixIcon: const Icon(Icons.search, color: AppTheme.textSecondary),
+          prefixIcon: Icon(Icons.search, color: context.gssms.textSecondary),
           suffixIcon: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -219,14 +232,14 @@ class _AssetListScreenState extends ConsumerState<AssetListScreen> {
                   },
                 ),
               IconButton(
-                icon: const Icon(Icons.qr_code_scanner, color: AppTheme.railwayBlue),
+                icon: Icon(Icons.qr_code_scanner, color: context.gssms.link),
                 tooltip: 'Scan Barcode / QR',
                 onPressed: _openQrScanner,
               ),
             ],
           ),
           filled: true,
-          fillColor: AppTheme.backgroundLight,
+          fillColor: context.gssms.surfaceInset,
           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
@@ -259,7 +272,7 @@ class _AssetListScreenState extends ConsumerState<AssetListScreen> {
         state.assets.where((a) => a.assetCategoryName == cat).length;
 
     return Container(
-      color: Colors.white,
+      color: context.gssms.surfaceRaised,
       padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
       child: DropdownButtonFormField<String?>(
         key: const Key('asset_category_filter_dropdown'),
@@ -309,7 +322,7 @@ class _AssetListScreenState extends ConsumerState<AssetListScreen> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Icon(Icons.error_outline, size: 48, color: AppTheme.errorRed),
+                  Icon(Icons.error_outline, size: 48, color: context.gssms.danger.foreground),
                   const SizedBox(height: 12),
                   Text(state.message, textAlign: TextAlign.center),
                   const SizedBox(height: 16),
@@ -381,10 +394,8 @@ class _AssetCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       key: Key('asset_card_${asset.id}'),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
-        borderRadius: BorderRadius.circular(12),
         onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(14),
@@ -398,15 +409,15 @@ class _AssetCard extends StatelessWidget {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: AppTheme.railwayBlue.withOpacity(0.1),
+                        color: context.gssms.info.background,
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
                         asset.uniqueId,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
-                          color: AppTheme.railwayBlue,
+                          color: context.gssms.link,
                         ),
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -425,37 +436,21 @@ class _AssetCard extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   asset.assetCategoryName!,
-                  style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                  style: TextStyle(fontSize: 12, color: context.gssms.textSecondary),
                 ),
               ],
               const Divider(height: 16),
               Row(
                 children: [
-                  const Icon(Icons.location_on_outlined, size: 14, color: AppTheme.textSecondary),
+                  Icon(Icons.location_on_outlined, size: 14, color: context.gssms.textSecondary),
                   const SizedBox(width: 4),
                   Expanded(
                     child: Text(
                       asset.stationName ?? asset.depotName ?? 'Location N/A',
-                      style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                      style: TextStyle(fontSize: 12, color: context.gssms.textSecondary),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  if (asset.criticality == AssetCriticality.critical)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: AppTheme.errorRed.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: const Text(
-                        'CRITICAL',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: AppTheme.errorRed,
-                        ),
-                      ),
-                    ),
                 ],
               ),
             ],
@@ -468,37 +463,12 @@ class _AssetCard extends StatelessWidget {
   /// Criticality badge. The register has no per-asset operational status
   /// column, so criticality is what actually distinguishes assets at a glance.
   Widget _criticalityBadge(AssetCriticality criticality) {
-    Color color;
-    switch (criticality) {
-      case AssetCriticality.critical:
-        color = Colors.red.shade900;
-        break;
-      case AssetCriticality.high:
-        color = AppTheme.errorRed;
-        break;
-      case AssetCriticality.medium:
-        color = Colors.orange.shade700;
-        break;
-      case AssetCriticality.low:
-        color = AppTheme.railwayGreen;
-        break;
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.4)),
-      ),
-      child: Text(
-        criticality.displayName,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.bold,
-          color: color,
-        ),
-      ),
-    );
+    final severity = switch (criticality) {
+      AssetCriticality.critical => GssmsSeverity.critical,
+      AssetCriticality.high => GssmsSeverity.high,
+      AssetCriticality.medium => GssmsSeverity.medium,
+      AssetCriticality.low => GssmsSeverity.low,
+    };
+    return SeverityChip(severity: severity, label: criticality.displayName);
   }
 }

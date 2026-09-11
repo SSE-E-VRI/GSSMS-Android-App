@@ -15,7 +15,9 @@ class StatusDonutChart extends StatelessWidget {
   final int total;
   final String title;
 
-  Color _parseColor(String? hex, int index) {
+  /// Server-provided segment colour, else a theme-resolved fallback. Solid
+  /// tone colours stay vivid on both light and dark cards.
+  Color _parseColor(BuildContext context, String? hex, int index) {
     if (hex != null && hex.isNotEmpty) {
       final clean = hex.replaceAll('#', '');
       if (clean.length == 6) {
@@ -23,13 +25,14 @@ class StatusDonutChart extends StatelessWidget {
         if (val != null) return Color(val);
       }
     }
-    const defaultColors = [
-      AppTheme.railwayGreen,
-      AppTheme.warningAmber,
-      AppTheme.errorRed,
-      AppTheme.railwayBlue,
-      Colors.purple,
-      Colors.teal,
+    final tokens = context.gssms;
+    final defaultColors = [
+      tokens.success.solid,
+      tokens.warning.solid,
+      tokens.danger.solid,
+      tokens.info.solid,
+      tokens.accent.solid,
+      tokens.neutral.solid,
     ];
     return defaultColors[index % defaultColors.length];
   }
@@ -59,7 +62,7 @@ class StatusDonutChart extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.railwayBlue),
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: context.gssms.link),
               ),
               const SizedBox(height: 16),
               SizedBox(
@@ -73,7 +76,7 @@ class StatusDonutChart extends StatelessWidget {
                       centerSpaceRadius: 50,
                       sections: List.generate(displaySegments.length, (i) {
                         final seg = displaySegments[i];
-                        final color = _parseColor(seg.colorHex, i);
+                        final color = _parseColor(context, seg.colorHex, i);
                         return PieChartSectionData(
                           color: color,
                           value: seg.count.toDouble(),
@@ -90,17 +93,17 @@ class StatusDonutChart extends StatelessWidget {
                       children: [
                         Text(
                           '$total',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.bold,
-                            color: AppTheme.textPrimary,
+                            color: context.gssms.textPrimary,
                           ),
                         ),
-                        const Text(
+                        Text(
                           'Total',
                           style: TextStyle(
                             fontSize: 11,
-                            color: AppTheme.textSecondary,
+                            color: context.gssms.textSecondary,
                           ),
                         ),
                       ],
@@ -115,7 +118,7 @@ class StatusDonutChart extends StatelessWidget {
               runSpacing: 8,
               children: List.generate(displaySegments.length, (i) {
                 final seg = displaySegments[i];
-                final color = _parseColor(seg.colorHex, i);
+                final color = _parseColor(context, seg.colorHex, i);
                 return Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [

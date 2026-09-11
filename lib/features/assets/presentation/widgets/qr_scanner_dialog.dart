@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../../../core/theme/app_theme.dart';
 
@@ -15,7 +18,8 @@ class QrScannerDialog extends StatefulWidget {
   State<QrScannerDialog> createState() => _QrScannerDialogState();
 }
 
-class _QrScannerDialogState extends State<QrScannerDialog> {
+class _QrScannerDialogState extends State<QrScannerDialog>
+    with WidgetsBindingObserver {
   final TextEditingController _codeController = TextEditingController();
   late final MobileScannerController _scannerController;
 
@@ -26,6 +30,7 @@ class _QrScannerDialogState extends State<QrScannerDialog> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _isManualMode = widget.startInManualMode;
     _scannerController = MobileScannerController(
       formats: const [
@@ -43,9 +48,28 @@ class _QrScannerDialogState extends State<QrScannerDialog> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _scannerController.dispose();
     _codeController.dispose();
     super.dispose();
+  }
+
+  /// mobile_scanner only manages the camera across app pauses for its own
+  /// internal controller; with ours it would keep the camera open while the
+  /// app is in the background. Release it on pause, reacquire on resume.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (_isManualMode || _hasDetected) return;
+    switch (state) {
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.paused:
+      case AppLifecycleState.hidden:
+        unawaited(_scannerController.stop());
+      case AppLifecycleState.resumed:
+        unawaited(_scannerController.start());
+      case AppLifecycleState.detached:
+        break;
+    }
   }
 
   void _onDetect(BarcodeCapture capture) {
@@ -53,7 +77,10 @@ class _QrScannerDialogState extends State<QrScannerDialog> {
     for (final barcode in capture.barcodes) {
       final code = barcode.rawValue?.trim();
       if (code != null && code.isNotEmpty) {
+        // Single-shot: later frames of the same label are ignored, so one
+        // scan never triggers two lookups.
         _hasDetected = true;
+        unawaited(HapticFeedback.mediumImpact());
         Navigator.of(context).pop(code);
         break;
       }
@@ -92,7 +119,7 @@ class _QrScannerDialogState extends State<QrScannerDialog> {
       child: Container(
         constraints: const BoxConstraints(maxWidth: 420, maxHeight: 600),
         decoration: BoxDecoration(
-          color: AppTheme.surfaceWhite,
+          color: Theme.of(context).cardTheme.color,
           borderRadius: BorderRadius.circular(16),
           boxShadow: const [
             BoxShadow(
@@ -110,14 +137,14 @@ class _QrScannerDialogState extends State<QrScannerDialog> {
               // Header
               Container(
                 padding: const EdgeInsets.fromLTRB(20, 16, 12, 16),
-                color: AppTheme.primaryDark,
+                color: Theme.of(context).appBarTheme.backgroundColor,
                 child: Row(
                   children: [
                     Icon(
                       _isManualMode
                           ? Icons.keyboard_alt_outlined
                           : Icons.qr_code_scanner_rounded,
-                      color: AppTheme.accentOrange,
+                      color: context.gssms.accent.foreground,
                       size: 24,
                     ),
                     const SizedBox(width: 12),
@@ -160,10 +187,10 @@ class _QrScannerDialogState extends State<QrScannerDialog> {
               Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                decoration: const BoxDecoration(
-                  color: AppTheme.backgroundLight,
+                decoration: BoxDecoration(
+                  color: context.gssms.surfaceInset,
                   border: Border(
-                    top: BorderSide(color: AppTheme.borderGrey),
+                    top: BorderSide(color: context.gssms.border),
                   ),
                 ),
                 child: Row(
@@ -268,7 +295,7 @@ class _QrScannerDialogState extends State<QrScannerDialog> {
       width: 240,
       height: 240,
       decoration: BoxDecoration(
-        border: Border.all(color: AppTheme.accentOrange, width: 2),
+        border: Border.all(color: context.gssms.accent.foreground, width: 2),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Stack(
@@ -280,10 +307,10 @@ class _QrScannerDialogState extends State<QrScannerDialog> {
             child: Container(
               width: 24,
               height: 24,
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 border: Border(
-                  top: BorderSide(color: AppTheme.successGreen, width: 4),
-                  left: BorderSide(color: AppTheme.successGreen, width: 4),
+                  top: BorderSide(color: context.gssms.success.foreground, width: 4),
+                  left: BorderSide(color: context.gssms.success.foreground, width: 4),
                 ),
               ),
             ),
@@ -294,10 +321,10 @@ class _QrScannerDialogState extends State<QrScannerDialog> {
             child: Container(
               width: 24,
               height: 24,
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 border: Border(
-                  top: BorderSide(color: AppTheme.successGreen, width: 4),
-                  right: BorderSide(color: AppTheme.successGreen, width: 4),
+                  top: BorderSide(color: context.gssms.success.foreground, width: 4),
+                  right: BorderSide(color: context.gssms.success.foreground, width: 4),
                 ),
               ),
             ),
@@ -308,10 +335,10 @@ class _QrScannerDialogState extends State<QrScannerDialog> {
             child: Container(
               width: 24,
               height: 24,
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 border: Border(
-                  bottom: BorderSide(color: AppTheme.successGreen, width: 4),
-                  left: BorderSide(color: AppTheme.successGreen, width: 4),
+                  bottom: BorderSide(color: context.gssms.success.foreground, width: 4),
+                  left: BorderSide(color: context.gssms.success.foreground, width: 4),
                 ),
               ),
             ),
@@ -322,10 +349,10 @@ class _QrScannerDialogState extends State<QrScannerDialog> {
             child: Container(
               width: 24,
               height: 24,
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 border: Border(
-                  bottom: BorderSide(color: AppTheme.successGreen, width: 4),
-                  right: BorderSide(color: AppTheme.successGreen, width: 4),
+                  bottom: BorderSide(color: context.gssms.success.foreground, width: 4),
+                  right: BorderSide(color: context.gssms.success.foreground, width: 4),
                 ),
               ),
             ),
@@ -338,21 +365,21 @@ class _QrScannerDialogState extends State<QrScannerDialog> {
   Widget _buildCameraErrorView(String message) {
     return Container(
       padding: const EdgeInsets.all(24),
-      color: Colors.white,
+      color: Theme.of(context).cardTheme.color,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(
+          Icon(
             Icons.no_photography_outlined,
             size: 48,
-            color: AppTheme.warningAmber,
+            color: context.gssms.warning.foreground,
           ),
           const SizedBox(height: 16),
           Text(
             'Camera Unavailable',
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.bold,
-                  color: AppTheme.textDark,
+                  color: context.gssms.textPrimary,
                 ),
           ),
           const SizedBox(height: 8),
@@ -360,7 +387,7 @@ class _QrScannerDialogState extends State<QrScannerDialog> {
             message,
             textAlign: TextAlign.center,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppTheme.textMuted,
+                  color: context.gssms.textSecondary,
                   height: 1.4,
                 ),
           ),
@@ -389,7 +416,7 @@ class _QrScannerDialogState extends State<QrScannerDialog> {
           Text(
             'For damaged, faded, or unreadable labels, enter the asset identifier directly.',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppTheme.textMuted,
+                  color: context.gssms.textSecondary,
                   height: 1.35,
                 ),
           ),
@@ -415,8 +442,8 @@ class _QrScannerDialogState extends State<QrScannerDialog> {
           ElevatedButton(
             key: const Key('confirm_code_lookup_button'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.railwayBlue,
-              foregroundColor: Colors.white,
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              foregroundColor: Theme.of(context).colorScheme.onPrimary,
               padding: const EdgeInsets.symmetric(vertical: 14),
             ),
             onPressed: _onSubmitManualCode,

@@ -58,6 +58,6 @@ void main() {
     expect(tester.takeException(), isNull);
     expect(find.text('Save Progress'), findsNothing);
     expect(find.byKey(const Key('complete_checklist_button')), findsOneWidget);
-    expect(find.text('1 required items left'), findsOneWidget);
+    expect(find.text('1 required item left'), findsOneWidget);
   });
 }

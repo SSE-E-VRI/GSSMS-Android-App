@@ -2,7 +2,9 @@ import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gssms_mobile/core/sync/mutation_outcome.dart';
 import 'package:gssms_mobile/core/widgets/org_scope_filter_bar.dart';
+import 'package:gssms_mobile/features/reports/domain/models/infrastructure_option.dart';
 import 'package:gssms_mobile/features/work_orders/data/work_order_repository.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/maintenance_record.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/verification_workspace.dart';
@@ -203,6 +205,69 @@ void main() {
       expect(state.dateFrom, DateTime(2026, 9, 1));
       expect(state.dateTo, DateTime(2026, 9, 7));
     });
+
+    // Regression B6: setDateRange/setOrgScope rebuilt the state with only
+    // status + search, silently dropping the type and infra filters while
+    // their dropdowns still showed the old selection.
+    test('date and org-scope changes keep type and infra filters', () async {
+      when(() => mockRepo.fetchWorkOrders()).thenAnswer((_) async => testOrders);
+      when(() => mockRepo.fetchWorkOrders(dateFrom: '2026-09-01', dateTo: '2026-09-07'))
+          .thenAnswer((_) async => testOrders);
+      when(() => mockRepo.fetchWorkOrders(
+            dateFrom: '2026-09-01',
+            dateTo: '2026-09-07',
+            depotId: 9,
+          )).thenAnswer((_) async => testOrders);
+
+      final controller = container.read(workOrderListControllerProvider.notifier);
+      await controller.fetchWorkOrders();
+      controller.setTypeFilter(WorkOrderType.breakdown);
+      controller.setInfraFilter(InfraFilterType.station, null);
+      controller.setInfraName('TPJ');
+
+      await controller.setDateRange(DateTime(2026, 9, 1), DateTime(2026, 9, 7));
+      await controller.setOrgScope(const OrgScopeSelection(depotId: 9));
+
+      final state = container.read(workOrderListControllerProvider) as WorkOrderListLoaded;
+      expect(state.selectedTypeFilter, WorkOrderType.breakdown);
+      expect(state.infraType, InfraFilterType.station);
+      expect(state.infraName, 'TPJ');
+      expect(state.dateFrom, DateTime(2026, 9, 1));
+      expect(state.orgScope.depotId, 9);
+    });
+
+    test('a slow response for an older filter cannot overwrite a newer one',
+        () async {
+      final slow = Completer<List<WorkOrder>>();
+      when(() => mockRepo.fetchWorkOrders()).thenAnswer((_) async => testOrders);
+      when(() => mockRepo.fetchWorkOrders(dateFrom: '2026-09-01', dateTo: '2026-09-01'))
+          .thenAnswer((_) => slow.future);
+      when(() => mockRepo.fetchWorkOrders(dateFrom: '2026-09-02', dateTo: '2026-09-02'))
+          .thenAnswer((_) async => [testOrders[1]]);
+
+      final controller = container.read(workOrderListControllerProvider.notifier);
+      await controller.fetchWorkOrders();
+
+      final older = controller.setDateRange(DateTime(2026, 9, 1), DateTime(2026, 9, 1));
+      await controller.setDateRange(DateTime(2026, 9, 2), DateTime(2026, 9, 2));
+      slow.complete([testOrders[0]]);
+      await older;
+
+      final state = container.read(workOrderListControllerProvider) as WorkOrderListLoaded;
+      expect(state.dateFrom, DateTime(2026, 9, 2));
+      expect(state.workOrders.single.id, 2);
+    });
+
+    test('load errors are user-facing, never a raw exception dump', () async {
+      when(() => mockRepo.fetchWorkOrders()).thenThrow(TypeError());
+
+      final controller = container.read(workOrderListControllerProvider.notifier);
+      await controller.fetchWorkOrders();
+
+      final state = container.read(workOrderListControllerProvider) as WorkOrderListError;
+      expect(state.message, isNot(contains('subtype')));
+      expect(state.message, isNot(contains('Error')));
+    });
   });
 
   group('ChecklistController Tests', () {
@@ -248,7 +313,8 @@ void main() {
 
     test('submitLineObservation updates line state and calls repository', () async {
       when(() => mockRepo.fetchMaintenanceRecord(50)).thenAnswer((_) async => testRecord);
-      when(() => mockRepo.submitChecklistLine(50, any())).thenAnswer((_) async {});
+      when(() => mockRepo.submitChecklistLine(50, any()))
+          .thenAnswer((_) async => MutationOutcome.synced);
 
       final controller = container.read(checklistControllerProvider(50).notifier);
       await controller.loadRecord();
@@ -262,7 +328,82 @@ void main() {
       expect(success, isTrue);
       final state = container.read(checklistControllerProvider(50)) as ChecklistLoaded;
       expect(state.record.lines[0].recordedValue, '240V');
+      expect(state.successMessage, 'Saved');
       verify(() => mockRepo.submitChecklistLine(50, any())).called(1);
+    });
+
+    // Regression B12: an offline save (queued in the outbox) was reported as
+    // "Saved", identical to a server-acknowledged one (SSOT §41).
+    test('a queued line save says it is saved on the device, not "Saved"',
+        () async {
+      when(() => mockRepo.fetchMaintenanceRecord(50)).thenAnswer((_) async => testRecord);
+      when(() => mockRepo.submitChecklistLine(50, any()))
+          .thenAnswer((_) async => MutationOutcome.queued);
+
+      final controller = container.read(checklistControllerProvider(50).notifier);
+      await controller.loadRecord();
+      await controller.submitLineObservation(lineId: 101, value: '240V');
+
+      final state = container.read(checklistControllerProvider(50)) as ChecklistLoaded;
+      expect(state.successMessage, contains('Saved on this device'));
+    });
+
+    test('completion reports queued when it only reached the outbox', () async {
+      when(() => mockRepo.fetchMaintenanceRecord(50)).thenAnswer((_) async => testRecord);
+      when(() => mockRepo.completeMaintenanceRecord(
+            50,
+            technicianName: any(named: 'technicianName'),
+            remarks: any(named: 'remarks'),
+            supervisorName: any(named: 'supervisorName'),
+            queueOnly: any(named: 'queueOnly'),
+          )).thenAnswer((_) async => MutationOutcome.queued);
+
+      final controller = container.read(checklistControllerProvider(50).notifier);
+      await controller.loadRecord();
+      final ok = await controller.completeExecution(
+        technicianName: 'Ramesh',
+        remarks: 'All readings within limits.',
+      );
+
+      expect(ok, isTrue);
+      expect(
+        container.read(checklistControllerProvider(50)),
+        const ChecklistCompleted(queued: true),
+      );
+    });
+
+    test('completion waits behind queued evidence instead of racing it',
+        () async {
+      when(() => mockRepo.fetchMaintenanceRecord(50)).thenAnswer((_) async => testRecord);
+      when(() => mockRepo.uploadEvidence(
+            50,
+            proofJpegPath: any(named: 'proofJpegPath'),
+            remarks: any(named: 'remarks'),
+            otherStaff: any(named: 'otherStaff'),
+          )).thenAnswer((_) async => MutationOutcome.queued);
+      when(() => mockRepo.completeMaintenanceRecord(
+            50,
+            technicianName: any(named: 'technicianName'),
+            remarks: any(named: 'remarks'),
+            supervisorName: any(named: 'supervisorName'),
+            queueOnly: any(named: 'queueOnly'),
+          )).thenAnswer((_) async => MutationOutcome.queued);
+
+      final controller = container.read(checklistControllerProvider(50).notifier);
+      await controller.loadRecord();
+      await controller.completeExecution(
+        technicianName: 'Ramesh',
+        remarks: 'All readings within limits.',
+        proofJpegPath: '/tmp/proof.jpg',
+      );
+
+      verify(() => mockRepo.completeMaintenanceRecord(
+            50,
+            technicianName: 'Ramesh',
+            remarks: 'All readings within limits.',
+            supervisorName: null,
+            queueOnly: true,
+          )).called(1);
     });
 
     test('a slower save for one line does not clobber a faster save for another',
@@ -288,11 +429,11 @@ void main() {
 
       // Line 101's request resolves only after line 102's does, simulating
       // two lines saved close together where the responses arrive out of order.
-      final line101Completer = Completer<void>();
+      final line101Completer = Completer<MutationOutcome>();
       when(() => mockRepo.submitChecklistLine(50, any(that: containsPair('line_id', 101))))
           .thenAnswer((_) => line101Completer.future);
       when(() => mockRepo.submitChecklistLine(50, any(that: containsPair('line_id', 102))))
-          .thenAnswer((_) async {});
+          .thenAnswer((_) async => MutationOutcome.synced);
 
       final controller = container.read(checklistControllerProvider(50).notifier);
       await controller.loadRecord();
@@ -305,7 +446,7 @@ void main() {
       // Line 102's save completes first and lands in state...
       await line102Save;
       // ...then line 101's save, which started earlier, finally resolves.
-      line101Completer.complete();
+      line101Completer.complete(MutationOutcome.synced);
       await line101Save;
 
       final state = container.read(checklistControllerProvider(50)) as ChecklistLoaded;

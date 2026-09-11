@@ -1,10 +1,11 @@
 import 'package:equatable/equatable.dart';
+import 'package:gssms_mobile/core/domain/location_label.dart';
 import 'package:gssms_mobile/core/utils/json_parsing.dart';
 
 enum InspectionStatus {
   open('OPEN', 'Open'),
   actionRequired('ACTION_REQUIRED', 'Action Required'),
-  converted('CONVERTED', 'Converted to Work Order'),
+  converted('CONVERTED', 'Converted to Job Work'),
   closed('CLOSED', 'Closed'),
   unknown('UNKNOWN', 'Unknown');
 
@@ -22,64 +23,54 @@ enum InspectionStatus {
   }
 }
 
-enum InspectionPriority {
-  critical('CRITICAL', 'Critical'),
-  high('HIGH', 'High'),
-  medium('MEDIUM', 'Medium'),
-  low('LOW', 'Low');
-
-  const InspectionPriority(this.code, this.displayName);
-  final String code;
-  final String displayName;
-
-  static InspectionPriority fromString(String? code) {
-    if (code == null) return InspectionPriority.medium;
-    final upper = code.toUpperCase().trim();
-    for (final p in InspectionPriority.values) {
-      if (p.code == upper) return p;
-    }
-    return InspectionPriority.medium;
-  }
-}
-
+/// An inspection as `InspectionSerializer` returns it (SSOT §11.1).
+///
+/// Inspections have no priority/severity and no asset link (SSOT §11.3), and
+/// no server-issued inspection number — the reference is `#<id>`.
 class Inspection extends Equatable {
   const Inspection({
     required this.id,
-    required this.inspectionNumber,
     required this.title,
     this.notes,
     this.status = InspectionStatus.open,
-    this.priority = InspectionPriority.medium,
     this.stationId,
     this.stationName,
     this.depotId,
     this.depotName,
-    this.assetId,
-    this.assetName,
+    this.infrastructureName,
+    this.infrastructureType,
+    this.lcGateNumber,
+    this.serviceBuildingName,
+    this.staffQuarterName,
     this.inspectionDate,
-    this.completedDate,
     this.createdAt,
-    this.reportedByName,
+    this.createdByName,
+    this.createdByDesignation,
     this.isConverted = false,
     this.workOrderId,
+    this.workOrderStatus,
   });
 
   final int id;
-  final String inspectionNumber;
   final String title;
   final String? notes;
   final InspectionStatus status;
-  final InspectionPriority priority;
   final int? stationId;
   final String? stationName;
   final int? depotId;
   final String? depotName;
-  final int? assetId;
-  final String? assetName;
+  final String? infrastructureName;
+  final String? infrastructureType;
+  final String? lcGateNumber;
+  final String? serviceBuildingName;
+  final String? staffQuarterName;
   final DateTime? inspectionDate;
-  final DateTime? completedDate;
   final DateTime? createdAt;
-  final String? reportedByName;
+
+  /// Inspector's full name when the serializer has it (`created_by_first_name`
+  /// + `created_by_last_name`), otherwise the username (`created_by_name`).
+  final String? createdByName;
+  final String? createdByDesignation;
 
   /// From InspectionSerializer.get_is_converted — whether a Work Order has
   /// already been migrated from this inspection. This is the authoritative
@@ -91,60 +82,105 @@ class Inspection extends Equatable {
   /// [isConverted] is true.
   final int? workOrderId;
 
+  /// From `wo_status` — raw status of the linked Job Work.
+  final String? workOrderStatus;
+
+  /// User-facing reference.
+  String get reference => '#$id';
+
+  /// Web `getInfraName`: station, else LC gate / building / quarter.
+  String? get locationLabel => infrastructureLocationLabel(
+        stationName: stationName,
+        lcGateNumber: lcGateNumber,
+        serviceBuildingName: serviceBuildingName,
+        staffQuarterName: staffQuarterName,
+        infrastructureName: infrastructureName,
+      );
+
   factory Inspection.fromJson(Map<String, dynamic> json) {
     DateTime? parseDate(dynamic d) {
       if (d == null || d == '') return null;
-      return DateTime.tryParse(d.toString());
+      return asJsonDateTime(d);
     }
 
     int? fkId(dynamic v) => v is Map ? asJsonInt(v['id']) : asJsonInt(v);
 
+    final first = asJsonString(json['created_by_first_name'])?.trim() ?? '';
+    final last = asJsonString(json['created_by_last_name'])?.trim() ?? '';
+    final fullName = '$first $last'.trim();
+
     return Inspection(
       id: asJsonInt(json['id']) ?? 0,
-      inspectionNumber: asJsonString(json['inspection_number']) ??
-          asJsonString(json['ticket_number']) ??
-          'INSP-${json['id']}',
       title: asJsonString(json['title']) ?? 'Untitled Inspection',
       notes: asJsonString(json['notes']),
       status: InspectionStatus.fromString(asJsonString(json['status'])),
-      priority: InspectionPriority.fromString(
-          asJsonString(json['priority']) ?? asJsonString(json['severity'])),
       stationId: fkId(json['station']),
       stationName: asJsonString(json['station_name']),
       depotId: fkId(json['depot']),
       depotName: asJsonString(json['depot_name']),
-      assetId: fkId(json['asset']),
-      assetName: asJsonString(json['asset_name']),
+      infrastructureName: asJsonString(json['infrastructure_name']),
+      infrastructureType: asJsonString(json['infrastructure_type']),
+      lcGateNumber: asJsonString(json['lc_gate_number']),
+      serviceBuildingName: asJsonString(json['service_building_name']),
+      staffQuarterName: asJsonString(json['staff_quarter_name']),
       inspectionDate: parseDate(json['inspection_date']),
-      completedDate: parseDate(json['completed_date'] ?? json['resolved_at']),
       createdAt: parseDate(json['created_at']),
-      reportedByName: asJsonString(json['reported_by_name']) ??
-          asJsonString(json['created_by_name']),
+      createdByName:
+          fullName.isNotEmpty ? fullName : asJsonString(json['created_by_name']),
+      createdByDesignation: asJsonString(json['created_by_designation']),
       isConverted: asJsonBool(json['is_converted']) ?? false,
-      workOrderId: asJsonInt(
-          json['wo_id'] ?? json['work_order_id'] ?? json['work_order']),
+      workOrderId: asJsonInt(json['wo_id']),
+      workOrderStatus: asJsonString(json['wo_status']),
+    );
+  }
+
+  /// Local copy after a successful conversion, before the next refresh.
+  Inspection markConverted({int? workOrderId}) {
+    return Inspection(
+      id: id,
+      title: title,
+      notes: notes,
+      status: InspectionStatus.converted,
+      stationId: stationId,
+      stationName: stationName,
+      depotId: depotId,
+      depotName: depotName,
+      infrastructureName: infrastructureName,
+      infrastructureType: infrastructureType,
+      lcGateNumber: lcGateNumber,
+      serviceBuildingName: serviceBuildingName,
+      staffQuarterName: staffQuarterName,
+      inspectionDate: inspectionDate,
+      createdAt: createdAt,
+      createdByName: createdByName,
+      createdByDesignation: createdByDesignation,
+      isConverted: true,
+      workOrderId: workOrderId ?? this.workOrderId,
+      workOrderStatus: workOrderStatus,
     );
   }
 
   @override
   List<Object?> get props => [
         id,
-        inspectionNumber,
         title,
         notes,
         status,
-        priority,
         stationId,
         stationName,
         depotId,
         depotName,
-        assetId,
-        assetName,
+        infrastructureName,
+        infrastructureType,
+        lcGateNumber,
+        serviceBuildingName,
+        staffQuarterName,
         inspectionDate,
-        completedDate,
         createdAt,
-        reportedByName,
+        createdByName,
+        createdByDesignation,
         isConverted,
         workOrderId,
+        workOrderStatus,
       ];
 }

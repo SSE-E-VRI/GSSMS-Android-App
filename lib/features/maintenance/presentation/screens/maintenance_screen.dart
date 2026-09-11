@@ -102,18 +102,18 @@ class _MaintenanceScreenState extends ConsumerState<MaintenanceScreen> {
             padding: const EdgeInsets.all(16),
             children: [
               Material(
-                color: AppTheme.errorRed.withOpacity(0.08),
+                color: context.gssms.danger.background,
                 borderRadius: BorderRadius.circular(8),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   child: Row(
                     children: [
-                      const Icon(Icons.cloud_off, size: 18, color: AppTheme.errorRed),
+                      Icon(Icons.cloud_off, size: 18, color: context.gssms.danger.foreground),
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           state.message,
-                          style: const TextStyle(fontSize: 12, color: AppTheme.errorRed),
+                          style: TextStyle(fontSize: 12, color: context.gssms.danger.foreground),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -143,12 +143,12 @@ class _MaintenanceScreenState extends ConsumerState<MaintenanceScreen> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.error_outline, size: 48, color: AppTheme.errorRed),
+              Icon(Icons.error_outline, size: 48, color: context.gssms.danger.foreground),
               const SizedBox(height: 12),
               Text(
                 state.message,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: AppTheme.textSecondary),
+                style: TextStyle(color: context.gssms.textSecondary),
               ),
               const SizedBox(height: 16),
               ElevatedButton(
@@ -187,45 +187,54 @@ class _MaintenanceScreenState extends ConsumerState<MaintenanceScreen> {
   }
 
   Widget _buildComplianceCard(double rate) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppTheme.railwayBlue,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Maintenance Compliance Rate',
-            style: TextStyle(color: Colors.white70, fontSize: 13, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-          Row(
+    final palette = rate >= 80 ? context.gssms.success : context.gssms.warning;
+    final textTheme = Theme.of(context).textTheme;
+    return Semantics(
+      container: true,
+      label: 'Maintenance compliance rate ${rate.toStringAsFixed(1)} percent',
+      child: Container(
+        padding: const EdgeInsets.all(GssmsSpacing.s16),
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardTheme.color,
+          borderRadius: BorderRadius.circular(GssmsRadius.r12),
+          border: Border.all(color: context.gssms.border),
+        ),
+        child: ExcludeSemantics(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '${rate.toStringAsFixed(1)}%',
-                style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold),
+                'Maintenance Compliance Rate',
+                style: textTheme.labelMedium?.copyWith(color: context.gssms.textSecondary),
               ),
-              const Spacer(),
-              Icon(
-                rate >= 80 ? Icons.check_circle : Icons.warning,
-                color: rate >= 80 ? AppTheme.railwayGreen : AppTheme.warningAmber,
-                size: 36,
+              const SizedBox(height: GssmsSpacing.s8),
+              Row(
+                children: [
+                  Text(
+                    '${rate.toStringAsFixed(1)}%',
+                    style: textTheme.headlineSmall?.copyWith(fontSize: 32),
+                  ),
+                  const Spacer(),
+                  Icon(
+                    rate >= 80 ? Icons.check_circle : Icons.warning_amber_rounded,
+                    color: palette.foreground,
+                    size: 36,
+                  ),
+                ],
+              ),
+              const SizedBox(height: GssmsSpacing.s8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(GssmsRadius.r4),
+                child: LinearProgressIndicator(
+                  value: (rate / 100).clamp(0.0, 1.0),
+                  minHeight: 8,
+                  backgroundColor: context.gssms.border,
+                  color: palette.solid,
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: (rate / 100).clamp(0.0, 1.0),
-              minHeight: 8,
-              backgroundColor: Colors.white24,
-              color: rate >= 80 ? AppTheme.railwayGreen : AppTheme.warningAmber,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -247,9 +256,9 @@ class _MaintenanceScreenState extends ConsumerState<MaintenanceScreen> {
     if (sessionAllows(session, 'maintenance.view')) {
       tiles.add(ListTile(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        tileColor: Colors.white,
-        leading: CircleAvatar(backgroundColor: AppTheme.railwayBlue.withOpacity(0.12), child: const Icon(Icons.assignment, color: AppTheme.railwayBlue)),
-        title: const Text('Job Works / Work Orders', style: TextStyle(fontWeight: FontWeight.bold)),
+        tileColor: Theme.of(context).cardTheme.color,
+        leading: CircleAvatar(backgroundColor: context.gssms.info.background, child: Icon(Icons.assignment, color: context.gssms.link)),
+        title: const Text('Job Works', style: TextStyle(fontWeight: FontWeight.bold)),
         subtitle: Text('${stats.pendingTaskCount} pending tasks'),
         trailing: const Icon(Icons.arrow_forward_ios, size: 16),
         onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const WorkOrderListScreen())),
@@ -259,8 +268,8 @@ class _MaintenanceScreenState extends ConsumerState<MaintenanceScreen> {
     if (sessionAllows(session, 'complaints.view')) {
       tiles.add(ListTile(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        tileColor: Colors.white,
-        leading: const CircleAvatar(backgroundColor: AppTheme.errorLight, child: Icon(Icons.report_problem, color: AppTheme.errorRed)),
+        tileColor: Theme.of(context).cardTheme.color,
+        leading: CircleAvatar(backgroundColor: context.gssms.danger.background, child: Icon(Icons.report_problem, color: context.gssms.danger.foreground)),
         title: const Text('Complaints & Failures', style: TextStyle(fontWeight: FontWeight.bold)),
         subtitle: Text('${stats.openComplaintCount} open complaints'),
         trailing: const Icon(Icons.arrow_forward_ios, size: 16),
@@ -271,8 +280,8 @@ class _MaintenanceScreenState extends ConsumerState<MaintenanceScreen> {
     if (sessionAllows(session, 'inspections.view')) {
       tiles.add(ListTile(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-        tileColor: Colors.white,
-        leading: CircleAvatar(backgroundColor: AppTheme.railwayGreen.withOpacity(0.12), child: const Icon(Icons.fact_check, color: AppTheme.railwayGreen)),
+        tileColor: Theme.of(context).cardTheme.color,
+        leading: CircleAvatar(backgroundColor: context.gssms.success.background, child: Icon(Icons.fact_check, color: context.gssms.success.foreground)),
         title: const Text('Inspections & Notes', style: TextStyle(fontWeight: FontWeight.bold)),
         subtitle: Text('${stats.inspectionCount} recorded notes'),
         trailing: const Icon(Icons.arrow_forward_ios, size: 16),
@@ -283,9 +292,9 @@ class _MaintenanceScreenState extends ConsumerState<MaintenanceScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text(
+        Text(
           'Quick Navigation',
-          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.railwayBlue),
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: context.gssms.link),
         ),
         const SizedBox(height: 10),
         for (var i = 0; i < tiles.length; i++) ...[

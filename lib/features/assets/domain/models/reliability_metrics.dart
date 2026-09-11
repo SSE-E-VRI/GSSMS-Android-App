@@ -77,7 +77,7 @@ class ReliabilityMetrics extends Equatable {
         ? Map<String, dynamic>.from(json['period'] as Map)
         : const <String, dynamic>{};
     DateTime? parseDate(dynamic v) =>
-        v == null ? null : DateTime.tryParse(v.toString());
+        v == null ? null : asJsonDateTime(v);
     double? asDoubleOrNull(dynamic v) =>
         v == null ? null : (v is num ? v.toDouble() : double.tryParse(v.toString()));
     double asDouble(dynamic v) => asDoubleOrNull(v) ?? 0;

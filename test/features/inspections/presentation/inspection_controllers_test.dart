@@ -15,10 +15,8 @@ void main() {
   const inspections = [
     Inspection(
       id: 1,
-      inspectionNumber: 'INSP-001',
       title: 'Check',
       notes: 'Desc',
-      priority: InspectionPriority.medium,
       status: InspectionStatus.open,
     ),
   ];

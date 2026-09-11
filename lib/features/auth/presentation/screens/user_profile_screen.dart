@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:gssms_mobile/core/network/api_error.dart';
 import 'package:gssms_mobile/core/services/profile_photo_cache.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
 import 'package:gssms_mobile/core/widgets/profile_avatar.dart';
@@ -35,8 +36,8 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
   String? _banner;
   bool _bannerError = false;
 
-  static const _fieldFill = AppTheme.backgroundLight;
-  static const _border = AppTheme.borderGrey;
+  Color get _fieldFill => context.gssms.surfaceInset;
+  Color get _border => context.gssms.border;
 
   IAuthRepository get _repo => ref.read(authRepositoryProvider);
 
@@ -113,14 +114,14 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                   'Profile Photo',
                   style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
-                        color: AppTheme.textDark,
+                        color: context.gssms.textPrimary,
                       ),
                 ),
               ),
               const Divider(height: 1),
               ListTile(
                 key: const Key('photo_option_camera'),
-                leading: const Icon(Icons.camera_alt, color: AppTheme.primaryBlue),
+                leading: Icon(Icons.camera_alt, color: context.gssms.link),
                 title: const Text('Take Photo'),
                 onTap: () {
                   Navigator.of(ctx).pop();
@@ -129,7 +130,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
               ),
               ListTile(
                 key: const Key('photo_option_gallery'),
-                leading: const Icon(Icons.photo_library, color: AppTheme.primaryBlue),
+                leading: Icon(Icons.photo_library, color: context.gssms.link),
                 title: const Text('Choose from Gallery'),
                 onTap: () {
                   Navigator.of(ctx).pop();
@@ -139,10 +140,10 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
               if (_profile?.profilePicture != null && _profile!.profilePicture!.isNotEmpty)
                 ListTile(
                   key: const Key('photo_option_remove'),
-                  leading: const Icon(Icons.delete_outline, color: AppTheme.errorRed),
-                  title: const Text(
+                  leading: Icon(Icons.delete_outline, color: context.gssms.danger.foreground),
+                  title: Text(
                     'Remove Photo',
-                    style: TextStyle(color: AppTheme.errorRed),
+                    style: TextStyle(color: context.gssms.danger.foreground),
                   ),
                   onTap: () {
                     Navigator.of(ctx).pop();
@@ -205,7 +206,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
       if (!mounted) return;
       setState(() {
         _uploadingPhoto = false;
-        _banner = 'Failed to upload photo: $e';
+        _banner = 'Could not upload photo: ${userFacingError(e)}';
         _bannerError = true;
       });
     }
@@ -338,7 +339,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.backgroundLight,
+      backgroundColor: context.gssms.surfaceInset,
       appBar: AppBar(title: const Text('User Profile')),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -352,15 +353,15 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                   children: [
                     Container(
                       width: double.infinity,
-                      color: AppTheme.primaryBlue,
+                      color: Theme.of(context).colorScheme.primary,
                       padding: const EdgeInsets.symmetric(
                         horizontal: 16,
                         vertical: 14,
                       ),
-                      child: const Text(
+                      child: Text(
                         'User Profile',
                         style: TextStyle(
-                          color: Colors.white,
+                          color: Theme.of(context).colorScheme.onPrimary,
                           fontSize: 18,
                           fontWeight: FontWeight.w600,
                         ),
@@ -391,10 +392,10 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                             Center(
                               child: Text(
                                 _username,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 18,
                                   fontWeight: FontWeight.bold,
-                                  color: AppTheme.textDark,
+                                  color: context.gssms.textPrimary,
                                 ),
                               ),
                             ),
@@ -407,13 +408,13 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                                     vertical: 3,
                                   ),
                                   decoration: BoxDecoration(
-                                    color: Colors.blueGrey.shade700,
+                                    color: context.gssms.neutral.solid,
                                     borderRadius: BorderRadius.circular(4),
                                   ),
                                   child: Text(
                                     _role,
-                                    style: const TextStyle(
-                                      color: Colors.white,
+                                    style: TextStyle(
+                                      color: context.gssms.neutral.onSolid,
                                       fontSize: 12,
                                       fontWeight: FontWeight.w600,
                                     ),
@@ -423,12 +424,12 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                             ],
                             const SizedBox(height: 20),
                           ],
-                          const Text(
+                          Text(
                             'Personal Information',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
-                              color: AppTheme.textMuted,
+                              color: context.gssms.textSecondary,
                             ),
                           ),
                           const SizedBox(height: 12),
@@ -469,7 +470,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                               key: const Key('profile_save_changes_button'),
                               onPressed: _savingProfile ? null : _saveProfile,
                               style: FilledButton.styleFrom(
-                                backgroundColor: AppTheme.primaryBlue,
+                                backgroundColor: Theme.of(context).colorScheme.primary,
                                 minimumSize: const Size(0, 40),
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 16,
@@ -477,24 +478,24 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                                 ),
                               ),
                               child: _savingProfile
-                                  ? const SizedBox(
+                                  ? SizedBox(
                                       width: 16,
                                       height: 16,
                                       child: CircularProgressIndicator(
                                         strokeWidth: 2,
-                                        color: Colors.white,
+                                        color: Theme.of(context).colorScheme.onPrimary,
                                       ),
                                     )
                                   : const Text('Save Changes'),
                             ),
                           ),
                           const Divider(height: 32),
-                          const Text(
+                          Text(
                             'Change Password',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
-                              color: AppTheme.textMuted,
+                              color: context.gssms.textSecondary,
                             ),
                           ),
                           const SizedBox(height: 12),
@@ -527,8 +528,8 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                                   ? null
                                   : _updatePassword,
                               style: FilledButton.styleFrom(
-                                backgroundColor: AppTheme.warningAmber,
-                                foregroundColor: AppTheme.textDark,
+                                backgroundColor: context.gssms.warning.solid,
+                                foregroundColor: context.gssms.textPrimary,
                                 minimumSize: const Size(0, 40),
                                 padding: const EdgeInsets.symmetric(
                                   horizontal: 16,
@@ -574,10 +575,10 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
       children: [
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w600,
-            color: AppTheme.textDark,
+            color: context.gssms.textPrimary,
           ),
         ),
         const SizedBox(height: 6),
@@ -594,11 +595,11 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
       contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: _border),
+        borderSide: BorderSide(color: _border),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: const BorderSide(color: _border),
+        borderSide: BorderSide(color: _border),
       ),
     );
   }

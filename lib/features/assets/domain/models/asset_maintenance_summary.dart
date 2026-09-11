@@ -11,7 +11,7 @@ class ScheduleCadenceStatus extends Equatable {
 
   factory ScheduleCadenceStatus.fromJson(Map<String, dynamic> json) {
     DateTime? parse(dynamic v) =>
-        v == null ? null : DateTime.tryParse(v.toString());
+        v == null ? null : asJsonDateTime(v);
     return ScheduleCadenceStatus(
       lastDoneDate: parse(json['last_done_date']),
       nextDueDate: parse(json['next_due_date']),
@@ -42,10 +42,10 @@ class AssetMaintenanceWorkOrder extends Equatable {
 
   factory AssetMaintenanceWorkOrder.fromJson(Map<String, dynamic> json) {
     DateTime? parse(dynamic v) =>
-        v == null ? null : DateTime.tryParse(v.toString());
+        v == null ? null : asJsonDateTime(v);
     return AssetMaintenanceWorkOrder(
       id: asJsonInt(json['id']) ?? 0,
-      title: asJsonString(json['title']) ?? 'Work Order',
+      title: asJsonString(json['title']) ?? 'Job Work',
       status: asJsonString(json['status']) ?? 'UNKNOWN',
       ticketNumber: asJsonString(json['ticket_number']),
       dueDate: parse(json['due_date']),
@@ -81,7 +81,7 @@ class AssetMaintenanceSummary extends Equatable {
 
   factory AssetMaintenanceSummary.fromJson(Map<String, dynamic> json) {
     DateTime? parse(dynamic v) =>
-        v == null ? null : DateTime.tryParse(v.toString());
+        v == null ? null : asJsonDateTime(v);
     final rawSummary = json['schedule_type_summary'];
     final summary = <String, ScheduleCadenceStatus>{};
     if (rawSummary is Map) {

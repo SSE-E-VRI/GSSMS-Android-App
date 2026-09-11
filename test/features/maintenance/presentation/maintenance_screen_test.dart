@@ -87,7 +87,7 @@ void main() {
       expect(find.text('Maintenance Compliance Rate'), findsOneWidget);
       expect(find.text('95.0%'), findsOneWidget);
       expect(find.text('Quick Navigation'), findsOneWidget);
-      expect(find.text('Job Works / Work Orders'), findsOneWidget);
+      expect(find.text('Job Works'), findsOneWidget);
       expect(find.text('Complaints & Failures'), findsOneWidget);
       expect(find.text('Inspections & Notes'), findsOneWidget);
     });
@@ -105,7 +105,7 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
-      expect(find.text('Job Works / Work Orders'), findsOneWidget);
+      expect(find.text('Job Works'), findsOneWidget);
       expect(find.text('Complaints & Failures'), findsNothing);
       expect(find.text('Inspections & Notes'), findsNothing);
     });

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gssms_mobile/core/sync/mutation_outcome.dart';
 import 'package:gssms_mobile/features/auth/domain/models/auth_role.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:gssms_mobile/features/work_orders/data/work_order_repository.dart';
@@ -55,7 +56,8 @@ void main() {
     setUp(() {
       mockRepo = MockWorkOrderRepository();
       when(() => mockRepo.fetchMaintenanceRecord(55)).thenAnswer((_) async => record);
-      when(() => mockRepo.submitChecklistLine(any(), any())).thenAnswer((_) async {});
+      when(() => mockRepo.submitChecklistLine(any(), any()))
+          .thenAnswer((_) async => MutationOutcome.synced);
     });
 
     Future<void> pumpChecklist(WidgetTester tester) async {

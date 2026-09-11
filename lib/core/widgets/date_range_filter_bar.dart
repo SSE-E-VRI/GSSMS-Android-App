@@ -104,45 +104,51 @@ class _DateChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final tokens = context.gssms;
     final accent = scheme.primary;
-    final secondary = AppTheme.mutedText(context);
-    return Material(
-      color: scheme.surface,
-      borderRadius: BorderRadius.circular(8),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-          decoration: BoxDecoration(
-            border: Border.all(
-              color: filled ? accent : AppTheme.borderGrey,
+    final secondary = tokens.textSecondary;
+    return Semantics(
+      button: true,
+      label: filled ? null : '$label date',
+      child: Material(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(GssmsRadius.r8),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(GssmsRadius.r8),
+          child: Container(
+            constraints: const BoxConstraints(minHeight: GssmsSize.touchTarget),
+            padding: const EdgeInsets.symmetric(
+              horizontal: GssmsSpacing.s12,
+              vertical: GssmsSpacing.s8,
             ),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Row(
-            children: [
-              Icon(
-                Icons.calendar_today,
-                size: 14,
-                color: filled ? accent : secondary,
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: filled ? accent : tokens.borderStrong,
               ),
-              const SizedBox(width: 6),
-              Expanded(
-                child: Text(
-                  label,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: filled ? FontWeight.w600 : FontWeight.normal,
-                    color: filled
-                        ? Theme.of(context).textTheme.bodyMedium?.color ??
-                            scheme.onSurface
-                        : secondary,
+              borderRadius: BorderRadius.circular(GssmsRadius.r8),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.calendar_today,
+                  size: 16,
+                  color: filled ? accent : secondary,
+                ),
+                const SizedBox(width: GssmsSpacing.s8),
+                Expanded(
+                  child: Text(
+                    label,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                          fontWeight:
+                              filled ? FontWeight.w600 : FontWeight.normal,
+                          color: filled ? tokens.textPrimary : secondary,
+                        ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

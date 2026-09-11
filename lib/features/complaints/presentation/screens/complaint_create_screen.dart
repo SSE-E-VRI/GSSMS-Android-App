@@ -71,9 +71,12 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
   String? _selectedCategory;
   int? _selectedAssetId;
 
-  static const _webRed = AppTheme.errorRed;
-  static const _webLightBg = AppTheme.backgroundLight;
-  static const _border = AppTheme.borderGrey;
+  /// Header band + submit button: a solid/on-solid pair so the text stays
+  /// readable in both themes (the band is red, as on the Web form).
+  Color get _band => context.gssms.danger.solid;
+  Color get _onBand => context.gssms.danger.onSolid;
+  Color get _webLightBg => context.gssms.surfaceInset;
+  Color get _border => context.gssms.border;
 
   @override
   void initState() {
@@ -234,9 +237,9 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
     }
     if (_canSelectDepot && _selectedDepotId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Please select a Depot'),
-            backgroundColor: AppTheme.errorRed),
+        SnackBar(
+            content: const Text('Please select a Depot'),
+            backgroundColor: context.gssms.danger.solid),
       );
       return;
     }
@@ -259,9 +262,9 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Complaint logged successfully!'),
-            backgroundColor: AppTheme.railwayGreen,
+          SnackBar(
+            content: const Text('Complaint logged successfully!'),
+            backgroundColor: context.gssms.success.solid,
           ),
         );
         Navigator.of(context).pop(true);
@@ -272,7 +275,7 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
           SnackBar(
             content:
                 Text('Failed to log complaint: ${workOrderReadableError(e)}'),
-            backgroundColor: AppTheme.errorRed,
+            backgroundColor: context.gssms.danger.solid,
           ),
         );
       }
@@ -287,7 +290,6 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
       return Scaffold(
         appBar: AppBar(
           title: const Text('Log New Complaint'),
-          backgroundColor: AppTheme.primaryDark,
         ),
         body: const PermissionDeniedView(),
       );
@@ -297,7 +299,7 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
       // No title here — the colored header below already carries it (as an
       // accessible `Semantics(header: true)` region), so the AppBar isn't
       // duplicating it back-to-back. Only the back button lives up top.
-      appBar: AppBar(backgroundColor: AppTheme.primaryDark),
+      appBar: AppBar(),
       backgroundColor: _webLightBg,
       body: !_bootstrapped
           ? const Center(child: CircularProgressIndicator())
@@ -307,7 +309,7 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
                 key: _formKey,
                 child: Container(
                   decoration: BoxDecoration(
-                    color: AppTheme.surfaceCard,
+                    color: Theme.of(context).cardTheme.color,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: _border),
                     boxShadow: [
@@ -333,22 +335,22 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
                         // their own semantics on top of this label.
                         excludeSemantics: true,
                         child: Container(
-                          decoration: const BoxDecoration(
-                            color: _webRed,
-                            borderRadius: BorderRadius.vertical(
+                          decoration: BoxDecoration(
+                            color: _band,
+                            borderRadius: const BorderRadius.vertical(
                                 top: Radius.circular(12)),
                           ),
                           padding: const EdgeInsets.symmetric(
                               horizontal: 16, vertical: 14),
-                          child: const Row(
+                          child: Row(
                             children: [
                               Icon(Icons.campaign_outlined,
-                                  color: Colors.white, size: 20),
-                              SizedBox(width: 8),
+                                  color: _onBand, size: 20),
+                              const SizedBox(width: 8),
                               Text(
                                 'Log New Complaint',
                                 style: TextStyle(
-                                    color: Colors.white,
+                                    color: _onBand,
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold),
                               ),
@@ -375,7 +377,7 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
                             const SizedBox(height: 14),
                             _descriptionField(),
                             const SizedBox(height: 16),
-                            const Divider(height: 1, color: _border),
+                            Divider(height: 1, color: _border),
                             const SizedBox(height: 16),
                             _actionRow(),
                           ],
@@ -395,19 +397,19 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
     return Row(
       children: [
         Flexible(
-          child: RichText(
-            text: TextSpan(
+          child: Text.rich(
+            TextSpan(
               text: label,
-              style: const TextStyle(
+              style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: AppTheme.textPrimary),
+                  color: context.gssms.textPrimary),
               children: [
                 if (required)
-                  const TextSpan(
+                  TextSpan(
                       text: ' *',
                       style: TextStyle(
-                          color: AppTheme.errorRed,
+                          color: context.gssms.danger.foreground,
                           fontWeight: FontWeight.bold)),
               ],
             ),
@@ -421,8 +423,8 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
         Tooltip(
           message: tooltip,
           triggerMode: TooltipTriggerMode.tap,
-          child: const Icon(Icons.info_outline,
-              size: 14, color: AppTheme.textSecondary),
+          child: Icon(Icons.info_outline,
+              size: 14, color: context.gssms.textSecondary),
         ),
       ],
     );
@@ -436,17 +438,17 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
     return InputDecoration(
       hintText: hint,
       hintStyle:
-          const TextStyle(color: AppTheme.textSecondary, fontSize: 14),
+          TextStyle(color: context.gssms.textSecondary, fontSize: 14),
       filled: true,
-      fillColor: Colors.white,
+      fillColor: Theme.of(context).inputDecorationTheme.fillColor,
       contentPadding:
           const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: _border)),
+          borderSide: BorderSide(color: _border)),
       enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: _border)),
+          borderSide: BorderSide(color: _border)),
       errorText: errorText,
       suffixIcon: suffixIcon,
     );
@@ -456,21 +458,21 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: AppTheme.railwayBlue.withOpacity(0.08),
+        color: context.gssms.info.background,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppTheme.railwayBlue.withOpacity(0.3)),
+        border: Border.all(color: context.gssms.info.border),
       ),
       child: Row(
         children: [
-          const Icon(Icons.build_circle_outlined,
-              color: AppTheme.railwayBlue, size: 18),
+          Icon(Icons.build_circle_outlined,
+              color: context.gssms.link, size: 18),
           const SizedBox(width: 8),
           Expanded(
             child: Text(
               'Target Asset: ${widget.initialAssetName}',
-              style: const TextStyle(
+              style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  color: AppTheme.railwayBlue,
+                  color: context.gssms.link,
                   fontSize: 13),
               overflow: TextOverflow.ellipsis,
             ),
@@ -636,7 +638,7 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppTheme.surfaceCard,
+        color: Theme.of(context).cardTheme.color,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: _border),
         boxShadow: [
@@ -649,15 +651,15 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              Icon(Icons.location_on, color: AppTheme.railwayBlue, size: 16),
-              SizedBox(width: 6),
+              Icon(Icons.location_on, color: context.gssms.link, size: 16),
+              const SizedBox(width: 6),
               Text(
                 'Location & Asset Details (Optional)',
                 style: TextStyle(
                     fontWeight: FontWeight.bold,
-                    color: AppTheme.railwayBlue,
+                    color: context.gssms.link,
                     fontSize: 13),
               ),
             ],
@@ -714,11 +716,11 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
             },
           ),
           if (_resolvedStationId != null && !_loadingAssets && _assets.isEmpty)
-            const Padding(
-              padding: EdgeInsets.only(top: 8),
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
               child: Text(
                 'No registered assets found for this location. You can still log a generic complaint.',
-                style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                style: TextStyle(fontSize: 12, color: context.gssms.textSecondary),
               ),
             ),
         ],
@@ -739,7 +741,7 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
           isExpanded: true,
           value: _infraType,
           decoration: _webInput().copyWith(
-            fillColor: AppTheme.surfaceCard,
+            fillColor: context.gssms.surfaceInset,
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
           ),
@@ -920,8 +922,8 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
         OutlinedButton.icon(
           key: const Key('cancel_complaint_button'),
           style: OutlinedButton.styleFrom(
-            foregroundColor: AppTheme.textMuted,
-            side: const BorderSide(color: AppTheme.borderGrey),
+            foregroundColor: context.gssms.textSecondary,
+            side: BorderSide(color: context.gssms.border),
             padding:
                 const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
             shape: RoundedRectangleBorder(
@@ -939,25 +941,25 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
         ElevatedButton.icon(
           key: const Key('submit_complaint_button'),
           style: ElevatedButton.styleFrom(
-            backgroundColor: _webRed,
-            foregroundColor: Colors.white,
+            backgroundColor: _band,
+            foregroundColor: _onBand,
             padding:
                 const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8)),
             elevation: 2,
-            minimumSize: const Size(0, 44),
+            minimumSize: const Size(0, GssmsSize.touchTarget),
             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
           onPressed: _isSubmitting ? null : _submitComplaint,
           icon: _isSubmitting
-              ? const SizedBox(
+              ? SizedBox(
                   width: 16,
                   height: 16,
                   child: CircularProgressIndicator(
-                      color: Colors.white, strokeWidth: 2))
+                      color: _onBand, strokeWidth: 2))
               : const Icon(Icons.send_outlined,
-                  size: 16, color: Colors.white),
+                  size: 16),
           label: Text(_isSubmitting ? 'Submitting...' : 'Submit Complaint',
               style:
                   const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),

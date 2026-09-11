@@ -3,7 +3,7 @@ import 'package:equatable/equatable.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/work_order.dart';
 
 enum NotificationType {
-  assignment('ASSIGNMENT', 'Work Order Assigned'),
+  assignment('ASSIGNMENT', 'Job Work Assigned'),
   rework('REWORK', 'Rework Required'),
   overdue('OVERDUE', 'Overdue Work'),
   slaBreach('SLA', 'SLA At Risk'),
@@ -87,7 +87,7 @@ class NotificationItem extends Equatable {
     } else if (wo.status == WorkOrderStatus.assigned) {
       add(
         NotificationType.assignment,
-        'Work Order Assigned',
+        'Job Work Assigned',
         '${wo.displayReference} — ${wo.displayTitle}'
             '${wo.stationName != null ? ' at ${wo.stationName}' : ''}.',
         when,
@@ -98,7 +98,7 @@ class NotificationItem extends Equatable {
     if (due != null && due.isBefore(reference) && _isOpen(wo.status)) {
       add(
         NotificationType.overdue,
-        'Overdue Work Order',
+        'Overdue Job Work',
         '${wo.displayReference} was due on ${_formatDate(due)} and is still ${wo.status.displayName}.',
         due,
       );

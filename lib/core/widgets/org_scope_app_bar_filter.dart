@@ -86,7 +86,7 @@ class OrgScopeAppBarFilter extends StatelessWidget {
         return Container(
           key: const Key('org_scope_bottom_sheet'),
           decoration: BoxDecoration(
-            color: Theme.of(sheetContext).colorScheme.surface,
+            color: Theme.of(sheetContext).cardTheme.color,
             borderRadius:
                 const BorderRadius.vertical(top: Radius.circular(16)),
           ),
@@ -106,7 +106,7 @@ class OrgScopeAppBarFilter extends StatelessWidget {
                       height: 4,
                       margin: const EdgeInsets.only(top: 10, bottom: 6),
                       decoration: BoxDecoration(
-                        color: AppTheme.borderGrey,
+                        color: sheetContext.gssms.borderStrong,
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -123,10 +123,7 @@ class OrgScopeAppBarFilter extends StatelessWidget {
                           style: Theme.of(sheetContext)
                               .textTheme
                               .titleMedium
-                              ?.copyWith(
-                                fontSize: 17,
-                                fontWeight: FontWeight.bold,
-                              ),
+                              ?.copyWith(fontWeight: FontWeight.bold),
                         ),
                         Row(
                           children: [
@@ -149,7 +146,7 @@ class OrgScopeAppBarFilter extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const Divider(height: 1, color: AppTheme.borderGrey),
+                  Divider(height: 1, color: sheetContext.gssms.border),
                   const SizedBox(height: 12),
 
                   // Cascading filter bar
@@ -218,11 +215,9 @@ class OrgScopeAppBarFilter extends StatelessWidget {
                 const SizedBox(width: 6),
                 Text(
                   _activeLabel,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.white,
-                  ),
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                        color: Colors.white,
+                      ),
                 ),
               ],
             ),

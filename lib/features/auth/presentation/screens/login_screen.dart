@@ -95,28 +95,28 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ),
             ],
           ),
-          child: const Icon(
+          child: Icon(
             Icons.electric_bolt_rounded,
             size: 40,
-            color: AppTheme.accentOrange,
+            color: context.gssms.accent.foreground,
           ),
         ),
         const SizedBox(height: 16),
-        const Text(
+        Text(
           'GSSMS Mobile',
           style: TextStyle(
             fontSize: 26,
             fontWeight: FontWeight.bold,
-            color: AppTheme.textDark,
+            color: context.gssms.textPrimary,
             letterSpacing: -0.5,
           ),
         ),
         const SizedBox(height: 6),
-        const Text(
+        Text(
           'General Service Smart Management System',
           style: TextStyle(
             fontSize: 14,
-            color: AppTheme.textMuted,
+            color: context.gssms.textSecondary,
           ),
           textAlign: TextAlign.center,
         ),
@@ -177,12 +177,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             key: const Key('login_submit_button'),
             onPressed: isLoading ? null : _onLoginPressed,
             child: isLoading
-                ? const SizedBox(
+                ? SizedBox(
                     width: 24,
                     height: 24,
                     child: CircularProgressIndicator(
                       strokeWidth: 2.5,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      color: Theme.of(context).colorScheme.onPrimary,
                     ),
                   )
                 : const Text('Sign In'),
@@ -209,7 +209,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           const SizedBox(height: 16),
           Row(
             children: [
-              const Expanded(child: Divider(color: AppTheme.borderGrey)),
+              Expanded(child: Divider(color: context.gssms.border)),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
                 child: Text(
@@ -217,11 +217,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: AppTheme.textMuted.withOpacity(0.8),
+                    color: context.gssms.textSecondary.withOpacity(0.8),
                   ),
                 ),
               ),
-              const Expanded(child: Divider(color: AppTheme.borderGrey)),
+              Expanded(child: Divider(color: context.gssms.border)),
             ],
           ),
           const SizedBox(height: 16),
@@ -257,18 +257,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.amber.shade50,
+              color: context.gssms.warning.background,
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.amber.shade300),
+              border: Border.all(color: context.gssms.warning.border),
             ),
             child: Row(
               children: [
-                Icon(Icons.security, color: Colors.amber.shade900),
+                Icon(Icons.security, color: context.gssms.warning.foreground),
                 const SizedBox(width: 12),
-                const Expanded(
+                Expanded(
                   child: Text(
                     'Two-Factor Authentication required. Enter the 6-digit code from your authenticator app.',
-                    style: TextStyle(fontSize: 13, color: Colors.black87),
+                    style: TextStyle(fontSize: 13, color: context.gssms.warning.foreground),
                   ),
                 ),
               ],
@@ -312,12 +312,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             key: const Key('login_otp_submit_button'),
             onPressed: isSubmitting ? null : _onOtpSubmitPressed,
             child: isSubmitting
-                ? const SizedBox(
+                ? SizedBox(
                     width: 24,
                     height: 24,
                     child: CircularProgressIndicator(
                       strokeWidth: 2.5,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      color: Theme.of(context).colorScheme.onPrimary,
                     ),
                   )
                 : const Text('Verify & Continue'),
@@ -344,20 +344,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: AppTheme.errorRed.withOpacity(0.08),
+          color: context.gssms.danger.background,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppTheme.errorRed.withOpacity(0.3)),
+          border: Border.all(color: context.gssms.danger.border),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.error_outline, color: AppTheme.errorRed, size: 20),
+            Icon(Icons.error_outline, color: context.gssms.danger.foreground, size: 20),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
                 message,
-                style: const TextStyle(
-                  color: AppTheme.errorRed,
+                style: TextStyle(
+                  color: context.gssms.danger.foreground,
                   fontSize: 13.5,
                   fontWeight: FontWeight.w500,
                 ),

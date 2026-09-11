@@ -40,64 +40,65 @@ class ChecklistActionBar extends ConsumerWidget {
     final syncState = ref.watch(syncManagerProvider);
     final lastSyncedText = _formatLastSyncTime(syncState.lastSyncTime);
     final textTheme = Theme.of(context).textTheme;
+    final tokens = context.gssms;
+    final remaining = state.remainingRequired;
 
-    return Container(
+    return DecoratedBox(
       decoration: BoxDecoration(
-        color: Theme.of(context).cardColor,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 8,
-            offset: const Offset(0, -2),
-          ),
-        ],
+        color: tokens.surfaceRaised,
+        border: Border(top: BorderSide(color: tokens.border)),
       ),
       child: SafeArea(
+        top: false,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+          padding: const EdgeInsets.fromLTRB(
+            GssmsSpacing.s16,
+            GssmsSpacing.s8,
+            GssmsSpacing.s16,
+            GssmsSpacing.s12,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               if (lastSyncedText != null) ...[
                 Text(
                   lastSyncedText,
-                  style: textTheme.labelSmall?.copyWith(
-                    color: AppTheme.textMuted,
-                  ),
+                  style: textTheme.labelSmall?.copyWith(color: tokens.textSecondary),
                 ),
-                const SizedBox(height: 6),
+                const SizedBox(height: GssmsSpacing.s6),
               ],
-              FilledButton.icon(
-                key: const Key('complete_checklist_button'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: AppTheme.railwayGreen,
-                  foregroundColor: Colors.white,
-                  disabledBackgroundColor: AppTheme.borderGrey,
-                  disabledForegroundColor: AppTheme.textMuted,
-                  minimumSize: const Size.fromHeight(52),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(GssmsRadius.r8),
+              Semantics(
+                liveRegion: true,
+                child: FilledButton.icon(
+                  key: const Key('complete_checklist_button'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: tokens.success.solid,
+                    foregroundColor: tokens.success.onSolid,
+                    disabledBackgroundColor: tokens.border,
+                    disabledForegroundColor: tokens.textSecondary,
+                    minimumSize: const Size.fromHeight(GssmsSize.primaryAction),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(GssmsRadius.r8),
+                    ),
                   ),
-                ),
-                onPressed: (state.canSubmit && !state.isSubmitting)
-                    ? onSignAndSubmit
-                    : null,
-                icon: state.isSubmitting
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : const Icon(Icons.check_circle_outline, size: 20),
-                label: Text(
-                  state.canSubmit
-                      ? 'Sign & Submit'
-                      : '${state.remainingRequired} required items left',
-                  style: textTheme.labelLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
+                  onPressed: (state.canSubmit && !state.isSubmitting)
+                      ? onSignAndSubmit
+                      : null,
+                  icon: state.isSubmitting
+                      ? SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: tokens.success.onSolid,
+                          ),
+                        )
+                      : const Icon(Icons.check_circle_outline, size: GssmsSize.iconMd),
+                  label: Text(
+                    state.canSubmit
+                        ? 'Sign & Submit'
+                        : '$remaining required ${remaining == 1 ? 'item' : 'items'} left',
+                    style: textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold),
                   ),
                 ),
               ),

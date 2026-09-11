@@ -38,7 +38,7 @@ class WorkOrderAuditEvent extends Equatable {
       actor: asJsonString(json['actor']),
       actorRole: asJsonString(json['actor_role']),
       reason: asJsonString(json['reason']) ?? asJsonString(json['remarks']),
-      timestamp: ts is String && ts.isNotEmpty ? DateTime.tryParse(ts) : null,
+      timestamp: ts is String && ts.isNotEmpty ? asJsonDateTime(ts) : null,
       isReturn: asJsonBool(json['is_return']) ?? false,
     );
   }

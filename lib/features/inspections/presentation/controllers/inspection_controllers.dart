@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:gssms_mobile/core/network/api_error.dart';
 import 'package:gssms_mobile/core/widgets/date_range_filter_bar.dart';
 import 'package:gssms_mobile/core/widgets/org_scope_filter_bar.dart';
 import 'package:gssms_mobile/features/inspections/data/inspection_api_service.dart';
@@ -47,11 +48,14 @@ class InspectionListLoaded extends InspectionListState {
       if (selectedStatus != null && i.status != selectedStatus) return false;
       if (searchQuery.isNotEmpty) {
         final q = searchQuery.toLowerCase();
-        final matchTitle = i.title.toLowerCase().contains(q);
-        final matchNumber = i.inspectionNumber.toLowerCase().contains(q);
-        final matchStation = i.stationName?.toLowerCase().contains(q) ?? false;
-        final matchAsset = i.assetName?.toLowerCase().contains(q) ?? false;
-        if (!matchTitle && !matchNumber && !matchStation && !matchAsset) return false;
+        bool has(String? v) => v != null && v.toLowerCase().contains(q);
+        final matches = has(i.title) ||
+            has(i.reference) ||
+            has(i.id.toString()) ||
+            has(i.notes) ||
+            has(i.locationLabel) ||
+            has(i.createdByName);
+        if (!matches) return false;
       }
       return true;
     }).toList();
@@ -112,54 +116,30 @@ class InspectionListController extends Notifier<InspectionListState> {
     return null;
   }
 
+  /// Guards against an older, slower response overwriting a newer filter's.
+  int _requestSeq = 0;
+
   Future<void> fetchInspections({bool forceRefresh = false}) async {
     final previous = _resolvePrevious();
     if (!forceRefresh && previous != null) return;
-    state = const InspectionListLoading();
-    final scope = previous?.orgScope ?? OrgScopeSelection.empty;
-    try {
-      final inspections = await _repository.fetchInspections(
-        dateFrom: formatApiDate(previous?.dateFrom),
-        dateTo: formatApiDate(previous?.dateTo),
-        zoneId: scope.zoneId,
-        divisionId: scope.divisionId,
-        depotId: scope.depotId,
-      );
-      state = InspectionListLoaded(
-        inspections: inspections,
-        selectedStatus: previous?.selectedStatus,
-        searchQuery: previous?.searchQuery ?? '',
-        dateFrom: previous?.dateFrom,
-        dateTo: previous?.dateTo,
-        orgScope: scope,
-      );
-    } catch (e) {
-      state = InspectionListError('Failed to load inspections: $e', previousLoaded: previous);
-    }
+    // Stale-while-refresh: keep rows visible during a pull-to-refresh.
+    if (previous == null) state = const InspectionListLoading();
+    await _load(
+      base: previous,
+      dateFrom: previous?.dateFrom,
+      dateTo: previous?.dateTo,
+      scope: previous?.orgScope ?? OrgScopeSelection.empty,
+    );
   }
 
   Future<void> setDateRange(DateTime? from, DateTime? to) async {
     final previous = _resolvePrevious();
-    final scope = previous?.orgScope ?? OrgScopeSelection.empty;
-    try {
-      final inspections = await _repository.fetchInspections(
-        dateFrom: formatApiDate(from),
-        dateTo: formatApiDate(to),
-        zoneId: scope.zoneId,
-        divisionId: scope.divisionId,
-        depotId: scope.depotId,
-      );
-      state = InspectionListLoaded(
-        inspections: inspections,
-        selectedStatus: previous?.selectedStatus,
-        searchQuery: previous?.searchQuery ?? '',
-        dateFrom: from,
-        dateTo: to,
-        orgScope: scope,
-      );
-    } catch (e) {
-      state = InspectionListError('Failed to load inspections: $e', previousLoaded: previous);
-    }
+    await _load(
+      base: previous,
+      dateFrom: from,
+      dateTo: to,
+      scope: previous?.orgScope ?? OrgScopeSelection.empty,
+    );
   }
 
   /// Server-side Zone/Division/Depot filter (Inspections has no
@@ -167,24 +147,57 @@ class InspectionListController extends Notifier<InspectionListState> {
   /// so this bar is used with `enableStation: false`).
   Future<void> setOrgScope(OrgScopeSelection scope) async {
     final previous = _resolvePrevious();
+    await _load(
+      base: previous,
+      dateFrom: previous?.dateFrom,
+      dateTo: previous?.dateTo,
+      scope: scope,
+    );
+  }
+
+  /// Clears status, search and date range; keeps the org scope.
+  Future<void> clearFilters() async {
+    final previous = _resolvePrevious();
+    await _load(
+      base: previous == null
+          ? null
+          : InspectionListLoaded(
+              inspections: previous.inspections,
+              orgScope: previous.orgScope,
+            ),
+      dateFrom: null,
+      dateTo: null,
+      scope: previous?.orgScope ?? OrgScopeSelection.empty,
+    );
+  }
+
+  Future<void> _load({
+    required InspectionListLoaded? base,
+    required DateTime? dateFrom,
+    required DateTime? dateTo,
+    required OrgScopeSelection scope,
+  }) async {
+    final seq = ++_requestSeq;
     try {
       final inspections = await _repository.fetchInspections(
-        dateFrom: formatApiDate(previous?.dateFrom),
-        dateTo: formatApiDate(previous?.dateTo),
+        dateFrom: formatApiDate(dateFrom),
+        dateTo: formatApiDate(dateTo),
         zoneId: scope.zoneId,
         divisionId: scope.divisionId,
         depotId: scope.depotId,
       );
+      if (seq != _requestSeq) return;
       state = InspectionListLoaded(
         inspections: inspections,
-        selectedStatus: previous?.selectedStatus,
-        searchQuery: previous?.searchQuery ?? '',
-        dateFrom: previous?.dateFrom,
-        dateTo: previous?.dateTo,
+        selectedStatus: base?.selectedStatus,
+        searchQuery: base?.searchQuery ?? '',
+        dateFrom: dateFrom,
+        dateTo: dateTo,
         orgScope: scope,
       );
     } catch (e) {
-      state = InspectionListError('Failed to load inspections: $e', previousLoaded: previous);
+      if (seq != _requestSeq) return;
+      state = InspectionListError(userFacingError(e), previousLoaded: base);
     }
   }
 

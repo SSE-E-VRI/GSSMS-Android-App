@@ -26,7 +26,7 @@ class AttentionItem extends Equatable {
       masterName: asJsonString(json['master_name']) ?? asJsonString(json['name']) ?? 'Schedule Item',
       stationName: asJsonString(json['station_name']),
       depotName: asJsonString(json['depot_name']),
-      dueDate: json['due_date'] != null ? DateTime.tryParse(json['due_date'].toString()) : null,
+      dueDate: json['due_date'] != null ? asJsonDateTime(json['due_date']) : null,
       daysOverdue: asJsonInt(json['days_overdue']) ?? asJsonInt(json['days_pending']),
       priority: asJsonString(json['priority']),
     );
@@ -252,9 +252,9 @@ class PendingAction extends Equatable {
       inspectionId:
           _fkId(json['inspection_id'] ?? json['inspection']),
       dueDate: json['due_date'] != null
-          ? DateTime.tryParse(json['due_date'].toString())
+          ? asJsonDateTime(json['due_date'])
           : (json['created_at'] != null
-              ? DateTime.tryParse(json['created_at'].toString())
+              ? asJsonDateTime(json['created_at'])
               : null),
     );
   }

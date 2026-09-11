@@ -57,12 +57,24 @@ void main() {
     expect(theme.labelSmall?.fontSize, 12);
   });
 
-  test('darkTheme is derived from the same seed tokens', () {
+  test('darkTheme uses the seed dark palette, not the light brand blue', () {
     expect(AppTheme.darkTheme.brightness, Brightness.dark);
-    expect(AppTheme.darkTheme.colorScheme.primary, AppTheme.primaryBlue);
+    // The light brand blue (#0F4C81) is unreadable as text/icons on dark
+    // surfaces; the dark primary must come from the seed's dark tones.
+    expect(AppTheme.darkTheme.colorScheme.primary, isNot(AppTheme.primaryBlue));
+    expect(AppTheme.darkTheme.colorScheme.surface, AppTheme.surfaceDark);
     expect(AppTheme.darkTheme.textTheme.titleLarge?.fontSize, 20);
-    expect(AppTheme.appBarDark, const Color(0xFF020617));
     expect(AppTheme.darkTheme.appBarTheme.backgroundColor, AppTheme.appBarDark);
+    expect(AppTheme.darkTheme.scaffoldBackgroundColor, AppTheme.scaffoldDark);
+  });
+
+  test('both themes size buttons to the 48dp touch target', () {
+    for (final theme in [AppTheme.lightTheme, AppTheme.darkTheme]) {
+      final size = theme.elevatedButtonTheme.style?.minimumSize?.resolve({});
+      expect(size?.height, GssmsSize.touchTarget);
+      final textSize = theme.textButtonTheme.style?.minimumSize?.resolve({});
+      expect(textSize?.height, GssmsSize.touchTarget);
+    }
   });
 
   test('darkTheme input labels use the dark muted token', () {

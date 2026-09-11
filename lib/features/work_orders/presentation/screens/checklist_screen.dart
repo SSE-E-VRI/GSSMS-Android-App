@@ -2,8 +2,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:gssms_mobile/core/network/api_error.dart';
 import 'package:gssms_mobile/core/sync/sync_manager.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
+import 'package:gssms_mobile/core/widgets/empty_state_view.dart';
+import 'package:gssms_mobile/core/widgets/feedback.dart';
+import 'package:gssms_mobile/core/widgets/skeleton_list.dart';
 import 'package:gssms_mobile/features/auth/domain/rbac.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_state.dart';
@@ -26,6 +30,11 @@ class ChecklistScreen extends ConsumerStatefulWidget {
 }
 
 class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
+  /// Replaced asset/component details captured from the overflow menu. There
+  /// is no API field for them, so they are carried into the closing remarks
+  /// (an existing `complete` field) instead of being discarded.
+  final List<String> _replacementNotes = [];
+
   @override
   void initState() {
     super.initState();
@@ -66,20 +75,19 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
 
     ref.listen(checklistControllerProvider(widget.recordId), (prev, next) {
       if (next is ChecklistCompleted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Maintenance execution completed successfully!'),
-            backgroundColor: AppTheme.railwayGreen,
-          ),
+        // Never claim completion that has only reached this device (SSOT §41).
+        showGssmsSnackBar(
+          context,
+          next.queued
+              ? 'Completion saved on this device. It will be submitted for '
+                  'verification when a connection is available.'
+              : 'Submitted for verification.',
+          tone: next.queued ? GssmsTone.warning : GssmsTone.success,
+          duration: Duration(seconds: next.queued ? 6 : 4),
         );
         Navigator.of(context).pop();
       } else if (next is ChecklistLoaded && next.errorMessage != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(next.errorMessage!),
-            backgroundColor: AppTheme.errorRed,
-          ),
-        );
+        showGssmsSnackBar(context, next.errorMessage!, tone: GssmsTone.danger);
       }
     });
 
@@ -128,35 +136,16 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
 
   Widget _buildBody(ChecklistState state) {
     if (state is ChecklistLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const SingleChildScrollView(child: SkeletonList(itemCount: 4));
     }
 
     if (state is ChecklistError) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error_outline, size: 48, color: AppTheme.errorRed),
-              const SizedBox(height: 12),
-              Text(
-                state.message,
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppTheme.textSecondary,
-                    ),
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () => ref
-                    .read(checklistControllerProvider(widget.recordId).notifier)
-                    .loadRecord(),
-                child: const Text('Try Again'),
-              ),
-            ],
-          ),
-        ),
+      return EmptyStateView.error(
+        title: 'Could not load the checklist',
+        message: state.message,
+        onRetry: () => ref
+            .read(checklistControllerProvider(widget.recordId).notifier)
+            .loadRecord(),
       );
     }
 
@@ -181,8 +170,8 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
                   value: record.progress,
                   backgroundColor: Colors.white24,
                   color: record.progress == 1.0
-                      ? AppTheme.railwayGreen
-                      : AppTheme.accentOrange,
+                      ? context.gssms.success.solid
+                      : context.gssms.accent.solid,
                 ),
               ),
             ),
@@ -251,10 +240,14 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
               ),
             ),
           if (lines.isEmpty)
-            const SliverFillRemaining(
+            SliverFillRemaining(
               hasScrollBody: false,
-              child: Center(
-                child: Text('No checklist items in this category.'),
+              child: EmptyStateView.noResults(
+                title: 'No checklist items in this subsystem',
+                icon: Icons.checklist,
+                onClearFilters: () => ref
+                    .read(checklistControllerProvider(widget.recordId).notifier)
+                    .setActiveSubCategory(null),
               ),
             )
           else
@@ -293,7 +286,7 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
       );
     }
 
-    return const Center(child: CircularProgressIndicator());
+    return const SingleChildScrollView(child: SkeletonList(itemCount: 4));
   }
 
   Widget _buildOverflowMenu(ChecklistLoaded state) {
@@ -313,55 +306,59 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
             break;
         }
       },
-      itemBuilder: (context) => [
-        const PopupMenuItem(
-          value: 'asset',
-          child: Row(
-            children: [
-              Icon(Icons.autorenew, color: AppTheme.errorRed, size: 20),
-              SizedBox(width: 12),
-              Text('Enter Replaced Asset'),
-            ],
-          ),
-        ),
-        const PopupMenuItem(
-          value: 'component',
-          child: Row(
-            children: [
-              Icon(Icons.build_circle_outlined, color: AppTheme.statusHigh, size: 20),
-              SizedBox(width: 12),
-              Text('Enter Replaced Component'),
-            ],
-          ),
-        ),
-        const PopupMenuItem(
-          value: 'preview',
-          child: Row(
-            children: [
-              Icon(Icons.remove_red_eye_outlined, color: AppTheme.primaryBlue, size: 20),
-              SizedBox(width: 12),
-              Text('Preview'),
-            ],
-          ),
-        ),
-      ],
+      itemBuilder: (context) {
+        final tokens = context.gssms;
+        PopupMenuItem<String> item(
+            String value, IconData icon, Color color, String label) {
+          return PopupMenuItem(
+            value: value,
+            child: Row(
+              children: [
+                Icon(icon, color: color, size: GssmsSize.iconMd),
+                const SizedBox(width: GssmsSpacing.s12),
+                Text(label),
+              ],
+            ),
+          );
+        }
+
+        return [
+          item('asset', Icons.autorenew, tokens.danger.foreground,
+              'Enter Replaced Asset'),
+          item('component', Icons.build_circle_outlined,
+              tokens.accent.foreground, 'Enter Replaced Component'),
+          item('preview', Icons.remove_red_eye_outlined, tokens.link, 'Preview'),
+        ];
+      },
     );
   }
 
-  void _showReplacedAssetSheet() {
-    unawaited(showModalBottomSheet<void>(
+  Future<void> _showReplacedAssetSheet() async {
+    final note = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
       builder: (ctx) => const _ReplacedAssetSheet(),
-    ));
+    );
+    _addReplacementNote(note);
   }
 
-  void _showReplacedComponentSheet() {
-    unawaited(showModalBottomSheet<void>(
+  Future<void> _showReplacedComponentSheet() async {
+    final note = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
       builder: (ctx) => const _ReplacedComponentSheet(),
-    ));
+    );
+    _addReplacementNote(note);
+  }
+
+  void _addReplacementNote(String? note) {
+    if (note == null || note.trim().isEmpty || !mounted) return;
+    setState(() => _replacementNotes.add(note.trim()));
+    showGssmsSnackBar(
+      context,
+      'Added to your closing remarks. Review them when you sign and submit.',
+      tone: GssmsTone.success,
+    );
   }
 
   void _showPreviewSheet(ChecklistLoaded state) {
@@ -377,7 +374,10 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
     unawaited(showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      builder: (ctx) => _CompletionSheet(recordId: widget.recordId),
+      builder: (ctx) => _CompletionSheet(
+        recordId: widget.recordId,
+        replacementNotes: List.unmodifiable(_replacementNotes),
+      ),
     ));
   }
 }
@@ -453,9 +453,15 @@ class _SubsystemChipsDelegate extends SliverPersistentHeaderDelegate {
 }
 
 class _CompletionSheet extends ConsumerStatefulWidget {
-  const _CompletionSheet({required this.recordId});
+  const _CompletionSheet({
+    required this.recordId,
+    this.replacementNotes = const [],
+  });
 
   final int recordId;
+
+  /// Replaced asset/component notes, pre-filled into the closing remarks.
+  final List<String> replacementNotes;
 
   @override
   ConsumerState<_CompletionSheet> createState() => _CompletionSheetState();
@@ -478,6 +484,9 @@ class _CompletionSheetState extends ConsumerState<_CompletionSheet> {
     if (authState is Authenticated) {
       _technicianController.text = authState.session.displayName;
     }
+    if (widget.replacementNotes.isNotEmpty) {
+      _remarksController.text = widget.replacementNotes.join('\n');
+    }
   }
 
   @override
@@ -496,122 +505,105 @@ class _CompletionSheetState extends ConsumerState<_CompletionSheet> {
           .capture(kind: EvidenceKind.proof, source: source);
       if (!mounted) return;
       if (file != null && !file.isWithinSizeLimit) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('That photo is over the 5 MB limit. Try again.'),
-            backgroundColor: AppTheme.errorRed,
-          ),
+        showGssmsSnackBar(
+          context,
+          'That photo is over the 5 MB limit. Try again.',
+          tone: GssmsTone.danger,
         );
         return;
       }
       if (file != null) setState(() => _proof = file);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Could not capture photo: $e'),
-          backgroundColor: AppTheme.errorRed,
-        ),
+      showGssmsSnackBar(
+        context,
+        'Could not capture photo. ${userFacingError(e)}',
+        tone: GssmsTone.danger,
       );
     } finally {
       if (mounted) setState(() => _capturing = false);
     }
   }
 
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(checklistControllerProvider(widget.recordId));
     final isSubmitting = state is ChecklistLoaded && state.isSubmitting;
-    final outstanding =
-        state is ChecklistLoaded ? state.remainingRequired : 0;
+    final outstanding = state is ChecklistLoaded ? state.remainingRequired : 0;
     final textTheme = Theme.of(context).textTheme;
+    final tokens = context.gssms;
 
     return Padding(
       padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
-        top: 16,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+        left: GssmsSpacing.s16,
+        right: GssmsSpacing.s16,
+        top: GssmsSpacing.s16,
+        bottom: MediaQuery.of(context).viewInsets.bottom + GssmsSpacing.s16,
       ),
       child: SingleChildScrollView(
         child: Form(
           key: _formKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              Text('Sign & Submit', style: textTheme.titleLarge),
+              const SizedBox(height: GssmsSpacing.s4),
               Text(
-                'Finalize Execution',
-                style: textTheme.titleLarge,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Submit this maintenance execution for supervisor verification.',
-                style: textTheme.bodyMedium?.copyWith(
-                  color: AppTheme.textSecondary,
-                ),
+                'Submits this maintenance execution to the depot incharge for '
+                'verification. Checklist readings cannot be changed afterwards.',
+                style: textTheme.bodyMedium?.copyWith(color: tokens.textSecondary),
               ),
               if (outstanding > 0) ...[
-                const SizedBox(height: 10),
-                Container(
-                  padding: const EdgeInsets.all(10),
-                  decoration: BoxDecoration(
-                    color: AppTheme.warningAmber.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                        color: AppTheme.warningAmber.withOpacity(0.5)),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.warning_amber_rounded,
-                          size: 18, color: AppTheme.warningAmber),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          '$outstanding required line(s) still unrecorded. The server will '
-                          'reject completion until every required line is submitted.',
-                          style: textTheme.labelSmall,
-                        ),
-                      ),
-                    ],
-                  ),
+                const SizedBox(height: GssmsSpacing.s12),
+                _SheetNotice(
+                  tone: GssmsTone.warning,
+                  icon: Icons.warning_amber_rounded,
+                  text: '$outstanding required '
+                      '${outstanding == 1 ? 'line is' : 'lines are'} still '
+                      'unrecorded. The server will reject completion until '
+                      'every required line is submitted.',
                 ),
               ],
-              const SizedBox(height: 14),
+              const SizedBox(height: GssmsSpacing.s16),
               _buildProofField(),
-              const SizedBox(height: 14),
+              const SizedBox(height: GssmsSpacing.s16),
               TextFormField(
                 key: const Key('completion_technician_field'),
                 controller: _technicianController,
+                textCapitalization: TextCapitalization.words,
+                textInputAction: TextInputAction.next,
                 decoration: const InputDecoration(
                   labelText: 'Technician Name *',
-                  border: OutlineInputBorder(),
                   isDense: true,
                 ),
                 validator: (val) => (val == null || val.trim().isEmpty)
                     ? 'Enter the technician name'
                     : null,
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: GssmsSpacing.s12),
               TextFormField(
                 key: const Key('completion_other_staff_field'),
                 controller: _otherStaffController,
+                textCapitalization: TextCapitalization.words,
+                textInputAction: TextInputAction.next,
                 decoration: const InputDecoration(
                   labelText: 'Other Staff Involved (optional)',
-                  border: OutlineInputBorder(),
                   isDense: true,
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: GssmsSpacing.s12),
               TextFormField(
                 key: const Key('completion_remarks_field'),
                 controller: _remarksController,
+                textCapitalization: TextCapitalization.sentences,
                 decoration: const InputDecoration(
                   labelText: 'Technician Closing Remarks *',
                   helperText: 'At least 10 characters',
-                  border: OutlineInputBorder(),
                 ),
-                maxLines: 3,
+                minLines: 3,
+                maxLines: 6,
                 validator: (val) {
                   final text = val?.trim() ?? '';
                   if (text.length < ChecklistController.minCompletionRemarksLength) {
@@ -621,7 +613,7 @@ class _CompletionSheetState extends ConsumerState<_CompletionSheet> {
                   return null;
                 },
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: GssmsSpacing.s8),
               CheckboxListTile(
                 key: const Key('completion_checked_out_checkbox'),
                 value: _checkedOutBySupervisor,
@@ -630,38 +622,34 @@ class _CompletionSheetState extends ConsumerState<_CompletionSheet> {
                 },
                 title: Text(
                   'Checked out by supervisor',
-                  style: textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w500,
-                  ),
+                  style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
                 ),
                 contentPadding: EdgeInsets.zero,
                 controlAffinity: ListTileControlAffinity.leading,
               ),
-              const SizedBox(height: 18),
-              Row(
-                children: [
-                  TextButton(
-                    onPressed: isSubmitting ? null : () => Navigator.of(context).pop(),
-                    child: const Text('Cancel'),
+              const SizedBox(height: GssmsSpacing.s16),
+              SizedBox(
+                height: GssmsSize.primaryAction,
+                child: FilledButton.icon(
+                  key: const Key('completion_confirm_button'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: tokens.success.solid,
+                    foregroundColor: tokens.success.onSolid,
                   ),
-                  const Spacer(),
-                  ElevatedButton(
-                    key: const Key('completion_confirm_button'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.railwayGreen,
-                      foregroundColor: Colors.white,
-                    ),
-                    onPressed: isSubmitting ? null : _submit,
-                    child: isSubmitting
-                        ? const SizedBox(
-                            height: 18,
-                            width: 18,
-                            child: CircularProgressIndicator(
-                                color: Colors.white, strokeWidth: 2),
-                          )
-                        : const Text('Confirm Completion'),
-                  ),
-                ],
+                  onPressed: isSubmitting ? null : _submit,
+                  icon: isSubmitting
+                      ? const SizedBox(
+                          height: 18,
+                          width: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.verified_outlined),
+                  label: Text(isSubmitting ? 'Submitting…' : 'Confirm & Submit'),
+                ),
+              ),
+              TextButton(
+                onPressed: isSubmitting ? null : () => Navigator.of(context).pop(),
+                child: const Text('Cancel'),
               ),
             ],
           ),
@@ -673,30 +661,29 @@ class _CompletionSheetState extends ConsumerState<_CompletionSheet> {
   Widget _buildProofField() {
     final proof = _proof;
     final textTheme = Theme.of(context).textTheme;
+    final tokens = context.gssms;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Proof of Execution',
-          style: textTheme.titleMedium,
-        ),
-        const SizedBox(height: 4),
+        Text('Proof of Execution', style: textTheme.titleMedium),
+        const SizedBox(height: GssmsSpacing.s4),
         Text(
           'Attach a clear photo of the serviced asset or final reading (max 5 MB).',
-          style: textTheme.labelSmall?.copyWith(color: AppTheme.textSecondary),
+          style: textTheme.bodySmall?.copyWith(color: tokens.textSecondary),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: GssmsSpacing.s8),
         if (proof != null)
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(GssmsSpacing.s8),
             decoration: BoxDecoration(
-              border: Border.all(color: AppTheme.borderGrey),
-              borderRadius: BorderRadius.circular(8),
+              color: tokens.success.background,
+              border: Border.all(color: tokens.success.border),
+              borderRadius: BorderRadius.circular(GssmsRadius.r8),
             ),
             child: Row(
               children: [
-                const Icon(Icons.check_circle, color: AppTheme.railwayGreen),
-                const SizedBox(width: 8),
+                Icon(Icons.check_circle, color: tokens.success.foreground),
+                const SizedBox(width: GssmsSpacing.s8),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -705,21 +692,17 @@ class _CompletionSheetState extends ConsumerState<_CompletionSheet> {
                         proof.fileName,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: textTheme.bodyMedium?.copyWith(
-                              fontWeight: FontWeight.w600,
-                            ),
+                        style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
                       ),
                       Text(
                         '${(proof.sizeBytes / 1024).toStringAsFixed(1)} KB',
-                        style: textTheme.labelSmall?.copyWith(
-                              color: AppTheme.textSecondary,
-                            ),
+                        style: textTheme.labelSmall?.copyWith(color: tokens.textSecondary),
                       ),
                     ],
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close, color: AppTheme.textSecondary),
+                  icon: const Icon(Icons.close),
                   tooltip: 'Remove photo',
                   onPressed: () => setState(() => _proof = null),
                 ),
@@ -729,24 +712,28 @@ class _CompletionSheetState extends ConsumerState<_CompletionSheet> {
         else
           Row(
             children: [
-              OutlinedButton.icon(
-                key: const Key('completion_take_photo'),
-                onPressed: _capturing ? null : () => _capture(ImageSource.camera),
-                icon: _capturing
-                    ? const SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.camera_alt_outlined, size: 18),
-                label: const Text('Take Photo'),
+              Expanded(
+                child: OutlinedButton.icon(
+                  key: const Key('completion_take_photo'),
+                  onPressed: _capturing ? null : () => _capture(ImageSource.camera),
+                  icon: _capturing
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.camera_alt_outlined, size: 18),
+                  label: const Text('Take Photo'),
+                ),
               ),
-              const SizedBox(width: 8),
-              OutlinedButton.icon(
-                key: const Key('completion_pick_photo'),
-                onPressed: _capturing ? null : () => _capture(ImageSource.gallery),
-                icon: const Icon(Icons.photo_library_outlined, size: 18),
-                label: const Text('Gallery'),
+              const SizedBox(width: GssmsSpacing.s8),
+              Expanded(
+                child: OutlinedButton.icon(
+                  key: const Key('completion_pick_photo'),
+                  onPressed: _capturing ? null : () => _capture(ImageSource.gallery),
+                  icon: const Icon(Icons.photo_library_outlined, size: 18),
+                  label: const Text('Gallery'),
+                ),
               ),
             ],
           ),
@@ -777,6 +764,99 @@ class _CompletionSheetState extends ConsumerState<_CompletionSheet> {
   }
 }
 
+/// Shared chrome for the checklist's bottom sheets: icon + title + close,
+/// keyboard-safe padding, scrollable body.
+class _SheetScaffold extends StatelessWidget {
+  const _SheetScaffold({
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    required this.children,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        left: GssmsSpacing.s16,
+        right: GssmsSpacing.s16,
+        top: GssmsSpacing.s8,
+        bottom: MediaQuery.of(context).viewInsets.bottom + GssmsSpacing.s16,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Icon(icon, color: iconColor),
+                const SizedBox(width: GssmsSpacing.s8),
+                Expanded(
+                  child: Text(title, style: Theme.of(context).textTheme.titleMedium),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  tooltip: 'Close',
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
+            const Divider(),
+            const SizedBox(height: GssmsSpacing.s8),
+            ...children,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SheetNotice extends StatelessWidget {
+  const _SheetNotice({required this.tone, required this.icon, required this.text});
+
+  final GssmsTone tone;
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = context.gssms.tone(tone);
+    return Container(
+      padding: const EdgeInsets.all(GssmsSpacing.s12),
+      decoration: BoxDecoration(
+        color: palette.background,
+        borderRadius: BorderRadius.circular(GssmsRadius.r8),
+        border: Border.all(color: palette.border),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: palette.foreground),
+          const SizedBox(width: GssmsSpacing.s8),
+          Expanded(
+            child: Text(
+              text,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: palette.foreground),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Collects replaced-asset details and pops with a remarks line. There is no
+/// replaced-asset API field, so the text travels in the closing remarks
+/// rather than being thrown away.
 class _ReplacedAssetSheet extends StatefulWidget {
   const _ReplacedAssetSheet();
 
@@ -785,6 +865,7 @@ class _ReplacedAssetSheet extends StatefulWidget {
 }
 
 class _ReplacedAssetSheetState extends State<_ReplacedAssetSheet> {
+  final _formKey = GlobalKey<FormState>();
   final _assetNameController = TextEditingController();
   final _oldSerialController = TextEditingController();
   final _newSerialController = TextEditingController();
@@ -799,109 +880,75 @@ class _ReplacedAssetSheetState extends State<_ReplacedAssetSheet> {
     super.dispose();
   }
 
+  void _save() {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+    final oldSerial = _oldSerialController.text.trim();
+    final reason = _reasonController.text.trim();
+    final note = [
+      'Replaced asset: ${_assetNameController.text.trim()}',
+      if (oldSerial.isNotEmpty) 'old $oldSerial',
+      'new ${_newSerialController.text.trim()}',
+      if (reason.isNotEmpty) 'reason: $reason',
+    ].join(', ');
+    Navigator.of(context).pop('$note.');
+  }
+
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Padding(
-      padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
-        top: 16,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
-      ),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.autorenew, color: AppTheme.errorRed),
-                const SizedBox(width: 8),
-                Text(
-                  'Enter Replaced Asset',
-                  style: textTheme.titleMedium,
-                ),
-                const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  tooltip: 'Close dialog',
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-              ],
+    String? required(String? v) =>
+        (v == null || v.trim().isEmpty) ? 'Required' : null;
+    return Form(
+      key: _formKey,
+      child: _SheetScaffold(
+        icon: Icons.autorenew,
+        iconColor: context.gssms.danger.foreground,
+        title: 'Enter Replaced Asset',
+        children: [
+          const _SheetNotice(
+            tone: GssmsTone.info,
+            icon: Icons.info_outline,
+            text: 'These details are added to your closing remarks so the '
+                'supervisor sees them when verifying.',
+          ),
+          const SizedBox(height: GssmsSpacing.s12),
+          TextFormField(
+            controller: _assetNameController,
+            textInputAction: TextInputAction.next,
+            decoration: const InputDecoration(labelText: 'Asset Name / Tag *', isDense: true),
+            validator: required,
+          ),
+          const SizedBox(height: GssmsSpacing.s12),
+          TextFormField(
+            controller: _oldSerialController,
+            textInputAction: TextInputAction.next,
+            decoration:
+                const InputDecoration(labelText: 'Old Serial / Asset Code', isDense: true),
+          ),
+          const SizedBox(height: GssmsSpacing.s12),
+          TextFormField(
+            controller: _newSerialController,
+            textInputAction: TextInputAction.next,
+            decoration:
+                const InputDecoration(labelText: 'New Serial / Asset Code *', isDense: true),
+            validator: required,
+          ),
+          const SizedBox(height: GssmsSpacing.s12),
+          TextFormField(
+            controller: _reasonController,
+            textCapitalization: TextCapitalization.sentences,
+            decoration:
+                const InputDecoration(labelText: 'Reason for Replacement', isDense: true),
+            maxLines: 2,
+          ),
+          const SizedBox(height: GssmsSpacing.s16),
+          SizedBox(
+            height: GssmsSize.touchTarget,
+            child: FilledButton(
+              onPressed: _save,
+              child: const Text('Add to Closing Remarks'),
             ),
-            const Divider(),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _assetNameController,
-              decoration: const InputDecoration(
-                labelText: 'Asset Name / Tag *',
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _oldSerialController,
-              decoration: const InputDecoration(
-                labelText: 'Old Serial / Asset Code',
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _newSerialController,
-              decoration: const InputDecoration(
-                labelText: 'New Serial / Asset Code *',
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _reasonController,
-              decoration: const InputDecoration(
-                labelText: 'Reason for Replacement',
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-              maxLines: 2,
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.errorRed,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-                onPressed: () {
-                  if (_assetNameController.text.trim().isEmpty ||
-                      _newSerialController.text.trim().isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Enter the asset name and the new serial / asset code.'),
-                        backgroundColor: AppTheme.errorRed,
-                      ),
-                    );
-                    return;
-                  }
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                          'Noted locally — include these details in your closing remarks for the supervisor.'),
-                      backgroundColor: AppTheme.railwayGreen,
-                    ),
-                  );
-                  Navigator.of(context).pop();
-                },
-                child: const Text('Record Replaced Asset'),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -915,6 +962,7 @@ class _ReplacedComponentSheet extends StatefulWidget {
 }
 
 class _ReplacedComponentSheetState extends State<_ReplacedComponentSheet> {
+  final _formKey = GlobalKey<FormState>();
   final _componentNameController = TextEditingController();
   final _partNumberController = TextEditingController();
   final _quantityController = TextEditingController(text: '1');
@@ -929,119 +977,75 @@ class _ReplacedComponentSheetState extends State<_ReplacedComponentSheet> {
     super.dispose();
   }
 
+  void _save() {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+    final part = _partNumberController.text.trim();
+    final details = _remarksController.text.trim();
+    final note = [
+      'Replaced component: ${_componentNameController.text.trim()}',
+      if (part.isNotEmpty) 'part $part',
+      'qty ${int.parse(_quantityController.text.trim())}',
+      if (details.isNotEmpty) details,
+    ].join(', ');
+    Navigator.of(context).pop('$note.');
+  }
+
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return Padding(
-      padding: EdgeInsets.only(
-        left: 16,
-        right: 16,
-        top: 16,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
-      ),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                const Icon(Icons.build_circle_outlined, color: AppTheme.statusHigh),
-                const SizedBox(width: 8),
-                Text(
-                  'Enter Replaced Component',
-                  style: textTheme.titleMedium,
-                ),
-                const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  tooltip: 'Close dialog',
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-              ],
+    return Form(
+      key: _formKey,
+      child: _SheetScaffold(
+        icon: Icons.build_circle_outlined,
+        iconColor: context.gssms.accent.foreground,
+        title: 'Enter Replaced Component',
+        children: [
+          const _SheetNotice(
+            tone: GssmsTone.info,
+            icon: Icons.info_outline,
+            text: 'These details are added to your closing remarks so the '
+                'supervisor sees them when verifying.',
+          ),
+          const SizedBox(height: GssmsSpacing.s12),
+          TextFormField(
+            controller: _componentNameController,
+            textInputAction: TextInputAction.next,
+            decoration: const InputDecoration(labelText: 'Component Name *', isDense: true),
+            validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+          ),
+          const SizedBox(height: GssmsSpacing.s12),
+          TextFormField(
+            controller: _partNumberController,
+            textInputAction: TextInputAction.next,
+            decoration: const InputDecoration(labelText: 'Part / Spec Number', isDense: true),
+          ),
+          const SizedBox(height: GssmsSpacing.s12),
+          TextFormField(
+            controller: _quantityController,
+            keyboardType: TextInputType.number,
+            textInputAction: TextInputAction.next,
+            decoration: const InputDecoration(labelText: 'Quantity Replaced *', isDense: true),
+            validator: (v) {
+              final qty = int.tryParse(v?.trim() ?? '');
+              return (qty == null || qty <= 0) ? 'Enter 1 or more' : null;
+            },
+          ),
+          const SizedBox(height: GssmsSpacing.s12),
+          TextFormField(
+            controller: _remarksController,
+            textCapitalization: TextCapitalization.sentences,
+            decoration:
+                const InputDecoration(labelText: 'Remarks / Action Details', isDense: true),
+            maxLines: 2,
+          ),
+          const SizedBox(height: GssmsSpacing.s16),
+          SizedBox(
+            height: GssmsSize.touchTarget,
+            child: FilledButton(
+              onPressed: _save,
+              child: const Text('Add to Closing Remarks'),
             ),
-            const Divider(),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _componentNameController,
-              decoration: const InputDecoration(
-                labelText: 'Component Name *',
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _partNumberController,
-              decoration: const InputDecoration(
-                labelText: 'Part / Spec Number',
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _quantityController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Quantity Replaced',
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: _remarksController,
-              decoration: const InputDecoration(
-                labelText: 'Remarks / Action Details',
-                border: OutlineInputBorder(),
-                isDense: true,
-              ),
-              maxLines: 2,
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppTheme.statusHigh,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                ),
-                onPressed: () {
-                  if (_componentNameController.text.trim().isEmpty) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Enter the component name.'),
-                        backgroundColor: AppTheme.errorRed,
-                      ),
-                    );
-                    return;
-                  }
-                  final qty = int.tryParse(_quantityController.text.trim());
-                  if (qty == null || qty <= 0) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Enter a valid quantity (1 or more).'),
-                        backgroundColor: AppTheme.errorRed,
-                      ),
-                    );
-                    return;
-                  }
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                          'Noted locally — include these details in your closing remarks for the supervisor.'),
-                      backgroundColor: AppTheme.railwayGreen,
-                    ),
-                  );
-                  Navigator.of(context).pop();
-                },
-                child: const Text('Record Replaced Component'),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -1055,78 +1059,79 @@ class _PreviewSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    return Container(
+    final tokens = context.gssms;
+    return SizedBox(
       height: MediaQuery.of(context).size.height * 0.75,
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.remove_red_eye_outlined, color: AppTheme.primaryBlue),
-              const SizedBox(width: 8),
-              Text(
-                'Checklist Summary Preview',
-                style: textTheme.titleMedium,
-              ),
-              const Spacer(),
-              IconButton(
-                icon: const Icon(Icons.close),
-                tooltip: 'Close preview',
-                onPressed: () => Navigator.of(context).pop(),
-              ),
-            ],
-          ),
-          const Divider(),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppTheme.primaryDark.withOpacity(0.08),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Padding(
+        padding: const EdgeInsets.all(GssmsSpacing.s16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
               children: [
-                Text(
-                  'Completed: ${record.completedLines}/${record.totalLines}',
-                  style: textTheme.labelLarge,
+                Icon(Icons.remove_red_eye_outlined, color: tokens.link),
+                const SizedBox(width: GssmsSpacing.s8),
+                Expanded(
+                  child: Text('Checklist Summary Preview', style: textTheme.titleMedium),
                 ),
-                Text(
-                  'Progress: ${(record.progress * 100).toInt()}%',
-                  style: textTheme.labelLarge?.copyWith(color: AppTheme.railwayBlue),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  tooltip: 'Close preview',
+                  onPressed: () => Navigator.of(context).pop(),
                 ),
               ],
             ),
-          ),
-          const SizedBox(height: 12),
-          Expanded(
-            child: ListView.separated(
-              itemCount: record.activeLines.length,
-              separatorBuilder: (_, __) => const Divider(height: 1),
-              itemBuilder: (ctx, idx) {
-                final line = record.activeLines[idx];
-                return ListTile(
-                  dense: true,
-                  title: Text(
-                    line.displayTitle,
-                    style: textTheme.titleMedium,
+            const Divider(),
+            Container(
+              padding: const EdgeInsets.all(GssmsSpacing.s12),
+              decoration: BoxDecoration(
+                color: tokens.surfaceInset,
+                borderRadius: BorderRadius.circular(GssmsRadius.r8),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Completed: ${record.completedLines}/${record.totalLines}',
+                    style: textTheme.labelLarge,
                   ),
-                  subtitle: Text(
-                    line.valueType.isMultiPart
-                        ? 'Readings: ${line.componentValues.entries.map((e) => "${e.key}: ${e.value}").join(", ")}'
-                        : 'Status: ${line.status} ${line.scalarValue.isNotEmpty ? "(${line.scalarValue})" : ""}',
-                    style: textTheme.labelSmall,
+                  Text(
+                    'Progress: ${(record.progress * 100).toInt()}%',
+                    style: textTheme.labelLarge?.copyWith(color: tokens.link),
                   ),
-                  trailing: Icon(
-                    line.isCompleted ? Icons.check_circle : Icons.radio_button_unchecked,
-                    color: line.isCompleted ? AppTheme.railwayGreen : AppTheme.borderGrey,
-                    size: 18,
-                  ),
-                );
-              },
+                ],
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: GssmsSpacing.s12),
+            Expanded(
+              child: ListView.separated(
+                itemCount: record.activeLines.length,
+                separatorBuilder: (_, __) => const Divider(height: 1),
+                itemBuilder: (ctx, idx) {
+                  final line = record.activeLines[idx];
+                  return ListTile(
+                    dense: true,
+                    title: Text(line.displayTitle, style: textTheme.titleSmall),
+                    subtitle: Text(
+                      line.valueType.isMultiPart
+                          ? 'Readings: ${line.componentValues.entries.map((e) => "${e.key}: ${e.value}").join(", ")}'
+                          : 'Status: ${line.status} ${line.scalarValue.isNotEmpty ? "(${line.scalarValue})" : ""}',
+                      style: textTheme.bodySmall?.copyWith(color: tokens.textSecondary),
+                    ),
+                    trailing: Icon(
+                      line.isCompleted ? Icons.check_circle : Icons.radio_button_unchecked,
+                      color: line.isCompleted
+                          ? tokens.success.foreground
+                          : tokens.textTertiary,
+                      size: GssmsSize.iconMd,
+                      semanticLabel: line.isCompleted ? 'Recorded' : 'Not recorded',
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

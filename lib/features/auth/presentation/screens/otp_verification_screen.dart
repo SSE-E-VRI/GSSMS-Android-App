@@ -93,9 +93,9 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Verification code resent to your email.'),
-          backgroundColor: AppTheme.successGreen,
+        SnackBar(
+          content: const Text('Verification code resent to your email.'),
+          backgroundColor: context.gssms.success.solid,
         ),
       );
 
@@ -197,10 +197,10 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
         if (!mounted) return;
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
+          SnackBar(
+            content: const Text(
                 'Password reset successfully. Please sign in with your new password.'),
-            backgroundColor: AppTheme.successGreen,
+            backgroundColor: context.gssms.success.solid,
           ),
         );
 
@@ -275,13 +275,13 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
                         width: 64,
                         height: 64,
                         decoration: BoxDecoration(
-                          color: AppTheme.primaryBlue.withOpacity(0.1),
+                          color: context.gssms.info.background,
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(
+                        child: Icon(
                           Icons.mark_email_read_rounded,
                           size: 32,
-                          color: AppTheme.primaryBlue,
+                          color: context.gssms.link,
                         ),
                       ),
                     ),
@@ -290,10 +290,10 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
                     // Title
                     Text(
                       title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
-                        color: AppTheme.textDark,
+                        color: context.gssms.textPrimary,
                         letterSpacing: -0.5,
                       ),
                       textAlign: TextAlign.center,
@@ -303,9 +303,9 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
                     // Subtitle with email
                     Text(
                       'Enter the 6-digit code sent to\n${widget.email}',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14,
-                        color: AppTheme.textMuted,
+                        color: context.gssms.textSecondary,
                         height: 1.4,
                       ),
                       textAlign: TextAlign.center,
@@ -319,21 +319,21 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
-                          color: AppTheme.borderGrey.withOpacity(0.5),
+                          color: context.gssms.border.withOpacity(0.5),
                           borderRadius: BorderRadius.circular(16),
                         ),
-                        child: const Row(
+                        child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Icon(Icons.timer_outlined,
-                                size: 16, color: AppTheme.textMuted),
-                            SizedBox(width: 6),
+                                size: 16, color: context.gssms.textSecondary),
+                            const SizedBox(width: 6),
                             Text(
                               'Expires in 10 minutes',
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
-                                color: AppTheme.textMuted,
+                                color: context.gssms.textSecondary,
                               ),
                             ),
                           ],
@@ -357,22 +357,22 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 12, vertical: 8),
                         decoration: BoxDecoration(
-                          color: AppTheme.warningAmber.withOpacity(0.1),
+                          color: context.gssms.warning.background,
                           borderRadius: BorderRadius.circular(8),
                           border: Border.all(
-                              color: AppTheme.warningAmber.withOpacity(0.3)),
+                              color: context.gssms.warning.border),
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.warning_amber_rounded,
-                                size: 18, color: AppTheme.warningAmber),
+                            Icon(Icons.warning_amber_rounded,
+                                size: 18, color: context.gssms.warning.foreground),
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
                                 '$_attemptsRemaining attempt${_attemptsRemaining != 1 ? 's' : ''} remaining before lockout.',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 13,
-                                  color: AppTheme.warningAmberDark,
+                                  color: context.gssms.warning.foreground,
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
@@ -497,13 +497,12 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
                       key: const Key('otp_verify_submit_button'),
                       onPressed: (_isLockedOut || _isLoading) ? null : _onSubmit,
                       child: _isLoading
-                          ? const SizedBox(
+                          ? SizedBox(
                               width: 24,
                               height: 24,
                               child: CircularProgressIndicator(
                                 strokeWidth: 2.5,
-                                valueColor:
-                                    AlwaysStoppedAnimation<Color>(Colors.white),
+                                color: Theme.of(context).colorScheme.onPrimary,
                               ),
                             )
                           : Text(submitButtonText),
@@ -516,9 +515,9 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
                           ? Text(
                               'Resend code in ${_secondsRemaining}s',
                               key: const Key('otp_resend_countdown_text'),
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 14,
-                                color: AppTheme.textMuted,
+                                color: context.gssms.textSecondary,
                                 fontWeight: FontWeight.w500,
                               ),
                             )
@@ -564,20 +563,20 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
         key: const Key('otp_error_banner'),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: AppTheme.errorRed.withOpacity(0.08),
+          color: context.gssms.danger.background,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppTheme.errorRed.withOpacity(0.3)),
+          border: Border.all(color: context.gssms.danger.border),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Icon(Icons.error_outline, color: AppTheme.errorRed, size: 20),
+            Icon(Icons.error_outline, color: context.gssms.danger.foreground, size: 20),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
                 message,
-                style: const TextStyle(
-                  color: AppTheme.errorRed,
+                style: TextStyle(
+                  color: context.gssms.danger.foreground,
                   fontSize: 13.5,
                   fontWeight: FontWeight.w500,
                 ),
