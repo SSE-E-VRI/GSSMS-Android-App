@@ -85,9 +85,10 @@ class OrgScopeAppBarFilter extends StatelessWidget {
       builder: (sheetContext) {
         return Container(
           key: const Key('org_scope_bottom_sheet'),
-          decoration: const BoxDecoration(
-            color: AppTheme.surfaceWhite,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+          decoration: BoxDecoration(
+            color: Theme.of(sheetContext).colorScheme.surface,
+            borderRadius:
+                const BorderRadius.vertical(top: Radius.circular(16)),
           ),
           child: SafeArea(
             child: Padding(
@@ -117,13 +118,15 @@ class OrgScopeAppBarFilter extends StatelessWidget {
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
+                        Text(
                           'Filter by Location',
-                          style: TextStyle(
-                            fontSize: 17,
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.textDark,
-                          ),
+                          style: Theme.of(sheetContext)
+                              .textTheme
+                              .titleMedium
+                              ?.copyWith(
+                                fontSize: 17,
+                                fontWeight: FontWeight.bold,
+                              ),
                         ),
                         Row(
                           children: [

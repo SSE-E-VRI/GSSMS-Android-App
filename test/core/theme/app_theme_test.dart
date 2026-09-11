@@ -64,4 +64,52 @@ void main() {
     expect(AppTheme.appBarDark, const Color(0xFF020617));
     expect(AppTheme.darkTheme.appBarTheme.backgroundColor, AppTheme.appBarDark);
   });
+
+  test('darkTheme input labels use the dark muted token', () {
+    expect(AppTheme.textMutedDark, const Color(0xFF94A3B8));
+    expect(
+      AppTheme.darkTheme.inputDecorationTheme.labelStyle?.color,
+      AppTheme.textMutedDark,
+    );
+    expect(
+      AppTheme.darkTheme.inputDecorationTheme.hintStyle?.color,
+      AppTheme.textMutedDark,
+    );
+    expect(
+      AppTheme.lightTheme.inputDecorationTheme.labelStyle?.color,
+      AppTheme.textMuted,
+    );
+  });
+
+  testWidgets('mutedText resolves to textMuted in the light theme',
+      (tester) async {
+    Color? light;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.lightTheme,
+        home: Builder(builder: (context) {
+          light = AppTheme.mutedText(context);
+          return const SizedBox();
+        }),
+      ),
+    );
+    expect(light, AppTheme.textMuted);
+  });
+
+  testWidgets('mutedText resolves to textMutedDark in the dark theme',
+      (tester) async {
+    Color? dark;
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.darkTheme,
+        darkTheme: AppTheme.darkTheme,
+        themeMode: ThemeMode.dark,
+        home: Builder(builder: (context) {
+          dark = AppTheme.mutedText(context);
+          return const SizedBox();
+        }),
+      ),
+    );
+    expect(dark, AppTheme.textMutedDark);
+  });
 }

@@ -32,29 +32,29 @@ void main() {
     test('getInspections calls GET /api/v1/inspections/ with filters', () async {
       dio.httpClientAdapter = MockAdapter((options) async {
         expect(options.path, '/api/v1/inspections/');
-        expect(options.queryParameters['status'], 'PENDING');
+        expect(options.queryParameters['status'], 'OPEN');
         expect(options.queryParameters['start_date'], '2026-09-01');
         expect(options.queryParameters['end_date'], '2026-09-07');
         return _json([
-          {'id': 10, 'title': 'Monthly Check', 'status': 'PENDING', 'priority': 'MEDIUM'}
+          {'id': 10, 'title': 'Monthly Check', 'status': 'OPEN'}
         ], 200);
       });
 
       final inspections = await apiService.getInspections(
-        status: 'PENDING',
+        status: 'OPEN',
         dateFrom: '2026-09-01',
         dateTo: '2026-09-07',
       );
       expect(inspections.length, 1);
       expect(inspections[0].id, 10);
-      expect(inspections[0].status, InspectionStatus.pending);
+      expect(inspections[0].status, InspectionStatus.open);
     });
 
     test('getInspections handles paginated results envelope', () async {
       dio.httpClientAdapter = MockAdapter((options) async {
         return _json({
           'results': [
-            {'id': 11, 'title': 'Paginated', 'status': 'COMPLETED'}
+            {'id': 11, 'title': 'Paginated', 'status': 'CLOSED'}
           ]
         }, 200);
       });
@@ -70,10 +70,14 @@ void main() {
         expect(options.method, 'POST');
         final data = options.data as Map<String, dynamic>;
         expect(data['title'], 'New Inspection');
-        return _json({'id': 12, 'title': 'New Inspection', 'status': 'PENDING', 'priority': 'HIGH'}, 201);
+        return _json({'id': 12, 'title': 'New Inspection', 'status': 'OPEN'}, 201);
       });
 
-      final created = await apiService.createInspection({'title': 'New Inspection', 'description': 'Desc', 'priority': 'HIGH'});
+      final created = await apiService.createInspection({
+        'title': 'New Inspection',
+        'notes': 'Observed abnormal condition in panel room.',
+        'inspection_date': '2026-09-09',
+      });
       expect(created.id, 12);
       expect(created.title, 'New Inspection');
     });
@@ -87,6 +91,15 @@ void main() {
 
       final result = await apiService.convertToWorkOrder(10);
       expect(result['work_order_id'], 99);
+    });
+
+    test('list never sends a priority filter (SSOT §11.4 FIX-003)', () async {
+      dio.httpClientAdapter = MockAdapter((options) async {
+        expect(options.queryParameters.containsKey('priority'), isFalse);
+        return _json([], 200);
+      });
+
+      await apiService.getInspections(status: 'OPEN');
     });
   });
 }

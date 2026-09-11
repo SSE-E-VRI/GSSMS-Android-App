@@ -17,9 +17,9 @@ void main() {
       id: 1,
       inspectionNumber: 'INSP-001',
       title: 'Check',
-      description: 'Desc',
+      notes: 'Desc',
       priority: InspectionPriority.medium,
-      status: InspectionStatus.pending,
+      status: InspectionStatus.open,
     ),
   ];
 

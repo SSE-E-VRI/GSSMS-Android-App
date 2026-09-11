@@ -61,8 +61,18 @@ class WorkOrderApiService {
     final queryParams = <String, dynamic>{};
     if (status != null && status.isNotEmpty) queryParams['status'] = status;
     if (type != null && type.isNotEmpty) queryParams['type'] = type;
-    if (dateFrom != null && dateFrom.isNotEmpty) queryParams['date_from'] = dateFrom;
-    if (dateTo != null && dateTo.isNotEmpty) queryParams['date_to'] = dateTo;
+    // SSOT §20 / FIX-007: the staff-scoped endpoint
+    // (`/api/v1/staff-workorders/`) reads `start_date`/`end_date`, while the
+    // main WorkOrderViewSet reads `date_from`/`date_to` — both filter
+    // `created_at`. Sending the wrong names is silently ignored server-side,
+    // so "My Work" date filters previously did nothing.
+    if (assignedToMe) {
+      if (dateFrom != null && dateFrom.isNotEmpty) queryParams['start_date'] = dateFrom;
+      if (dateTo != null && dateTo.isNotEmpty) queryParams['end_date'] = dateTo;
+    } else {
+      if (dateFrom != null && dateFrom.isNotEmpty) queryParams['date_from'] = dateFrom;
+      if (dateTo != null && dateTo.isNotEmpty) queryParams['date_to'] = dateTo;
+    }
     // depot_id/division_id/zone_id are mutually exclusive server-side (most
     // specific wins — WorkOrderViewSet.get_queryset), so sending all three
     // that are set is harmless; the server picks the narrowest.

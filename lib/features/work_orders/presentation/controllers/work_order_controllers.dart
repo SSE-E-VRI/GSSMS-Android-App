@@ -170,7 +170,9 @@ class WorkOrderListController extends Notifier<WorkOrderListState> {
   }
 
   /// Server-side date filter. Unlike status chips this is not applied in memory:
-  /// the list can be unbounded, so the range is sent as `date_from`/`date_to`.
+  /// the list can be unbounded, so the range is sent as `date_from`/`date_to`
+  /// (main register) or `start_date`/`end_date` (staff-scoped "My Work" —
+  /// see WorkOrderApiService.getWorkOrders).
   Future<void> setDateRange(DateTime? from, DateTime? to) async {
     final previous = _resolvePrevious();
     final scope = previous?.orgScope ?? OrgScopeSelection.empty;

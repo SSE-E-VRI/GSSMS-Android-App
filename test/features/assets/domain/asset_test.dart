@@ -113,9 +113,22 @@ void main() {
         AssetWarrantyStatus.fromString('IN_WARRANTY'),
         AssetWarrantyStatus.inWarranty,
       );
+      // SSOT §28: EXPIRED/EXPIRING_SOON are not backend values — unknown.
       expect(
         AssetWarrantyStatus.fromString('EXPIRED'),
-        AssetWarrantyStatus.expired,
+        AssetWarrantyStatus.unknown,
+      );
+      expect(
+        AssetWarrantyStatus.fromString('OUT_OF_WARRANTY'),
+        AssetWarrantyStatus.outOfWarranty,
+      );
+      expect(
+        AssetWarrantyStatus.fromString('WARRANTY_YEAR_PRECISION'),
+        AssetWarrantyStatus.warrantyYearPrecision,
+      );
+      expect(
+        AssetWarrantyStatus.fromString('WARRANTY_MONTH_PRECISION'),
+        AssetWarrantyStatus.warrantyMonthPrecision,
       );
       expect(AssetWarrantyStatus.fromString(null), AssetWarrantyStatus.unknown);
       expect(AssetWarrantyStatus.fromString(''), AssetWarrantyStatus.unknown);

@@ -8,18 +8,17 @@ void main() {
         'id': 42,
         'inspection_number': 'INSP-2026-0042',
         'title': 'EB Bunk Monthly Check',
-        'description': 'Check earth resistance and cleaning',
-        'status': 'PENDING',
-        'priority': 'HIGH',
+        'notes': 'Check earth resistance and cleaning',
+        'status': 'OPEN',
         'station': 48,
         'station_name': 'Thalanallur',
         'depot': 23,
         'depot_name': 'Vriddhachalam Depot',
-        'asset': 101,
-        'asset_name': 'EB-01',
+        'infrastructure': 101,
+        'infrastructure_name': 'EB-01',
         'created_by_name': 'depot_user',
         'created_at': '2026-08-18T05:00:00Z',
-        'scheduled_date': '2026-08-20T00:00:00Z',
+        'inspection_date': '2026-08-20T00:00:00Z',
       };
 
       final i = Inspection.fromJson(json);
@@ -27,23 +26,27 @@ void main() {
       expect(i.id, 42);
       expect(i.inspectionNumber, 'INSP-2026-0042');
       expect(i.title, 'EB Bunk Monthly Check');
-      expect(i.status, InspectionStatus.pending);
-      expect(i.priority, InspectionPriority.high);
+      expect(i.status, InspectionStatus.open);
+      expect(i.priority, InspectionPriority.medium);
       expect(i.stationName, 'Thalanallur');
-      expect(i.assetName, 'EB-01');
       expect(i.reportedByName, 'depot_user');
-      expect(i.scheduledDate, isNotNull);
+      expect(i.inspectionDate, isNotNull);
     });
 
     test('InspectionStatus.fromString handles all canonical values', () {
-      expect(InspectionStatus.fromString('PENDING'), InspectionStatus.pending);
-      expect(InspectionStatus.fromString('IN_PROGRESS'), InspectionStatus.inProgress);
-      expect(InspectionStatus.fromString('COMPLETED'), InspectionStatus.completed);
+      expect(InspectionStatus.fromString('OPEN'), InspectionStatus.open);
+      expect(InspectionStatus.fromString('ACTION_REQUIRED'),
+          InspectionStatus.actionRequired);
       expect(InspectionStatus.fromString('CONVERTED'), InspectionStatus.converted);
-      expect(InspectionStatus.fromString('CANCELLED'), InspectionStatus.cancelled);
+      expect(InspectionStatus.fromString('CLOSED'), InspectionStatus.closed);
       expect(InspectionStatus.fromString(null), InspectionStatus.unknown);
       expect(InspectionStatus.fromString('INVALID'), InspectionStatus.unknown);
-      expect(InspectionStatus.fromString('pending'), InspectionStatus.pending);
+      expect(InspectionStatus.fromString('open'), InspectionStatus.open);
+      // Pre-SSOT values must map to unknown, never to invented states.
+      expect(InspectionStatus.fromString('PENDING'), InspectionStatus.unknown);
+      expect(InspectionStatus.fromString('IN_PROGRESS'), InspectionStatus.unknown);
+      expect(InspectionStatus.fromString('COMPLETED'), InspectionStatus.unknown);
+      expect(InspectionStatus.fromString('CANCELLED'), InspectionStatus.unknown);
     });
 
     test('InspectionPriority.fromString defaults to medium', () {
@@ -60,11 +63,11 @@ void main() {
         'id': 7,
         'ticket_number': 'INSP-LEGACY-07',
         'title': 'Legacy payload',
-        'status': 'COMPLETED',
+        'status': 'CLOSED',
       };
       final i = Inspection.fromJson(json);
       expect(i.inspectionNumber, 'INSP-LEGACY-07');
-      expect(i.status, InspectionStatus.completed);
+      expect(i.status, InspectionStatus.closed);
     });
   });
 }

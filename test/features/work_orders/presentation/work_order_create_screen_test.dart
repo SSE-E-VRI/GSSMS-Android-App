@@ -64,7 +64,7 @@ void main() {
           stationId: any(named: 'stationId'),
           infrastructureId: any(named: 'infrastructureId'),
           assetId: any(named: 'assetId'),
-          dueDate: any(named: 'dueDate'),
+          scheduledDate: any(named: 'scheduledDate'),
         )).thenAnswer((_) async => const WorkOrder(
           id: 202,
           status: WorkOrderStatus.newOrder,
@@ -110,7 +110,7 @@ void main() {
           stationId: null,
           infrastructureId: null,
           assetId: null,
-          dueDate: null,
+          scheduledDate: null,
         )).called(1);
   });
 }

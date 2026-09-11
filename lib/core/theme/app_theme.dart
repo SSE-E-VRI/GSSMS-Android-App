@@ -19,6 +19,17 @@ class AppTheme {
 
   /// Outdoor-readable muted text (WCAG AA on `backgroundLight` / `surfaceWhite`).
   static const Color textMuted = Color(0xFF475569);
+
+  /// Muted text for dark surfaces (≈7:1 on `primaryDark` / `textDark`).
+  /// Use [mutedText] in widgets so secondary copy stays readable in both
+  /// themes instead of hard-coding [textMuted].
+  static const Color textMutedDark = Color(0xFF94A3B8);
+
+  /// Brightness-aware secondary text colour.
+  static Color mutedText(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark
+          ? textMutedDark
+          : textMuted;
   static const Color borderGrey = Color(0xFFE2E8F0);
   static const Color successGreen = Color(0xFF10B981);
   static const Color warningAmber = Color(0xFFF59E0B);
@@ -91,6 +102,7 @@ class AppTheme {
         cardColor: surfaceCard,
         inputFill: surfaceWhite,
         textColor: textDark,
+        labelColor: textMuted,
       );
 
   static ThemeData get darkTheme => _theme(
@@ -108,6 +120,7 @@ class AppTheme {
         cardColor: textDark,
         inputFill: textDark,
         textColor: surfaceWhite,
+        labelColor: textMutedDark,
       );
 
   static ThemeData _theme({
@@ -118,6 +131,7 @@ class AppTheme {
     required Color cardColor,
     required Color inputFill,
     required Color textColor,
+    required Color labelColor,
   }) {
     final themedText = textScale.apply(
       bodyColor: textColor,
@@ -177,7 +191,9 @@ class AppTheme {
           borderRadius: BorderRadius.circular(GssmsRadius.r8),
           borderSide: const BorderSide(color: errorRed),
         ),
-        labelStyle: const TextStyle(color: textMuted),
+        labelStyle: TextStyle(color: labelColor),
+        hintStyle: TextStyle(color: labelColor),
+        helperStyle: TextStyle(color: labelColor),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(

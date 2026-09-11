@@ -33,12 +33,14 @@ void main() {
       expect(c.reportedByName, 'tech_ramesh');
     });
 
-    test('ComplaintStatus.fromString handles invalid and case-insensitive strings safely', () {
+    test('ComplaintStatus.fromString handles canonical values (SSOT §10.3)', () {
       expect(ComplaintStatus.fromString('OPEN'), ComplaintStatus.open);
-      expect(ComplaintStatus.fromString('in_progress'), ComplaintStatus.inProgress);
-      expect(ComplaintStatus.fromString('RESOLVED'), ComplaintStatus.resolved);
+      expect(ComplaintStatus.fromString('CONVERTED'), ComplaintStatus.converted);
       expect(ComplaintStatus.fromString('CLOSED'), ComplaintStatus.closed);
-      expect(ComplaintStatus.fromString('REJECTED'), ComplaintStatus.rejected);
+      // Removed backend values must map to unknown, never to invented states.
+      expect(ComplaintStatus.fromString('in_progress'), ComplaintStatus.unknown);
+      expect(ComplaintStatus.fromString('RESOLVED'), ComplaintStatus.unknown);
+      expect(ComplaintStatus.fromString('REJECTED'), ComplaintStatus.unknown);
       expect(ComplaintStatus.fromString(null), ComplaintStatus.unknown);
       expect(ComplaintStatus.fromString('INVALID'), ComplaintStatus.unknown);
     });

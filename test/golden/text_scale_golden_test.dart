@@ -119,9 +119,9 @@ void main() {
       id: 1,
       inspectionNumber: 'INSP-001',
       title: 'EB Bunk Monthly Check',
-      description: 'Earth resistance and cleaning',
+      notes: 'Earth resistance and cleaning',
       priority: InspectionPriority.high,
-      status: InspectionStatus.pending,
+      status: InspectionStatus.open,
       stationName: 'Thalanallur',
     ),
   ];

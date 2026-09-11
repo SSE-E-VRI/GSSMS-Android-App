@@ -103,8 +103,11 @@ class _DateChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final accent = scheme.primary;
+    final secondary = AppTheme.mutedText(context);
     return Material(
-      color: Colors.white,
+      color: scheme.surface,
       borderRadius: BorderRadius.circular(8),
       child: InkWell(
         onTap: onTap,
@@ -113,7 +116,7 @@ class _DateChip extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
           decoration: BoxDecoration(
             border: Border.all(
-              color: filled ? AppTheme.railwayBlue : AppTheme.borderGrey,
+              color: filled ? accent : AppTheme.borderGrey,
             ),
             borderRadius: BorderRadius.circular(8),
           ),
@@ -122,7 +125,7 @@ class _DateChip extends StatelessWidget {
               Icon(
                 Icons.calendar_today,
                 size: 14,
-                color: filled ? AppTheme.railwayBlue : AppTheme.textSecondary,
+                color: filled ? accent : secondary,
               ),
               const SizedBox(width: 6),
               Expanded(
@@ -132,7 +135,10 @@ class _DateChip extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: filled ? FontWeight.w600 : FontWeight.normal,
-                    color: filled ? AppTheme.textPrimary : AppTheme.textSecondary,
+                    color: filled
+                        ? Theme.of(context).textTheme.bodyMedium?.color ??
+                            scheme.onSurface
+                        : secondary,
                   ),
                 ),
               ),

@@ -41,7 +41,7 @@ class EmptyStateView extends StatelessWidget {
                 body!,
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: AppTheme.textMuted,
+                      color: AppTheme.mutedText(context),
                     ),
               ),
             ],
