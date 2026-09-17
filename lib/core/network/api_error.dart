@@ -126,12 +126,47 @@ String _dioMessage(DioException error) {
 String _conflictMessage(Object? data) {
   final base = serverMessage(data) ?? kConflictErrorMessage;
   if (data is Map) {
-    final ticket = data['existing_ticket'];
-    if (ticket is String && ticket.isNotEmpty && !base.contains(ticket)) {
-      return '$base ($ticket)';
+    // S2 §24.1: prefer the structured blocking ticket, keep the legacy
+    // existing_ticket compat when the structured field is absent.
+    final ticket = blockingTicket(data);
+    final withTicket =
+        ticket != null && !base.contains(ticket) ? '$base ($ticket)' : base;
+    final pending = data['pending_request'];
+    if (pending is Map) {
+      final type = pending['type'];
+      // No approval model exists until S8 (pending_request is null), so this
+      // branch is forward-compat only — covered by fixture, not live data.
+      if (type is String && type.isNotEmpty) {
+        return '$withTicket (approval: $type)';
+      }
     }
+    return withTicket;
   }
   return base;
+}
+
+/// S2 §24.1: machine-readable conflict code from a response body, or null
+/// when the body carries none (legacy bodies, network errors).
+String? conflictCode(Object? data) {
+  if (data is! Map) return null;
+  final code = data['code'];
+  if (code is List && code.isNotEmpty) return code.first?.toString();
+  if (code is String && code.isNotEmpty) return code;
+  return null;
+}
+
+/// S2 §24.1: ticket of the blocking Work Order — the structured
+/// `blocking_work_order.ticket_number` first, legacy `existing_ticket` after.
+String? blockingTicket(Object? data) {
+  if (data is! Map) return null;
+  final blocking = data['blocking_work_order'];
+  if (blocking is Map) {
+    final ticket = blocking['ticket_number'];
+    if (ticket is String && ticket.isNotEmpty) return ticket;
+  }
+  final legacy = data['existing_ticket'];
+  if (legacy is String && legacy.isNotEmpty) return legacy;
+  return null;
 }
 
 /// Extracts the human-readable message from a DRF error body (SSOT §6):
@@ -172,6 +207,9 @@ const _nonFieldKeys = {
   'non_field_errors',
   'code',
   'existing_ticket',
+  // S2 §24.1 structured fields: machine-readable metadata, never messages.
+  'blocking_work_order',
+  'pending_request',
   'messages',
 };
 
