@@ -68,4 +68,68 @@ class MaintenanceScheduleApiService {
     );
     return BatchConvertResult.fromJson(_asObject(response.data) ?? const {});
   }
+
+  // -------------------------------------------------------------------------
+  // S7 — Next-7-days PM Conversion
+  // -------------------------------------------------------------------------
+
+  /// Endpoint L: upcoming occurrences within [windowDays] for [scheduleType].
+  /// Optionally filter by [stationId]. Pass [includeOverdue] to also include
+  /// past-due items within the same window.
+  Future<List<MaintenanceSchedule>> getUpcomingSchedules({
+    required String scheduleType,
+    int? stationId,
+    int windowDays = 7,
+    bool includeOverdue = false,
+  }) async {
+    final query = <String, dynamic>{
+      'schedule_type': scheduleType,
+      'window_days': windowDays,
+      if (includeOverdue) 'include_overdue': 'true',
+      if (stationId != null) 'station_id': stationId,
+    };
+    final response = await _dio.get(
+      '$_schedules/upcoming/',
+      queryParameters: query,
+    );
+    return _asList(response.data)
+        .whereType<Map>()
+        .map((e) => MaintenanceSchedule.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+
+  /// Endpoint N: convert a single occurrence into a WorkOrder.
+  /// [mode] is always 'LOCATION' in this release.
+  Future<Map<String, dynamic>> convertSchedule(
+    int scheduleId, {
+    String mode = 'LOCATION',
+    int? assignedTo,
+  }) async {
+    final data = <String, dynamic>{'mode': mode};
+    if (assignedTo != null) data['assigned_to'] = assignedTo;
+    final response = await _dio.post(
+      '$_schedules/$scheduleId/convert/',
+      data: data,
+    );
+    return _asObject(response.data) ?? {};
+  }
+
+  /// Endpoint C (S7): batch-convert by schedule_type + window instead of
+  /// explicit schedule IDs.
+  Future<BatchConvertResult> createBatchByScheduleType({
+    required String scheduleType,
+    int? stationId,
+    int windowDays = 7,
+  }) async {
+    final data = <String, dynamic>{
+      'schedule_type': scheduleType,
+      'window_days': windowDays,
+      if (stationId != null) 'station_id': stationId,
+    };
+    final response = await _dio.post(
+      '$_schedules/create_batch_work_orders/',
+      data: data,
+    );
+    return BatchConvertResult.fromJson(_asObject(response.data) ?? const {});
+  }
 }

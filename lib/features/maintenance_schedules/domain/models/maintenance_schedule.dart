@@ -25,9 +25,49 @@ enum ScheduleStatus {
   }
 }
 
+/// Eligibility result from `SchedulingService.check_occurrence_eligibility`.
+class ScheduleEligibility {
+  const ScheduleEligibility({
+    required this.eligible,
+    this.reason,
+    this.code,
+  });
+
+  final bool eligible;
+  final String? reason;
+  final String? code;
+
+  factory ScheduleEligibility.fromJson(Map<String, dynamic> json) {
+    return ScheduleEligibility(
+      eligible: json['eligible'] == true,
+      reason: asJsonString(json['reason']),
+      code: asJsonString(json['code']),
+    );
+  }
+}
+
+/// Template summary returned in upcoming/conversion-context payloads.
+class TemplateRef {
+  const TemplateRef({required this.id, required this.name, this.source});
+  final int id;
+  final String name;
+  final String? source;
+
+  factory TemplateRef.fromJson(Map<String, dynamic> json) {
+    return TemplateRef(
+      id: asJsonInt(json['id']) ?? 0,
+      name: asJsonString(json['name']) ?? '',
+      source: asJsonString(json['source']),
+    );
+  }
+}
+
 /// One row from `GET /api/v1/maintenance/schedules/pending/`
 /// (`MaintenanceScheduleSerializer`) — a scheduled preventive-maintenance
 /// task awaiting conversion into (or completion of) a Job Work.
+///
+/// Also used for Endpoint L (`upcoming`) which adds [periodStart],
+/// [templateSource], [eligibility], and [defaultTemplate].
 class MaintenanceSchedule extends Equatable {
   const MaintenanceSchedule({
     required this.id,
@@ -40,6 +80,11 @@ class MaintenanceSchedule extends Equatable {
     this.workOrderId,
     this.workOrderTicket,
     this.workOrderStatus,
+    // S7 fields
+    this.periodStart,
+    this.templateSource,
+    this.eligibility,
+    this.defaultTemplate,
   });
 
   final int id;
@@ -58,9 +103,26 @@ class MaintenanceSchedule extends Equatable {
   final String? workOrderTicket;
   final String? workOrderStatus;
 
+  // S7: present only when fetched via Endpoint L (upcoming).
+  final DateTime? periodStart;
+  final String? templateSource;
+  final ScheduleEligibility? eligibility;
+  final TemplateRef? defaultTemplate;
+
   bool get isConverted => workOrderId != null;
+  bool get isEligible => eligibility?.eligible ?? false;
 
   factory MaintenanceSchedule.fromJson(Map<String, dynamic> json) {
+    ScheduleEligibility? eligibility;
+    if (json['eligibility'] is Map) {
+      eligibility = ScheduleEligibility.fromJson(
+          Map<String, dynamic>.from(json['eligibility'] as Map));
+    }
+    TemplateRef? defaultTemplate;
+    if (json['default_template'] is Map) {
+      defaultTemplate = TemplateRef.fromJson(
+          Map<String, dynamic>.from(json['default_template'] as Map));
+    }
     return MaintenanceSchedule(
       id: asJsonInt(json['id']) ?? 0,
       templateName: asJsonString(json['template_name']) ??
@@ -76,6 +138,12 @@ class MaintenanceSchedule extends Equatable {
       workOrderId: asJsonInt(json['work_order_id']),
       workOrderTicket: asJsonString(json['work_order_ticket']),
       workOrderStatus: asJsonString(json['work_order_status']),
+      periodStart: asJsonString(json['period_start']) != null
+          ? asJsonDateTime(json['period_start'])
+          : null,
+      templateSource: asJsonString(json['template_source']),
+      eligibility: eligibility,
+      defaultTemplate: defaultTemplate,
     );
   }
 
@@ -91,5 +159,7 @@ class MaintenanceSchedule extends Equatable {
         workOrderId,
         workOrderTicket,
         workOrderStatus,
+        periodStart,
+        templateSource,
       ];
 }

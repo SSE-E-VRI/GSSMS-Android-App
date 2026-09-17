@@ -144,6 +144,9 @@ class WorkOrder extends Equatable {
     this.originalScheduleId,
     this.originalComplaintId,
     this.originalInspectionId,
+    // S7 fields
+    this.maintenanceMasterNameSnapshot,
+    this.templateSource,
   });
 
   final int id;
@@ -155,6 +158,12 @@ class WorkOrder extends Equatable {
 
   /// Checklist template this work order executes.
   final String? maintenanceMasterName;
+
+  /// S7: frozen template name as of WO creation (survives template rename).
+  final String? maintenanceMasterNameSnapshot;
+
+  /// S7: how the template was resolved — OBLIGATION_DEFAULT / LAST_EXECUTED / APPROVED_CHANGE.
+  final String? templateSource;
 
   /// Server-computed SLA state, e.g. "OK", "AT_RISK", "BREACHED".
   final String? slaStatus;
@@ -305,6 +314,9 @@ class WorkOrder extends Equatable {
       originalScheduleId: asJsonInt(json['original_schedule_id']),
       originalComplaintId: asJsonInt(json['original_complaint_id']),
       originalInspectionId: asJsonInt(json['original_inspection_id']),
+      maintenanceMasterNameSnapshot:
+          asJsonString(json['maintenance_master_name_snapshot']),
+      templateSource: asJsonString(json['template_source']),
     );
   }
 
@@ -315,6 +327,8 @@ class WorkOrder extends Equatable {
         type,
         ticketNumber,
         maintenanceMasterName,
+        maintenanceMasterNameSnapshot,
+        templateSource,
         slaStatus,
         escalationLevel,
         stationId,
