@@ -133,9 +133,7 @@ String _conflictMessage(Object? data) {
         ticket != null && !base.contains(ticket) ? '$base ($ticket)' : base;
     final pending = data['pending_request'];
     if (pending is Map) {
-      final type = pending['type'];
-      // No approval model exists until S8 (pending_request is null), so this
-      // branch is forward-compat only — covered by fixture, not live data.
+      final type = pending['type'] ?? pending['request_type'];
       if (type is String && type.isNotEmpty) {
         return '$withTicket (approval: $type)';
       }

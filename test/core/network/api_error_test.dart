@@ -182,5 +182,21 @@ void main() {
       expect(conflictCode(null), isNull);
       expect(conflictCode({'code': ['PM_PENDING_EXISTS']}), 'PM_PENDING_EXISTS');
     });
+
+    test('409 APPROVAL_PENDING includes approval request type or request_type', () {
+      final e1 = _response(409, {
+        'error': 'An approval request is pending for this occurrence.',
+        'code': 'APPROVAL_PENDING',
+        'pending_request': {'type': 'SKIP'},
+      });
+      expect(userFacingError(e1), contains('(approval: SKIP)'));
+
+      final e2 = _response(409, {
+        'error': 'An approval request is pending for this occurrence.',
+        'code': 'APPROVAL_PENDING',
+        'pending_request': {'request_type': 'SKIP'},
+      });
+      expect(userFacingError(e2), contains('(approval: SKIP)'));
+    });
   });
 }
