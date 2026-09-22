@@ -54,5 +54,24 @@ void main() {
       expect(result.count, 0);
       expect(result.failures, isEmpty);
     });
+
+    test('C1 asset refusal renders its code and error text', () {
+      final result = BatchConvertResult.fromJson(const {
+        'work_order_ids': [],
+        'results': [
+          {
+            'schedule_id': 511,
+            'created': false,
+            'work_order_id': null,
+            'code': 'ASSET_NO_LONGER_ELIGIBLE',
+            'error': 'Asset VRI-PMP-CLS-TRN-001 is archived and can no longer receive preventive maintenance.',
+            'existing_ticket': null,
+          },
+        ],
+      });
+      expect(result.failures, hasLength(1));
+      expect(result.failures.single.code, 'ASSET_NO_LONGER_ELIGIBLE');
+      expect(result.failures.single.error, contains('archived'));
+    });
   });
 }

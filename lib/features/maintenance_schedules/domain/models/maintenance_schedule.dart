@@ -9,6 +9,7 @@ enum ScheduleStatus {
   inProgress('IN_PROGRESS', 'In Progress'),
   completed('COMPLETED', 'Completed'),
   overdue('OVERDUE', 'Overdue'),
+  skipped('SKIPPED', 'Skipped'),
   unknown('UNKNOWN', 'Unknown');
 
   const ScheduleStatus(this.code, this.displayName);
@@ -85,6 +86,13 @@ class MaintenanceSchedule extends Equatable {
     this.templateSource,
     this.eligibility,
     this.defaultTemplate,
+    // C1 asset scope: present only for asset occurrences; null for
+    // station/infrastructure occurrences (and for cached payloads that
+    // predate these keys — parsing stays null-safe).
+    this.assetId,
+    this.assetName,
+    this.assetUniqueId,
+    this.terminationReason,
   });
 
   final int id;
@@ -109,8 +117,28 @@ class MaintenanceSchedule extends Equatable {
   final ScheduleEligibility? eligibility;
   final TemplateRef? defaultTemplate;
 
+  // C1: the occurrence's asset when it has one (raw `asset` id on the wire),
+  // its display name / unique id, and why a SKIPPED row was closed early.
+  final int? assetId;
+  final String? assetName;
+  final String? assetUniqueId;
+  final String? terminationReason;
+
   bool get isConverted => workOrderId != null;
   bool get isEligible => eligibility?.eligible ?? false;
+
+  /// Human label for [terminationReason] (`ASSET_TRANSFERRED` →
+  /// 'Asset Transferred'); null when there is no reason.
+  String? get terminationLabel {
+    final raw = terminationReason;
+    if (raw == null || raw.trim().isEmpty) return null;
+    return raw
+        .split('_')
+        .where((part) => part.isNotEmpty)
+        .map((part) =>
+            part[0].toUpperCase() + part.substring(1).toLowerCase())
+        .join(' ');
+  }
 
   factory MaintenanceSchedule.fromJson(Map<String, dynamic> json) {
     ScheduleEligibility? eligibility;
@@ -144,6 +172,10 @@ class MaintenanceSchedule extends Equatable {
       templateSource: asJsonString(json['template_source']),
       eligibility: eligibility,
       defaultTemplate: defaultTemplate,
+      assetId: asJsonInt(json['asset']),
+      assetName: asJsonString(json['asset_name']),
+      assetUniqueId: asJsonString(json['asset_unique_id']),
+      terminationReason: asJsonString(json['termination_reason']),
     );
   }
 
@@ -161,5 +193,9 @@ class MaintenanceSchedule extends Equatable {
         workOrderStatus,
         periodStart,
         templateSource,
+        assetId,
+        assetName,
+        assetUniqueId,
+        terminationReason,
       ];
 }
