@@ -118,6 +118,11 @@ class WorkOrder extends Equatable {
     required this.type,
     this.ticketNumber,
     this.maintenanceMasterName,
+    // S-V1 checklist version frozen when this Job Work was created
+    // (`maintenance_master_version_snapshot`), surfaced in S-V4. This is the
+    // version actually executed — not the master's current version — and is
+    // null for legacy/unversioned rows.
+    this.maintenanceMasterVersionSnapshot,
     this.slaStatus,
     this.escalationLevel,
     this.stationId,
@@ -155,6 +160,9 @@ class WorkOrder extends Equatable {
 
   /// Checklist template this work order executes.
   final String? maintenanceMasterName;
+
+  /// Checklist version frozen at execution time (see above).
+  final String? maintenanceMasterVersionSnapshot;
 
   /// Server-computed SLA state, e.g. "OK", "AT_RISK", "BREACHED".
   final String? slaStatus;
@@ -224,6 +232,7 @@ class WorkOrder extends Equatable {
       type: type,
       ticketNumber: ticketNumber,
       maintenanceMasterName: maintenanceMasterName,
+      maintenanceMasterVersionSnapshot: maintenanceMasterVersionSnapshot,
       slaStatus: slaStatus,
       escalationLevel: escalationLevel,
       stationId: stationId,
@@ -279,6 +288,8 @@ class WorkOrder extends Equatable {
       type: WorkOrderType.fromString(asJsonString(json['type'])),
       ticketNumber: asJsonString(json['ticket_number']),
       maintenanceMasterName: asJsonString(json['maintenance_master_name']),
+      maintenanceMasterVersionSnapshot:
+          asJsonString(json['maintenance_master_version_snapshot']),
       slaStatus: asJsonString(json['sla_status']),
       escalationLevel: asJsonString(json['escalation_level']),
       stationId: fkId(json['station']),
@@ -315,6 +326,7 @@ class WorkOrder extends Equatable {
         type,
         ticketNumber,
         maintenanceMasterName,
+        maintenanceMasterVersionSnapshot,
         slaStatus,
         escalationLevel,
         stationId,

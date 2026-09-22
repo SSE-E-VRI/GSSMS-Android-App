@@ -209,6 +209,18 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
         ),
         const SizedBox(height: GssmsSpacing.s8),
         Text(wo.displayTitle, style: textTheme.titleLarge),
+        // S-V4: the checklist version actually executed (frozen server-side
+        // at creation), not the template's current version. Shown only when
+        // the server sent one — legacy rows render exactly as before.
+        if (wo.maintenanceMasterVersionSnapshot != null &&
+            wo.maintenanceMasterVersionSnapshot!.trim().isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: GssmsSpacing.s4),
+            child: Text(
+              'Checklist v${wo.maintenanceMasterVersionSnapshot!.trim()} · as executed',
+              style: textTheme.bodySmall,
+            ),
+          ),
         const SizedBox(height: GssmsSpacing.s12),
         Wrap(
           spacing: GssmsSpacing.s8,

@@ -809,12 +809,16 @@ class _WorkOrderCreateScreenState
           const SizedBox(height: 12),
           _label('Category',
               tooltip:
-                  'Asset Template applies to one specific asset; Station / Batch Template applies broadly across a station.'),
+                  'Asset Template applies to one specific asset; Station / Batch Template applies broadly across a station; AMC lists the division AMC checklists.'),
           const SizedBox(height: 6),
           // Web splits templates into Asset Templates / Station Templates
           // tables (MaintenanceMasterList.jsx `template_kind`); here that's a
           // segmented toggle instead of two lists. "Station / Batch" is the
-          // scoped-across-a-station template kind ("batch job work").
+          // scoped-across-a-station template kind ("batch job work"). S-V4:
+          // AMC checklists arrive in this same list from the server
+          // (division-scoped, not opt-in-gated) and get their own tab so they
+          // no longer hide inside "Asset". The ad hoc kinds stay out: they
+          // are never fetched (no ?include_divisional) until S-V5 exists.
           SegmentedButton<MaintenanceTemplateKind>(
             key: const Key('wo_template_kind_segment'),
             segments: const [
@@ -825,6 +829,10 @@ class _WorkOrderCreateScreenState
               ButtonSegment(
                 value: MaintenanceTemplateKind.stationTemplate,
                 label: Text('Station / Batch', style: TextStyle(fontSize: 12)),
+              ),
+              ButtonSegment(
+                value: MaintenanceTemplateKind.amc,
+                label: Text('AMC', style: TextStyle(fontSize: 12)),
               ),
             ],
             selected: {_templateKindFilter},
@@ -894,7 +902,7 @@ class _WorkOrderCreateScreenState
                   value: null, child: Text('-- No Template --')),
               ...filtered.map((t) => DropdownMenuItem(
                   value: t.id,
-                  child: Text('${t.name} (${t.scheduleType.displayName})',
+                  child: Text(t.displayLabel,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(fontSize: 13)))),
             ],

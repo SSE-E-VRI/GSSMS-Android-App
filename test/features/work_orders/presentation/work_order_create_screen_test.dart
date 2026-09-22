@@ -12,6 +12,7 @@ import 'package:gssms_mobile/features/reports/data/infrastructure_options_servic
 import 'package:gssms_mobile/features/reports/domain/models/infrastructure_option.dart';
 import 'package:gssms_mobile/features/reports/presentation/controllers/reports_controller.dart';
 import 'package:gssms_mobile/features/work_orders/data/work_order_repository.dart';
+import 'package:gssms_mobile/features/work_orders/domain/models/maintenance_master.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/work_order.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_order_controllers.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/screens/work_order_create_screen.dart';
@@ -112,5 +113,69 @@ void main() {
           assetId: null,
           scheduledDate: null,
         )).called(1);
+  });
+
+  testWidgets('AMC checklist renders under its own segment, not Asset',
+      (tester) async {
+    const assetMaster = MaintenanceMaster(
+      id: 11,
+      name: 'Panel Monthly',
+      scheduleType: MaintenanceScheduleType.monthly,
+      templateKind: MaintenanceTemplateKind.assetTemplate,
+    );
+    const amcMaster = MaintenanceMaster(
+      id: 12,
+      name: 'DG Set AMC',
+      scheduleType: MaintenanceScheduleType.quarterly,
+      templateKind: MaintenanceTemplateKind.amc,
+    );
+
+    final mockRepo = MockWorkOrderRepository();
+    final mockOrg = MockOrgScopeOptionsService();
+    final mockInfra = MockInfraOptionsService();
+    final mockAssets = MockAssetApiService();
+
+    when(() => mockInfra.fetchOptions(any(), depotId: any(named: 'depotId')))
+        .thenAnswer((_) async => const []);
+    when(() => mockRepo.fetchMaintenanceMasters())
+        .thenAnswer((_) async => const [assetMaster, amcMaster]);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          workOrderRepositoryProvider.overrideWithValue(mockRepo),
+          authControllerProvider.overrideWith(() => _FakeAuth(_session)),
+          orgScopeOptionsServiceProvider.overrideWithValue(mockOrg),
+          infrastructureOptionsServiceProvider.overrideWithValue(mockInfra),
+          assetApiServiceProvider.overrideWithValue(mockAssets),
+        ],
+        child: const MaterialApp(home: WorkOrderCreateScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    Future<void> openTemplateMenu() async {
+      await tester.ensureVisible(find.byKey(const Key('wo_template_dropdown')));
+      await tester.tap(find.byKey(const Key('wo_template_dropdown')));
+      await tester.pumpAndSettle();
+    }
+
+    // Default Asset segment: the AMC checklist must not hide here.
+    await openTemplateMenu();
+    expect(find.text('Panel Monthly (Monthly)'), findsOneWidget);
+    expect(find.text('DG Set AMC (Quarterly)'), findsNothing);
+
+    // The open menu consumes the first tap outside it to dismiss; tap the
+    // AMC segment text again to actually select it.
+    await tester.tap(find.text('AMC'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('AMC'));
+    await tester.tap(find.text('AMC'));
+    await tester.pumpAndSettle();
+
+    // AMC segment: the AMC checklist renders here, the asset one does not.
+    await openTemplateMenu();
+    expect(find.text('DG Set AMC (Quarterly)'), findsOneWidget);
+    expect(find.text('Panel Monthly (Monthly)'), findsNothing);
   });
 }
