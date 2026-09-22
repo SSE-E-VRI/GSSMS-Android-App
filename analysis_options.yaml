@@ -9,6 +9,10 @@ linter:
     always_declare_return_types: true
 
 analyzer:
+  exclude:
+    - build/**
+    - android/**
+    - ios/**
   plugins:
     - custom_lint
 

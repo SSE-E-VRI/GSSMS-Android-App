@@ -297,7 +297,11 @@ class _SchedulesTab extends ConsumerWidget {
           key: Key('schedule_pending_card_${s.id}'),
           margin: const EdgeInsets.only(bottom: 10),
           child: ListTile(
-            leading: canConvert && !s.isConverted
+            // Review finding B1: SKIPPED rows have no work order, so
+            // `!s.isConverted` alone let them render a live checkbox and be
+            // submitted for batch conversion - which the backend always
+            // refuses (400), with no explanation surfaced back to the user.
+            leading: canConvert && !s.isConverted && !s.isSkipped
                 ? Checkbox(
                     value: selected,
                     onChanged: (_) => ref
