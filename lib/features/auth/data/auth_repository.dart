@@ -71,6 +71,7 @@ class AuthRepository implements IAuthRepository {
   String? get currentAccessToken => _currentAccessToken;
 
   Future<String?>? _inFlightRefresh;
+  int _opGeneration = 0;
 
   @override
   Future<UserSession> login({
@@ -145,7 +146,9 @@ class AuthRepository implements IAuthRepository {
   }
 
   Future<String?> _performRefreshToken() async {
+    final gen = _opGeneration;
     final storedRefreshToken = await _secureStorage.getRefreshToken();
+    if (gen != _opGeneration) return null;
     if (storedRefreshToken == null || storedRefreshToken.isEmpty) {
       await logout();
       return null;
@@ -153,6 +156,7 @@ class AuthRepository implements IAuthRepository {
 
     try {
       final tokens = await _apiService.refreshToken(storedRefreshToken);
+      if (gen != _opGeneration) return null;
       final newSession = UserSession.fromJwt(tokens.accessToken);
 
       if (tokens.refreshToken != null && tokens.refreshToken != storedRefreshToken) {
@@ -166,10 +170,10 @@ class AuthRepository implements IAuthRepository {
       await _onSessionRefreshed?.call(newSession, previous);
       return _currentAccessToken;
     } on UnauthorizedException {
-      await logout();
+      if (gen == _opGeneration) await logout();
       return null;
     } on GuestExpiredException {
-      await logout();
+      if (gen == _opGeneration) await logout();
       return null;
     } catch (_) {
       // Transient error: do NOT logout. Return null so request retry can handle standard error.
@@ -231,19 +235,22 @@ class AuthRepository implements IAuthRepository {
     final cache = _cacheService;
     if (cache == null) return;
 
-    final owner = await cache.getCacheOwnerUserId();
-    final userChanged = session.userId != null &&
-        owner != null &&
-        owner != session.userId;
-    final authChanged =
-        previous != null && session.authorizationChangedFrom(previous);
+    // Cache I/O must never fail login/restore: tokens are already valid.
+    try {
+      final owner = await cache.getCacheOwnerUserId();
+      final userChanged = session.userId != null &&
+          owner != null &&
+          owner != session.userId;
+      final authChanged =
+          previous != null && session.authorizationChangedFrom(previous);
 
-    if (userChanged || authChanged) {
-      await cache.clearAllCache();
-    }
-    if (session.userId != null) {
-      await cache.setCacheOwnerUserId(session.userId!);
-    }
+      if (userChanged || authChanged) {
+        await cache.clearAllCache();
+      }
+      if (session.userId != null) {
+        await cache.setCacheOwnerUserId(session.userId!);
+      }
+    } catch (_) {}
   }
 
   @override
@@ -295,6 +302,10 @@ class AuthRepository implements IAuthRepository {
 
   @override
   Future<void> logout() async {
+    // Bump generation so an in-flight refresh/login can no longer
+    // repopulate the session after this clear.
+    _opGeneration++;
+    _inFlightRefresh = null;
     _currentSession = null;
     _currentAccessToken = null;
     await _secureStorage.clearTokens();

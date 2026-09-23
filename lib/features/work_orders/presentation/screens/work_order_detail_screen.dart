@@ -68,6 +68,7 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
     }
 
     ref.listen(workOrderDetailControllerProvider(widget.workOrderId), (prev, next) {
+      if (!context.mounted) return;
       if (next is WorkOrderDetailLoaded && next.errorMessage != null) {
         final tokens = context.gssms;
         ScaffoldMessenger.of(context).showSnackBar(

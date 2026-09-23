@@ -14,7 +14,7 @@ final authenticatedDioProvider = Provider<Dio>((ref) {
     refreshTokenHandler: () => authRepo.refreshToken(),
     onSessionExpired: () async {
       await authRepo.logout();
-      ref.read(authControllerProvider.notifier).handleSessionExpired();
+      await ref.read(authControllerProvider.notifier).handleSessionExpired();
     },
   );
 });

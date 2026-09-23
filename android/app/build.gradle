@@ -17,9 +17,11 @@ if (keystorePropertiesFile.exists()) {
 
 android {
     namespace = "com.ssee_vri.gssms_mobile"
-    compileSdk = 35
-    buildToolsVersion = "34.0.0"
-    ndkVersion = "25.1.8937393"
+    compileSdk = 36
+
+    buildFeatures {
+        resValues = true
+    }
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -32,8 +34,9 @@ android {
 
     defaultConfig {
         applicationId = "com.ssee_vri.gssms_mobile"
-        minSdk = 21
-        targetSdk = flutter.targetSdkVersion
+        // flutter_secure_storage encrypted prefs need 23+; CameraX/mobile_scanner need 24+.
+        minSdk = 24
+        targetSdk = 36
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }

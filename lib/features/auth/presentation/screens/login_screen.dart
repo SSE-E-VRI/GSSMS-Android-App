@@ -20,9 +20,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _passwordController = TextEditingController();
   final _otpController = TextEditingController();
   bool _obscurePassword = true;
+  ProviderSubscription<AuthState>? _authSub;
+
+  @override
+  void initState() {
+    super.initState();
+    // Clear the password from memory as soon as authentication succeeds —
+    // the controller must not retain it in its TextEditingController.
+    _authSub = ref.listenManual<AuthState>(authControllerProvider,
+        (prev, next) {
+      if (next is Authenticated) {
+        _passwordController.clear();
+        _otpController.clear();
+      }
+    });
+  }
 
   @override
   void dispose() {
+    _authSub?.close();
     _usernameController.dispose();
     _passwordController.dispose();
     _otpController.dispose();

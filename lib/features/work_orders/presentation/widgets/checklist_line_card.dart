@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
@@ -120,10 +121,26 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
         _remarksController.text = widget.line.observationAction ?? '';
       }
       final components = widget.line.componentValues;
-      for (final key in widget.line.valueType.componentKeys) {
-        final focus = _componentFocusNodes[key];
-        final ctrl = _componentControllers[key];
-        if (ctrl != null && focus != null && !focus.hasFocus) {
+      // RYB <-> VoltAmp switches introduce new keys: create controllers
+      // for them, dispose removed ones, sync text for existing ones.
+      final newKeys = widget.line.valueType.componentKeys.toSet();
+      final oldKeys = _componentControllers.keys.toSet();
+      for (final removed in oldKeys.difference(newKeys)) {
+        _componentFocusNodes[removed]?.removeListener(_onFocusChanged);
+        _componentFocusNodes[removed]?.dispose();
+        _componentFocusNodes.remove(removed);
+        _componentControllers[removed]?.dispose();
+        _componentControllers.remove(removed);
+      }
+      for (final key in newKeys) {
+        var ctrl = _componentControllers[key];
+        var focus = _componentFocusNodes[key];
+        if (ctrl == null || focus == null) {
+          ctrl = TextEditingController(text: components[key] ?? '');
+          focus = FocusNode()..addListener(_onFocusChanged);
+          _componentControllers[key] = ctrl;
+          _componentFocusNodes[key] = focus;
+        } else if (!focus.hasFocus) {
           ctrl.text = components[key] ?? '';
         }
       }
@@ -373,12 +390,23 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
       keyboardType: isNumeric
           ? const TextInputType.numberWithOptions(decimal: true, signed: true)
           : TextInputType.text,
+      inputFormatters: isNumeric
+          ? [
+              FilteringTextInputFormatter.allow(
+                  RegExp(r'^-?[0-9]*\.?[0-9]*')),
+            ]
+          : null,
       decoration: InputDecoration(
         labelText: 'Reading',
         hintText: hasReference ? 'Reference: ${line.referenceValue}' : null,
         suffixText: hasUnit ? line.unit : null,
         isDense: true,
         border: const OutlineInputBorder(),
+        errorText: isNumeric &&
+                _valueController.text.trim().isNotEmpty &&
+                double.tryParse(_valueController.text.trim()) == null
+            ? 'Enter a valid number'
+            : null,
       ),
       onChanged: (_) => _triggerSave(),
       onEditingComplete: () => _triggerSave(immediate: true),
@@ -414,6 +442,10 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
               controller: _componentControllers[key],
               focusNode: _componentFocusNodes[key],
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(
+                    RegExp(r'^-?[0-9]*\.?[0-9]*')),
+              ],
               decoration: InputDecoration(
                 labelText: key,
                 labelStyle: TextStyle(
@@ -427,7 +459,7 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderSide: BorderSide(
-                      color: _getComponentColor(key).withOpacity(0.6)),
+                      color: _getComponentColor(key).withValues(alpha: 0.6)),
                 ),
                 border: const OutlineInputBorder(),
               ),

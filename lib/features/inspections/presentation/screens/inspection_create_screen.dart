@@ -53,6 +53,7 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
   List<InfrastructureOption> _locations = const [];
   bool _loadingLocations = false;
   int? _selectedLocationId;
+  int _loadSeq = 0;
 
   // Inspection Points
   final List<TextEditingController> _pointControllers = [TextEditingController()];
@@ -132,6 +133,7 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
   }
 
   Future<void> _loadDepots({int? zoneId, int? divisionId}) async {
+    if (!mounted) return;
     setState(() => _loadingDepots = true);
     try {
       final depots = await ref.read(orgScopeOptionsServiceProvider).fetchDepots(zoneId: zoneId, divisionId: divisionId);
@@ -144,6 +146,8 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
   }
 
   Future<void> _loadLocations() async {
+    if (!mounted) return;
+    final seq = ++_loadSeq;
     if (_infraType == InfraFilterType.all) {
       setState(() {
         _locations = const [];
@@ -158,11 +162,13 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
     });
     try {
       final options = await ref.read(infrastructureOptionsServiceProvider).fetchOptions(_infraType, depotId: _selectedDepotId);
-      if (mounted) setState(() => _locations = options);
+      if (!mounted || seq != _loadSeq) return;
+      setState(() => _locations = options);
     } catch (_) {
-      if (mounted) setState(() => _locations = const []);
+      if (!mounted || seq != _loadSeq) return;
+      setState(() => _locations = const []);
     } finally {
-      if (mounted) setState(() => _loadingLocations = false);
+      if (mounted && seq == _loadSeq) setState(() => _loadingLocations = false);
     }
   }
 
@@ -206,7 +212,10 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
   }
 
   Future<void> _submit() async {
-    if (!sessionAllows(sessionOf(ref), 'inspections.create')) return;
+    if (!sessionAllows(
+        sessionFromAuth(ref.read(authControllerProvider)), 'inspections.create')) {
+      return;
+    }
     final titleValid = _formKey.currentState?.validate() ?? false;
     // Points validation is outside Form's TextFormFields because the list is dynamic.
     final points = _pointControllers.map((c) => c.text.trim()).where((t) => t.isNotEmpty).toList();
@@ -554,13 +563,28 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
             ],
           ),
           const SizedBox(height: 14),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(child: _infraTypeField()),
-              const SizedBox(width: 12),
-              Expanded(child: _locationNameField()),
-            ],
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final narrow = constraints.maxWidth < 420;
+              if (narrow) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _infraTypeField(),
+                    const SizedBox(height: 12),
+                    _locationNameField(),
+                  ],
+                );
+              }
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: _infraTypeField()),
+                  const SizedBox(width: 12),
+                  Expanded(child: _locationNameField()),
+                ],
+              );
+            },
           ),
         ],
       ),

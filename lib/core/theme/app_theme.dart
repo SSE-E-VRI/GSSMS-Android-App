@@ -212,7 +212,7 @@ class AppTheme {
         centerTitle: false,
         titleTextStyle: themedText.titleLarge?.copyWith(color: Colors.white),
       ),
-      tabBarTheme: TabBarTheme(
+      tabBarTheme: TabBarThemeData(
         labelColor: Colors.white,
         unselectedLabelColor: Colors.white70,
         indicatorColor: Colors.white,
@@ -221,7 +221,7 @@ class AppTheme {
         unselectedLabelStyle:
             themedText.labelMedium?.copyWith(fontWeight: FontWeight.w500),
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: cardColor,
         surfaceTintColor: Colors.transparent,
         elevation: brightness == Brightness.light ? 1 : 0,
@@ -305,7 +305,7 @@ class AppTheme {
           borderRadius: BorderRadius.circular(GssmsRadius.r8),
         ),
       ),
-      dialogTheme: DialogTheme(
+      dialogTheme: DialogThemeData(
         backgroundColor: cardColor,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(

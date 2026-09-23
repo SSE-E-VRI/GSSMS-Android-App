@@ -74,6 +74,7 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
     final state = ref.watch(checklistControllerProvider(widget.recordId));
 
     ref.listen(checklistControllerProvider(widget.recordId), (prev, next) {
+      if (!context.mounted) return;
       if (next is ChecklistCompleted) {
         // Never claim completion that has only reached this device (SSOT §41).
         showGssmsSnackBar(
@@ -742,7 +743,7 @@ class _CompletionSheetState extends ConsumerState<_CompletionSheet> {
   }
 
   Future<void> _submit() async {
-    if (!canWriteChecklist(sessionOf(ref))) {
+    if (!canWriteChecklist(sessionFromAuth(ref.read(authControllerProvider)))) {
       if (mounted) {
         showPermissionDeniedSnackBar(context);
       }

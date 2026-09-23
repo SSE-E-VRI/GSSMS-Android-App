@@ -24,6 +24,22 @@ int? asJsonInt(dynamic value) {
   return int.tryParse(value.toString());
 }
 
+/// Defensively coerces a decoded JSON value to a double.
+///
+/// Handles `int`, `double`, and numeric strings (`"12.5"`) without throwing.
+/// Returns null for empty/invalid input.
+double? asJsonDouble(dynamic value) {
+  if (value == null) return null;
+  if (value is double) return value;
+  if (value is num) return value.toDouble();
+  if (value is String) {
+    final text = value.trim();
+    if (text.isEmpty) return null;
+    return double.tryParse(text);
+  }
+  return null;
+}
+
 /// Parses an API date/datetime into **device-local** time.
 ///
 /// The backend runs with `USE_TZ = True` and serializes datetimes with an

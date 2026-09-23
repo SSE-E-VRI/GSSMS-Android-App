@@ -32,6 +32,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       final session = sessionFromAuth(ref.read(authControllerProvider));
       if (!sessionAllows(session, 'dashboard.view')) return;
       ref.read(dashboardControllerProvider.notifier).loadDashboard();
@@ -388,7 +389,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         rows.add(_pendingRow(
           icon: Icons.hourglass_empty_outlined,
           color: context.gssms.warning.foreground,
-          title: '${stats.pendingTaskCount} pending tasks',
+          title: '${stats.pendingTaskCount} pending job works',
           subtitle: 'Open assignments needing execution',
           onTap: () => openList(const WorkOrderListScreen()),
         ));

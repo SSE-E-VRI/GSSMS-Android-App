@@ -116,11 +116,19 @@ class WorkOrderListController extends Notifier<WorkOrderListState> {
   }
 
   void setStatusFilter(WorkOrderStatus? status) {
-    if (state is WorkOrderListLoaded) {
-      final current = state as WorkOrderListLoaded;
-      state = current.copyWith(
+    final s = state;
+    if (s is WorkOrderListLoaded) {
+      state = s.copyWith(
         selectedStatusFilter: status,
         clearStatusFilter: status == null,
+      );
+    } else if (s is WorkOrderListError && s.previousLoaded != null) {
+      state = WorkOrderListError(
+        s.message,
+        previousLoaded: s.previousLoaded!.copyWith(
+          selectedStatusFilter: status,
+          clearStatusFilter: status == null,
+        ),
       );
     }
   }
@@ -198,9 +206,14 @@ class WorkOrderListController extends Notifier<WorkOrderListState> {
   }
 
   void setSearchQuery(String query) {
-    if (state is WorkOrderListLoaded) {
-      final current = state as WorkOrderListLoaded;
-      state = current.copyWith(searchQuery: query);
+    final s = state;
+    if (s is WorkOrderListLoaded) {
+      state = s.copyWith(searchQuery: query);
+    } else if (s is WorkOrderListError && s.previousLoaded != null) {
+      state = WorkOrderListError(
+        s.message,
+        previousLoaded: s.previousLoaded!.copyWith(searchQuery: query),
+      );
     }
   }
 
@@ -295,8 +308,11 @@ class WorkOrderDetailController extends FamilyNotifier<WorkOrderDetailState, int
       state = current.copyWith(isTransitioning: false, actionMessage: e.toString());
       return null;
     } catch (e) {
-      state = current.copyWith(isTransitioning: false, actionMessage: null);
-      state = WorkOrderDetailError('Failed to start execution: ${_readableError(e)}');
+      // Stay on Loaded with an inline message (consistent with
+      // assign/verify/transition) so the detail is not lost on error.
+      state = current.copyWith(
+          isTransitioning: false,
+          actionMessage: 'Failed to start execution: ${_readableError(e)}');
       return null;
     }
   }

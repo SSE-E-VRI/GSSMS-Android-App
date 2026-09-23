@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gssms_mobile/core/sync/sync_manager.dart';
 import 'package:gssms_mobile/features/assets/presentation/controllers/asset_controllers.dart';
@@ -11,14 +12,22 @@ import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_
 
 /// Drop offline WO/record/outbox cache and in-memory list/detail providers
 /// so a later login on a shared device cannot read the previous user's data.
-Future<void> clearOperationalSession(Ref ref) async {
+/// Returns true when the wipe fully succeeded; false when cache clearing
+/// failed (caller should surface it — a failed wipe leaks prior user data).
+Future<bool> clearOperationalSession(Ref ref) async {
+  var ok = true;
   try {
     ref.read(syncManagerProvider.notifier).invalidateSessionBoundWork();
-  } catch (_) {}
+  } catch (e) {
+    debugPrint('clearOperationalSession: invalidate failed: $e');
+    ok = false;
+  }
   try {
     await ref.read(localCacheServiceProvider).clearAllCache();
-  } catch (_) {
+  } catch (e) {
     // SharedPreferences may be unavailable in unit tests; still invalidate.
+    debugPrint('clearOperationalSession: clearAllCache failed: $e');
+    ok = false;
   }
   try {
     ref.invalidate(workOrderListControllerProvider);
@@ -32,5 +41,9 @@ Future<void> clearOperationalSession(Ref ref) async {
     ref.invalidate(assetListControllerProvider);
     ref.invalidate(assetDetailControllerProvider);
     ref.invalidate(notificationsListProvider);
-  } catch (_) {}
+  } catch (e) {
+    debugPrint('clearOperationalSession: invalidate providers failed: $e');
+    ok = false;
+  }
+  return ok;
 }

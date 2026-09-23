@@ -90,6 +90,18 @@ class AppConfig {
         ? explicitBaseUrl
         : (environment == AppEnvironment.prod ? defaultBaseUrl : environment.defaultBaseUrl);
 
+    final uri = Uri.tryParse(baseUrl);
+    assert(
+      uri != null &&
+          (uri.scheme == 'https' ||
+              environment != AppEnvironment.prod ||
+              uri.host == 'localhost' ||
+              uri.host == '127.0.0.1' ||
+              uri.host == '10.0.2.2'),
+      'Prod/staging base URL must be https (got $baseUrl). '
+      'Pass --dart-define=GSSMS_BASE_URL=https://…',
+    );
+
     return AppConfig(
       baseUrl: baseUrl,
       environment: environment,

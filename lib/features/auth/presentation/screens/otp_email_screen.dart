@@ -49,6 +49,9 @@ class _OtpEmailScreenState extends ConsumerState<OtpEmailScreen> {
           );
 
       if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+      });
 
       await Navigator.of(context).push(
         MaterialPageRoute(

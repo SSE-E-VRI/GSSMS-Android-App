@@ -67,6 +67,7 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
 
   List<Asset> _assets = const [];
   bool _loadingAssets = false;
+  int _loadSeq = 0;
   List<String> _categories = const [];
   String? _selectedCategory;
   int? _selectedAssetId;
@@ -137,6 +138,7 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
   }
 
   Future<void> _loadDepartments() async {
+    if (!mounted) return;
     setState(() => _loadingDepartments = true);
     try {
       final options = await ref
@@ -153,6 +155,7 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
   }
 
   Future<void> _loadDepots({int? zoneId, int? divisionId}) async {
+    if (!mounted) return;
     setState(() => _loadingDepots = true);
     try {
       final depots = await ref
@@ -167,6 +170,8 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
   }
 
   Future<void> _loadLocations() async {
+    if (!mounted) return;
+    final seq = ++_loadSeq;
     setState(() {
       _loadingLocations = true;
       _selectedLocationId = null;
@@ -180,15 +185,19 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
       final options = await ref
           .read(infrastructureOptionsServiceProvider)
           .fetchOptions(_infraType, depotId: _selectedDepotId);
-      if (mounted) setState(() => _locations = options);
+      if (!mounted || seq != _loadSeq) return;
+      setState(() => _locations = options);
     } catch (_) {
-      if (mounted) setState(() => _locations = const []);
+      if (!mounted || seq != _loadSeq) return;
+      setState(() => _locations = const []);
     } finally {
-      if (mounted) setState(() => _loadingLocations = false);
+      if (mounted && seq == _loadSeq) setState(() => _loadingLocations = false);
     }
   }
 
   Future<void> _loadAssetsForLocation() async {
+    if (!mounted) return;
+    final seq = ++_loadSeq;
     final stationId = _resolvedStationId;
     setState(() {
       _assets = const [];
@@ -203,7 +212,7 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
       final page = await ref
           .read(assetApiServiceProvider)
           .getAssets(stationId: stationId);
-      if (!mounted) return;
+      if (!mounted || seq != _loadSeq) return;
       final categories = <String>{
         for (final a in page.assets)
           if ((a.assetCategoryName ?? '').trim().isNotEmpty)
@@ -215,9 +224,10 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
         _categories = categories;
       });
     } catch (_) {
-      if (mounted) setState(() => _assets = const []);
+      if (!mounted || seq != _loadSeq) return;
+      setState(() => _assets = const []);
     } finally {
-      if (mounted) setState(() => _loadingAssets = false);
+      if (mounted && seq == _loadSeq) setState(() => _loadingAssets = false);
     }
   }
 
@@ -229,8 +239,11 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
   }
 
   Future<void> _submitComplaint() async {
-    if (!sessionAllows(sessionOf(ref), 'complaints.create')) return;
-    if (!_formKey.currentState!.validate()) return;
+    if (!sessionAllows(
+        sessionFromAuth(ref.read(authControllerProvider)), 'complaints.create')) {
+      return;
+    }
+    if (!(_formKey.currentState?.validate() ?? false)) return;
     if (_selectedDepartment == null) {
       setState(() => _departmentError = 'Please select a department');
       return;

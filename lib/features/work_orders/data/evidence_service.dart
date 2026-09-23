@@ -157,6 +157,14 @@ class EvidenceService {
     final target = '${dir.path}${Platform.pathSeparator}${kind.name}_$stamp.jpg';
 
     try {
+      final sourceLen = await source.length();
+      // Picker maxWidth is best-effort: a full-res pick decodes to ~48 MB
+      // RGBA. Refuse absurdly large files before paying for the read.
+      const maxSourceBytes = 30 * 1024 * 1024;
+      if (sourceLen > maxSourceBytes) {
+        throw FileSystemException(
+            'Photo is too large (${(sourceLen / 1048576).toStringAsFixed(1)} MB)', sourcePath);
+      }
       final rawBytes = await source.readAsBytes();
 
       // decode/bake/resize/encode are pure Dart and would otherwise run on the
@@ -194,10 +202,15 @@ class EvidenceService {
   @visibleForTesting
   Future<Uint8List?> Function(Uint8List bytes)? processImageOverride;
 
-  Future<Uint8List?> _runImageProcessing(Uint8List rawBytes) {
+  Future<Uint8List?> _runImageProcessing(Uint8List rawBytes) async {
     final override = processImageOverride;
     if (override != null) return override(rawBytes);
-    return compute(normalizeEvidenceJpeg, rawBytes);
+    try {
+      return await compute(normalizeEvidenceJpeg, rawBytes);
+    } catch (_) {
+      // OOM or isolate failure on huge images: caller falls back to copy.
+      return null;
+    }
   }
 
   /// Returns total bytes occupied by local evidence photos in the app's evidence directory.
@@ -245,9 +258,26 @@ class EvidenceService {
       final dir = Directory('${docs.path}${Platform.pathSeparator}$_evidenceDirName');
       if (!await dir.exists()) return;
       final cutoff = DateTime.now().subtract(maxAge ?? retentionPeriod);
+      // Canonicalize once: callers pass File.absolute paths (see SyncManager)
+      // and dir.list may yield symlinked/relative forms.
+      final canonicalExcluded = excludePaths?.map((p) {
+        try {
+          return File(p).absolute.path;
+        } catch (_) {
+          return p;
+        }
+      }).toSet();
       await for (final entity in dir.list(recursive: false)) {
         if (entity is File) {
-          if (excludePaths != null && excludePaths.contains(entity.path)) {
+          String canonicalEntity;
+          try {
+            canonicalEntity = File(entity.path).absolute.path;
+          } catch (_) {
+            canonicalEntity = entity.path;
+          }
+          if (canonicalExcluded != null &&
+              (canonicalExcluded.contains(entity.path) ||
+                  canonicalExcluded.contains(canonicalEntity))) {
             continue;
           }
           final stat = await entity.stat();

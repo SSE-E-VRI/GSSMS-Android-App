@@ -67,6 +67,7 @@ class _WorkOrderCreateScreenState
   MaintenanceScheduleType? _templateScheduleFilter;
   MaintenanceTemplateKind _templateKindFilter = MaintenanceTemplateKind.assetTemplate;
   int? _selectedMaintenanceMasterId;
+  int _loadSeq = 0;
 
   List<MaintenanceMaster> get _filteredTemplates {
     return _templates.where((t) {
@@ -143,6 +144,7 @@ class _WorkOrderCreateScreenState
   }
 
   Future<void> _loadTemplates() async {
+    if (!mounted) return;
     setState(() => _loadingTemplates = true);
     try {
       final templates =
@@ -158,6 +160,7 @@ class _WorkOrderCreateScreenState
   }
 
   Future<void> _loadDepots({int? zoneId, int? divisionId}) async {
+    if (!mounted) return;
     setState(() => _loadingDepots = true);
     try {
       final d = await ref
@@ -172,6 +175,8 @@ class _WorkOrderCreateScreenState
   }
 
   Future<void> _loadLocations() async {
+    if (!mounted) return;
+    final seq = ++_loadSeq;
     setState(() {
       _loadingLocations = true;
       _selectedLocationId = null;
@@ -185,15 +190,19 @@ class _WorkOrderCreateScreenState
       final opts = await ref
           .read(infrastructureOptionsServiceProvider)
           .fetchOptions(_infraType, depotId: _selectedDepotId);
-      if (mounted) setState(() => _locations = opts);
+      if (!mounted || seq != _loadSeq) return;
+      setState(() => _locations = opts);
     } catch (_) {
-      if (mounted) setState(() => _locations = const []);
+      if (!mounted || seq != _loadSeq) return;
+      setState(() => _locations = const []);
     } finally {
-      if (mounted) setState(() => _loadingLocations = false);
+      if (mounted && seq == _loadSeq) setState(() => _loadingLocations = false);
     }
   }
 
   Future<void> _loadAssets() async {
+    if (!mounted) return;
+    final seq = ++_loadSeq;
     final stationId = _resolvedStationId;
     setState(() {
       _assets = const [];
@@ -207,7 +216,7 @@ class _WorkOrderCreateScreenState
       final page = await ref
           .read(assetApiServiceProvider)
           .getAssets(stationId: stationId);
-      if (!mounted) return;
+      if (!mounted || seq != _loadSeq) return;
       final cats = <String>{
         for (final a in page.assets)
           if ((a.assetCategoryName ?? '').trim().isNotEmpty)
@@ -219,9 +228,10 @@ class _WorkOrderCreateScreenState
         _categories = cats;
       });
     } catch (_) {
-      if (mounted) setState(() => _assets = const []);
+      if (!mounted || seq != _loadSeq) return;
+      setState(() => _assets = const []);
     } finally {
-      if (mounted) setState(() => _loadingAssets = false);
+      if (mounted && seq == _loadSeq) setState(() => _loadingAssets = false);
     }
   }
 
@@ -245,7 +255,7 @@ class _WorkOrderCreateScreenState
   }
 
   Future<void> _submit() async {
-    if (!canCreateWorkOrder(sessionOf(ref))) {
+    if (!canCreateWorkOrder(sessionFromAuth(ref.read(authControllerProvider)))) {
       if (mounted) {
         showPermissionDeniedSnackBar(context);
       }

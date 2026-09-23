@@ -259,7 +259,7 @@ class _MaintenanceScreenState extends ConsumerState<MaintenanceScreen> {
         tileColor: Theme.of(context).cardTheme.color,
         leading: CircleAvatar(backgroundColor: context.gssms.info.background, child: Icon(Icons.assignment, color: context.gssms.link)),
         title: const Text('Job Works', style: TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text('${stats.pendingTaskCount} pending tasks'),
+        subtitle: Text('${stats.pendingTaskCount} pending job works'),
         trailing: const Icon(Icons.arrow_forward_ios, size: 16),
         onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const WorkOrderListScreen())),
       ));

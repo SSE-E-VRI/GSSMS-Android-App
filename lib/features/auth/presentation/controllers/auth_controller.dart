@@ -33,7 +33,7 @@ final authRepositoryProvider = Provider<IAuthRepository>((ref) {
     refreshTokenHandler: () => repository.refreshToken(),
     onSessionExpired: () async {
       await repository.logout();
-      ref.read(authControllerProvider.notifier).handleSessionExpired();
+      await ref.read(authControllerProvider.notifier).handleSessionExpired();
     },
   );
 
@@ -58,6 +58,10 @@ final authControllerProvider = NotifierProvider<AuthController, AuthState>(() {
 class AuthController extends Notifier<AuthState> {
   String? _pendingPassword;
 
+  // Boxed generation token so stale async completions can be ignored
+  // (last-writer-wins would let a stale login overwrite a logout).
+  Object _opGenBox = Object();
+
   @override
   AuthState build() {
     ref.onDispose(() {
@@ -70,17 +74,21 @@ class AuthController extends Notifier<AuthState> {
 
   /// Restore existing session on app launch
   Future<void> restoreSession() async {
+    final op = _opGenBox = Object();
     state = const AuthLoading('Restoring session...');
     try {
       final session = await _repository.restoreSession();
+      if (!identical(op, _opGenBox)) return;
       if (session != null) {
         state = Authenticated(session);
       } else {
         state = const Unauthenticated();
       }
     } on GuestExpiredException catch (e) {
+      if (!identical(op, _opGenBox)) return;
       state = AuthError(e.message, code: e.code);
     } catch (_) {
+      if (!identical(op, _opGenBox)) return;
       state = const Unauthenticated();
     }
   }
@@ -92,21 +100,26 @@ class AuthController extends Notifier<AuthState> {
       return;
     }
 
+    final op = _opGenBox = Object();
     state = const AuthLoading('Signing in...');
     try {
       final session = await _repository.login(
         username: username,
         password: password,
       );
+      if (!identical(op, _opGenBox)) return;
       _pendingPassword = null;
       state = Authenticated(session);
     } on TwoFactorRequiredException {
+      if (!identical(op, _opGenBox)) return;
       _pendingPassword = password;
       state = OtpRequired(username: username);
     } on AuthException catch (e) {
+      if (!identical(op, _opGenBox)) return;
       _pendingPassword = null;
       state = AuthError(e.message, code: e.code);
     } catch (_) {
+      if (!identical(op, _opGenBox)) return;
       _pendingPassword = null;
       state = const AuthError('An unexpected authentication error occurred. Please try again.');
     }
@@ -144,7 +157,8 @@ class AuthController extends Notifier<AuthState> {
   /// Submit OTP code when challenge is requested
   Future<void> submitOtp(String otp) async {
     final currentState = state;
-    if (currentState is! OtpRequired || _pendingPassword == null) {
+    final pendingPassword = _pendingPassword;
+    if (currentState is! OtpRequired || pendingPassword == null) {
       state = const AuthError('No active 2FA challenge found. Please sign in again.');
       return;
     }
@@ -157,6 +171,7 @@ class AuthController extends Notifier<AuthState> {
       return;
     }
 
+    final op = _opGenBox = Object();
     // Retain OtpRequired view while verifying to prevent flickering
     state = OtpRequired(
       username: currentState.username,
@@ -166,21 +181,25 @@ class AuthController extends Notifier<AuthState> {
     try {
       final session = await _repository.login(
         username: currentState.username,
-        password: _pendingPassword!,
+        password: pendingPassword,
         otp: otp.trim(),
       );
+      if (!identical(op, _opGenBox)) return;
       _pendingPassword = null;
       state = Authenticated(session);
     } on InvalidOtpException catch (e) {
+      if (!identical(op, _opGenBox)) return;
       state = OtpRequired(
         username: currentState.username,
         errorMessage: e.message,
         isSubmitting: false,
       );
     } on AuthException catch (e) {
+      if (!identical(op, _opGenBox)) return;
       _pendingPassword = null;
       state = AuthError(e.message, code: e.code);
     } catch (_) {
+      if (!identical(op, _opGenBox)) return;
       _pendingPassword = null;
       state = const AuthError('Failed to verify 2FA code. Please try again.');
     }
@@ -216,16 +235,13 @@ class AuthController extends Notifier<AuthState> {
   }
 
   /// Triggered by interceptor when token refresh fails or guest access expires
-  void handleSessionExpired([String? reason]) {
+  Future<void> handleSessionExpired([String? reason]) async {
+    _opGenBox = Object();
     _pendingPassword = null;
     try {
       ref.read(syncManagerProvider.notifier).invalidateSessionBoundWork();
     } catch (_) {}
-    Future<void> cleanup() async {
-      await clearOperationalSession(ref);
-    }
-
-    cleanup();
+    await clearOperationalSession(ref);
     state = AuthError(
       reason ?? 'Your session has expired. Please log in again.',
       code: 'SESSION_EXPIRED',
@@ -246,6 +262,7 @@ class AuthController extends Notifier<AuthState> {
 
   /// Log out user and clear stored credentials
   Future<void> logout() async {
+    _opGenBox = Object();
     _pendingPassword = null;
     state = const AuthLoading('Signing out...');
     try {

@@ -184,10 +184,10 @@ class UserSession extends Equatable {
       throw const GuestExpiredException();
     }
 
-    // Parse scope
+    // Parse scope — claims may decode as Map<dynamic,dynamic>.
     final rawScope = claims['scope'];
-    final OrgScope scope = rawScope is Map<String, dynamic>
-        ? OrgScope.fromJson(rawScope)
+    final OrgScope scope = rawScope is Map
+        ? OrgScope.fromJson(Map<String, dynamic>.from(rawScope))
         : const OrgScope();
 
     final userIdRaw = claims['user_id'] ?? claims['id'];

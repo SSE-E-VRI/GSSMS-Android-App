@@ -141,6 +141,16 @@ class AuthInterceptor extends QueuedInterceptor {
       );
 
       // Replay through a bare Dio that shares this client's adapter and options.
+      // Re-enforce the HTTPS-only guard from DioClient: the retry client is
+      // bare and would otherwise bypass prod TLS enforcement.
+      final retryUri = requestOptions.uri;
+      if (retryUri.scheme != 'https' &&
+          !(retryUri.host == 'localhost' ||
+              retryUri.host == '127.0.0.1' ||
+              retryUri.host == '10.0.2.2')) {
+        await onSessionExpired();
+        return handler.next(err);
+      }
       try {
         final response = await _retryClient.fetch<dynamic>(requestOptions);
         return handler.resolve(response);

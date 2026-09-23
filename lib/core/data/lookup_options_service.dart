@@ -43,8 +43,8 @@ class LookupOptionsService {
     final raw = data is Map ? data['options'] : null;
     if (raw is! List) return const [];
     return raw
-        .whereType<Map<String, dynamic>>()
-        .map(LookupOption.fromJson)
+        .whereType<Map>()
+        .map((m) => LookupOption.fromJson(Map<String, dynamic>.from(m)))
         .where((o) => o.key.isNotEmpty)
         .toList();
   }

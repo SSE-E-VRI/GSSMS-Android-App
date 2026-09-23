@@ -164,6 +164,10 @@ class ProfilePhotoCache {
         .toList();
   }
 
+  /// Max bytes accepted for a profile photo (avatars are small; anything
+  /// larger is an error page or abuse).
+  static const int maxPhotoBytes = 5 * 1024 * 1024;
+
   /// Download from network and cache locally.
   Future<File?> downloadAndCache(int userId, String photoUrl) async {
     try {
@@ -172,6 +176,12 @@ class ProfilePhotoCache {
         fullUrl,
         options: Options(responseType: ResponseType.bytes),
       );
+      final contentLength =
+          int.tryParse(response.headers.value('content-length') ?? '');
+      if (contentLength != null && contentLength > maxPhotoBytes) {
+        debugPrint('ProfilePhotoCache: refusing oversized photo ($contentLength bytes)');
+        return null;
+      }
       // Never cache error pages: a 403/404 HTML body must not poison the
       // cache as a fake photo.
       final contentType =
@@ -181,6 +191,10 @@ class ProfilePhotoCache {
         return null;
       }
       if (response.data != null && response.data!.isNotEmpty) {
+        if (response.data!.length > maxPhotoBytes) {
+          debugPrint('ProfilePhotoCache: refusing oversized body (${response.data!.length} bytes)');
+          return null;
+        }
         final ext = photoUrl.toLowerCase().endsWith('.png') ? 'png' : 'jpg';
         return await savePhotoBytes(
           userId,

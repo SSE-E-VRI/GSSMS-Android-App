@@ -149,6 +149,30 @@ class WorkOrderRepository implements IWorkOrderRepository {
     return false;
   }
 
+  /// Enqueue unless an identical PENDING command is already queued
+  /// (double-tap offline must not create two idempotency keys for the same
+  /// logical write — the server would apply it twice).
+  /// Returns true when a new command was enqueued, false on dedup-hit.
+  Future<bool> _enqueueDeduped(
+    OutboxCommand cmd, {
+    bool Function(OutboxCommand existing)? matches,
+  }) async {
+    final sync = _syncManager;
+    if (sync == null) return false;
+    try {
+      final existing = await _cacheService.getOutboxCommands();
+      final isDup = existing.any((c) {
+        if (c.status != OutboxCommandStatus.pending) return false;
+        if (c.type != cmd.type || c.entityId != cmd.entityId) return false;
+        if (matches != null) return matches(c);
+        return true;
+      });
+      if (isDup) return false;
+    } catch (_) {}
+    await sync.enqueueCommand(cmd);
+    return true;
+  }
+
   @override
   Future<List<WorkOrder>> fetchWorkOrders({
     String? status,
@@ -325,7 +349,7 @@ class WorkOrderRepository implements IWorkOrderRepository {
           payload: const {},
           createdAt: DateTime.now(),
         );
-        await _syncManager.enqueueCommand(cmd);
+        await _enqueueDeduped(cmd);
         throw const StartExecutionQueuedOffline();
       }
       rethrow;
@@ -370,7 +394,8 @@ class WorkOrderRepository implements IWorkOrderRepository {
           },
           createdAt: DateTime.now(),
         );
-        await _syncManager.enqueueCommand(cmd);
+        await _enqueueDeduped(cmd,
+            matches: (c) => c.payload['status'] == status);
 
         // Optimistic update in cache. `remarks` is the transition note, not
         // the work order's description — copyWith'ing it into `description`
@@ -421,7 +446,8 @@ class WorkOrderRepository implements IWorkOrderRepository {
           payload: lineData,
           createdAt: DateTime.now(),
         );
-        await _syncManager.enqueueCommand(cmd);
+        await _enqueueDeduped(cmd,
+            matches: (c) => c.payload['line_id'] == lineId);
         return MutationOutcome.queued;
       }
       rethrow;
@@ -451,7 +477,7 @@ class WorkOrderRepository implements IWorkOrderRepository {
       return MutationOutcome.synced;
     } catch (e) {
       if (_isNetworkException(e) && _syncManager != null) {
-        await _syncManager.enqueueCommand(OutboxCommand(
+        await _enqueueDeduped(OutboxCommand(
           idempotencyKey: 'evidence_${recordId}_${DateTime.now().millisecondsSinceEpoch}',
           type: OutboxCommandType.uploadEvidence,
           entityId: recordId,
@@ -461,7 +487,7 @@ class WorkOrderRepository implements IWorkOrderRepository {
             if (otherStaff != null) 'other_staff': otherStaff,
           },
           createdAt: DateTime.now(),
-        ));
+        ), matches: (c) => c.payload['proof_path'] == proofJpegPath);
         return MutationOutcome.queued;
       }
       rethrow;
@@ -478,7 +504,7 @@ class WorkOrderRepository implements IWorkOrderRepository {
   }) async {
     final syncManager = _syncManager;
     Future<MutationOutcome> enqueue(SyncManager sync) async {
-      await sync.enqueueCommand(OutboxCommand(
+      await _enqueueDeduped(OutboxCommand(
         idempotencyKey: 'complete_${recordId}_${DateTime.now().millisecondsSinceEpoch}',
         type: OutboxCommandType.completeRecord,
         entityId: recordId,
@@ -541,7 +567,11 @@ class WorkOrderRepository implements IWorkOrderRepository {
           },
           createdAt: DateTime.now(),
         );
-        await _syncManager.enqueueCommand(cmd);
+        await _enqueueDeduped(cmd,
+            matches: (c) =>
+                c.payload['line_id'] == lineId &&
+                c.payload['kind'] == kind &&
+                c.payload['file_path'] == imagePath);
 
         return LineAttachment(
           id: -DateTime.now().millisecondsSinceEpoch,
