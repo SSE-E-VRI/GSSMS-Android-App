@@ -13,13 +13,24 @@ import 'package:gssms_mobile/features/auth/presentation/controllers/auth_control
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_state.dart';
 import 'package:gssms_mobile/features/auth/presentation/widgets/permission_denied_view.dart';
 import 'package:gssms_mobile/features/work_orders/data/evidence_service.dart';
+import 'package:gssms_mobile/features/work_orders/data/narrative_execution_api_service.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/maintenance_record.dart';
+import 'package:gssms_mobile/features/work_orders/domain/models/narrative_execution.dart';
+import 'package:gssms_mobile/features/work_orders/presentation/screens/narrative_execution_screen.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_order_controllers.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_order_state.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/widgets/checklist_action_bar.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/widgets/checklist_header.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/widgets/checklist_line_card.dart';
 
+/// Entry point for executing a Job Work's record.
+///
+/// Most Job Works use the checklist ([ChecklistFormScreen]). Fix-it work —
+/// breakdowns, deficiency rectifications, manual Corrective, escalated
+/// inspection points, legacy inspections — uses the narrative form instead
+/// (SSOT RULE 5.1), which the backend signals with `execution_mode ==
+/// COMPLAINT` and an empty line list. The mode is read from the record; if it
+/// cannot be read (offline, error) the checklist opens exactly as before.
 class ChecklistScreen extends ConsumerStatefulWidget {
   const ChecklistScreen({super.key, required this.recordId});
 
@@ -30,6 +41,47 @@ class ChecklistScreen extends ConsumerStatefulWidget {
 }
 
 class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
+  late final Future<NarrativeContext?> _context = _readContext();
+
+  Future<NarrativeContext?> _readContext() async {
+    try {
+      return await ref.read(narrativeExecutionApiServiceProvider).getContext(widget.recordId);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<NarrativeContext?>(
+      future: _context,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return Scaffold(
+            appBar: AppBar(title: Text('#${widget.recordId}')),
+            body: const Center(child: CircularProgressIndicator()),
+          );
+        }
+        final narrative = snapshot.data;
+        if (narrative != null && narrative.usesNarrativeForm) {
+          return NarrativeExecutionScreen(recordId: widget.recordId, context: narrative);
+        }
+        return ChecklistFormScreen(recordId: widget.recordId);
+      },
+    );
+  }
+}
+
+class ChecklistFormScreen extends ConsumerStatefulWidget {
+  const ChecklistFormScreen({super.key, required this.recordId});
+
+  final int recordId;
+
+  @override
+  ConsumerState<ChecklistFormScreen> createState() => _ChecklistFormScreenState();
+}
+
+class _ChecklistFormScreenState extends ConsumerState<ChecklistFormScreen> {
   /// Replaced asset/component details captured from the overflow menu. There
   /// is no API field for them, so they are carried into the closing remarks
   /// (an existing `complete` field) instead of being discarded.
