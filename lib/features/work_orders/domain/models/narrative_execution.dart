@@ -184,6 +184,9 @@ class NarrativeContext extends Equatable {
   /// (mirrors `MaintenanceRecordForm.jsx`: such a Job Work keeps its checklist).
   bool get usesNarrativeForm => executionMode == kNarrativeExecutionMode && lineCount == 0;
 
+  /// Grouped deficiency rectification: the multi-item form.
+  bool get usesRectificationForm => executionMode == kRectificationExecutionMode && lineCount == 0;
+
   /// The backend accepts edits only while the Job Work is IN_PROGRESS.
   bool get isEditable => status == 'IN_PROGRESS';
 
@@ -221,4 +224,106 @@ class NarrativeContext extends Equatable {
         originalComplaintId,
         deficiency,
       ];
+}
+
+/// Backend `execution_mode` for a grouped deficiency rectification
+/// (SSOT section 6): one Job Work, one item per deficiency.
+const String kRectificationExecutionMode = 'RECTIFICATION';
+
+class RectificationItem extends Equatable {
+  const RectificationItem({
+    required this.id,
+    this.asset = '',
+    this.checkpoint = '',
+    this.finding = '',
+    this.severity,
+    this.sourceTicket,
+    this.actionTaken = '',
+    this.outcome = '',
+    this.reason = '',
+    this.photos = const [],
+  });
+
+  final int id;
+  final String asset;
+  final String checkpoint;
+  final String finding;
+  final String? severity;
+  final String? sourceTicket;
+  final String actionTaken;
+
+  /// '', 'RECTIFIED' or 'NOT_RECTIFIED'.
+  final String outcome;
+  final String reason;
+  final List<NarrativePhoto> photos;
+
+  bool get isRectified => outcome == 'RECTIFIED';
+  bool get isNotRectified => outcome == 'NOT_RECTIFIED';
+
+  List<NarrativePhoto> photosOf(NarrativePhotoKind kind) =>
+      photos.where((p) => p.kind == kind.code).toList();
+
+  /// Same per-item rules as the backend (SSOT 6.5) and the web form.
+  List<String> blockers() {
+    final label = '$asset — $checkpoint';
+    final out = <String>[];
+    if (actionTaken.trim().isEmpty) out.add('$label: write the action taken.');
+    if (outcome.isEmpty) out.add('$label: choose Rectified or Not rectified.');
+    if (photosOf(NarrativePhotoKind.before).isEmpty) out.add('$label: add a Before photo.');
+    if (isRectified && photosOf(NarrativePhotoKind.after).isEmpty) {
+      out.add('$label: add an After photo.');
+    }
+    if (isNotRectified && reason.trim().isEmpty) {
+      out.add('$label: give the reason it could not be rectified.');
+    }
+    return out;
+  }
+
+  factory RectificationItem.fromJson(Map<String, dynamic> json) {
+    final rawPhotos = json['photos'];
+    return RectificationItem(
+      id: asJsonInt(json['id']) ?? 0,
+      asset: asJsonString(json['asset']) ?? '',
+      checkpoint: asJsonString(json['checkpoint']) ?? '',
+      finding: asJsonString(json['finding']) ?? '',
+      severity: asJsonString(json['severity']),
+      sourceTicket: asJsonString(json['source_ticket']),
+      actionTaken: asJsonString(json['action_taken']) ?? '',
+      outcome: (asJsonString(json['outcome']) ?? '').toUpperCase(),
+      reason: asJsonString(json['reason']) ?? '',
+      photos: rawPhotos is List
+          ? rawPhotos
+              .whereType<Map>()
+              .map((m) => NarrativePhoto.fromJson(Map<String, dynamic>.from(m)))
+              .toList()
+          : const [],
+    );
+  }
+
+  @override
+  List<Object?> get props =>
+      [id, asset, checkpoint, finding, severity, sourceTicket, actionTaken, outcome, reason, photos];
+}
+
+class RectificationExecution extends Equatable {
+  const RectificationExecution({this.finalRemarks = '', this.items = const []});
+
+  final String finalRemarks;
+  final List<RectificationItem> items;
+
+  factory RectificationExecution.fromJson(Map<String, dynamic> json) {
+    final raw = json['items'];
+    return RectificationExecution(
+      finalRemarks: asJsonString(json['final_remarks']) ?? '',
+      items: raw is List
+          ? raw
+              .whereType<Map>()
+              .map((m) => RectificationItem.fromJson(Map<String, dynamic>.from(m)))
+              .toList()
+          : const [],
+    );
+  }
+
+  @override
+  List<Object?> get props => [finalRemarks, items];
 }

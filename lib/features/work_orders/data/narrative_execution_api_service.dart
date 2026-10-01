@@ -91,4 +91,64 @@ class NarrativeExecutionApiService {
       },
     );
   }
+
+  // ---- Grouped deficiency rectification (execution_mode RECTIFICATION) ----
+
+  Future<RectificationExecution> getRectification(int workOrderId) async {
+    final response = await _dio.get('$_staffWorkOrders/$workOrderId/rectification/');
+    return RectificationExecution.fromJson(_object(response, 'rectification'));
+  }
+
+  /// Partial draft save: [items] rows carry only the fields to write.
+  Future<void> saveRectification(
+    int workOrderId, {
+    required String finalRemarks,
+    required List<Map<String, dynamic>> items,
+  }) async {
+    await _dio.patch(
+      '$_staffWorkOrders/$workOrderId/rectification/',
+      data: {'final_remarks': finalRemarks, 'items': items},
+    );
+  }
+
+  Future<NarrativePhoto> uploadRectificationPhoto(
+    int workOrderId,
+    int itemId,
+    NarrativePhotoKind kind,
+    String filePath,
+  ) async {
+    final form = FormData.fromMap({
+      'kind': kind.code,
+      'image': await MultipartFile.fromFile(
+        filePath,
+        filename: filePath.split(RegExp(r'[\\/]')).last,
+      ),
+    });
+    final response = await _dio.post(
+      '$_staffWorkOrders/$workOrderId/rectification/items/$itemId/photos/',
+      data: form,
+    );
+    return NarrativePhoto.fromJson(_object(response, 'photo'));
+  }
+
+  Future<void> deleteRectificationPhoto(int workOrderId, int itemId, int photoId) async {
+    await _dio.delete(
+      '$_staffWorkOrders/$workOrderId/rectification/items/$itemId/photos/$photoId/',
+    );
+  }
+
+  Future<void> submitRectification(
+    int workOrderId, {
+    required String remarks,
+    required String technicianName,
+  }) async {
+    await _dio.post(
+      '$_staffWorkOrders/$workOrderId/rectification/submit/',
+      data: {
+        'remarks': remarks,
+        'technician_name': technicianName,
+        'technician_signature': 'SIGNED_DIGITALLY',
+      },
+    );
+  }
 }

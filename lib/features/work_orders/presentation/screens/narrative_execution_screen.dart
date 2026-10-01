@@ -60,11 +60,13 @@ class _NarrativeExecutionScreenState extends ConsumerState<NarrativeExecutionScr
   NarrativeContext get _ctx => widget.context;
   int get _workOrderId => _ctx.workOrderId;
   bool get _editable => _ctx.isEditable;
-  NarrativeExecutionApiService get _api => ref.read(narrativeExecutionApiServiceProvider);
+  // Captured once: `ref` cannot be read from dispose(), which flushes a pending save.
+  late final NarrativeExecutionApiService _api = ref.read(narrativeExecutionApiServiceProvider);
 
   @override
   void initState() {
     super.initState();
+    _api;
     _load();
   }
 

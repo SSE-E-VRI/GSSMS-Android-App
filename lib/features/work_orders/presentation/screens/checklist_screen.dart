@@ -17,6 +17,7 @@ import 'package:gssms_mobile/features/work_orders/data/narrative_execution_api_s
 import 'package:gssms_mobile/features/work_orders/domain/models/maintenance_record.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/narrative_execution.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/screens/narrative_execution_screen.dart';
+import 'package:gssms_mobile/features/work_orders/presentation/screens/rectification_execution_screen.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_order_controllers.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_order_state.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/widgets/checklist_action_bar.dart';
@@ -65,6 +66,9 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
         final narrative = snapshot.data;
         if (narrative != null && narrative.usesNarrativeForm) {
           return NarrativeExecutionScreen(recordId: widget.recordId, context: narrative);
+        }
+        if (narrative != null && narrative.usesRectificationForm) {
+          return RectificationExecutionScreen(recordId: widget.recordId, context: narrative);
         }
         return ChecklistFormScreen(recordId: widget.recordId);
       },
