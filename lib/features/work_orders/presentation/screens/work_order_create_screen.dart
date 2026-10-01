@@ -44,7 +44,7 @@ class _WorkOrderCreateScreenState
   bool _loadingDepots = false;
   int? _selectedDepotId;
 
-  WorkOrderType _type = WorkOrderType.preventive;
+  WorkOrderType _type = WorkOrderType.corrective;
   WorkOrderPriority _priority = WorkOrderPriority.medium;
   DateTime? _dueDate;
 
@@ -268,6 +268,12 @@ class _WorkOrderCreateScreenState
           backgroundColor: context.gssms.danger.solid));
       return;
     }
+    if (_type == WorkOrderType.preventive && _selectedMaintenanceMasterId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: const Text('A preventive maintenance Job Work needs a checklist.'),
+          backgroundColor: context.gssms.danger.solid));
+      return;
+    }
     setState(() => _isSubmitting = true);
     try {
       await ref.read(workOrderRepositoryProvider).createWorkOrder(
@@ -427,10 +433,6 @@ class _WorkOrderCreateScreenState
                                         items: const [
                                           WorkOrderType.preventive,
                                           WorkOrderType.corrective,
-                                          WorkOrderType.breakdown,
-                                          WorkOrderType.calibration,
-                                          WorkOrderType.installation,
-                                          WorkOrderType.other,
                                         ]
                                             .map((t) => DropdownMenuItem(
                                                 value: t,
@@ -445,6 +447,14 @@ class _WorkOrderCreateScreenState
                                             setState(() => _type = t);
                                           }
                                         },
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'Report breakdowns in the Breakdowns module.',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: context.gssms.textSecondary,
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -809,11 +819,15 @@ class _WorkOrderCreateScreenState
             children: [
               Icon(Icons.checklist, color: context.gssms.link, size: 16),
               const SizedBox(width: 6),
-              Text('Template / Checklist (Optional)',
-                  style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: context.gssms.link,
-                      fontSize: 13)),
+              Text(
+                _type == WorkOrderType.corrective
+                    ? 'Template / Checklist (Optional)'
+                    : 'Template / Checklist *',
+                style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: context.gssms.link,
+                    fontSize: 13),
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -918,6 +932,16 @@ class _WorkOrderCreateScreenState
             ],
             onChanged: (id) =>
                 setState(() => _selectedMaintenanceMasterId = id),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            _type == WorkOrderType.corrective
+                ? 'Leave empty to use the generic breakdown checklist.'
+                : 'Scheduled PM is created from Schedules → Convert. Use this only for ad-hoc checklists not assigned to this location.',
+            style: TextStyle(
+              fontSize: 11,
+              color: context.gssms.textSecondary,
+            ),
           ),
         ],
       ),

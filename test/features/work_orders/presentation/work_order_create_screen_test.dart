@@ -105,7 +105,7 @@ void main() {
     verify(() => mockRepo.createWorkOrder(
           title: 'Station monthly maintenance',
           description: any(named: 'description'),
-          type: 'PREVENTIVE',
+          type: 'CORRECTIVE',
           priority: 'MEDIUM',
           depotId: 23,
           stationId: null,
@@ -177,5 +177,111 @@ void main() {
     await openTemplateMenu();
     expect(find.text('DG Set AMC (Quarterly)'), findsOneWidget);
     expect(find.text('Panel Monthly (Monthly)'), findsNothing);
+  });
+
+
+  testWidgets('WorkOrderCreateScreen restricts types, shows hints, and validates checklist for Preventive', (tester) async {
+    final mockRepo = MockWorkOrderRepository();
+    final mockOrg = MockOrgScopeOptionsService();
+    final mockInfra = MockInfraOptionsService();
+    final mockAssets = MockAssetApiService();
+
+    const testMaster = MaintenanceMaster(
+      id: 10,
+      name: 'Ad-hoc PM Checklist',
+      scheduleType: MaintenanceScheduleType.monthly,
+      templateKind: MaintenanceTemplateKind.assetTemplate,
+    );
+
+    when(() => mockInfra.fetchOptions(any(), depotId: any(named: 'depotId')))
+        .thenAnswer((_) async => const []);
+    when(() => mockRepo.fetchMaintenanceMasters())
+        .thenAnswer((_) async => const [testMaster]);
+    when(() => mockRepo.createWorkOrder(
+          title: any(named: 'title'),
+          description: any(named: 'description'),
+          type: any(named: 'type'),
+          priority: any(named: 'priority'),
+          depotId: any(named: 'depotId'),
+          stationId: any(named: 'stationId'),
+          infrastructureId: any(named: 'infrastructureId'),
+          assetId: any(named: 'assetId'),
+          scheduledDate: any(named: 'scheduledDate'),
+          maintenanceMasterId: any(named: 'maintenanceMasterId'),
+        )).thenAnswer((_) async => const WorkOrder(
+          id: 303,
+          status: WorkOrderStatus.newOrder,
+          type: WorkOrderType.preventive,
+          title: 'Ad-hoc PM',
+        ));
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          workOrderRepositoryProvider.overrideWithValue(mockRepo),
+          authControllerProvider.overrideWith(() => _FakeAuth(_session)),
+          orgScopeOptionsServiceProvider.overrideWithValue(mockOrg),
+          infrastructureOptionsServiceProvider.overrideWithValue(mockInfra),
+          assetApiServiceProvider.overrideWithValue(mockAssets),
+        ],
+        child: const MaterialApp(home: WorkOrderCreateScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // 1. General breakdown hint is visible
+    expect(find.text('Report breakdowns in the Breakdowns module.'), findsOneWidget);
+
+    // 2. In default CORRECTIVE mode: Checklist header is optional, and generic checklist text is visible
+    expect(find.text('Template / Checklist (Optional)'), findsOneWidget);
+    expect(find.text('Leave empty to use the generic breakdown checklist.'), findsOneWidget);
+
+    // 3. Open type dropdown and verify only Preventive and Corrective are choices
+    await tester.tap(find.byKey(const Key('wo_type_dropdown')));
+    await tester.pumpAndSettle();
+    expect(find.text('Corrective Maintenance'), findsWidgets);
+    expect(find.text('Preventive Maintenance'), findsWidgets);
+    expect(find.text('Breakdown'), findsNothing);
+    expect(find.text('Calibration'), findsNothing);
+    expect(find.text('Installation'), findsNothing);
+
+    // 4. Select Preventive Maintenance
+    await tester.tap(find.text('Preventive Maintenance').last);
+    await tester.pumpAndSettle();
+
+    // 5. In PREVENTIVE mode: Checklist header has asterisk, and ad-hoc PM text is visible
+    expect(find.text('Template / Checklist *'), findsOneWidget);
+    expect(find.text('Scheduled PM is created from Schedules → Convert. Use this only for ad-hoc checklists not assigned to this location.'), findsOneWidget);
+
+    // 6. Attempt submit without checklist -> rejected
+    await tester.enterText(find.byKey(const Key('wo_title_field')), 'Ad-hoc PM');
+    await tester.ensureVisible(find.byKey(const Key('submit_wo_button')));
+    await tester.tap(find.byKey(const Key('submit_wo_button')));
+    await tester.pumpAndSettle();
+    expect(find.text('A preventive maintenance Job Work needs a checklist.'), findsOneWidget);
+
+    // 7. Select a template and submit -> succeeds
+    await tester.ensureVisible(find.byKey(const Key('wo_template_dropdown')));
+    await tester.tap(find.byKey(const Key('wo_template_dropdown')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ad-hoc PM Checklist (Monthly)').last);
+    await tester.pumpAndSettle();
+
+    await tester.ensureVisible(find.byKey(const Key('submit_wo_button')));
+    await tester.tap(find.byKey(const Key('submit_wo_button')));
+    await tester.pumpAndSettle();
+
+    verify(() => mockRepo.createWorkOrder(
+          title: 'Ad-hoc PM',
+          description: any(named: 'description'),
+          type: 'PREVENTIVE',
+          priority: 'MEDIUM',
+          depotId: 23,
+          stationId: null,
+          infrastructureId: null,
+          assetId: null,
+          scheduledDate: null,
+          maintenanceMasterId: 10,
+        )).called(1);
   });
 }
