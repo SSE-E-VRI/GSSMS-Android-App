@@ -1,0 +1,132 @@
+{
+  "id": "inspection_pointwise",
+  "kind": "inspection",
+  "generatedAt": "2026-10-03T04:00:00Z",
+  "ticket": "JW-2026-000107",
+  "workOrder": {
+    "id": 107,
+    "ticket_number": "JW-2026-000107",
+    "station_name": "Thalanallur",
+    "depot_name": "Depot 1",
+    "assigned_to_name": "P. Inspector",
+    "title": "Detailed Substation Safety Inspection",
+    "description": "Routine quarterly safety and compliance inspection",
+    "execution_mode": "INSPECTION",
+    "status": "COMPLETED"
+  },
+  "payload": {
+    "id": 707,
+    "ticket_number": "JW-2026-000107",
+    "is_pointwise": true,
+    "inspection_details": {
+      "title": "Quarterly Electrical Safety Audit",
+      "inspection_no": "INSP-2026-042",
+      "inspector_name": "P. Inspector",
+      "inspection_date": "2026-09-25",
+      "inspection_time": "10:30:00",
+      "station_name": "Thalanallur",
+      "remarks": "Overall installation compliant with safety guidelines. Observations noted below.",
+      "general_evidence_photos": [
+        {
+          "image": "/parity-images/wide_1.jpg",
+          "caption": "Control room general overview"
+        },
+        {
+          "image": "/parity-images/evidence_1.jpg",
+          "caption": "Yard perimeter fence intact"
+        }
+      ]
+    },
+    "submission_history": [
+      {
+        "submission_no": 1,
+        "timestamp": "2026-09-25T14:30:00Z",
+        "submitted_by_name": "P. Inspector",
+        "point_snapshots": [
+          {
+            "point_job_work_id": 701,
+            "point_number": 1,
+            "observation": "Lightning arrester surge counter reading",
+            "asset_name": "LA-01",
+            "priority": "LOW",
+            "initial_findings": "Counter reading 14 recorded.",
+            "action_taken": "",
+            "final_remarks": "Observation only \u2014 no corrective action required",
+            "corrective_action_performed": false,
+            "technical_parameters": [],
+            "before_photos": [],
+            "after_photos": [],
+            "inspection_evidence_photos": []
+          },
+          {
+            "point_job_work_id": 702,
+            "point_number": 2,
+            "observation": "Earth resistance measurement at main pit #1",
+            "asset_name": "EARTH-01",
+            "priority": "HIGH",
+            "initial_findings": "Resistance measured 4.8 ohms (standard <= 2.0 ohms).",
+            "action_taken": "Treated pit with bentonite compound and water.",
+            "final_remarks": "Resistance reduced to 1.8 ohms.",
+            "corrective_action_performed": true,
+            "technical_parameters": [
+              {
+                "parameter_name": "Initial Resistance",
+                "recorded_value": "4.8",
+                "unit": "Ohm"
+              },
+              {
+                "parameter_name": "Final Resistance",
+                "recorded_value": "1.8",
+                "unit": "Ohm"
+              }
+            ],
+            "inspection_evidence_photos": [
+              {
+                "image": "/parity-images/evidence_1.jpg",
+                "caption": "Earth tester reading 4.8 Ohm"
+              }
+            ],
+            "before_photos": [
+              {
+                "image": "/parity-images/before_1.jpg",
+                "caption": "Dry soil in earth pit"
+              }
+            ],
+            "after_photos": [
+              {
+                "image": "/parity-images/after_1.jpg",
+                "caption": "Moist pit after chemical treatment"
+              }
+            ]
+          },
+          {
+            "point_job_work_id": 703,
+            "point_number": 3,
+            "observation": "Battery bank terminal torque check",
+            "asset_name": "BAT-BANK",
+            "priority": "MEDIUM",
+            "initial_findings": "Two cell interconnections loose.",
+            "action_taken": "Torqued all terminals to 12 Nm.",
+            "final_remarks": "Re-torqued and applied petroleum jelly.",
+            "corrective_action_performed": true,
+            "technical_parameters": [
+              {
+                "parameter_name": "Applied Torque",
+                "recorded_value": "12",
+                "unit": "Nm"
+              }
+            ],
+            "inspection_evidence_photos": [],
+            "before_photos": [],
+            "after_photos": []
+          }
+        ]
+      }
+    ],
+    "verification": {
+      "verified_by_name": "Chief Safety Officer",
+      "verified_at": "2026-09-26T09:15:00Z",
+      "remarks": "Safety compliance verified."
+    }
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "id": "checklist_pm_minimal",
+  "kind": "checklist",
+  "generatedAt": "2026-10-03T04:00:00Z",
+  "ticket": "JW-2026-000102",
+  "workOrder": {
+    "id": 102,
+    "ticket_number": "JW-2026-000102",
+    "station_name": "Katpadi",
+    "depot_name": "Katpadi Depot",
+    "assigned_to_name": "A. Singh",
+    "title": "Minimal Checklist",
+    "description": "Minimal check",
+    "execution_mode": "CHECKLIST",
+    "status": "COMPLETED"
+  },
+  "payload": {
+    "id": 502,
+    "work_order": 102,
+    "date_of_maintenance": "2026-10-01",
+    "technician_name": "A. Singh",
+    "remarks": "",
+    "other_staff": "",
+    "schedule_details": null,
+    "verification": null,
+    "lines": [
+      {
+        "id": 1020,
+        "asset_unique_id": "GEN-01",
+        "asset_category": "General",
+        "item_name": "Visual Inspection",
+        "inspection_point": "Check physical foundation",
+        "status": "OK",
+        "checked_out": true,
+        "excluded": false
+      }
+    ]
+  }
+}

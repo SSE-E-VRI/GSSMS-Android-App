@@ -1,0 +1,53 @@
+{
+  "id": "rectification_single",
+  "kind": "rectification",
+  "generatedAt": "2026-10-03T04:00:00Z",
+  "ticket": "JW-2026-000110",
+  "workOrder": {
+    "id": 110,
+    "ticket_number": "JW-2026-000110",
+    "station_name": null,
+    "depot_name": "TBM Depot",
+    "assigned_to_name": "P. Sundaram",
+    "title": "Single Item Rectification",
+    "description": "Fix single isolator lock",
+    "execution_mode": "RECTIFICATION",
+    "status": "COMPLETED"
+  },
+  "payload": {
+    "id": 810,
+    "ticket_number": "JW-2026-000110",
+    "report_date": "2026-09-22",
+    "station_name": null,
+    "technician_name": "P. Sundaram",
+    "other_staff": "",
+    "organization": null,
+    "verified_by": null,
+    "verified_at": null,
+    "verification_remarks": "",
+    "final_outcome": "Deficiency closed.",
+    "items": [
+      {
+        "id": 910,
+        "asset_unique_id": "ISO-LOCK-01",
+        "checkpoint": "Mechanical interlock mechanism",
+        "source_ticket": "JW-2026-000075",
+        "source_date": "2026-09-10",
+        "finding": "Castleton key interlock jammed with rust.",
+        "action_taken": "Dismantled lock barrel, cleaned with kerosene, lubricated with graphite powder.",
+        "outcome": "RECTIFIED",
+        "reason_not_rectified": null,
+        "photos": [
+          {
+            "image": "/parity-images/before_1.jpg",
+            "kind": "BEFORE"
+          },
+          {
+            "image": "/parity-images/after_1.jpg",
+            "kind": "AFTER"
+          }
+        ]
+      }
+    ]
+  }
+}

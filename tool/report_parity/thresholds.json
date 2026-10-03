@@ -1,0 +1,39 @@
+{
+  "_comment": "Acceptance thresholds per plan §4. Reference: Chrome on Windows, A4, 1cm margins, headers/footers OFF, background graphics OFF.",
+  "Checklist": {
+    "pages_equal": true,
+    "words_identical": true,
+    "word_delta_p95_max": 2.0,
+    "word_delta_max": 5.0,
+    "drawings_matched_min": 95.0,
+    "blurred_mismatch_max": 1.5,
+    "raw_mismatch_max": 6.0
+  },
+  "Breakdown": {
+    "pages_equal": true,
+    "words_identical": true,
+    "word_delta_p95_max": 2.0,
+    "word_delta_max": 4.0,
+    "drawings_matched_min": 95.0,
+    "blurred_mismatch_max": 1.5,
+    "raw_mismatch_max": 6.0
+  },
+  "Inspection": {
+    "pages_equal": true,
+    "words_identical": true,
+    "word_delta_p95_max": 2.5,
+    "word_delta_max": 5.0,
+    "drawings_matched_min": 93.0,
+    "blurred_mismatch_max": 2.0,
+    "raw_mismatch_max": 7.0
+  },
+  "Rectification": {
+    "pages_equal": true,
+    "words_identical": true,
+    "word_delta_p95_max": 2.0,
+    "word_delta_max": 4.0,
+    "drawings_matched_min": 95.0,
+    "blurred_mismatch_max": 1.5,
+    "raw_mismatch_max": 6.0
+  }
+}
