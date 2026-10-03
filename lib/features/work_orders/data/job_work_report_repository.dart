@@ -30,7 +30,7 @@ class JobWorkReportRepository {
         report = RectificationJobWorkReport.fromJson(
           await _api.fetchRectification(wo.id),
           fallbackTicket: wo.displayReference,
-          fallbackStation: wo.stationName ?? wo.depotName,
+          fallbackStation: null,
         );
       case ExecutionRoute.complaint:
         final results = await Future.wait([

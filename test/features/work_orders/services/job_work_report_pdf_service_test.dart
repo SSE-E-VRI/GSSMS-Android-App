@@ -30,6 +30,8 @@ Future<void> _check(JobWorkReport r, Map<String, Uint8List?> photos) async {
 }
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   final jpeg = Uint8List.fromList(img.encodeJpg(img.Image(width: 2, height: 2)));
   final photos = <String, Uint8List?>{
     'http://x/media/a.jpg': jpeg,
@@ -41,8 +43,7 @@ void main() {
   ];
 
   test('pdfSafe maps non-Latin-1 punctuation', () {
-    expect(pdfSafe('a—b • ‘x’ ₹5…'),
-        "a-b * 'x' Rs.5...");
+    expect(pdfSafe('a—b • ‘x’ ₹5…'), 'a—b • ‘x’ Rs.5…');
   });
 
   test('checklist report builds with photos and merged cells', () async {

@@ -156,7 +156,7 @@ void main() {
     await _pump(tester, repo);
     await tester.pumpAndSettle();
     expect(find.text('Deficiency Rectification Report'), findsOneWidget);
-    expect(find.text('1 item | 1 rectified | 0 not rectified'),
+    expect(find.text('1 item · 1 rectified · 0 not rectified'),
         findsOneWidget);
   });
 

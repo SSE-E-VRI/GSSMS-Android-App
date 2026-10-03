@@ -3,8 +3,10 @@ import 'dart:typed_data';
 
 import 'package:equatable/equatable.dart';
 import 'package:gssms_mobile/core/utils/json_parsing.dart';
+import 'package:gssms_mobile/features/work_orders/domain/models/report_date_format.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/work_order.dart';
-import 'package:intl/intl.dart';
+
+export 'package:gssms_mobile/features/work_orders/domain/models/report_date_format.dart';
 
 // ---------------------------------------------------------------------------
 // Job Work report models (technician "Report Preview").
@@ -17,14 +19,6 @@ import 'package:intl/intl.dart';
 // ComplaintExecutionPrintPreview, InspectionReportPreview and
 // RectificationReportPreview data shaping.
 // ---------------------------------------------------------------------------
-
-/// `dd MMM yyyy`, or [fallback] when [value] is null.
-String formatReportDate(DateTime? value, {String fallback = 'N/A'}) =>
-    value == null ? fallback : DateFormat('dd MMM yyyy').format(value);
-
-/// `dd MMM yyyy, HH:mm`, or [fallback] when [value] is null.
-String formatReportDateTime(DateTime? value, {String fallback = 'N/A'}) =>
-    value == null ? fallback : DateFormat('dd MMM yyyy, HH:mm').format(value);
 
 /// Printed PM status text: the configured option label, never a raw DB code.
 /// Mirrors web `reportStatusLabel` / backend `_report_status_label`.
@@ -40,18 +34,21 @@ String reportStatusLabel({
 
 /// Ports web `formatRecordedValue`: a JSON object string (or a decoded map)
 /// becomes `k: v, k2: v2` skipping null / empty values; anything else is
-/// stringified. Returns '' for null / empty input.
+/// stringified. Returns '' for falsy or empty input.
 String formatRecordedValue(dynamic value) {
-  if (value == null) return '';
+  if (value == null || value == '' || value == false) return '';
   dynamic parsed = value;
   if (value is String) {
-    if (value.isEmpty) return '';
-    if (value.startsWith('{') || value.startsWith('[')) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return '';
+    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
       try {
-        parsed = jsonDecode(value);
+        parsed = jsonDecode(trimmed);
       } catch (_) {
         return value;
       }
+    } else {
+      return value;
     }
   }
   if (parsed is Map) {
@@ -61,10 +58,11 @@ String formatRecordedValue(dynamic value) {
         .join(', ');
   }
   if (parsed is List) {
-    return parsed
-        .where((e) => e != null && e.toString().isNotEmpty)
-        .map((e) => e.toString())
-        .join(', ');
+    return [
+      for (var i = 0; i < parsed.length; i++)
+        if (parsed[i] != null && parsed[i].toString().isNotEmpty)
+          '$i: ${parsed[i]}'
+    ].join(', ');
   }
   return parsed.toString();
 }
@@ -110,14 +108,18 @@ class ReportOrganization extends Equatable {
   final String divisionName;
   final String depotName;
 
-  factory ReportOrganization.fromJson(Map<dynamic, dynamic>? json) {
+  factory ReportOrganization.fromJson(
+    Map<dynamic, dynamic>? json, {
+    bool useRegisterTitle = false,
+  }) {
     final m = _map(json);
     if (m == null) return const ReportOrganization();
     return ReportOrganization(
       railwayName: _firstText([m['railway_name']], 'Railway').toUpperCase(),
       divisionName: _firstText([m['division_name']], 'Division'),
-      depotName:
-          _firstText([m['depot_name'], m['register_title']], 'Depot'),
+      depotName: useRegisterTitle
+          ? _firstText([m['depot_name'], m['register_title']], 'Depot')
+          : _firstText([m['depot_name']], 'Depot'),
     );
   }
 
@@ -135,6 +137,10 @@ class ReportVerification extends Equatable {
   final String verifiedByName;
   final DateTime? verifiedAt;
   final String remarks;
+
+  /// Pre-formatted verified date-time (IST); '' when absent.
+  String get verifiedAtLabel =>
+      verifiedAt == null ? '' : webFormatReportDateTime(verifiedAt);
 
   /// Null when `verified_by_name` is empty (Job Work not yet verified).
   static ReportVerification? fromJson(Map<dynamic, dynamic>? json) {
@@ -229,6 +235,10 @@ class ReportSubmission extends Equatable {
   final String number;
   final DateTime? timestamp;
   final String submittedByName;
+
+  /// Pre-formatted submission timestamp (IST); '' when absent.
+  String get timestampLabel =>
+      timestamp == null ? '' : webFormatReportDateTime(timestamp);
 
   @override
   List<Object?> get props => [number, timestamp, submittedByName];
@@ -393,6 +403,7 @@ class ChecklistJobWorkReport extends JobWorkReport {
     required this.otherStaff,
     required this.groups,
     required this.deficiencies,
+    this.showJobWork = false,
   });
 
   /// Report for a Job Work with no checklist record ("No details available").
@@ -408,13 +419,15 @@ class ChecklistJobWorkReport extends JobWorkReport {
         otherStaff: '',
         groups: const [],
         deficiencies: const [],
+        showJobWork: false,
       );
 
   /// Ports web `viewJobWork` (checklist branch) + `FormPreview` shaping.
   factory ChecklistJobWorkReport.fromRecordJson(
     Map<dynamic, dynamic> record,
-    WorkOrder wo,
-  ) {
+    WorkOrder wo, {
+    bool showJobWork = false,
+  }) {
     final rec = _map(record) ?? const <String, dynamic>{};
     final lines = _maps(rec['lines']);
 
@@ -491,7 +504,8 @@ class ChecklistJobWorkReport extends JobWorkReport {
     final sched = _map(rec['schedule_details']);
     return ChecklistJobWorkReport(
       ticket: wo.displayReference,
-      org: ReportOrganization.fromJson(_map(sched?['organization'])),
+      org: ReportOrganization.fromJson(_map(sched?['organization']),
+          useRegisterTitle: true),
       station: _firstText(
           [sched?['station_name'], wo.stationName, wo.depotName], 'Unknown'),
       date: asJsonDateTime(rec['date_of_maintenance']) ??
@@ -499,7 +513,7 @@ class ChecklistJobWorkReport extends JobWorkReport {
           wo.createdAt,
       schedule: sched != null
           ? _firstText([sched['template_name']], 'Scheduled Maintenance')
-          : wo.displayTitle,
+          : (wo.title ?? ''),
       technician:
           _firstText([rec['technician_name'], wo.assignedToName], 'Unknown'),
       verification: ReportVerification.fromJson(_map(rec['verification'])),
@@ -507,6 +521,7 @@ class ChecklistJobWorkReport extends JobWorkReport {
       otherStaff: _str(rec['other_staff']),
       groups: groups,
       deficiencies: deficiencies,
+      showJobWork: showJobWork,
     );
   }
 
@@ -556,6 +571,7 @@ class ChecklistJobWorkReport extends JobWorkReport {
   final String otherStaff;
   final List<ChecklistReportGroup> groups;
   final List<ChecklistDeficiencyRow> deficiencies;
+  final bool showJobWork;
 
   /// True when there is nothing to show ("No details available.").
   bool get isEmpty => groups.isEmpty;
@@ -565,7 +581,7 @@ class ChecklistJobWorkReport extends JobWorkReport {
   @override
   String get location => station;
   @override
-  String get dateLabel => formatReportDate(date);
+  String get dateLabel => webFormatDate(date);
 
   @override
   List<ReportPhoto> get allPhotos => _dedupe([
@@ -586,6 +602,7 @@ class ChecklistJobWorkReport extends JobWorkReport {
         otherStaff,
         groups,
         deficiencies,
+        showJobWork,
       ];
 }
 
@@ -650,19 +667,6 @@ class ReportComplaintDetails extends Equatable {
 
 String _naIfBlank(dynamic v) => _firstText([v], 'N/A');
 
-/// `dd MMM yyyy[, HH:mm]` from a date value and an optional `HH:mm[:ss]`.
-String _dateWithTime(dynamic date, dynamic time) {
-  final d = asJsonDateTime(date);
-  if (d == null) return 'N/A';
-  final t = RegExp(r'^(\d{1,2}):(\d{2})').firstMatch(_str(time));
-  final text = formatReportDate(d);
-  // A date-only value is local midnight; only append an explicit clock time.
-  if (t != null && _str(date).length <= 10) {
-    return '$text, ${t.group(1)!.padLeft(2, '0')}:${t.group(2)}';
-  }
-  return _str(date).length > 10 ? formatReportDateTime(d) : text;
-}
-
 class ComplaintJobWorkReport extends JobWorkReport {
   const ComplaintJobWorkReport({
     required this.ticket,
@@ -704,10 +708,10 @@ class ComplaintJobWorkReport extends JobWorkReport {
     final compRaw = _map(w['original_complaint_details']);
 
     final station = _firstText(
-        [w['station_name'], w['depot_name']], 'N/A');
+        [w['station_name'], w['depot_name']], 'Unknown');
 
     ReportDeficiencyDetails? defDetails;
-    if (defRaw != null && defRaw.isNotEmpty) {
+    if (defRaw != null) {
       defDetails = ReportDeficiencyDetails(
         sourceTicket: _naIfBlank(defRaw['source_ticket']),
         severity: _naIfBlank(defRaw['severity']),
@@ -723,7 +727,7 @@ class ComplaintJobWorkReport extends JobWorkReport {
         complaintNumber: _naIfBlank(compRaw['complaint_number']),
         failureDateTime: _str(compRaw['failure_date']).isEmpty
             ? 'N/A'
-            : _dateWithTime(compRaw['failure_date'], compRaw['failure_time']),
+            : webFormatReportDateTime(compRaw['failure_date'], _str(compRaw['failure_time'])),
         complainant: _naIfBlank(compRaw['complainant_name']),
         reportedAsset: _firstText([
           compRaw['asset_name'],
@@ -738,7 +742,8 @@ class ComplaintJobWorkReport extends JobWorkReport {
     final submissionNo = _str(src['submission_no']);
     return ComplaintJobWorkReport(
       ticket: _firstText([w['ticket_number']], fallbackTicket ?? ''),
-      org: ReportOrganization.fromJson(_map(e['organization'])),
+      org: ReportOrganization.fromJson(_map(e['organization']),
+          useRegisterTitle: false),
       station: station,
       reportDate: asJsonDateTime(src['timestamp']) ??
           asJsonDateTime(src['updated_at']) ??
@@ -746,9 +751,10 @@ class ComplaintJobWorkReport extends JobWorkReport {
       submitter: _firstText([
         src['submitted_by_name'],
         src['submitted_by'],
+        src['updated_by_name'],
         e['updated_by_name'],
         w['assigned_to_name'],
-      ], 'N/A'),
+      ], 'Unknown'),
       submission: submissionNo.isEmpty
           ? null
           : ReportSubmission(
@@ -802,14 +808,14 @@ class ComplaintJobWorkReport extends JobWorkReport {
 
   /// "Work to be done" text for the "Job Work Details" block.
   String get workToBeDone =>
-      [workTitle, workDescription].where((s) => s.isNotEmpty).join(' - ');
+      [workTitle, workDescription].where((s) => s.isNotEmpty).join(' \u2014 ');
 
   @override
   String get title => 'Breakdown Job Work Report';
   @override
   String get location => station;
   @override
-  String get dateLabel => formatReportDate(reportDate);
+  String get dateLabel => webFormatDate(reportDate);
 
   @override
   List<ReportPhoto> get allPhotos =>
@@ -916,6 +922,7 @@ class InspectionJobWorkReport extends JobWorkReport {
     required this.org,
     required this.station,
     required this.inspectionDate,
+    this.rawInspectionDate = '',
     required this.inspectionTime,
     required this.inspectionTitle,
     required this.inspectionNumber,
@@ -979,10 +986,12 @@ class InspectionJobWorkReport extends JobWorkReport {
     final covered = _maps(details['points']);
     return InspectionJobWorkReport(
       ticket: _firstText([p['ticket_number']], fallbackTicket),
-      org: ReportOrganization.fromJson(_map(details['organization'])),
+      org: ReportOrganization.fromJson(_map(details['organization']),
+          useRegisterTitle: false),
       station: _firstText(
-          [details['station_name'], details['location']], '-'),
+          [details['station_name'], details['location']], '—'),
       inspectionDate: asJsonDateTime(details['inspection_date']),
+      rawInspectionDate: _str(details['inspection_date']),
       inspectionTime: _str(details['inspection_time']),
       inspectionTitle: _str(details['inspection_title']),
       inspectionNumber: _naIfBlank(details['inspection_number']),
@@ -1055,6 +1064,7 @@ class InspectionJobWorkReport extends JobWorkReport {
   final ReportOrganization org;
   final String station;
   final DateTime? inspectionDate;
+  final String rawInspectionDate;
 
   /// Raw `HH:mm[:ss]` text ('' when none).
   final String inspectionTime;
@@ -1083,9 +1093,9 @@ class InspectionJobWorkReport extends JobWorkReport {
   @override
   String get location => station;
   @override
-  String get dateLabel =>
-      _dateWithTime(inspectionDate?.toIso8601String().substring(0, 10),
-          inspectionTime);
+  String get dateLabel => webFormatReportDateTime(
+      rawInspectionDate.isNotEmpty ? rawInspectionDate : inspectionDate,
+      inspectionTime);
 
   @override
   List<ReportPhoto> get allPhotos => _dedupe([
@@ -1103,6 +1113,7 @@ class InspectionJobWorkReport extends JobWorkReport {
         org,
         station,
         inspectionDate,
+        rawInspectionDate,
         inspectionTime,
         inspectionTitle,
         inspectionNumber,
@@ -1154,10 +1165,10 @@ class RectificationReportItem extends Equatable {
   final List<ReportPhoto> beforePhotos;
   final List<ReportPhoto> afterPhotos;
 
-  /// `source_ticket | detected date` as the web prints it.
+  /// `source_ticket · detected date` as the web prints it.
   String get sourceLabel => detectedAt == null
       ? sourceTicket
-      : '$sourceTicket | ${formatReportDate(detectedAt)}';
+      : '$sourceTicket · ${webFormatDate(detectedAt)}';
 
   @override
   List<Object?> get props => [
@@ -1196,9 +1207,10 @@ class RectificationJobWorkReport extends JobWorkReport {
     final p = _map(payload) ?? const <String, dynamic>{};
     final verifiedBy = _str(p['verified_by']);
     return RectificationJobWorkReport(
-      ticket: _firstText([p['ticket_number']], fallbackTicket),
-      org: ReportOrganization.fromJson(_map(p['organization'])),
-      station: _firstText([p['station_name'], fallbackStation], '-'),
+      ticket: _firstText([fallbackTicket, p['ticket_number']]),
+      org: ReportOrganization.fromJson(_map(p['organization']),
+          useRegisterTitle: true),
+      station: _firstText([p['station_name'], fallbackStation], '—'),
       reportDate: asJsonDateTime(p['report_date']),
       finalRemarks: _str(p['final_remarks']),
       technician: _str(p['technician']),
@@ -1260,17 +1272,17 @@ class RectificationJobWorkReport extends JobWorkReport {
       .where((i) => i.outcome == RectificationOutcome.notRectified)
       .length;
 
-  /// `N items | x rectified | y not rectified`.
+  /// `N item(s) · x rectified · y not rectified`.
   String get summaryLine =>
-      '$totalCount item${totalCount == 1 ? '' : 's'} | $rectifiedCount '
-      'rectified | $notRectifiedCount not rectified';
+      '$totalCount item${totalCount == 1 ? '' : 's'} · $rectifiedCount '
+      'rectified · $notRectifiedCount not rectified';
 
   @override
   String get title => 'Deficiency Rectification Report';
   @override
   String get location => station;
   @override
-  String get dateLabel => formatReportDate(reportDate);
+  String get dateLabel => webFormatDate(reportDate);
 
   @override
   List<ReportPhoto> get allPhotos => _dedupe([

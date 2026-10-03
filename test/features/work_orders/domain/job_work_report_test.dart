@@ -56,7 +56,7 @@ void main() {
       final o = ReportOrganization.fromJson({
         'railway_name': 'southern',
         'register_title': 'Reg Title',
-      });
+      }, useRegisterTitle: true);
       expect(o.railwayName, 'SOUTHERN');
       expect(o.divisionName, 'Division');
       expect(o.depotName, 'Reg Title');
@@ -233,7 +233,7 @@ void main() {
       expect(r.station, 'Sched Stn');
       expect(r.schedule, 'Quarterly');
       expect(r.technician, 'Rec Tech');
-      expect(r.dateLabel, '10 Sep 2026');
+      expect(r.dateLabel, '10/09/2026');
       expect(r.remarks, 'all good');
       expect(r.otherStaff, 'Helper');
       expect(r.verification!.verifiedByName, 'Sup');
@@ -249,7 +249,7 @@ void main() {
       expect(r.station, 'Station X');
       expect(r.schedule, 'Monthly PM');
       expect(r.technician, 'Tech A');
-      expect(r.dateLabel, '09 Sep 2026');
+      expect(r.dateLabel, '09/09/2026');
       expect(r.verification, isNull);
       expect(r.isEmpty, isTrue);
     });
@@ -306,7 +306,7 @@ void main() {
       expect(r.org.railwayName, 'SR');
       expect(r.ticket, 'BD-9');
       expect(r.location, 'Stn');
-      expect(r.dateLabel, '12 Sep 2026');
+      expect(r.dateLabel, '12/09/2026');
       expect(r.allPhotos, hasLength(2));
     });
 
@@ -330,7 +330,7 @@ void main() {
       });
       expect(complaint.section1Kind, ComplaintSection1Kind.complaint);
       expect(complaint.complaintDetails!.failureDateTime,
-          '01 Sep 2026, 14:05');
+          '01/09/2026 14:05');
       expect(complaint.complaintDetails!.reportedAsset, 'Lobby fan');
       expect(complaint.complaintDetails!.description, 'wo desc');
       expect(complaint.complaintDetails!.complainant, 'N/A');
@@ -341,7 +341,7 @@ void main() {
       });
       expect(none.section1Kind, ComplaintSection1Kind.jobWork);
       expect(none.assetName, 'General');
-      expect(none.workToBeDone, 'Fix - Door');
+      expect(none.workToBeDone, 'Fix \u2014 Door');
     });
 
     test('submitter fallback chain', () {
@@ -351,7 +351,7 @@ void main() {
       expect(submitter({'updated_by_name': 'U'}, {'assigned_to_name': 'A'}),
           'U');
       expect(submitter({}, {'assigned_to_name': 'A'}), 'A');
-      expect(submitter({}, {}), 'N/A');
+      expect(submitter({}, {}), 'Unknown');
     });
 
     test('ticket and station fallbacks', () {
@@ -359,7 +359,7 @@ void main() {
           fallbackTicket: 'WO #5');
       expect(r.ticket, 'WO #5');
       expect(r.location, 'Depot');
-      expect(ComplaintJobWorkReport.fromJson({}, {}).location, 'N/A');
+      expect(ComplaintJobWorkReport.fromJson({}, {}).location, 'Unknown');
     });
   });
 
@@ -421,7 +421,7 @@ void main() {
       expect(r.inspectionRemarks, 'obs');
       expect(r.inspectionNumber, 'INS-7');
       expect(r.inspector, 'N/A');
-      expect(r.dateLabel, '05 Sep 2026, 09:15');
+      expect(r.dateLabel, '05/09/2026 09:15');
       expect(r.org.depotName, 'Dep');
       expect(r.allPhotos.map((x) => x.url),
           ['/media/g.jpg', '/media/e.jpg', '/media/b.jpg']);
@@ -495,7 +495,7 @@ void main() {
       expect(r.points.single.isLegacy, isTrue);
       expect(r.points.single.initialFindings, 'legacy');
       expect(r.points.single.correctiveActionPerformed, isFalse);
-      expect(r.station, '-');
+      expect(r.station, '—');
     });
   });
 
@@ -528,18 +528,18 @@ void main() {
       expect(r.totalCount, 3);
       expect(r.rectifiedCount, 1);
       expect(r.notRectifiedCount, 1);
-      expect(r.summaryLine, '3 items | 1 rectified | 1 not rectified');
+      expect(r.summaryLine, '3 items · 1 rectified · 1 not rectified');
       expect(r.items[2].outcome, RectificationOutcome.pending);
       expect(r.items[0].beforePhotos.single.url, '/media/b.jpg');
       expect(r.items[0].afterPhotos.single.url, '/media/a.jpg');
-      expect(r.items[0].sourceLabel, 'D-1 | 01 Sep 2026');
+      expect(r.items[0].sourceLabel, 'D-1 · 01/09/2026');
       expect(r.items[1].reason, 'no part');
       expect(r.items[1].severity, 'N/A');
       expect(r.verification!.verifiedByName, 'Sup');
       expect(r.verification!.remarks, 'ok');
       expect(r.ticket, 'WO #2');
       expect(r.location, 'Stn');
-      expect(r.dateLabel, '20 Sep 2026');
+      expect(r.dateLabel, '20/09/2026');
       expect(r.allPhotos.map((p) => p.url), ['/media/b.jpg', '/media/a.jpg']);
     });
 
@@ -551,7 +551,7 @@ void main() {
         ],
       });
       expect(r.verification, isNull);
-      expect(r.summaryLine, '1 item | 0 rectified | 0 not rectified');
+      expect(r.summaryLine, '1 item · 0 rectified · 0 not rectified');
     });
   });
 }

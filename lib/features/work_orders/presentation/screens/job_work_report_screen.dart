@@ -343,15 +343,18 @@ class _ReportBody extends StatelessWidget {
           label: 'Supervisor',
           value: v == null
               ? 'Pending verification'
-              : '${v.verifiedByName} | ${formatReportDateTime(v.verifiedAt)}',
+              : (v.verifiedAtLabel.isEmpty
+                  ? v.verifiedByName
+                  : '${v.verifiedByName} | ${v.verifiedAtLabel}'),
         ),
         if (v != null && v.remarks.isNotEmpty)
           InfoRow(label: 'Supervisor Remarks', value: v.remarks),
         if (submission != null && submission.number.isNotEmpty)
           InfoRow(
             label: 'Submission',
-            value: '#${submission.number} | '
-                '${formatReportDateTime(submission.timestamp)}',
+            value: submission.timestampLabel.isEmpty
+                ? '#${submission.number}'
+                : '#${submission.number} | ${submission.timestampLabel}',
           ),
       ],
     );
