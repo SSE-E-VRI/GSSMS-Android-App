@@ -377,7 +377,9 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
   Widget? _buildBottomActions(WorkOrderDetailState state, UserSession? session) {
     if (state is! WorkOrderDetailLoaded) return null;
     final wo = state.workOrder;
-    final canEdit = sessionAllows(session, 'maintenance.edit');
+    // Admin/HQ-only sessions are read-only on mobile (SSOT §5.1) even though
+    // the server's allowed-actions payload lists ADMIN-tier transitions.
+    final canEdit = canOperateJobWorksOnMobile(session);
     final canChecklist = canWriteChecklist(session);
     final allowed = state.actions;
     final busy = state.isTransitioning;

@@ -127,27 +127,39 @@ bool _editWithRoles(UserSession? session, Set<AuthRole> roles) {
   return session.roles.any(roles.contains);
 }
 
+/// Roles that operate Job Works on mobile. MOBILE_APP_SSOT §5.1: DIV_ADMIN,
+/// ZR_ADMIN and SUPER_ADMIN are "awareness only" on mobile ("power tools stay
+/// on web permanently") and HQ users are read + export. The server still
+/// lists lifecycle transitions (assign, cancel, hold, verify, close) for the
+/// ADMIN tier because the web may perform them, so the mobile client must
+/// not render them. Multi-role users keep the controls of any field role
+/// they also hold (role union).
+const _jobWorkFieldRoles = {
+  AuthRole.depotIncharge,
+  AuthRole.depotUser,
+  AuthRole.maintenanceStaff,
+};
+
+/// Whether this session may perform Job Work mutations on mobile at all:
+/// `maintenance.edit` plus at least one field role. Admin/HQ-only sessions
+/// are read-only here.
+bool canOperateJobWorksOnMobile(UserSession? session) =>
+    _editWithRoles(session, _jobWorkFieldRoles);
+
 /// Reassign technician (`POST .../work-orders/{id}/reassign/`, `views.py:3705`,
-/// `workorder_lifecycle_service.py:1061`): `maintenance.edit` plus legacy role
-/// ADMIN (SUPER/ZR/DIV admin), DEPOT_INCHARGE or DEPOT_USER.
+/// `workorder_lifecycle_service.py:1061`): the server also accepts the ADMIN
+/// tier, but on mobile only DEPOT_INCHARGE / DEPOT_USER (SSOT §5.1).
 bool canReassignWorkOrder(UserSession? session) => _editWithRoles(session, {
-      AuthRole.superAdmin,
-      AuthRole.zrAdmin,
-      AuthRole.divAdmin,
       AuthRole.depotIncharge,
       AuthRole.depotUser,
     });
 
 /// Pre-START checklist preparation and supervisor mandates
 /// (`prepare-checklist/` `views.py:3049`, `supervisor-mandate/` `views.py:3065`):
-/// `maintenance.edit` plus SUPER_ADMIN, ZR_ADMIN, DIV_ADMIN or DEPOT_INCHARGE.
+/// the server also accepts the ADMIN tier, but on mobile only DEPOT_INCHARGE
+/// (SSOT §5.1).
 bool canManagePreStartMandates(UserSession? session) =>
-    _editWithRoles(session, {
-      AuthRole.superAdmin,
-      AuthRole.zrAdmin,
-      AuthRole.divAdmin,
-      AuthRole.depotIncharge,
-    });
+    _editWithRoles(session, {AuthRole.depotIncharge});
 
 /// Un-checking a checked-out asset group (`group-inclusion/`, `views.py:2151`)
 /// needs `maintenance.group_uncheckout` (DEPOT_INCHARGE; SUPER_ADMIN holds all).

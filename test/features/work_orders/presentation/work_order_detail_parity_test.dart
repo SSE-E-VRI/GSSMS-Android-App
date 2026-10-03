@@ -26,14 +26,16 @@ Future<void> _pump(
   WorkOrder wo,
   UserSession session, {
   List<Override> extraOverrides = const [],
+  List<WorkOrderAction> allowed = const [],
+  String currentStatus = 'ASSIGNED',
 }) async {
   final repo = _MockRepo();
   when(() => repo.fetchWorkOrderById(wo.id)).thenAnswer((_) async => wo);
   when(() => repo.fetchAllowedActions(wo.id)).thenAnswer(
     (_) async => WorkOrderActionSet(
       workOrderId: wo.id,
-      currentStatus: 'ASSIGNED',
-      allowed: const [],
+      currentStatus: currentStatus,
+      allowed: allowed,
     ),
   );
   when(() => repo.fetchAudit(wo.id))
@@ -80,6 +82,54 @@ void main() {
     expect(find.text('Request PM skip'), findsOneWidget);
     expect(find.text('Request checklist change'), findsOneWidget);
     expect(find.byKey(const Key('pre_start_panel')), findsOneWidget);
+  });
+
+  group('Admin tier is awareness-only on mobile (SSOT 5.1)', () {
+    const newActions = [
+      WorkOrderAction(targetStatus: 'ASSIGNED', label: 'Assigned', enabled: true),
+      WorkOrderAction(targetStatus: 'CANCELLED', label: 'Cancelled', enabled: true),
+    ];
+    WorkOrder newWo() => const WorkOrder(
+          id: 101,
+          status: WorkOrderStatus.newOrder,
+          type: WorkOrderType.preventive,
+          title: 'Monthly PM',
+          originalScheduleId: 5,
+        );
+
+    for (final role in [AuthRole.divAdmin, AuthRole.zrAdmin, AuthRole.superAdmin]) {
+      testWidgets('${role.code} sees no Assign / lifecycle actions',
+          (tester) async {
+        await _pump(
+          tester,
+          newWo(),
+          fakeSession(
+            role: role,
+            permissions: role == AuthRole.superAdmin
+                ? const ['*']
+                : const ['maintenance.view', 'maintenance.edit'],
+          ),
+          allowed: newActions,
+          currentStatus: 'NEW',
+        );
+        expect(find.text('Assign'), findsNothing);
+        expect(find.text('Cancelled'), findsNothing);
+        expect(find.byKey(const Key('work_order_overflow_menu')), findsNothing);
+        expect(find.byKey(const Key('pre_start_panel')), findsNothing);
+      });
+    }
+
+    testWidgets('DEPOT_INCHARGE still sees Assign', (tester) async {
+      await _pump(tester, newWo(), fakeSession(),
+          allowed: newActions, currentStatus: 'NEW');
+      expect(find.text('Assign'), findsOneWidget);
+    });
+
+    testWidgets('DIV_ADMIN cannot reassign an assigned Job Work',
+        (tester) async {
+      await _pump(tester, _wo(), fakeSession(role: AuthRole.divAdmin));
+      expect(find.byKey(const Key('work_order_overflow_menu')), findsNothing);
+    });
   });
 
   testWidgets('in-progress Job Work has no overflow menu', (tester) async {

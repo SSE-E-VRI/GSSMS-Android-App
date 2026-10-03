@@ -180,14 +180,38 @@ void main() {
     test('canReassignWorkOrder', () {
       expect(canReassignWorkOrder(null), isFalse);
       expect(canReassignWorkOrder(sess(AuthRole.depotUser, edit)), isTrue);
-      expect(canReassignWorkOrder(sess(AuthRole.divAdmin, edit)), isTrue);
+      // SSOT §5.1: admin tier is awareness-only on mobile.
+      expect(canReassignWorkOrder(sess(AuthRole.divAdmin, edit)), isFalse);
+      expect(canReassignWorkOrder(sess(AuthRole.superAdmin, const ['*'])), isFalse);
       expect(canReassignWorkOrder(sess(AuthRole.depotUser, const [])), isFalse);
       expect(canReassignWorkOrder(sess(AuthRole.maintenanceStaff, edit)), isFalse);
     });
 
+    test('canOperateJobWorksOnMobile: admin/HQ tier is read-only (SSOT 5.1)', () {
+      expect(canOperateJobWorksOnMobile(null), isFalse);
+      expect(canOperateJobWorksOnMobile(sess(AuthRole.depotIncharge, edit)), isTrue);
+      expect(canOperateJobWorksOnMobile(sess(AuthRole.depotUser, edit)), isTrue);
+      expect(canOperateJobWorksOnMobile(sess(AuthRole.maintenanceStaff, edit)), isTrue);
+      expect(canOperateJobWorksOnMobile(sess(AuthRole.divAdmin, edit)), isFalse);
+      expect(canOperateJobWorksOnMobile(sess(AuthRole.zrAdmin, edit)), isFalse);
+      expect(canOperateJobWorksOnMobile(sess(AuthRole.superAdmin, const ['*'])), isFalse);
+      expect(canOperateJobWorksOnMobile(sess(AuthRole.divHqUser, edit)), isFalse);
+      expect(canOperateJobWorksOnMobile(sess(AuthRole.depotIncharge, const [])), isFalse);
+      // Role union: an admin who is also a depot incharge keeps field controls.
+      final multi = UserSession(
+        accessToken: 't',
+        username: 'u',
+        primaryRole: AuthRole.divAdmin,
+        roles: const [AuthRole.divAdmin, AuthRole.depotIncharge],
+        permissions: edit,
+      );
+      expect(canOperateJobWorksOnMobile(multi), isTrue);
+    });
+
     test('canManagePreStartMandates', () {
       expect(canManagePreStartMandates(sess(AuthRole.depotIncharge, edit)), isTrue);
-      expect(canManagePreStartMandates(sess(AuthRole.zrAdmin, edit)), isTrue);
+      expect(canManagePreStartMandates(sess(AuthRole.zrAdmin, edit)), isFalse);
+      expect(canManagePreStartMandates(sess(AuthRole.divAdmin, edit)), isFalse);
       expect(canManagePreStartMandates(sess(AuthRole.depotUser, edit)), isFalse);
       expect(canManagePreStartMandates(null), isFalse);
     });
