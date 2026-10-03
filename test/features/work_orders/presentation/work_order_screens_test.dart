@@ -210,6 +210,51 @@ void main() {
       expect(find.text('New → Assigned'), findsOneWidget);
     });
 
+    testWidgets('audit timeline names reassigned technicians and reason',
+        (tester) async {
+      when(() => mockRepo.fetchWorkOrderById(101)).thenAnswer((_) async => testOrders[0]);
+      when(() => mockRepo.fetchAllowedActions(101)).thenAnswer(
+        (_) async => const WorkOrderActionSet(
+          workOrderId: 101,
+          currentStatus: 'ASSIGNED',
+          allowed: [],
+        ),
+      );
+      when(() => mockRepo.fetchAudit(101)).thenAnswer(
+        (_) async => WorkOrderAudit(
+          workOrderId: 101,
+          events: [
+            WorkOrderAuditEvent.fromJson(const {
+              'event_id': 'e2',
+              'event_type': 'REASSIGNED',
+              'actor': 'incharge_kumar',
+              'reason': 'Wrongly assigned',
+              'details': {'from_user': 'Alice', 'to_user': 'Bob'},
+            }),
+          ],
+        ),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            workOrderRepositoryProvider.overrideWithValue(mockRepo),
+            authControllerProvider.overrideWith(
+              () => FakeAuthenticatedController(fakeSession()),
+            ),
+          ],
+          child: const MaterialApp(
+            home: WorkOrderDetailScreen(workOrderId: 101),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Reassigned'), findsOneWidget);
+      expect(find.text('Alice → Bob'), findsOneWidget);
+      expect(find.text('Reason: Wrongly assigned'), findsOneWidget);
+    });
+
     testWidgets('WorkOrderDetailScreen offers no transition the server withheld',
         (tester) async {
       when(() => mockRepo.fetchWorkOrderById(101)).thenAnswer((_) async => testOrders[0]);

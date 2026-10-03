@@ -42,6 +42,18 @@ void main() {
       apiService = ComplaintApiService(dio);
     });
 
+    test('getComplaints sends exclude_status when given', () async {
+      dio.httpClientAdapter = MockAdapter((options) async {
+        expect(options.path, '/api/v1/complaints/');
+        expect(options.queryParameters['exclude_status'], 'CLOSED');
+        expect(options.queryParameters.containsKey('status'), isFalse);
+        return _json([], 200);
+      });
+
+      final complaints = await apiService.getComplaints(excludeStatus: 'CLOSED');
+      expect(complaints, isEmpty);
+    });
+
     test('getComplaints calls GET /api/v1/complaints/ with query filters', () async {
       dio.httpClientAdapter = MockAdapter((options) async {
         expect(options.path, '/api/v1/complaints/');

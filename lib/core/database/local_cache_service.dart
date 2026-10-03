@@ -139,6 +139,8 @@ class LocalCacheService implements ILocalCacheService {
       'linked_record_id': workOrder.linkedRecordId,
       'ticket_number': workOrder.ticketNumber,
       'maintenance_master_name': workOrder.maintenanceMasterName,
+      'maintenance_master': workOrder.maintenanceMasterId,
+      'source': workOrder.source,
       'sla_status': workOrder.slaStatus,
       'escalation_level': workOrder.escalationLevel,
       'station': workOrder.stationId,
@@ -242,7 +244,7 @@ class LocalCacheService implements ILocalCacheService {
 
     final validCommands = <OutboxCommand>[];
     var corrupt = 0;
-    final items = decoded ?? const [];
+    final items = decoded;
     for (final item in items) {
       if (item is Map) {
         try {

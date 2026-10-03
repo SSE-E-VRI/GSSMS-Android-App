@@ -161,15 +161,24 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
+            // Wrap (not Row): title + two badges overflow a phone-width card,
+            // so the badges drop to the next line instead of clipping.
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                Icon(Icons.warning_amber_rounded, color: context.gssms.danger.foreground),
-                const SizedBox(width: 8),
-                Text(
-                  'Attention Required',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: context.gssms.link),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.warning_amber_rounded, color: context.gssms.danger.foreground),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Attention Required',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: context.gssms.link),
+                    ),
+                  ],
                 ),
-                const Spacer(),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
@@ -182,7 +191,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   ),
                 ),
                 if (attention.dueSoon.isNotEmpty) ...[
-                  const SizedBox(width: 6),
                   Container(
                     key: const Key('attention_due_soon_badge'),
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -398,8 +406,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         rows.add(_pendingRow(
           icon: Icons.report_problem_outlined,
           color: context.gssms.danger.foreground,
-          title: '${stats.openComplaintCount} open complaints',
-          subtitle: 'Triage the complaint queue',
+          title: '${stats.openComplaintCount} open breakdowns',
+          subtitle: 'Triage the breakdown queue',
           onTap: () => openList(const ComplaintListScreen()),
         ));
       }
@@ -572,7 +580,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: _buildKpiCard('Open Complaints', '${stats.openComplaintCount}',
+                child: _buildKpiCard('Open Breakdowns', '${stats.openComplaintCount}',
                     Icons.report_problem_outlined, context.gssms.danger.foreground),
               ),
             ],

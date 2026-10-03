@@ -74,6 +74,7 @@ void main() {
       expect(find.text('Super Admin'), findsOneWidget);
       expect(find.byKey(const Key('module_maintenance')), findsOneWidget);
       expect(find.byKey(const Key('module_complaints')), findsOneWidget);
+      expect(find.byKey(const Key('module_deficiencies')), findsOneWidget);
       expect(find.byKey(const Key('module_assets')), findsOneWidget);
       expect(find.byKey(const Key('module_dashboard')), findsOneWidget);
       expect(find.byKey(const Key('module_reports')), findsOneWidget);

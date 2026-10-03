@@ -88,7 +88,7 @@ class WorkOrderPdfService {
               style: const pw.TextStyle(fontSize: 11)),
           pw.SizedBox(height: 4),
           pw.Text(
-              'Status: ${wo.status.displayName}  |  Type: ${wo.type.displayName}  |  Priority: ${wo.priority.displayName}',
+              'Status: ${wo.status.displayName}  |  Type: ${wo.displayTypeLabel}  |  Priority: ${wo.priority.displayName}',
               textAlign: pw.TextAlign.center,
               style: const pw.TextStyle(
                   fontSize: 9, color: PdfColors.grey700)),

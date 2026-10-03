@@ -347,5 +347,30 @@ void main() {
 
       expect(wo.maintenanceMasterVersionSnapshot, isNull);
     });
+    test('parses executionMode, maintenanceMasterId and source', () {
+      final wo = WorkOrder.fromJson(const {
+        'id': 1,
+        'execution_mode': 'COMPLAINT',
+        'maintenance_master': 5,
+        'source': 'SCHEDULED_PM',
+      });
+      expect(wo.executionMode, 'COMPLAINT');
+      expect(wo.isModeExecution, isTrue);
+      expect(wo.maintenanceMasterId, 5);
+      expect(wo.source, 'SCHEDULED_PM');
+      expect(wo.isPmWorkOrder, isTrue);
+    });
+
+    test('isModeExecution identifies server-owned modes', () {
+      for (final mode in ['COMPLAINT', 'INSPECTION', 'RECTIFICATION']) {
+        final wo = WorkOrder.fromJson({'id': 1, 'execution_mode': mode});
+        expect(wo.isModeExecution, isTrue, reason: mode);
+      }
+      expect(
+        WorkOrder.fromJson(const {'id': 1, 'execution_mode': 'CHECKLIST'}).isModeExecution,
+        isFalse,
+      );
+      expect(WorkOrder.fromJson(const {'id': 1}).isModeExecution, isFalse);
+    });
   });
 }

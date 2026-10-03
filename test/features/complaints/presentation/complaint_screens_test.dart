@@ -92,7 +92,7 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      expect(find.text('Complaints & Issues'), findsOneWidget);
+      expect(find.text('Breakdowns & Issues'), findsOneWidget);
       expect(find.byKey(const Key('date_range_from')), findsOneWidget);
       expect(find.text('Transformer Leakage'), findsOneWidget);
       expect(find.text('#1'), findsOneWidget);
@@ -127,7 +127,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(ComplaintDetailScreen), findsOneWidget);
-      expect(find.text('Complaint #1'), findsOneWidget);
+      expect(find.text('Breakdown #1'), findsOneWidget);
       expect(find.text('Oil leaking near base valve'), findsOneWidget);
       expect(find.text('Open'), findsOneWidget);
     });
@@ -152,6 +152,10 @@ void main() {
             stationId: any(named: 'stationId'),
             infrastructureId: any(named: 'infrastructureId'),
             assetId: any(named: 'assetId'),
+            generalAssetDescription: any(named: 'generalAssetDescription'),
+            failureDate: any(named: 'failureDate'),
+            failureTime: any(named: 'failureTime'),
+            complainantName: any(named: 'complainantName'),
           )).thenAnswer((_) async => testComplaints[0]);
 
       await tester.pumpWidget(
@@ -178,14 +182,15 @@ void main() {
       await tester.tap(find.byKey(const Key('submit_complaint_button')));
       await tester.pumpAndSettle();
 
-      expect(find.text('Please enter a complaint title'), findsOneWidget);
+      expect(find.text('Please enter a breakdown title'), findsOneWidget);
       expect(find.text('Please enter detailed description'), findsOneWidget);
 
-      // Fill in title/description, but still no department -> the Form-level
+      // Fill in title/description and complainant name, but still no department -> the Form-level
       // errors clear while the department check (a plain submit-time guard,
       // not a FormField validator) now surfaces on its own.
       await tester.enterText(find.byKey(const Key('complaint_title_field')), 'Test Title');
       await tester.enterText(find.byKey(const Key('complaint_description_field')), 'Detailed failure description');
+      await tester.enterText(find.byKey(const Key('complaint_complainant_field')), 'Test User');
       await tester.ensureVisible(find.byKey(const Key('submit_complaint_button')));
       await tester.tap(find.byKey(const Key('submit_complaint_button')));
       await tester.pumpAndSettle();
@@ -196,6 +201,20 @@ void main() {
       await tester.tap(find.byKey(const Key('complaint_department_dropdown')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Electrical').last);
+      await tester.pumpAndSettle();
+
+      // Pick failure date
+      await tester.ensureVisible(find.byKey(const Key('complaint_failure_date_field')));
+      await tester.tap(find.byKey(const Key('complaint_failure_date_field')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('OK'));
+      await tester.pumpAndSettle();
+
+      // Pick failure time
+      await tester.ensureVisible(find.byKey(const Key('complaint_failure_time_field')));
+      await tester.tap(find.byKey(const Key('complaint_failure_time_field')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('OK'));
       await tester.pumpAndSettle();
 
       await tester.ensureVisible(find.byKey(const Key('submit_complaint_button')));
@@ -210,6 +229,10 @@ void main() {
             stationId: null,
             infrastructureId: null,
             assetId: null,
+            generalAssetDescription: null,
+            failureDate: any(named: 'failureDate'),
+            failureTime: any(named: 'failureTime'),
+            complainantName: 'Test User',
           )).called(1);
     });
   });

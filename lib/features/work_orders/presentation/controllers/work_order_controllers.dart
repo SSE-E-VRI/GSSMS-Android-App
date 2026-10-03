@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:dio/dio.dart' show DioException;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gssms_mobile/core/network/api_error.dart';
 import 'package:gssms_mobile/core/network/dio_client.dart';
@@ -542,6 +543,88 @@ class ChecklistController extends FamilyNotifier<ChecklistState, int> {
       if (latest is! ChecklistLoaded) return false;
       state = latest.copyWith(
           errorMessage: 'Could not save the reading: ${userFacingError(e)}');
+      return false;
+    }
+  }
+
+  /// True when the last [setGroupIncluded] failed because the server wants a
+  /// reason (un-check at TECH_COMPLETED). The UI prompts and retries.
+  bool groupReasonRequired = false;
+
+  /// Checks an asset group out (`included: true`) or un-checks it. Online
+  /// only: nothing is changed locally unless the server acknowledged.
+  Future<bool> setGroupIncluded(
+    ChecklistAssetGroup g,
+    bool included, {
+    String? reason,
+  }) async {
+    final current = state;
+    if (current is! ChecklistLoaded) return false;
+    if (current.savingGroupKeys.contains(g.key)) return false;
+
+    groupReasonRequired = false;
+    state = current.copyWith(
+      savingGroupKeys: {...current.savingGroupKeys, g.key},
+      successMessage: current.successMessage,
+      errorMessage: current.errorMessage,
+    );
+
+    Set<String> without(ChecklistLoaded s) =>
+        s.savingGroupKeys.where((k) => k != g.key).toSet();
+
+    try {
+      final result = await _repository.setGroupInclusion(
+        arg,
+        assetCategoryId: g.assetCategoryId,
+        assetName: g.assetName,
+        included: included,
+        reason: reason,
+      );
+
+      final latest = state;
+      if (latest is! ChecklistLoaded) return true;
+
+      final name = g.assetName.trim().toLowerCase();
+      final updatedLines = latest.record.lines.map((l) {
+        if (l.assetCategoryId == g.assetCategoryId &&
+            l.itemName.trim().toLowerCase() == name) {
+          return l.copyWith(
+            checkedOut: result.checkedOut,
+            checkoutSource: result.checkoutSource,
+            excluded: result.excluded,
+            exclusionReason: result.exclusionReason,
+            applicability: result.applicability,
+          );
+        }
+        return l;
+      }).toList();
+
+      state = latest.copyWith(
+        record: latest.record.copyWith(lines: updatedLines),
+        savingGroupKeys: without(latest),
+        successMessage: result.returnedToTechnician
+            ? 'Job Work returned to the technician for rework.'
+            : (result.checkedOut
+                ? '${g.displayTitle}: checked out'
+                : '${g.displayTitle}: un-checked'),
+      );
+      return true;
+    } catch (e) {
+      final latest = state;
+      if (latest is! ChecklistLoaded) return false;
+      String message = 'Could not change group: ${userFacingError(e)}';
+      if (e is DioException && e.response?.statusCode == 400) {
+        final data = e.response?.data;
+        if (data is Map && data['reason'] != null) {
+          groupReasonRequired = true;
+          final r = data['reason'];
+          message = r is List ? r.join(' ') : '$r';
+        }
+      }
+      state = latest.copyWith(
+        savingGroupKeys: without(latest),
+        errorMessage: groupReasonRequired ? null : message,
+      );
       return false;
     }
   }

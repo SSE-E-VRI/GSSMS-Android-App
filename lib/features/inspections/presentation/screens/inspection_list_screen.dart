@@ -14,6 +14,7 @@ import 'package:gssms_mobile/features/auth/domain/rbac.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:gssms_mobile/features/auth/presentation/widgets/permission_denied_view.dart';
 import 'package:gssms_mobile/features/inspections/domain/models/inspection.dart';
+import 'package:gssms_mobile/features/inspections/domain/models/inspection_effective_status.dart';
 import 'package:gssms_mobile/features/inspections/presentation/controllers/inspection_controllers.dart';
 import 'package:gssms_mobile/features/inspections/presentation/inspection_status_style.dart';
 import 'package:gssms_mobile/features/inspections/presentation/screens/inspection_create_screen.dart';
@@ -66,6 +67,7 @@ class _InspectionListScreenState extends ConsumerState<InspectionListScreen> {
   bool _hasActiveFilters(InspectionListLoaded? s) =>
       s != null &&
       (s.selectedStatus != null ||
+          s.selectedEffectiveStatus != null ||
           s.searchQuery.isNotEmpty ||
           s.dateFrom != null ||
           s.dateTo != null);
@@ -130,7 +132,7 @@ class _InspectionListScreenState extends ConsumerState<InspectionListScreen> {
                   children: [
                     GssmsSearchField(
                       controller: _searchController,
-                      hintText: 'Search by #, title, location, inspector…',
+                      hintText: 'Search by number, title, location, asset…',
                       onChanged: _controller.setSearchQuery,
                     ),
                     const SizedBox(height: GssmsSpacing.s8),
@@ -144,6 +146,11 @@ class _InspectionListScreenState extends ConsumerState<InspectionListScreen> {
                     _StatusFilter(
                       state: loaded,
                       onChanged: _controller.setStatusFilter,
+                    ),
+                    const SizedBox(height: GssmsSpacing.s8),
+                    _EffectiveStatusFilter(
+                      state: loaded,
+                      onChanged: _controller.setEffectiveStatusFilter,
                     ),
                   ],
                 ),
@@ -255,7 +262,8 @@ class _InspectionListScreenState extends ConsumerState<InspectionListScreen> {
   }
 }
 
-/// Status filter as a dropdown: a chip row clipped "Action Required" at 360dp.
+/// Record-status filter (server-side narrowing). A chip row clipped
+/// "Action Required" at 360dp, so this stays a dropdown.
 class _StatusFilter extends StatelessWidget {
   const _StatusFilter({required this.state, required this.onChanged});
 
@@ -283,7 +291,7 @@ class _StatusFilter extends StatelessWidget {
       isExpanded: true,
       value: s?.selectedStatus,
       decoration: const InputDecoration(
-        labelText: 'Status',
+        labelText: 'Record status',
         isDense: true,
         contentPadding: EdgeInsets.symmetric(
           horizontal: GssmsSpacing.s12,
@@ -301,6 +309,65 @@ class _StatusFilter extends StatelessWidget {
             child: Text(
               '${status == InspectionStatus.converted ? 'Converted' : status.displayName}'
               ' (${countFor(status)})',
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+      ],
+      onChanged: onChanged,
+    );
+  }
+}
+
+/// Effective-status filter (client-side computed aggregate, mirrors web).
+class _EffectiveStatusFilter extends StatelessWidget {
+  const _EffectiveStatusFilter({required this.state, required this.onChanged});
+
+  final InspectionListLoaded? state;
+  final ValueChanged<EffectiveInspectionStatus?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = state;
+    int countFor(EffectiveInspectionStatus? status) {
+      if (s == null) return 0;
+      if (status == null) return s.inspections.length;
+      return s.inspections.where((i) => i.effectiveStatus == status).length;
+    }
+
+    const statuses = [
+      EffectiveInspectionStatus.open,
+      EffectiveInspectionStatus.partiallyConverted,
+      EffectiveInspectionStatus.assigned,
+      EffectiveInspectionStatus.inProgress,
+      EffectiveInspectionStatus.underSupervisorReview,
+      EffectiveInspectionStatus.reworkRequired,
+      EffectiveInspectionStatus.replacementPendingApproval,
+      EffectiveInspectionStatus.replacementApproved,
+      EffectiveInspectionStatus.closed,
+    ];
+
+    return DropdownButtonFormField<EffectiveInspectionStatus?>(
+      key: const Key('inspection_effective_status_filter_dropdown'),
+      isExpanded: true,
+      value: s?.selectedEffectiveStatus,
+      decoration: const InputDecoration(
+        labelText: 'Effective status',
+        isDense: true,
+        contentPadding: EdgeInsets.symmetric(
+          horizontal: GssmsSpacing.s12,
+          vertical: GssmsSpacing.s12,
+        ),
+      ),
+      items: [
+        DropdownMenuItem(
+          value: null,
+          child: Text('All (${countFor(null)})'),
+        ),
+        for (final status in statuses)
+          DropdownMenuItem(
+            value: status,
+            child: Text(
+              '${status.displayName} (${countFor(status)})',
               overflow: TextOverflow.ellipsis,
             ),
           ),
@@ -347,9 +414,18 @@ class _InspectionCard extends StatelessWidget {
                       inspection.reference,
                       style: textTheme.labelMedium?.copyWith(color: tokens.link),
                     ),
-                    InspectionStatusChip(inspection: inspection),
+                    InspectionPointsBadge(inspection: inspection),
                   ],
                 ),
+              ),
+              const SizedBox(height: GssmsSpacing.s4),
+              Wrap(
+                spacing: GssmsSpacing.s8,
+                runSpacing: GssmsSpacing.s4,
+                children: [
+                  InspectionStatusChip(inspection: inspection),
+                  InspectionEffectiveStatusChip(inspection: inspection),
+                ],
               ),
               const SizedBox(height: GssmsSpacing.s8),
               Text(

@@ -46,7 +46,40 @@ class ComplaintStatusChip extends StatelessWidget {
       label: status.displayName,
       tone: status.tone,
       icon: status.icon,
-      semanticPrefix: 'Status',
+      semanticPrefix: 'Record status',
+    );
+  }
+}
+
+/// Live aggregate status (linked Job Work status once converted) — mirrors
+/// web's `effective_status` alongside `record_status`. Shown only when it
+/// carries information beyond the record chip.
+class ComplaintEffectiveChip extends StatelessWidget {
+  const ComplaintEffectiveChip({super.key, required this.complaint});
+
+  final Complaint complaint;
+
+  static String pretty(String code) {
+    final words = code.trim().replaceAll('_', ' ').toLowerCase().split(' ');
+    return words
+        .map((w) => w.isEmpty ? w : w[0].toUpperCase() + w.substring(1))
+        .join(' ');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final effective = complaint.effectiveStatus?.trim();
+    if (effective == null || effective.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    if (effective.toUpperCase() == complaint.status.code) {
+      return const SizedBox.shrink();
+    }
+    return StatusChip(
+      label: pretty(effective),
+      tone: GssmsTone.info,
+      icon: Icons.sync_outlined,
+      semanticPrefix: 'Effective status',
     );
   }
 }

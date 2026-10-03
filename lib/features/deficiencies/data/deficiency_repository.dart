@@ -1,6 +1,11 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gssms_mobile/features/deficiencies/data/deficiency_api_service.dart';
 import 'package:gssms_mobile/features/deficiencies/domain/models/deficiency.dart';
 
+final deficiencyRepositoryProvider = Provider<IDeficiencyRepository>((ref) {
+  final api = ref.watch(deficiencyApiServiceProvider);
+  return DeficiencyRepository(api);
+});
 abstract class IDeficiencyRepository {
   Future<List<Deficiency>> fetchPendingDeficiencies({
     int? zoneId,

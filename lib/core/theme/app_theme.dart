@@ -72,6 +72,7 @@ class AppTheme {
   static const Color moduleComplaints = accentOrange;
   static const Color moduleInspections = Color(0xFF0F766E);
   static const Color moduleAssets = Color(0xFF1D4ED8);
+  static const Color moduleDeficiencies = Color(0xFFBE123C);
   static const Color moduleReports = Color(0xFFB45309);
   static const Color moduleEnergy = Color(0xFF3730A3);
 

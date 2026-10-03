@@ -17,6 +17,7 @@ import '../../../complaints/presentation/screens/complaint_list_screen.dart';
 import '../../../dashboard/presentation/controllers/dashboard_controller.dart';
 import '../../../dashboard/presentation/controllers/dashboard_state.dart';
 import '../../../dashboard/presentation/screens/dashboard_screen.dart';
+import '../../../deficiencies/presentation/screens/deficiency_list_screen.dart';
 import '../../../energy/presentation/screens/energy_placeholder_screen.dart';
 import '../../../inspections/presentation/screens/inspection_list_screen.dart';
 import '../../../maintenance/presentation/screens/maintenance_screen.dart';
@@ -572,8 +573,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     if (sessionAllows(session, 'complaints.view')) {
       add(
         key: const Key('module_complaints'),
-        title: 'Complaints',
-        subtitle: 'Log and track field complaints',
+        title: 'Breakdowns',
+        subtitle: 'Report and track field breakdowns',
         icon: Icons.report_problem_outlined,
         color: AppTheme.moduleComplaints,
         screen: const ComplaintListScreen(),
@@ -588,6 +589,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         icon: Icons.fact_check_outlined,
         color: AppTheme.moduleInspections,
         screen: const InspectionListScreen(),
+      );
+    }
+
+    if (sessionAllows(session, 'assets.view')) {
+      add(
+        key: const Key('module_deficiencies'),
+        title: 'Deficiencies',
+        subtitle: 'Open findings & rectification status',
+        icon: Icons.rule_outlined,
+        color: AppTheme.moduleDeficiencies,
+        screen: const DeficiencyListScreen(),
       );
     }
 

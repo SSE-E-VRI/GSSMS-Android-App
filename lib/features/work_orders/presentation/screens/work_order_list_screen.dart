@@ -19,6 +19,7 @@ import 'package:gssms_mobile/features/work_orders/domain/models/work_order.dart'
 import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_order_controllers.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_order_state.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/screens/work_order_create_screen.dart';
+import 'package:gssms_mobile/features/work_orders/presentation/screens/job_work_report_screen.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/screens/work_order_detail_screen.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/work_order_status_style.dart';
 import 'package:intl/intl.dart';
@@ -224,6 +225,7 @@ class _WorkOrderListScreenState extends ConsumerState<WorkOrderListScreen> {
   }
 
   List<Widget> _buildLoadedSlivers(WorkOrderListLoaded state) {
+    final session = sessionFromAuth(ref.watch(authControllerProvider));
     final orders = state.filteredOrders;
     if (orders.isEmpty) {
       final filtered = _hasActiveFilters(state);
@@ -253,6 +255,14 @@ class _WorkOrderListScreenState extends ConsumerState<WorkOrderListScreen> {
               final order = orders[i];
               return _WorkOrderCard(
                 workOrder: order,
+                onViewReport: JobWorkReportScreen.canShow(order, session)
+                    ? () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) =>
+                                JobWorkReportScreen(workOrder: order),
+                          ),
+                        )
+                    : null,
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
@@ -440,10 +450,14 @@ class _WorkOrderCard extends StatelessWidget {
   const _WorkOrderCard({
     required this.workOrder,
     required this.onTap,
+    this.onViewReport,
   });
 
   final WorkOrder workOrder;
   final VoidCallback onTap;
+
+  /// Non-null only for an assigned technician on a reportable Job Work.
+  final VoidCallback? onViewReport;
 
   static final DateFormat _dateFormat = DateFormat('dd MMM yyyy');
 
@@ -509,7 +523,7 @@ class _WorkOrderCard extends StatelessWidget {
                   runSpacing: GssmsSpacing.s4,
                   children: [
                     WorkOrderPriorityChip(priority: workOrder.priority),
-                    StatusChip(label: workOrder.type.displayName),
+                    StatusChip(label: workOrder.displayTypeLabel),
                     if (workOrder.isSlaAtRisk)
                       StatusChip(
                         label: 'SLA ${workOrder.slaStatus!.replaceAll('_', ' ').toLowerCase()}',
@@ -539,6 +553,16 @@ class _WorkOrderCard extends StatelessWidget {
                       ),
                   ],
                 ),
+                if (onViewReport != null)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      key: Key('work_order_card_report_${workOrder.id}'),
+                      onPressed: onViewReport,
+                      icon: const Icon(Icons.description_outlined),
+                      label: const Text('View Report'),
+                    ),
+                  ),
               ],
             ),
           ),

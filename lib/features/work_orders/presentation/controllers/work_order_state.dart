@@ -260,6 +260,7 @@ class ChecklistLoaded extends ChecklistState {
     this.activeSubCategory,
     this.successMessage,
     this.errorMessage,
+    this.savingGroupKeys = const {},
   });
 
   final MaintenanceRecord record;
@@ -268,16 +269,26 @@ class ChecklistLoaded extends ChecklistState {
   final String? successMessage;
   final String? errorMessage;
 
+  /// Keys of asset groups whose check-out/un-check request is in flight.
+  final Set<String> savingGroupKeys;
+
   /// Equipment groups present on this record, used as the subsystem filter.
   List<String> get subCategories {
     final categories = <String>{};
-    for (final line in record.activeLines) {
-      final category = line.assetCategory;
-      if (category != null && category.isNotEmpty) {
-        categories.add(category);
-      }
+    for (final g in record.assetGroups) {
+      if (g.categoryLabel.isNotEmpty) categories.add(g.categoryLabel);
     }
     return categories.toList()..sort();
+  }
+
+  /// Asset groups to show (checked out or not), filtered by the subsystem
+  /// selection against each group's category label.
+  List<ChecklistAssetGroup> get displayedGroups {
+    final groups = record.assetGroups;
+    if (activeSubCategory == null || activeSubCategory!.isEmpty) {
+      return groups;
+    }
+    return groups.where((g) => g.categoryLabel == activeSubCategory).toList();
   }
 
   /// Lines to show: excluded lines are not part of this record's work, so they
@@ -310,8 +321,10 @@ class ChecklistLoaded extends ChecklistState {
     bool clearCategoryFilter = false,
     String? successMessage,
     String? errorMessage,
+    Set<String>? savingGroupKeys,
   }) {
     return ChecklistLoaded(
+      savingGroupKeys: savingGroupKeys ?? this.savingGroupKeys,
       record: record ?? this.record,
       isSubmitting: isSubmitting ?? this.isSubmitting,
       activeSubCategory: clearCategoryFilter ? null : (activeSubCategory ?? this.activeSubCategory),
@@ -327,6 +340,7 @@ class ChecklistLoaded extends ChecklistState {
         activeSubCategory,
         successMessage,
         errorMessage,
+        savingGroupKeys,
       ];
 }
 

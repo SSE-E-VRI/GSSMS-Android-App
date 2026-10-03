@@ -34,13 +34,13 @@ enum MaintenanceScheduleType {
 /// Template category, matching `MaintenanceMaster.TEMPLATE_KIND_CHOICES`.
 ///
 /// The backend/web term for `STATION_TEMPLATE` is "Station Template"; it is
-/// labelled "Station / Batch Template" here since that scope — one template
-/// applied across a whole station/infrastructure rather than one specific
-/// asset — is what "batch job work" refers to. The API value sent/received
-/// is always `STATION_TEMPLATE`; only the display label differs (SSOT Rule 4).
+/// labelled "Station" here since that scope — one template applied across a
+/// whole station/infrastructure rather than one specific asset. The API value
+/// sent/received is always `STATION_TEMPLATE`; only the display label differs
+/// (SSOT Rule 4).
 enum MaintenanceTemplateKind {
-  assetTemplate('ASSET_TEMPLATE', 'Asset Template'),
-  stationTemplate('STATION_TEMPLATE', 'Station / Batch Template'),
+  assetTemplate('ASSET_TEMPLATE', 'Asset'),
+  stationTemplate('STATION_TEMPLATE', 'Station'),
   // S-V4: the backend sends four more kinds since checklist versioning
   // (S-V1/S-V2/S-V3). AMC is listed by default and must render correctly;
   // the ad hoc kinds (handover/takeover/specialDrive) stay server-side
@@ -104,7 +104,7 @@ class MaintenanceMaster extends Equatable {
   factory MaintenanceMaster.fromJson(Map<String, dynamic> json) {
     return MaintenanceMaster(
       id: asJsonInt(json['id']) ?? 0,
-      name: asJsonString(json['name']) ?? 'Untitled Template',
+        name: asJsonString(json['name']) ?? 'Untitled Checklist',
       scheduleType: MaintenanceScheduleType.fromString(
           asJsonString(json['schedule_type'])),
       templateKind: MaintenanceTemplateKind.fromString(

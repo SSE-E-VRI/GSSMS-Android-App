@@ -73,6 +73,11 @@ void main() {
 
     await tester.pumpAndSettle();
 
+    // The station details block now scrolls away with the content instead of
+    // living in a tall pinned app bar; scroll past it as a user would.
+    await tester.drag(find.byType(CustomScrollView), const Offset(0, -200));
+    await tester.pumpAndSettle();
+
     final cardsFinder = find.byType(ChecklistLineCard);
     final renderedCount = cardsFinder.evaluate().length;
 

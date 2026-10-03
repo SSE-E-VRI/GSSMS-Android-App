@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
+import 'package:gssms_mobile/core/widgets/status_chip.dart';
 import 'package:gssms_mobile/core/widgets/org_scope_app_bar_filter.dart';
 import 'package:gssms_mobile/features/assets/presentation/screens/asset_detail_screen.dart';
 import 'package:gssms_mobile/features/auth/domain/rbac.dart';
@@ -99,10 +100,10 @@ class _PendingActionsScreenState extends ConsumerState<PendingActionsScreen> {
             labelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
             unselectedLabelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.normal),
             tabs: [
-              _tab(Icons.event_repeat, 'Schedules', state.schedules.length),
-              _tab(Icons.campaign_outlined, 'Complaints', state.complaints.length),
-              _tab(Icons.note_add_outlined, 'Inspections', state.inspections.length),
-              _tab(Icons.report_problem_outlined, 'Deficiencies', state.deficiencies.length),
+              _tab(Icons.event_repeat, 'Schedules', state.filteredSchedules.length),
+              _tab(Icons.campaign_outlined, 'Breakdowns', state.filteredComplaints.length),
+              _tab(Icons.note_add_outlined, 'Inspections', state.filteredInspections.length),
+              _tab(Icons.report_problem_outlined, 'Deficiencies', state.filteredDeficiencies.length),
             ],
           ),
         ),
@@ -110,12 +111,19 @@ class _PendingActionsScreenState extends ConsumerState<PendingActionsScreen> {
             ? const Center(child: CircularProgressIndicator())
             : state.error != null
                 ? _errorView(state.error!)
-                : TabBarView(
+                : Column(
                     children: [
-                      _SchedulesTab(state: state),
-                      _ComplaintsTab(state: state),
-                      _InspectionsTab(state: state),
-                      _DeficienciesTab(state: state),
+                      const _SubFilterBar(),
+                      Expanded(
+                        child: TabBarView(
+                          children: [
+                            _SchedulesTab(state: state),
+                            _ComplaintsTab(state: state),
+                            _InspectionsTab(state: state),
+                            _DeficienciesTab(state: state),
+                          ],
+                        ),
+                      ),
                     ],
                   ),
       ),
@@ -157,9 +165,82 @@ class _PendingActionsScreenState extends ConsumerState<PendingActionsScreen> {
   }
 }
 
+/// "IN_PROGRESS" -> "In Progress" for the linked Job Work status chip.
+String _prettyStatus(String raw) => raw
+    .trim()
+    .split('_')
+    .where((w) => w.isNotEmpty)
+    .map((w) => w[0].toUpperCase() + w.substring(1).toLowerCase())
+    .join(' ');
+
+/// Chip for the linked Job Work's status on converted rows.
+Widget? _woStatusChip(String? status) {
+  if (status == null || status.trim().isEmpty) return null;
+  return StatusChip(label: _prettyStatus(status));
+}
+
+/// Per-filter empty text, as on web ("No breakdowns need action." etc.).
+String _emptyText(String all, String noun, PendingSubFilter f) => switch (f) {
+      PendingSubFilter.all => all,
+      PendingSubFilter.needsAction => 'No $noun need action.',
+      PendingSubFilter.inProgress => 'No $noun in progress.',
+      PendingSubFilter.awaitingClosure => 'No $noun awaiting closure.',
+    };
+
+/// Horizontal sub-filter chips (All / Needs action / In progress / Awaiting
+/// closure) with counts for whichever tab is showing.
+class _SubFilterBar extends ConsumerWidget {
+  const _SubFilterBar();
+
+  static const _tabs = PendingActionTab.values;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(pendingActionsControllerProvider);
+    final tabController = DefaultTabController.of(context);
+    return ListenableBuilder(
+      listenable: tabController,
+      builder: (context, _) {
+        final counts = state.countsFor(_tabs[tabController.index]);
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.fromLTRB(
+              GssmsSpacing.s12, GssmsSpacing.s8, GssmsSpacing.s12, 0),
+          child: Row(
+            children: [
+              for (final f in PendingSubFilter.values)
+                Padding(
+                  padding: const EdgeInsets.only(right: GssmsSpacing.s8),
+                  child: ChoiceChip(
+                    key: Key(_filterKey(f)),
+                    label: Text('${f.label} (${counts[f] ?? 0})'),
+                    selected: state.subFilter == f,
+                    onSelected: (_) => ref
+                        .read(pendingActionsControllerProvider.notifier)
+                        .setSubFilter(f),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  static String _filterKey(PendingSubFilter f) => switch (f) {
+        PendingSubFilter.all => 'pending_subfilter_all',
+        PendingSubFilter.needsAction => 'pending_subfilter_needs_action',
+        PendingSubFilter.inProgress => 'pending_subfilter_in_progress',
+        PendingSubFilter.awaitingClosure => 'pending_subfilter_awaiting_closure',
+      };
+}
+
 /// Shared "select rows, then convert" footer + empty state, parameterised
-/// per tab so the three convertible tabs (Schedules/Complaints/Inspections)
-/// don't each hand-roll the same selection-count bar and button.
+/// per tab so the four convertible tabs (Schedules/Breakdowns/Inspections/
+/// Deficiencies) don't each hand-roll the same selection-count bar and
+/// button. Deficiencies pass [actionNoun] 'rectification Job Work' plus an
+/// [aboveButton] grouping switch and an [onConvert] override carrying the
+/// switch value into `convertSelected`.
 class _ConvertibleListScaffold extends ConsumerWidget {
   const _ConvertibleListScaffold({
     required this.tab,
@@ -168,6 +249,10 @@ class _ConvertibleListScaffold extends ConsumerWidget {
     required this.canConvert,
     required this.emptyLabel,
     required this.itemBuilder,
+    this.actionNoun = 'Job Work',
+    this.aboveButton,
+    this.onConvert,
+    this.confirmMessage,
   });
 
   final PendingActionTab tab;
@@ -176,6 +261,10 @@ class _ConvertibleListScaffold extends ConsumerWidget {
   final bool canConvert;
   final String emptyLabel;
   final Widget Function(BuildContext context, int index) itemBuilder;
+  final String actionNoun;
+  final Widget? aboveButton;
+  final Future<bool> Function()? onConvert;
+  final String? confirmMessage;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -210,33 +299,47 @@ class _ConvertibleListScaffold extends ConsumerWidget {
             color: context.gssms.surfaceRaised,
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
-              child: SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  key: const Key('pending_actions_convert_button'),
-                  onPressed: converting
-                      ? null
-                      : () async {
-                          final confirmed = await showDialog<bool>(
-                            context: context,
-                            builder: (ctx) => AlertDialog(
-                              title: const Text('Create Job Works'),
-                              content: Text(
-                                  'Create $selectedCount Job Work${selectedCount == 1 ? '' : 's'} from the selected items?'),
-                              actions: [
-                                TextButton(
-                                    onPressed: () => Navigator.pop(ctx, false),
-                                    child: const Text('Cancel')),
-                                ElevatedButton(
-                                    onPressed: () => Navigator.pop(ctx, true),
-                                    child: const Text('Create')),
-                              ],
-                            ),
-                          );
-                          if (confirmed != true) return;
-                          final ok = await ref
-                              .read(pendingActionsControllerProvider.notifier)
-                              .convertSelected(tab);
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (aboveButton != null) ...[
+                    aboveButton!,
+                    const SizedBox(height: 8),
+                  ],
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      key: const Key('pending_actions_convert_button'),
+                      onPressed: converting
+                          ? null
+                          : () async {
+                              final plural = selectedCount == 1 ? '' : 's';
+                              final confirmed = await showDialog<bool>(
+                                context: context,
+                                builder: (ctx) => AlertDialog(
+                                  title: Text('Create $actionNoun$plural'),
+                                  content: Text(confirmMessage ??
+                                      'Create $selectedCount $actionNoun$plural from the selected items?'),
+                                  actions: [
+                                    TextButton(
+                                        onPressed: () =>
+                                            Navigator.pop(ctx, false),
+                                        child: const Text('Cancel')),
+                                    ElevatedButton(
+                                        onPressed: () =>
+                                            Navigator.pop(ctx, true),
+                                        child: const Text('Create')),
+                                  ],
+                                ),
+                              );
+                              if (confirmed != true) return;
+                              final ok = onConvert != null
+                                  ? await onConvert!()
+                                  : await ref
+                                      .read(pendingActionsControllerProvider
+                                          .notifier)
+                                      .convertSelected(tab);
                           final message = ref
                               .read(pendingActionsControllerProvider)
                               .actionMessage;
@@ -259,7 +362,7 @@ class _ConvertibleListScaffold extends ConsumerWidget {
                       : const Icon(Icons.gpp_good_outlined, size: 18),
                   label: Text(converting
                       ? 'Creating...'
-                      : 'Create $selectedCount Job Work${selectedCount == 1 ? '' : 's'}'),
+                      : 'Create $selectedCount $actionNoun${selectedCount == 1 ? '' : 's'}'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Theme.of(context).colorScheme.primary,
                     foregroundColor: Theme.of(context).colorScheme.onPrimary,
@@ -267,9 +370,11 @@ class _ConvertibleListScaffold extends ConsumerWidget {
                   ),
                 ),
               ),
-            ),
+            ],
           ),
-      ],
+        ),
+      ),
+    ],
     );
   }
 }
@@ -283,15 +388,17 @@ class _SchedulesTab extends ConsumerWidget {
     final session = sessionFromAuth(ref.watch(authControllerProvider));
     final canConvert = canBatchConvertSchedules(session);
     final dateFormat = DateFormat('dd MMM yyyy');
+    final schedules = state.filteredSchedules;
 
     return _ConvertibleListScaffold(
       tab: PendingActionTab.schedules,
-      itemCount: state.schedules.length,
+      itemCount: schedules.length,
       selectedCount: state.selectedScheduleIds.length,
       canConvert: canConvert,
-      emptyLabel: 'No pending scheduled tasks.',
+      emptyLabel: _emptyText('No pending scheduled tasks.',
+          'scheduled tasks', state.subFilter),
       itemBuilder: (context, index) {
-        final s = state.schedules[index];
+        final s = schedules[index];
         final selected = state.selectedScheduleIds.contains(s.id);
         return Card(
           key: Key('schedule_pending_card_${s.id}'),
@@ -316,7 +423,9 @@ class _SchedulesTab extends ConsumerWidget {
               if (s.dueDate != null) 'Due ${dateFormat.format(s.dueDate!)}',
             ].join(' • ')),
             trailing: s.isConverted
-                ? Icon(Icons.link, color: context.gssms.success.foreground, size: 18)
+                ? (_woStatusChip(s.workOrderStatus) ??
+                    Icon(Icons.link,
+                        color: context.gssms.success.foreground, size: 18))
                 : Chip(
                     label: Text(s.status.displayName,
                         style: const TextStyle(fontSize: 11)),
@@ -337,21 +446,23 @@ class _ComplaintsTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final session = sessionFromAuth(ref.watch(authControllerProvider));
     final canConvert = canBatchConvertToWorkOrder(session);
+    final complaints = state.filteredComplaints;
 
     return _ConvertibleListScaffold(
       tab: PendingActionTab.complaints,
-      itemCount: state.complaints.length,
+      itemCount: complaints.length,
       selectedCount: state.selectedComplaintIds.length,
       canConvert: canConvert,
-      emptyLabel: 'No open complaints.',
+      emptyLabel:
+          _emptyText('No open breakdowns.', 'breakdowns', state.subFilter),
       itemBuilder: (context, index) {
-        final Complaint c = state.complaints[index];
+        final Complaint c = complaints[index];
         final selected = state.selectedComplaintIds.contains(c.id);
         return Card(
           key: Key('complaint_pending_card_${c.id}'),
           margin: const EdgeInsets.only(bottom: 10),
           child: ListTile(
-            leading: canConvert
+            leading: canConvert && !c.isConverted && !c.isClosed
                 ? Checkbox(
                     value: selected,
                     onChanged: (_) => ref
@@ -362,6 +473,7 @@ class _ComplaintsTab extends ConsumerWidget {
             title: Text(c.title, style: const TextStyle(fontWeight: FontWeight.bold)),
             subtitle: Text(
                 '${c.reference} • ${c.locationLabel ?? c.depotName ?? 'Location not set'}'),
+            trailing: c.isConverted ? _woStatusChip(c.workOrderStatus) : null,
             onTap: () => Navigator.of(context).push(MaterialPageRoute(
                 builder: (_) => ComplaintDetailScreen(complaint: c))),
           ),
@@ -379,21 +491,26 @@ class _InspectionsTab extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final session = sessionFromAuth(ref.watch(authControllerProvider));
     final canConvert = canBatchConvertToWorkOrder(session);
+    final inspections = state.filteredInspections;
 
     return _ConvertibleListScaffold(
       tab: PendingActionTab.inspections,
-      itemCount: state.inspections.length,
+      itemCount: inspections.length,
       selectedCount: state.selectedInspectionIds.length,
       canConvert: canConvert,
-      emptyLabel: 'No inspection notes pending conversion.',
+      emptyLabel: _emptyText('No inspection notes pending.',
+          'inspection notes', state.subFilter),
       itemBuilder: (context, index) {
-        final Inspection insp = state.inspections[index];
+        final Inspection insp = inspections[index];
         final selected = state.selectedInspectionIds.contains(insp.id);
         return Card(
           key: Key('inspection_pending_card_${insp.id}'),
           margin: const EdgeInsets.only(bottom: 10),
           child: ListTile(
-            leading: canConvert
+            // Point-wise inspections can't be converted whole (since 1.9.0):
+            // only point-less, unconverted notes are selectable; the rest
+            // open the detail screen on tap.
+            leading: canConvert && insp.pointsCount == 0 && !insp.isConverted
                 ? Checkbox(
                     value: selected,
                     onChanged: (_) => ref
@@ -405,6 +522,8 @@ class _InspectionsTab extends ConsumerWidget {
                 Text(insp.title, style: const TextStyle(fontWeight: FontWeight.bold)),
             subtitle: Text(
                 '${insp.reference} • ${insp.locationLabel ?? insp.depotName ?? 'Location not set'}'),
+            trailing:
+                insp.isConverted ? _woStatusChip(insp.workOrderStatus) : null,
             onTap: () => Navigator.of(context).push(MaterialPageRoute(
                 builder: (_) => InspectionDetailScreen(inspection: insp))),
           ),
@@ -414,10 +533,10 @@ class _InspectionsTab extends ConsumerWidget {
   }
 }
 
-/// View-only, same as web: no selection/convert here, tap deep-links to the
-/// asset's own Deficiencies tab (AssetDetailScreen), matching
-/// `navigate(/assets/{id}?tab=deficiencies)` on web as closely as the
-/// mobile asset screen allows today.
+/// Tap deep-links to the asset's own Deficiencies tab (AssetDetailScreen),
+/// matching `navigate(/assets/{id}?tab=deficiencies)` on web as closely as
+/// the mobile asset screen allows today — or to the linked Job Work first,
+/// following the same priority web's `openDeficiency`/"View report" use.
 /// RESOLVED/CLOSED green, everything else amber — same two-bucket logic as
 /// web's `deficiencyStatusBadgeClass` (OPEN/ASSIGNED/IN_PROGRESS all read
 /// amber there too, not a distinct colour per status).
@@ -438,21 +557,65 @@ Color _deficiencyStatusColor(BuildContext context, DeficiencyStatus status) {
 /// Equipment / Checkpoint / Deficiency Finding / Status columns) — a wide
 /// data table doesn't fit a phone, so each row's columns become labelled
 /// lines on a card instead, in the same left-to-right reading order.
-class _DeficienciesTab extends ConsumerWidget {
+/// Rows are selectable for grouped rectification Job Work creation,
+/// mirroring web's Deficiencies tab (`createRectification`, one Job Work
+/// per location by default, one per deficiency on toggle).
+class _DeficienciesTab extends ConsumerStatefulWidget {
   const _DeficienciesTab({required this.state});
   final PendingActionsState state;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_DeficienciesTab> createState() => _DeficienciesTabState();
+}
+
+class _DeficienciesTabState extends ConsumerState<_DeficienciesTab> {
+  bool _onePerDeficiency = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final state = widget.state;
+    final session = sessionFromAuth(ref.watch(authControllerProvider));
+    final canConvert = canCreateRectification(session);
     final dateFormat = DateFormat('dd MMM yyyy');
+    final deficiencies = state.filteredDeficiencies;
     return _ConvertibleListScaffold(
       tab: PendingActionTab.deficiencies,
-      itemCount: state.deficiencies.length,
-      selectedCount: 0,
-      canConvert: false,
-      emptyLabel: 'No pending deficiencies.',
+      itemCount: deficiencies.length,
+      selectedCount: state.selectedDeficiencyIds.length,
+      canConvert: canConvert,
+      emptyLabel: _emptyText(
+          'No pending deficiencies.', 'deficiencies', state.subFilter),
+      actionNoun: 'rectification Job Work',
+      aboveButton: Row(
+        children: [
+          Expanded(
+            child: Text(
+              _onePerDeficiency
+                  ? 'One Job Work per deficiency'
+                  : 'One Job Work per location (grouped)',
+              style: TextStyle(
+                  fontSize: 13, color: context.gssms.textSecondary),
+            ),
+          ),
+          Switch(
+            key: const Key('rectification_grouping_switch'),
+            value: _onePerDeficiency,
+            onChanged: (v) => setState(() => _onePerDeficiency = v),
+          ),
+        ],
+      ),
+      onConvert: () => ref
+          .read(pendingActionsControllerProvider.notifier)
+          .convertSelected(
+            PendingActionTab.deficiencies,
+            onePerDeficiency: _onePerDeficiency,
+          ),
+      confirmMessage: _onePerDeficiency
+          ? 'Create one rectification Job Work for each of the ${state.selectedDeficiencyIds.length} selected deficiencies?'
+          : 'Create rectification Job Work(s) for the ${state.selectedDeficiencyIds.length} selected deficiencies, grouped by location?',
       itemBuilder: (context, index) {
-        final Deficiency d = state.deficiencies[index];
+        final Deficiency d = deficiencies[index];
+        final selected = state.selectedDeficiencyIds.contains(d.id);
         final statusColor = _deficiencyStatusColor(context, d.status);
         // Same priority web's `openDeficiency`/"View report" use: the
         // linked Job Work first (there's no mobile "Reports" screen to open
@@ -486,6 +649,22 @@ class _DeficienciesTab extends ConsumerWidget {
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      if (canConvert &&
+                          deficiencyBucket(d) == PendingBucket.needsAction)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 4),
+                          child: Checkbox(
+                            key: Key(
+                                'deficiency_pending_check_${d.id}'),
+                            value: selected,
+                            visualDensity: VisualDensity.compact,
+                            onChanged: (_) => ref
+                                .read(pendingActionsControllerProvider
+                                    .notifier)
+                                .toggleSelection(
+                                    PendingActionTab.deficiencies, d.id),
+                          ),
+                        ),
                       Expanded(
                         child: Text(
                             d.reportCheckpoint ?? d.displayAssetEquipment,

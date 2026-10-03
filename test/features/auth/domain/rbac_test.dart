@@ -166,4 +166,77 @@ void main() {
         expect(canWriteChecklist(incharge), isFalse);
       });
     });
+
+  group('WP5 helpers', () {
+    UserSession sess(AuthRole role, List<String> perms) => UserSession(
+          accessToken: 't',
+          username: 'u',
+          primaryRole: role,
+          roles: [role],
+          permissions: perms,
+        );
+    const edit = ['maintenance.edit'];
+
+    test('canReassignWorkOrder', () {
+      expect(canReassignWorkOrder(null), isFalse);
+      expect(canReassignWorkOrder(sess(AuthRole.depotUser, edit)), isTrue);
+      expect(canReassignWorkOrder(sess(AuthRole.divAdmin, edit)), isTrue);
+      expect(canReassignWorkOrder(sess(AuthRole.depotUser, const [])), isFalse);
+      expect(canReassignWorkOrder(sess(AuthRole.maintenanceStaff, edit)), isFalse);
+    });
+
+    test('canManagePreStartMandates', () {
+      expect(canManagePreStartMandates(sess(AuthRole.depotIncharge, edit)), isTrue);
+      expect(canManagePreStartMandates(sess(AuthRole.zrAdmin, edit)), isTrue);
+      expect(canManagePreStartMandates(sess(AuthRole.depotUser, edit)), isFalse);
+      expect(canManagePreStartMandates(null), isFalse);
+    });
+
+    test('canUncheckoutGroup', () {
+      expect(
+          canUncheckoutGroup(
+              sess(AuthRole.depotIncharge, const ['maintenance.group_uncheckout'])),
+          isTrue);
+      expect(canUncheckoutGroup(sess(AuthRole.depotIncharge, edit)), isFalse);
+      expect(canUncheckoutGroup(null), isFalse);
+    });
+
+    test('canTriageDeficiencySeverity', () {
+      expect(canTriageDeficiencySeverity(sess(AuthRole.depotUser, edit)), isTrue);
+      expect(canTriageDeficiencySeverity(sess(AuthRole.divAdmin, edit)), isFalse);
+      expect(canTriageDeficiencySeverity(null), isFalse);
+    });
+
+    test('canFlagRemarkDeficiency', () {
+      expect(canFlagRemarkDeficiency(sess(AuthRole.divAdmin, edit)), isTrue);
+      expect(canFlagRemarkDeficiency(sess(AuthRole.depotUser, edit)), isTrue);
+      expect(canFlagRemarkDeficiency(sess(AuthRole.maintenanceStaff, edit)), isFalse);
+      expect(canFlagRemarkDeficiency(sess(AuthRole.depotUser, const [])), isFalse);
+    });
+
+    test('canRequestPmApproval', () {
+      expect(canRequestPmApproval(sess(AuthRole.depotIncharge, edit)), isTrue);
+      expect(canRequestPmApproval(sess(AuthRole.superAdmin, edit)), isFalse);
+      expect(canRequestPmApproval(null), isFalse);
+    });
+
+    test('canReplaceAssets / canReplaceWholeAsset', () {
+      const perms = ['maintenance.view', 'maintenance.edit', 'assets.replace'];
+      final staff = sess(AuthRole.maintenanceStaff, perms);
+      expect(canReplaceAssets(staff), isTrue);
+      expect(canReplaceWholeAsset(staff), isTrue);
+
+      // SUPER_ADMIN holds '*' but is not MAINTENANCE_STAFF: component only.
+      final admin = sess(AuthRole.superAdmin, const ['*']);
+      expect(canReplaceAssets(admin), isTrue);
+      expect(canReplaceWholeAsset(admin), isFalse);
+
+      final depot = sess(AuthRole.depotIncharge, edit);
+      expect(canReplaceAssets(depot), isFalse);
+      expect(canReplaceWholeAsset(depot), isFalse);
+
+      expect(canReplaceAssets(null), isFalse);
+      expect(canReplaceWholeAsset(null), isFalse);
+    });
+  });
 }

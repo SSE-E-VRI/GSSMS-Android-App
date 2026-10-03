@@ -81,4 +81,10 @@ void main() {
       expect(withoutVersion.displayLabel, 'Panel Monthly (Monthly)');
     });
   });
+
+  group('Template kind display names (WP1)', () {
+    test('stationTemplate displayName is Station', () {
+      expect(MaintenanceTemplateKind.stationTemplate.displayName, 'Station');
+    });
+  });
 }

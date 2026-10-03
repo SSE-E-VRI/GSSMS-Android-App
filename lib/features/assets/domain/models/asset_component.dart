@@ -16,6 +16,7 @@ class AssetComponent extends Equatable {
     this.serialNumber,
     this.status,
     this.installedOn,
+    this.sourceType,
   });
 
   final String sourceId;
@@ -27,7 +28,15 @@ class AssetComponent extends Equatable {
   final String? status;
   final DateTime? installedOn;
 
+  /// `INSTALLED_COMPONENT` or `ASSET_SET_MEMBER` (`source_type`).
+  final String? sourceType;
+
   bool get isActive => status == 'IN_SERVICE';
+
+  /// Only active installed components can be replaced through
+  /// `installed-components/{id}/replace/` (web MaintenanceRecordForm filter).
+  bool get isReplaceableInstalled =>
+      sourceType == 'INSTALLED_COMPONENT' && status == 'IN_SERVICE';
 
   factory AssetComponent.fromJson(Map<String, dynamic> json) {
     return AssetComponent(
@@ -43,10 +52,21 @@ class AssetComponent extends Equatable {
       installedOn: asJsonString(json['installed_on']) != null
           ? asJsonDateTime(json['installed_on'])
           : null,
+      sourceType: asJsonString(json['source_type']),
     );
   }
 
   @override
   List<Object?> get props =>
-      [sourceId, name, componentCode, make, model, serialNumber, status, installedOn];
+      [
+        sourceId,
+        name,
+        componentCode,
+        make,
+        model,
+        serialNumber,
+        status,
+        installedOn,
+        sourceType,
+      ];
 }

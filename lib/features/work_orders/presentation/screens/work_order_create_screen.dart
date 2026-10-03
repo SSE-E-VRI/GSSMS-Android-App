@@ -44,7 +44,7 @@ class _WorkOrderCreateScreenState
   bool _loadingDepots = false;
   int? _selectedDepotId;
 
-  WorkOrderType _type = WorkOrderType.corrective;
+  final WorkOrderType _type = WorkOrderType.preventive;
   WorkOrderPriority _priority = WorkOrderPriority.medium;
   DateTime? _dueDate;
 
@@ -268,9 +268,9 @@ class _WorkOrderCreateScreenState
           backgroundColor: context.gssms.danger.solid));
       return;
     }
-    if (_type == WorkOrderType.preventive && _selectedMaintenanceMasterId == null) {
+    if (_selectedMaintenanceMasterId == null) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: const Text('A preventive maintenance Job Work needs a checklist.'),
+          content: const Text('A Preventive Job Work needs a checklist.'),
           backgroundColor: context.gssms.danger.solid));
       return;
     }
@@ -423,7 +423,7 @@ class _WorkOrderCreateScreenState
                                     children: [
                                       _label('Type',
                                           tooltip:
-                                              'The nature of the work — preventive, corrective, breakdown, etc.'),
+                                              'New Job Work is Preventive only.'),
                                       const SizedBox(height: 6),
                                       DropdownButtonFormField<WorkOrderType>(
                                         key: const Key('wo_type_dropdown'),
@@ -432,7 +432,6 @@ class _WorkOrderCreateScreenState
                                         decoration: _input(),
                                         items: const [
                                           WorkOrderType.preventive,
-                                          WorkOrderType.corrective,
                                         ]
                                             .map((t) => DropdownMenuItem(
                                                 value: t,
@@ -442,11 +441,7 @@ class _WorkOrderCreateScreenState
                                                     style: const TextStyle(
                                                         fontSize: 13))))
                                             .toList(),
-                                        onChanged: (t) {
-                                          if (t != null) {
-                                            setState(() => _type = t);
-                                          }
-                                        },
+                                        onChanged: null,
                                       ),
                                       const SizedBox(height: 4),
                                       Text(
@@ -820,9 +815,7 @@ class _WorkOrderCreateScreenState
               Icon(Icons.checklist, color: context.gssms.link, size: 16),
               const SizedBox(width: 6),
               Text(
-                _type == WorkOrderType.corrective
-                    ? 'Template / Checklist (Optional)'
-                    : 'Template / Checklist *',
+                'Checklist *',
                 style: TextStyle(
                     fontWeight: FontWeight.bold,
                     color: context.gssms.link,
@@ -833,7 +826,7 @@ class _WorkOrderCreateScreenState
           const SizedBox(height: 12),
           _label('Category',
               tooltip:
-                  'Asset Template applies to one specific asset; Station / Batch Template applies broadly across a station; AMC lists the division AMC checklists.'),
+                  'Asset applies to one specific asset; Station applies across a station; AMC lists the division AMC checklists.'),
           const SizedBox(height: 6),
           // Web splits templates into Asset Templates / Station Templates
           // tables (MaintenanceMasterList.jsx `template_kind`); here that's a
@@ -852,7 +845,7 @@ class _WorkOrderCreateScreenState
               ),
               ButtonSegment(
                 value: MaintenanceTemplateKind.stationTemplate,
-                label: Text('Station / Batch', style: TextStyle(fontSize: 12)),
+                label: Text('Station', style: TextStyle(fontSize: 12)),
               ),
               ButtonSegment(
                 value: MaintenanceTemplateKind.amc,
@@ -872,7 +865,7 @@ class _WorkOrderCreateScreenState
             },
           ),
           const SizedBox(height: 12),
-          _label('Schedule Type', tooltip: 'How often this checklist template is meant to run.'),
+          _label('Schedule Type', tooltip: 'How often this checklist is meant to run.'),
           const SizedBox(height: 6),
           DropdownButtonFormField<MaintenanceScheduleType?>(
             key: const Key('wo_template_schedule_dropdown'),
@@ -901,9 +894,9 @@ class _WorkOrderCreateScreenState
             },
           ),
           const SizedBox(height: 12),
-          _label('Template',
+          _label('Checklist',
               tooltip:
-                  'Attach a checklist template so the technician has a structured checklist during execution.'),
+                  'Attach a checklist so the technician has a structured checklist during execution.'),
           const SizedBox(height: 6),
           DropdownButtonFormField<int>(
             key: const Key('wo_template_dropdown'),
@@ -911,7 +904,7 @@ class _WorkOrderCreateScreenState
             value: filtered.any((t) => t.id == _selectedMaintenanceMasterId)
                 ? _selectedMaintenanceMasterId
                 : null,
-            decoration: _input('-- No Template --').copyWith(
+            decoration: _input('-- Select Checklist --').copyWith(
               suffixIcon: _loadingTemplates
                   ? const Padding(
                       padding: EdgeInsets.all(10),
@@ -923,7 +916,7 @@ class _WorkOrderCreateScreenState
             ),
             items: [
               const DropdownMenuItem<int>(
-                  value: null, child: Text('-- No Template --')),
+                  value: null, child: Text('-- Select Checklist --')),
               ...filtered.map((t) => DropdownMenuItem(
                   value: t.id,
                   child: Text(t.displayLabel,
@@ -935,9 +928,7 @@ class _WorkOrderCreateScreenState
           ),
           const SizedBox(height: 6),
           Text(
-            _type == WorkOrderType.corrective
-                ? 'Leave empty to use the generic breakdown checklist.'
-                : 'Scheduled PM is created from Schedules → Convert. Use this only for ad-hoc checklists not assigned to this location.',
+            'Scheduled PM is created from Schedules → Convert. Use this only for ad-hoc checklists not assigned to this location.',
             style: TextStyle(
               fontSize: 11,
               color: context.gssms.textSecondary,

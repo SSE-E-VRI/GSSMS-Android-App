@@ -23,9 +23,14 @@ import 'package:intl/intl.dart';
 /// component replacement, etc.) exist here, same reasoning as Deficiencies
 /// already being view-only in Pending Actions.
 class AssetDetailScreen extends ConsumerStatefulWidget {
-  const AssetDetailScreen({super.key, required this.assetId});
+  const AssetDetailScreen({
+    super.key,
+    required this.assetId,
+    this.initialTabIndex = 0,
+  });
 
   final int assetId;
+  final int initialTabIndex;
 
   @override
   ConsumerState<AssetDetailScreen> createState() => _AssetDetailScreenState();
@@ -59,6 +64,7 @@ class _AssetDetailScreenState extends ConsumerState<AssetDetailScreen> {
 
     return DefaultTabController(
       length: 6,
+      initialIndex: widget.initialTabIndex,
       child: Scaffold(
         appBar: AppBar(
           title: Text(_titleFor(state)),

@@ -14,6 +14,8 @@ class WorkOrderAuditEvent extends Equatable {
     this.reason,
     this.timestamp,
     this.isReturn = false,
+    this.fromUser,
+    this.toUser,
   });
 
   final String eventId;
@@ -28,8 +30,15 @@ class WorkOrderAuditEvent extends Equatable {
   /// Server marks transitions that sent the work order back for rework.
   final bool isReturn;
 
+  /// Technician moved from / to (REASSIGNED), or the assignee on the first
+  /// assignment event. Null when the server sends no `details`.
+  final String? fromUser;
+  final String? toUser;
+
   factory WorkOrderAuditEvent.fromJson(Map<String, dynamic> json) {
     final ts = json['timestamp'] ?? json['created_at'];
+    final rawDetails = json['details'];
+    final details = rawDetails is Map ? rawDetails : const {};
     return WorkOrderAuditEvent(
       eventId: asJsonString(json['event_id']) ?? '',
       eventType: asJsonString(json['event_type']) ?? 'EVENT',
@@ -40,6 +49,10 @@ class WorkOrderAuditEvent extends Equatable {
       reason: asJsonString(json['reason']) ?? asJsonString(json['remarks']),
       timestamp: ts is String && ts.isNotEmpty ? asJsonDateTime(ts) : null,
       isReturn: asJsonBool(json['is_return']) ?? false,
+      fromUser: asJsonString(details['from_user']) ?? asJsonString(json['from_user']),
+      toUser: asJsonString(details['to_user']) ??
+          asJsonString(details['assigned_to']) ??
+          asJsonString(json['to_user']),
     );
   }
 
@@ -54,6 +67,8 @@ class WorkOrderAuditEvent extends Equatable {
         reason,
         timestamp,
         isReturn,
+        fromUser,
+        toUser,
       ];
 }
 

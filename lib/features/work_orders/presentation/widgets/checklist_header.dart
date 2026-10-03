@@ -22,91 +22,100 @@ class ChecklistHeader extends StatelessWidget {
 
     final textTheme = Theme.of(context).textTheme;
 
+    final metas = <(String, String)>[
+      ('Location', record.stationName ?? notSpecified),
+      ('Schedule', record.templateName ?? notSpecified),
+      ('Job Work', record.workOrderTicket ?? notSpecified),
+      ('Date', dateStr),
+    ];
+
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
       // Same colour as the app bar above it, in either theme, so the header
       // reads as one identity band.
       decoration: BoxDecoration(
         color: Theme.of(context).appBarTheme.backgroundColor ?? AppTheme.primaryDark,
       ),
-      child: SafeArea(
-        bottom: false,
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          alignment: Alignment.center,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'SOUTHERN RAILWAY',
-                style: textTheme.labelLarge?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 0.8,
-                ),
-              ),
-              if (orgLine.isNotEmpty) ...[
-                const SizedBox(height: 2),
-                Text(
-                  orgLine,
-                  style: textTheme.labelSmall?.copyWith(
-                    color: Colors.white70,
-                  ),
-                ),
-              ],
-              const SizedBox(height: 6),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: Wrap(
-                  alignment: WrapAlignment.spaceAround,
-                  spacing: 12,
-                  runSpacing: 4,
-                  children: [
-                    _buildHeaderMeta(context, 'Location',
-                        record.stationName ?? notSpecified),
-                    _buildHeaderMeta(context, 'Schedule',
-                        record.templateName ?? notSpecified),
-                    _buildHeaderMeta(context, 'Job Work',
-                        record.workOrderTicket ?? notSpecified),
-                    _buildHeaderMeta(context, 'Date', dateStr),
-                  ],
-                ),
-              ),
-            ],
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            'SOUTHERN RAILWAY',
+            textAlign: TextAlign.center,
+            style: textTheme.labelLarge?.copyWith(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.8,
+            ),
           ),
-        ),
+          if (orgLine.isNotEmpty) ...[
+            const SizedBox(height: 2),
+            Text(
+              orgLine,
+              textAlign: TextAlign.center,
+              style: textTheme.labelMedium?.copyWith(color: Colors.white70),
+            ),
+          ],
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                const gap = 16.0;
+                // Two columns only when each half stays comfortably wide.
+                final twoColumns = constraints.maxWidth >= 300 &&
+                    MediaQuery.textScalerOf(context).scale(14) <= 14 * 1.3;
+                final itemWidth = twoColumns
+                    ? ((constraints.maxWidth - gap) / 2).floorToDouble()
+                    : constraints.maxWidth;
+                return Wrap(
+                  spacing: gap,
+                  runSpacing: 6,
+                  children: [
+                    for (final m in metas)
+                      SizedBox(
+                        width: itemWidth,
+                        child: _buildHeaderMeta(context, m.$1, m.$2),
+                      ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildHeaderMeta(BuildContext context, String label, String value) {
     final textTheme = Theme.of(context).textTheme;
-    return Text.rich(
-      TextSpan(
-        style: textTheme.labelSmall?.copyWith(color: Colors.white),
-        children: [
-          TextSpan(
-            text: '$label: ',
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Colors.white70,
-            ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label,
+          style: textTheme.labelMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: Colors.white70,
           ),
-          TextSpan(
-            text: value,
-            // Amber on the navy band: ≈7.8:1, readable in sunlight.
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              color: AppTheme.warningAmber,
-            ),
+        ),
+        Text(
+          value,
+          softWrap: true,
+          // Amber on the navy band: ≈7.8:1, readable in sunlight.
+          style: textTheme.bodySmall?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: AppTheme.warningAmber,
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }

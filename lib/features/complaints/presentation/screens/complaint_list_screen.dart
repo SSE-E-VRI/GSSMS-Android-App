@@ -82,7 +82,7 @@ class _ComplaintListScreenState extends ConsumerState<ComplaintListScreen> {
 
     if (!sessionAllows(session, 'complaints.view')) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Complaints & Issues')),
+        appBar: AppBar(title: const Text('Breakdowns & Issues')),
         body: const PermissionDeniedView(),
       );
     }
@@ -95,7 +95,7 @@ class _ComplaintListScreenState extends ConsumerState<ComplaintListScreen> {
       appBar: widget.isEmbedded
           ? null
           : AppBar(
-              title: const Text('Complaints & Issues'),
+              title: const Text('Breakdowns & Issues'),
               actions: [
                 if (session != null)
                   OrgScopeAppBarFilter(
@@ -141,7 +141,7 @@ class _ComplaintListScreenState extends ConsumerState<ComplaintListScreen> {
                 child: ListResultHeader(
                   shown: loaded.filteredComplaints.length,
                   total: loaded.complaints.length,
-                  noun: 'complaints',
+                  noun: 'breakdowns',
                   onClearFilters: _hasActiveFilters(loaded) ? _clearFilters : null,
                 ),
               ),
@@ -155,7 +155,7 @@ class _ComplaintListScreenState extends ConsumerState<ComplaintListScreen> {
           ? FloatingActionButton.extended(
               key: const Key('fab_create_complaint'),
               icon: const Icon(Icons.add_comment_outlined),
-              label: const Text('Log Complaint'),
+              label: const Text('Report Breakdown'),
               onPressed: () async {
                 final created = await Navigator.of(context).push<bool>(
                   MaterialPageRoute(
@@ -193,7 +193,7 @@ class _ComplaintListScreenState extends ConsumerState<ComplaintListScreen> {
         SliverFillRemaining(
           hasScrollBody: false,
           child: EmptyStateView.error(
-            title: 'Could not load complaints',
+            title: 'Could not load breakdowns',
             message: state.message,
             onRetry: () => _controller.fetchComplaints(forceRefresh: true),
           ),
@@ -218,8 +218,8 @@ class _ComplaintListScreenState extends ConsumerState<ComplaintListScreen> {
           hasScrollBody: false,
           child: EmptyStateView.noResults(
             title: filtered
-                ? 'No complaints match these filters'
-                : 'No complaints logged yet',
+                ? 'No breakdowns match these filters'
+                : 'No breakdowns reported yet',
             icon: Icons.report_problem_outlined,
             onClearFilters: filtered ? _clearFilters : null,
           ),

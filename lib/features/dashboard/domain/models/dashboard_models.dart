@@ -170,7 +170,7 @@ class DashboardStats extends Equatable {
 enum PendingActionKind {
   verification('VERIFICATION', 'Verification'),
   assignment('ASSIGNMENT', 'Assignment'),
-  complaint('COMPLAINT', 'Complaint'),
+  complaint('COMPLAINT', 'Breakdown'),
   inspection('INSPECTION', 'Inspection'),
   task('TASK', 'Task'),
   unknown('UNKNOWN', 'Action');

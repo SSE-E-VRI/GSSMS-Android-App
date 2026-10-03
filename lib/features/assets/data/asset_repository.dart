@@ -14,6 +14,7 @@ abstract class IAssetRepository {
     int? divisionId,
     int? depotId,
     int? stationId,
+    int? infrastructureId,
   });
 
   Future<Asset> fetchAssetById(int id);
@@ -43,6 +44,7 @@ class AssetRepository implements IAssetRepository {
     int? divisionId,
     int? depotId,
     int? stationId,
+    int? infrastructureId,
   }) async {
     return _apiService.getAssets(
       search: search,
@@ -51,6 +53,7 @@ class AssetRepository implements IAssetRepository {
       divisionId: divisionId,
       depotId: depotId,
       stationId: stationId,
+      infrastructureId: infrastructureId,
     );
   }
 

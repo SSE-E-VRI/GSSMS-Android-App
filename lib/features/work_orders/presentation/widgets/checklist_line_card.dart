@@ -41,6 +41,7 @@ class ChecklistLineCard extends ConsumerStatefulWidget {
     this.onCapturePhoto,
     this.onDeletePhoto,
     this.onRetryPhoto,
+    this.showAttachments = true,
   });
 
   final MaintenanceRecordLine line;
@@ -50,6 +51,10 @@ class ChecklistLineCard extends ConsumerStatefulWidget {
   final Future<void> Function(EvidenceKind kind, ImageSource source)? onCapturePhoto;
   final Future<void> Function(LineAttachment attachment)? onDeletePhoto;
   final Future<void> Function(LineAttachment attachment)? onRetryPhoto;
+
+  /// False when the photos are shown once per asset group instead (the group
+  /// evidence strip), so the per-line photo section is left out.
+  final bool showAttachments;
 
   @override
   ConsumerState<ChecklistLineCard> createState() => _ChecklistLineCardState();
@@ -259,7 +264,7 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
             const Divider(height: 10),
             ..._buildValueInput(line),
             if (line.statusOptions.isNotEmpty) ..._buildStatusAndAction(line),
-            _buildAttachmentsSection(line),
+            if (widget.showAttachments) _buildAttachmentsSection(line),
           ],
         ),
       ),
@@ -826,7 +831,7 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
                 maxHeight: MediaQuery.of(ctx).size.height * 0.65,
               ),
               child: InteractiveViewer(
-                child: _AttachmentImage(
+                child: AttachmentImage(
                   attachment: attachment,
                   headers: _authHeaders(),
                   fit: BoxFit.contain,
@@ -1076,7 +1081,7 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
                   width: 76,
                   height: 76,
                   color: tokens.surfaceInset,
-                  child: _AttachmentImage(
+                  child: AttachmentImage(
                     attachment: attachment,
                     headers: _authHeaders(),
                     fit: BoxFit.cover,
@@ -1134,8 +1139,9 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
 /// Local file first (queued photos), then the server copy, then a placeholder
 /// — without a synchronous `File.existsSync()` in `build` (disk I/O on the UI
 /// thread for every thumbnail on every rebuild).
-class _AttachmentImage extends StatelessWidget {
-  const _AttachmentImage({
+class AttachmentImage extends StatelessWidget {
+  const AttachmentImage({
+    super.key,
     required this.attachment,
     required this.headers,
     required this.fit,

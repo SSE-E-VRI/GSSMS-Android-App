@@ -6,13 +6,15 @@ import '../../../auth/domain/rbac.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../../../auth/presentation/widgets/permission_denied_view.dart';
 import '../../../complaints/presentation/screens/complaint_list_screen.dart';
+import '../../../deficiencies/presentation/screens/deficiency_list_screen.dart';
 import '../../../inspections/presentation/screens/inspection_list_screen.dart';
 import '../../../work_orders/presentation/screens/work_order_list_screen.dart';
 
 /// Unified Work destination hosting role-permitted work streams:
 /// - Work Orders (`maintenance.view`)
-/// - Complaints (`complaints.view`)
+/// - Breakdowns (`complaints.view`)
 /// - Inspections (`inspections.view`)
+/// - Deficiencies (`assets.view`)
 ///
 /// Uses a [TabBar] when multiple streams are permitted, or renders the single
 /// permitted stream directly without tab chrome.
@@ -38,7 +40,7 @@ class WorkScreen extends ConsumerWidget {
     }
     if (sessionAllows(effectiveSession, 'complaints.view')) {
       tabs.add(const Tab(
-        text: 'Complaints',
+        text: 'Breakdowns',
         icon: Icon(Icons.report_problem_outlined),
       ));
       views.add(const ComplaintListScreen(isEmbedded: true));
@@ -49,6 +51,13 @@ class WorkScreen extends ConsumerWidget {
         icon: Icon(Icons.fact_check_outlined),
       ));
       views.add(const InspectionListScreen(isEmbedded: true));
+    }
+    if (sessionAllows(effectiveSession, 'assets.view')) {
+      tabs.add(const Tab(
+        text: 'Deficiencies',
+        icon: Icon(Icons.rule_outlined),
+      ));
+      views.add(const DeficiencyListScreen(isEmbedded: true));
     }
 
     if (tabs.isEmpty) {

@@ -35,7 +35,7 @@ void main() {
       expect(i.title, 'EB Bunk Monthly Check');
       expect(i.status, InspectionStatus.open);
       expect(i.stationName, 'Thalanallur');
-      expect(i.locationLabel, 'Thalanallur (Station)');
+      expect(i.locationLabel, 'Thalanallur - EB-01');
       expect(i.createdByName, 'Ravi Kumar');
       expect(i.createdByDesignation, 'SSE');
       expect(i.isConverted, isFalse);

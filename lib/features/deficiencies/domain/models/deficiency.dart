@@ -50,6 +50,8 @@ class Deficiency extends Equatable {
     this.workOrderId,
     this.workOrderTicket,
     this.detectedAt,
+    this.activeRemedialWorkOrderId,
+    this.activeRemedialWorkOrderStatus,
   });
 
   final int id;
@@ -75,10 +77,12 @@ class Deficiency extends Equatable {
   final int? workOrderId;
   final String? workOrderTicket;
   final DateTime? detectedAt;
+  /// `active_remedial_work_order.id` — an open remedial Job Work, if any.
+  final int? activeRemedialWorkOrderId;
+  final String? activeRemedialWorkOrderStatus;
 
-  /// The line to show as the card's main text — the human-readable finding
-  /// when present, falling back to the raw description (mirrors web's
-  /// `item.deficiency_finding || item.description`).
+  bool get hasActiveRemedial => activeRemedialWorkOrderId != null;
+
   String get displayFinding =>
       (deficiencyFinding != null && deficiencyFinding!.isNotEmpty)
           ? deficiencyFinding!
@@ -94,6 +98,7 @@ class Deficiency extends Equatable {
   }
 
   factory Deficiency.fromJson(Map<String, dynamic> json) {
+    final remedial = json['active_remedial_work_order'];
     return Deficiency(
       id: asJsonInt(json['id']) ?? 0,
       code: asJsonString(json['code']),
@@ -113,7 +118,10 @@ class Deficiency extends Equatable {
       detectedAt: asJsonString(json['detected_at']) != null
           ? asJsonDateTime(json['detected_at'])
           : null,
-    );
+      activeRemedialWorkOrderId:
+          remedial is Map ? asJsonInt(remedial['id']) : null,
+      activeRemedialWorkOrderStatus:
+          remedial is Map ? asJsonString(remedial['status']) : null,    );
   }
 
   @override
@@ -134,5 +142,7 @@ class Deficiency extends Equatable {
         workOrderId,
         workOrderTicket,
         detectedAt,
+        activeRemedialWorkOrderId,
+        activeRemedialWorkOrderStatus,
       ];
 }

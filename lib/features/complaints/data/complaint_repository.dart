@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:gssms_mobile/features/complaints/data/complaint_api_service.dart';
 import 'package:gssms_mobile/features/complaints/domain/models/complaint.dart';
 
@@ -6,6 +7,7 @@ abstract class IComplaintRepository {
   // has no severity field/filter to send.
   Future<List<Complaint>> fetchComplaints({
     String? status,
+    String? excludeStatus,
     int? zoneId,
     int? divisionId,
     int? depotId,
@@ -22,9 +24,27 @@ abstract class IComplaintRepository {
     int? stationId,
     int? infrastructureId,
     int? assetId,
+    String? generalAssetDescription,
+    String? failureDate,
+    String? failureTime,
+    String? complainantName,
   });
 
   Future<Map<String, dynamic>> convertToWorkOrder(int complaintId);
+  Future<Complaint> closeComplaint(
+    int complaintId, {
+    required String closureReason,
+    required String closureRemarks,
+  });
+  Future<ComplaintPhoto> uploadPhoto({
+    required int complaintId,
+    required MultipartFile file,
+  });
+  Future<void> deletePhoto({
+    required int complaintId,
+    required int photoId,
+  });
+  Future<void> deleteComplaint(int complaintId);
 }
 
 class ComplaintRepository implements IComplaintRepository {
@@ -35,6 +55,7 @@ class ComplaintRepository implements IComplaintRepository {
   @override
   Future<List<Complaint>> fetchComplaints({
     String? status,
+    String? excludeStatus,
     int? zoneId,
     int? divisionId,
     int? depotId,
@@ -43,6 +64,7 @@ class ComplaintRepository implements IComplaintRepository {
   }) async {
     return _apiService.getComplaints(
       status: status,
+      excludeStatus: excludeStatus,
       zoneId: zoneId,
       divisionId: divisionId,
       depotId: depotId,
@@ -65,6 +87,10 @@ class ComplaintRepository implements IComplaintRepository {
     int? stationId,
     int? infrastructureId,
     int? assetId,
+    String? generalAssetDescription,
+    String? failureDate,
+    String? failureTime,
+    String? complainantName,
   }) async {
     final payload = {
       'title': title,
@@ -74,6 +100,15 @@ class ComplaintRepository implements IComplaintRepository {
       if (stationId != null) 'station': stationId,
       if (infrastructureId != null) 'infrastructure': infrastructureId,
       if (assetId != null) 'asset': assetId,
+      if (generalAssetDescription != null &&
+          generalAssetDescription.trim().isNotEmpty)
+        'general_asset_description': generalAssetDescription.trim(),
+      if (failureDate != null && failureDate.isNotEmpty)
+        'failure_date': failureDate,
+      if (failureTime != null && failureTime.isNotEmpty)
+        'failure_time': failureTime,
+      if (complainantName != null && complainantName.trim().isNotEmpty)
+        'complainant_name': complainantName.trim(),
     };
     return _apiService.createComplaint(payload);
   }
@@ -81,4 +116,34 @@ class ComplaintRepository implements IComplaintRepository {
   @override
   Future<Map<String, dynamic>> convertToWorkOrder(int complaintId) =>
       _apiService.convertToWorkOrder(complaintId);
+
+  @override
+  Future<Complaint> closeComplaint(
+    int complaintId, {
+    required String closureReason,
+    required String closureRemarks,
+  }) =>
+      _apiService.closeComplaint(
+        complaintId,
+        closureReason: closureReason,
+        closureRemarks: closureRemarks,
+      );
+
+  @override
+  Future<ComplaintPhoto> uploadPhoto({
+    required int complaintId,
+    required MultipartFile file,
+  }) =>
+      _apiService.uploadPhoto(complaintId: complaintId, file: file);
+
+  @override
+  Future<void> deletePhoto({
+    required int complaintId,
+    required int photoId,
+  }) =>
+      _apiService.deletePhoto(complaintId: complaintId, photoId: photoId);
+
+  @override
+  Future<void> deleteComplaint(int complaintId) =>
+      _apiService.deleteComplaint(complaintId);
 }

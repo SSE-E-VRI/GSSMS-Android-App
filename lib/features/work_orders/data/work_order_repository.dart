@@ -7,8 +7,12 @@ import 'package:gssms_mobile/core/sync/outbox_command.dart';
 import 'package:gssms_mobile/core/sync/sync_manager.dart';
 import 'package:gssms_mobile/features/work_orders/data/work_order_api_service.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/batch_convert_result.dart';
+import 'package:gssms_mobile/features/work_orders/domain/models/deficiency_severity_option.dart';
+import 'package:gssms_mobile/features/work_orders/domain/models/group_inclusion_result.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/maintenance_master.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/maintenance_record.dart';
+import 'package:gssms_mobile/features/work_orders/domain/models/pm_approval_request.dart';
+import 'package:gssms_mobile/features/work_orders/domain/models/supervisor_mandate.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/technician.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/verification_workspace.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/work_order.dart';
@@ -67,12 +71,63 @@ abstract class IWorkOrderRepository {
   Future<List<MaintenanceMaster>> fetchMaintenanceMasters();
   Future<BatchConvertResult> createWorkOrdersFromComplaints(List<int> complaintIds);
   Future<BatchConvertResult> createWorkOrdersFromInspections(List<int> inspectionIds);
-  Future<WorkOrderActionSet> fetchAllowedActions(int workOrderId);
+  Future<BatchConvertResult> createRectification(
+    List<int> deficiencyIds, {
+    bool onePerDeficiency = false,
+  });  Future<WorkOrderActionSet> fetchAllowedActions(int workOrderId);
   Future<WorkOrderAudit> fetchAudit(int workOrderId);
   Future<List<Technician>> fetchAssignableTechnicians({int? depotId});
   Future<WorkOrder> assignTechnician(int workOrderId, int technicianId);
   Future<WorkOrder> verifyWorkOrder(int workOrderId, {String? remarks});
   Future<VerificationWorkspace> fetchVerificationWorkspace(int workOrderId);
+
+  // Online-only mutations/reads (no outbox): errors are rethrown to the UI.
+  Future<WorkOrder> reassignWorkOrder(
+    int workOrderId, {
+    required int technicianId,
+    required String reason,
+  });
+  Future<PrepareChecklistResult> prepareChecklist(int workOrderId);
+  Future<List<SupervisorMandate>> getSupervisorMandates(int workOrderId);
+  Future<SupervisorMandate> setSupervisorMandate(
+    int workOrderId, {
+    int? assetCategoryId,
+    required String assetName,
+    required String action,
+    String reason = '',
+  });
+  Future<List<ChecklistGroupPreview>> getMasterChecklistGroups(int masterId);
+  Future<GroupInclusionResult> setGroupInclusion(
+    int recordId, {
+    int? assetCategoryId,
+    required String assetName,
+    required bool included,
+    String? reason,
+  });
+  Future<List<DeficiencySeverityOption>> getDeficiencySeverities();
+  Future<DeficiencySeverityUpdate> updateDeficiencySeverity(
+    int deficiencyId, {
+    required int severityId,
+    required int expectedVersion,
+  });
+  Future<RemarkFlagResult> flagRemarkDeficiency(
+    int recordId, {
+    required int remarkIndex,
+    String? assetUniqueId,
+    int? severityId,
+  });
+  Future<void> unflagRemarkDeficiency(int recordId, {required int remarkIndex});
+  Future<List<ScheduleAlternative>> getScheduleAlternatives(int scheduleId);
+  Future<ApprovalRequestSummary> requestPmSkip(
+    int scheduleId, {
+    required String reasonCode,
+    required String remarks,
+  });
+  Future<ApprovalRequestSummary> requestChecklistChange(
+    int scheduleId, {
+    required int maintenanceMasterId,
+    required String remarks,
+  });
   Future<int> startExecution(int workOrderId);
   Future<WorkOrder> transitionStatus(
     int workOrderId, {
@@ -289,6 +344,16 @@ class WorkOrderRepository implements IWorkOrderRepository {
   Future<BatchConvertResult> createWorkOrdersFromInspections(List<int> inspectionIds) {
     return _apiService.createWorkOrdersFromInspections(inspectionIds);
   }
+  @override
+  Future<BatchConvertResult> createRectification(
+    List<int> deficiencyIds, {
+    bool onePerDeficiency = false,
+  }) {
+    return _apiService.createRectification(
+      deficiencyIds,
+      onePerDeficiency: onePerDeficiency,
+    );
+  }
 
   /// Transitions the server permits right now. These are deliberately not
   /// cached: an offline client cannot know whether a transition is still
@@ -326,6 +391,127 @@ class WorkOrderRepository implements IWorkOrderRepository {
   Future<VerificationWorkspace> fetchVerificationWorkspace(int workOrderId) {
     return _apiService.getVerificationWorkspace(workOrderId);
   }
+
+  @override
+  Future<WorkOrder> reassignWorkOrder(
+    int workOrderId, {
+    required int technicianId,
+    required String reason,
+  }) async {
+    final order = await _apiService.reassignWorkOrder(
+      workOrderId,
+      technicianId: technicianId,
+      reason: reason,
+    );
+    await _cacheService.cacheWorkOrderDetail(order);
+    return order;
+  }
+
+  @override
+  Future<PrepareChecklistResult> prepareChecklist(int workOrderId) =>
+      _apiService.prepareChecklist(workOrderId);
+
+  @override
+  Future<List<SupervisorMandate>> getSupervisorMandates(int workOrderId) =>
+      _apiService.getSupervisorMandates(workOrderId);
+
+  @override
+  Future<SupervisorMandate> setSupervisorMandate(
+    int workOrderId, {
+    int? assetCategoryId,
+    required String assetName,
+    required String action,
+    String reason = '',
+  }) =>
+      _apiService.setSupervisorMandate(
+        workOrderId,
+        assetCategoryId: assetCategoryId,
+        assetName: assetName,
+        action: action,
+        reason: reason,
+      );
+
+  @override
+  Future<List<ChecklistGroupPreview>> getMasterChecklistGroups(int masterId) =>
+      _apiService.getMasterChecklistGroups(masterId);
+
+  @override
+  Future<GroupInclusionResult> setGroupInclusion(
+    int recordId, {
+    int? assetCategoryId,
+    required String assetName,
+    required bool included,
+    String? reason,
+  }) =>
+      _apiService.setGroupInclusion(
+        recordId,
+        assetCategoryId: assetCategoryId,
+        assetName: assetName,
+        included: included,
+        reason: reason,
+      );
+
+  @override
+  Future<List<DeficiencySeverityOption>> getDeficiencySeverities() =>
+      _apiService.getDeficiencySeverities();
+
+  @override
+  Future<DeficiencySeverityUpdate> updateDeficiencySeverity(
+    int deficiencyId, {
+    required int severityId,
+    required int expectedVersion,
+  }) =>
+      _apiService.updateDeficiencySeverity(
+        deficiencyId,
+        severityId: severityId,
+        expectedVersion: expectedVersion,
+      );
+
+  @override
+  Future<RemarkFlagResult> flagRemarkDeficiency(
+    int recordId, {
+    required int remarkIndex,
+    String? assetUniqueId,
+    int? severityId,
+  }) =>
+      _apiService.flagRemarkDeficiency(
+        recordId,
+        remarkIndex: remarkIndex,
+        assetUniqueId: assetUniqueId,
+        severityId: severityId,
+      );
+
+  @override
+  Future<void> unflagRemarkDeficiency(int recordId, {required int remarkIndex}) =>
+      _apiService.unflagRemarkDeficiency(recordId, remarkIndex: remarkIndex);
+
+  @override
+  Future<List<ScheduleAlternative>> getScheduleAlternatives(int scheduleId) =>
+      _apiService.getScheduleAlternatives(scheduleId);
+
+  @override
+  Future<ApprovalRequestSummary> requestPmSkip(
+    int scheduleId, {
+    required String reasonCode,
+    required String remarks,
+  }) =>
+      _apiService.requestPmSkip(
+        scheduleId,
+        reasonCode: reasonCode,
+        remarks: remarks,
+      );
+
+  @override
+  Future<ApprovalRequestSummary> requestChecklistChange(
+    int scheduleId, {
+    required int maintenanceMasterId,
+    required String remarks,
+  }) =>
+      _apiService.requestChecklistChange(
+        scheduleId,
+        maintenanceMasterId: maintenanceMasterId,
+        remarks: remarks,
+      );
 
   @override
   Future<int> startExecution(int workOrderId) async {

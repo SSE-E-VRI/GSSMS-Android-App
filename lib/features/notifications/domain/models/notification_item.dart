@@ -7,7 +7,7 @@ enum NotificationType {
   rework('REWORK', 'Rework Required'),
   overdue('OVERDUE', 'Overdue Work'),
   slaBreach('SLA', 'SLA At Risk'),
-  complaint('COMPLAINT', 'New Complaint Logged'),
+  complaint('COMPLAINT', 'New Breakdown Reported'),
   schedule('SCHEDULE', 'Upcoming Schedule'),
   alert('ALERT', 'System Alert');
 
