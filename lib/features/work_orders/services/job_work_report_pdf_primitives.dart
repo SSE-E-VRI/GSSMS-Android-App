@@ -151,7 +151,7 @@ class AvoidBreakInside extends pw.SingleChildWidget {
   void layout(pw.Context context, pw.BoxConstraints constraints,
       {bool parentUsesSize = false}) {
     super.layout(context, constraints, parentUsesSize: parentUsesSize);
-    if (box != null && context.page != null) {
+    if (box != null) {
       if (box!.height > context.page.pageFormat.availableHeight) {
         _tooTall = true;
       }
