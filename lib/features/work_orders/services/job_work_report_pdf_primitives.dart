@@ -211,8 +211,8 @@ pw.Widget reportCard(
 /// 10.2pt bold UPPERCASE #1f4e79, 0.75pt bottom rule, pb 3pt, mb 4.8pt.
 pw.Widget sectionHeading(String text) => pw.Container(
       width: double.infinity,
-      margin: pw.EdgeInsets.only(bottom: ReportPdfTheme.px(6.4)),
-      padding: pw.EdgeInsets.only(bottom: ReportPdfTheme.px(4.0)),
+      margin: const pw.EdgeInsets.only(bottom: 8.0),
+      padding: const pw.EdgeInsets.only(bottom: 6.5),
       decoration: const pw.BoxDecoration(
         border: pw.Border(
           bottom: pw.BorderSide(color: ReportPdfTheme.accentTint, width: 0.75),
@@ -223,6 +223,7 @@ pw.Widget sectionHeading(String text) => pw.Container(
         sizePx: 13.6,
         weight: 700,
         upper: true,
+        lineHeight: 1.2,
         color: ReportPdfTheme.accent,
       ),
     );
@@ -356,8 +357,8 @@ pw.Widget reportHeader({
 }) {
   return pw.Container(
     width: double.infinity,
-    padding: pw.EdgeInsets.only(bottom: ReportPdfTheme.px(12.0)),
-    margin: pw.EdgeInsets.only(bottom: ReportPdfTheme.px(16.0)),
+    padding: const pw.EdgeInsets.only(bottom: 10.65),
+    margin: const pw.EdgeInsets.only(bottom: 13.0),
     decoration: const pw.BoxDecoration(
       border: pw.Border(
         bottom: pw.BorderSide(color: ReportPdfTheme.accent, width: 1.5),
@@ -371,27 +372,30 @@ pw.Widget reportHeader({
           sizePx: 20.0,
           weight: 700,
           upper: true,
+          lineHeight: 1.2,
           letterSpacingEm: 0.03,
           align: pw.TextAlign.center,
         ),
-        pw.SizedBox(height: 2),
+        pw.SizedBox(height: 3.0),
         cssText(
           org.divisionName,
           sizePx: 16.0,
           weight: 600,
+          lineHeight: 1.2,
           color: ReportPdfTheme.muted,
           align: pw.TextAlign.center,
         ),
-        pw.SizedBox(height: 1),
+        pw.SizedBox(height: 2.4),
         cssText(
           org.depotName,
           sizePx: 16.0,
           weight: 600,
+          lineHeight: 1.2,
           color: ReportPdfTheme.muted,
           align: pw.TextAlign.center,
         ),
         if (metaLeft.isNotEmpty || metaRight.isNotEmpty) ...[
-          pw.SizedBox(height: 6),
+          pw.SizedBox(height: 6.6),
           pw.Row(
             mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
             children: [
@@ -453,23 +457,25 @@ pw.Widget reportHeader({
               ),
             ],
           ),
+          pw.SizedBox(height: 6.6),
         ],
-        pw.SizedBox(height: 8),
         cssText(
           title,
           sizePx: 17.6,
           weight: 700,
           upper: true,
+          lineHeight: 1.2,
           color: ReportPdfTheme.accent,
           letterSpacingEm: 0.05,
           align: pw.TextAlign.center,
         ),
         if (subtitle != null && subtitle.isNotEmpty) ...[
-          pw.SizedBox(height: 2),
+          pw.SizedBox(height: 2.9),
           cssText(
             subtitle,
             sizePx: 14.4,
             weight: 600,
+            lineHeight: 1.2,
             align: pw.TextAlign.center,
           ),
         ],

@@ -35,7 +35,7 @@ class JobWorkReportPdfService {
     doc.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(28.3465),
+        margin: const pw.EdgeInsets.all(27.75),
         theme: pw.ThemeData.withFont(
           base: ReportFonts.regular,
           bold: ReportFonts.bold,
