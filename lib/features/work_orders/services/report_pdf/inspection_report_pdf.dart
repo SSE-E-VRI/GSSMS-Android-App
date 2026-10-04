@@ -1,4 +1,4 @@
-﻿import 'dart:typed_data';
+import 'dart:typed_data';
 
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -37,8 +37,14 @@ List<pw.Widget> buildInspectionReportPdf(
     ],
 
     // Inspection No. / Inspector 2-cell header grid (stacked label+value per cell)
-    pw.Padding(
-      padding: const pw.EdgeInsets.only(bottom: 8),
+    pw.Container(
+      margin: const pw.EdgeInsets.only(bottom: 12),
+      padding: const pw.EdgeInsets.only(bottom: 12),
+      decoration: const pw.BoxDecoration(
+        border: pw.Border(
+          bottom: pw.BorderSide(color: ReportPdfTheme.border, width: 0.75),
+        ),
+      ),
       child: pw.Row(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
@@ -48,9 +54,10 @@ List<pw.Widget> buildInspectionReportPdf(
               mainAxisSize: pw.MainAxisSize.min,
               children: [
                 cssText('Inspection No.',
-                    sizePx: 11.5, weight: 600, color: ReportPdfTheme.muted),
+                    sizePx: 14.0, color: ReportPdfTheme.muted),
                 pw.SizedBox(height: 1),
-                cssText(r.inspectionNumber, sizePx: 12.0, weight: 600),
+                cssText(r.inspectionNumber.isEmpty ? 'N/A' : r.inspectionNumber,
+                    sizePx: 16.0, weight: 600),
               ],
             ),
           ),
@@ -60,9 +67,10 @@ List<pw.Widget> buildInspectionReportPdf(
               mainAxisSize: pw.MainAxisSize.min,
               children: [
                 cssText('Inspector',
-                    sizePx: 11.5, weight: 600, color: ReportPdfTheme.muted),
+                    sizePx: 14.0, color: ReportPdfTheme.muted),
                 pw.SizedBox(height: 1),
-                cssText(r.inspector, sizePx: 12.0, weight: 600),
+                cssText(r.inspector.isEmpty ? 'N/A' : r.inspector,
+                    sizePx: 16.0, weight: 600),
               ],
             ),
           ),
@@ -73,15 +81,15 @@ List<pw.Widget> buildInspectionReportPdf(
     // Inspection Remarks (only when present)
     if (r.inspectionRemarks.isNotEmpty) ...[
       pw.Padding(
-        padding: const pw.EdgeInsets.only(bottom: 8),
+        padding: const pw.EdgeInsets.only(bottom: 12),
         child: pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           mainAxisSize: pw.MainAxisSize.min,
           children: [
             cssText('Inspection Remarks',
-                sizePx: 11.5, weight: 600, color: ReportPdfTheme.muted),
+                sizePx: 14.0, weight: 700, color: ReportPdfTheme.muted),
             pw.SizedBox(height: 2),
-            cssText(r.inspectionRemarks, sizePx: 12.0),
+            cssText(r.inspectionRemarks, sizePx: 16.0),
           ],
         ),
       ),
@@ -90,27 +98,47 @@ List<pw.Widget> buildInspectionReportPdf(
     // General Evidence Photos (only when present)
     if (r.generalEvidencePhotos.isNotEmpty) ...[
       pw.Padding(
-        padding: const pw.EdgeInsets.only(bottom: 12),
+        padding: const pw.EdgeInsets.only(bottom: 18),
         child: pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           mainAxisSize: pw.MainAxisSize.min,
           children: [
             cssText('General Evidence Photos',
-                sizePx: 11.5, weight: 600, color: ReportPdfTheme.muted),
-            pw.SizedBox(height: 4),
+                sizePx: 14.0, weight: 700, color: ReportPdfTheme.muted),
+            pw.SizedBox(height: 3),
             photoRow(r.generalEvidencePhotos, photos, 'None', captions: true),
           ],
         ),
       ),
     ],
 
-    // Leading points (all but last) â€” no keep-together with signOff
-    for (final p in leadingPoints) ..._inspectionPoint(r, p, photos),
+    // Leading points (all but last) — no keep-together with signOff
+    for (final p in leadingPoints) ...[
+      ..._inspectionPoint(r, p, photos),
+      pw.Container(
+        width: double.infinity,
+        margin: const pw.EdgeInsets.only(bottom: 18),
+        decoration: const pw.BoxDecoration(
+          border: pw.Border(
+            bottom: pw.BorderSide(color: ReportPdfTheme.border, width: 0.75),
+          ),
+        ),
+      ),
+    ],
 
     // Last point + signOff kept together to avoid orphan signoff
     if (lastPoint != null)
       keepTogether([
         ..._inspectionPoint(r, lastPoint, photos),
+        pw.Container(
+          width: double.infinity,
+          margin: const pw.EdgeInsets.only(bottom: 18),
+          decoration: const pw.BoxDecoration(
+            border: pw.Border(
+              bottom: pw.BorderSide(color: ReportPdfTheme.border, width: 0.75),
+            ),
+          ),
+        ),
         signOff(
           technician: r.submission?.submittedByName.isNotEmpty == true
               ? r.submission!.submittedByName
@@ -134,24 +162,20 @@ List<pw.Widget> _inspectionPoint(InspectionJobWorkReport r,
     InspectionReportPoint p, Map<String, Uint8List?> photos) {
   final observationOnly = p.correctiveActionPerformed == false;
   final tag =
-      '${p.assetName.isEmpty ? 'N/A' : p.assetName} Â· ${p.priority.isEmpty ? 'N/A' : p.priority}';
+      '${p.assetName.isEmpty ? 'N/A' : p.assetName} \u00B7 ${p.priority.isEmpty ? 'N/A' : p.priority}';
 
   return [
-    pw.SizedBox(height: 8),
-
-    // â”€â”€ Point header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // Point header
     if (!p.isLegacy)
-      pw.Container(
-        width: double.infinity,
-        color: PdfColors.grey300,
-        padding: const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+      pw.Padding(
+        padding: const pw.EdgeInsets.only(bottom: 6),
         child: pw.Row(
           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
           children: [
             pw.Expanded(
               child: cssText(
                   'Point #${p.pointNumber}: ${p.observation}'.trim(),
-                  sizePx: 9.5,
+                  sizePx: 16.0,
                   weight: 700),
             ),
             pw.SizedBox(width: 6),
@@ -169,57 +193,56 @@ List<pw.Widget> _inspectionPoint(InspectionJobWorkReport r,
             child: cssText(
                 '#${c.number}: ${c.text}'
                 '${c.priority.isEmpty ? '' : ' (${c.priority})'}',
-                sizePx: 11.5),
+                sizePx: 14.0),
           ),
         pw.SizedBox(height: 4),
       ],
     ],
 
-    // â”€â”€ 3-column fields grid: Initial Findings / Action Taken / Final Remarks
+    // 3-column fields grid: Initial Findings / Action Taken / Final Remarks
     pw.Padding(
-      padding: const pw.EdgeInsets.only(top: 4, bottom: 6),
+      padding: const pw.EdgeInsets.only(bottom: 8),
       child: pw.Row(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
           pw.Expanded(child: _fieldColumn('Initial Findings', p.initialFindings)),
-          pw.SizedBox(width: 6),
+          pw.SizedBox(width: 12),
           pw.Expanded(child: _fieldColumn('Action Taken', p.actionTaken)),
-          pw.SizedBox(width: 6),
+          pw.SizedBox(width: 12),
           pw.Expanded(
             child: _fieldColumn(
               'Final Remarks',
               p.finalRemarks,
-              observationOnlyNote: observationOnly,
             ),
           ),
         ],
       ),
     ),
 
-    // â”€â”€ Technical Parameters â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // Technical Parameters
     if (p.technicalParameters.isNotEmpty) ...[
       pw.Padding(
-        padding: const pw.EdgeInsets.only(bottom: 6),
+        padding: const pw.EdgeInsets.only(bottom: 8),
         child: pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           mainAxisSize: pw.MainAxisSize.min,
           children: [
             cssText('Technical Parameters',
-                sizePx: 11.5, weight: 600, color: ReportPdfTheme.muted),
-            pw.SizedBox(height: 4),
+                sizePx: 14.0, weight: 700, color: ReportPdfTheme.muted),
+            pw.SizedBox(height: 3),
             paramTable(p.technicalParameters),
           ],
         ),
       ),
     ],
 
-    // â”€â”€ Photo grid: 3-column (pointwise) or 2-column (legacy) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    // Photo grid: 3-column (pointwise) or 2-column (legacy)
     pw.Padding(
-      padding: const pw.EdgeInsets.only(bottom: 4),
+      padding: const pw.EdgeInsets.only(bottom: 12),
       child: pw.Row(
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
-          // "Before Photos (From Inspection)" column â€” pointwise only
+          // "Before Photos (From Inspection)" column — pointwise only
           if (!p.isLegacy) ...[
             pw.Expanded(
               child: _photoColumn(
@@ -228,13 +251,13 @@ List<pw.Widget> _inspectionPoint(InspectionJobWorkReport r,
                   photos,
                   'None'),
             ),
-            pw.SizedBox(width: 6),
+            pw.SizedBox(width: 12),
           ],
           pw.Expanded(
             child: _photoColumn(
                 'Before Photos', p.beforePhotos, photos, 'None uploaded'),
           ),
-          pw.SizedBox(width: 6),
+          pw.SizedBox(width: 12),
           pw.Expanded(
             child: _photoColumn(
               'After Photos',
@@ -250,7 +273,7 @@ List<pw.Widget> _inspectionPoint(InspectionJobWorkReport r,
   ];
 }
 
-/// Small muted bold label above content â€” matches web `<Field>` component.
+/// Small muted bold label above content — matches web `<Field>` component.
 pw.Widget _fieldColumn(
   String label,
   String value, {
@@ -260,21 +283,21 @@ pw.Widget _fieldColumn(
     crossAxisAlignment: pw.CrossAxisAlignment.start,
     mainAxisSize: pw.MainAxisSize.min,
     children: [
-      cssText(label, sizePx: 11.5, weight: 600, color: ReportPdfTheme.muted),
+      cssText(label, sizePx: 14.0, weight: 700, color: ReportPdfTheme.muted),
       pw.SizedBox(height: 2),
       if (observationOnlyNote)
-        cssText('Observation only â€” no corrective action required',
-            sizePx: 11.5, italic: true, color: ReportPdfTheme.muted),
+        cssText('Observation only \u2014 no corrective action required',
+            sizePx: 14.0, italic: true, color: ReportPdfTheme.muted),
       if (value.trim().isNotEmpty)
-        cssText(value, sizePx: 12.0)
+        cssText(value, sizePx: 16.0)
       else
         cssText('None recorded',
-            sizePx: 12.0, italic: true, color: ReportPdfTheme.faint),
+            sizePx: 16.0, italic: true, color: ReportPdfTheme.faint),
     ],
   );
 }
 
-/// Small muted bold label above a PhotoGrid â€” matches web photo sub-headers.
+/// Small muted bold label above a PhotoGrid — matches web photo sub-headers.
 pw.Widget _photoColumn(
   String label,
   List<ReportPhoto> list,
@@ -286,11 +309,13 @@ pw.Widget _photoColumn(
     crossAxisAlignment: pw.CrossAxisAlignment.start,
     mainAxisSize: pw.MainAxisSize.min,
     children: [
-      cssText(label, sizePx: 11.5, weight: 600, color: ReportPdfTheme.muted),
-      pw.SizedBox(height: 4),
-      if (observationOnlyNote)
-        cssText('Observation only â€” no corrective action required',
-            sizePx: 11.5, italic: true, color: ReportPdfTheme.muted),
+      cssText(label, sizePx: 14.0, weight: 700, color: ReportPdfTheme.muted),
+      pw.SizedBox(height: 3),
+      if (observationOnlyNote) ...[
+        cssText('Observation only \u2014 no corrective action required',
+            sizePx: 14.0, italic: true, color: ReportPdfTheme.muted),
+        pw.SizedBox(height: 3),
+      ],
       photoRow(list, photos, emptyLabel, captions: true),
     ],
   );

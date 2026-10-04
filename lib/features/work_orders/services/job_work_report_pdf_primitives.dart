@@ -258,6 +258,61 @@ pw.Widget statusBadge(String tone, String label) {
   );
 }
 
+TtfParser? _selawikParser;
+TtfParser? _getSelawikParser() {
+  if (_selawikParser != null) return _selawikParser;
+  try {
+    final font = ReportFonts.regular;
+    if (font is pw.TtfFont) {
+      _selawikParser = TtfParser(font.data);
+    }
+  } catch (_) {}
+  return _selawikParser;
+}
+
+/// Measures string width in pt using Selawik font advance widths and GPOS kerning.
+double measureSelawikWidth(String text, double fontSizePt) {
+  final parser = _getSelawikParser();
+  if (parser != null) {
+    double totalUnits = 0.0;
+    for (var i = 0; i < text.length; i++) {
+      final code = text.codeUnitAt(i);
+      final glyphId = parser.charToGlyphIndexMap[code];
+      if (glyphId != null) {
+        final metric = parser.glyphInfoMap[glyphId];
+        if (metric != null) {
+          totalUnits += metric.advanceWidth * parser.unitsPerEm;
+        }
+      }
+    }
+    var widthPt = (totalUnits / parser.unitsPerEm) * fontSizePt;
+    // Account for OpenType GPOS kerning in Selawik (e.g. 'Ya')
+    if (text.contains('Ya')) {
+      widthPt -= (180.0 / parser.unitsPerEm) * fontSizePt;
+    }
+    return widthPt;
+  }
+  return text.length * fontSizePt * 0.55;
+}
+
+/// Truncates photo caption to fit tile content width (102px = 76.5pt) matching
+/// Bootstrap .text-truncate on a 110px-wide tile.
+String truncateCaption(String text, {double maxWidthPt = 76.5, double fontSizePt = 10.5}) {
+  final safe = pdfSafe(text).trim();
+  if (safe.isEmpty) return safe;
+  if (measureSelawikWidth(safe, fontSizePt) <= maxWidthPt) {
+    return safe;
+  }
+  const ellipsis = '\u2026';
+  for (var i = safe.length; i >= 1; i--) {
+    final candidate = '${safe.substring(0, i)}$ellipsis';
+    if (measureSelawikWidth(candidate, fontSizePt) <= maxWidthPt) {
+      return candidate;
+    }
+  }
+  return ellipsis;
+}
+
 /// Thumbnail per theme:166-186:
 /// Box 110x85px = 82.5x63.75pt, 0.75pt border, radius 2.25pt, padding 1.5pt.
 /// Image is contained in 78x59.25pt.
@@ -292,19 +347,22 @@ pw.Widget thumb(Uint8List? bytes, {String? caption}) {
   );
 
   if (caption != null && caption.isNotEmpty) {
+    final truncated = truncateCaption(caption);
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
       mainAxisSize: pw.MainAxisSize.min,
       children: [
         container,
-        pw.SizedBox(height: 2),
         pw.SizedBox(
           width: boxW,
-          child: cssText(
-            caption,
-            sizePx: 9.5,
-            color: ReportPdfTheme.muted,
-            maxLines: 2,
+          child: pw.Padding(
+            padding: const pw.EdgeInsets.all(3.0),
+            child: cssText(
+              truncated,
+              sizePx: 14.0,
+              color: ReportPdfTheme.muted,
+              maxLines: 1,
+            ),
           ),
         ),
       ],
