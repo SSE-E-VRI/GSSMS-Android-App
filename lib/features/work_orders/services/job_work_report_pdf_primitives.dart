@@ -703,15 +703,15 @@ pw.Widget signOff({
               submission.timestampLabel.isNotEmpty
                   ? 'Submission #${submission.number} · ${submission.timestampLabel}'
                   : 'Submission #${submission.number}',
-              sizePx: 11.0,
-              color: ReportPdfTheme.faint,
+              sizePx: 12.0,
+              color: ReportPdfTheme.muted,
             )
           else
             pw.SizedBox(),
           cssText(
             'Generated: ${formatGeneratedAt(generatedAt)}',
-            sizePx: 11.0,
-            color: ReportPdfTheme.faint,
+            sizePx: 12.0,
+            color: ReportPdfTheme.muted,
           ),
         ],
       ),
