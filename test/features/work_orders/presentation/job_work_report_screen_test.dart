@@ -15,6 +15,8 @@ import 'package:gssms_mobile/features/work_orders/domain/models/work_order.dart'
 import 'package:gssms_mobile/features/work_orders/presentation/screens/job_work_report_screen.dart';
 import 'package:mocktail/mocktail.dart';
 
+import 'package:printing/printing.dart';
+
 import '../../../helpers/fake_auth.dart';
 
 class _MockRepo extends Mock implements JobWorkReportRepository {}
@@ -43,6 +45,7 @@ Future<void> _pump(
   _MockRepo repo, {
   UserSession? session,
   WorkOrder? wo,
+  JobWorkReportPreviewBuilder? previewBuilder,
 }) async {
   await tester.pumpWidget(
     ProviderScope(
@@ -50,6 +53,15 @@ Future<void> _pump(
         jobWorkReportRepositoryProvider.overrideWithValue(repo),
         authControllerProvider.overrideWith(
             () => FakeAuthenticatedController(session ?? _tech())),
+        jobWorkReportPreviewBuilderProvider.overrideWithValue(
+          previewBuilder ??
+              (context, {required loaded, required getPdfBytes, required fileName}) {
+                return KeyedSubtree(
+                  key: const Key('job_work_report_pdf_preview'),
+                  child: JobWorkReportBody(loaded: loaded),
+                );
+              },
+        ),
       ],
       child: MaterialApp(
         home: JobWorkReportScreen(workOrder: wo ?? _wo()),
@@ -240,4 +252,73 @@ void main() {
       );
     });
   });
+
+  group('preview builder', () {
+    testWidgets('default builder provides PdfPreview widget', (tester) async {
+      late Widget built;
+      await tester.pumpWidget(
+        ProviderScope(
+          child: MaterialApp(
+            home: Consumer(
+              builder: (context, ref, _) {
+                final builder = ref.watch(jobWorkReportPreviewBuilderProvider);
+                built = builder(
+                  context,
+                  loaded: _loaded(_checklist()),
+                  getPdfBytes: () async => Uint8List(0),
+                  fileName: 'JobWork-Test.pdf',
+                );
+                return built;
+              },
+            ),
+          ),
+        ),
+      );
+      expect(built, isA<PdfPreview>());
+      expect(find.byType(PdfPreview), findsOneWidget);
+    });
+
+    testWidgets('passes loaded data, filename and non-empty pdf bytes',
+        (tester) async {
+      LoadedJobWorkReport? capturedLoaded;
+      String? capturedFileName;
+      Uint8List? capturedBytes;
+
+      when(() => repo.load(any()))
+          .thenAnswer((_) async => _loaded(_checklist()));
+
+      await _pump(
+        tester,
+        repo,
+        previewBuilder:
+            (context, {required loaded, required getPdfBytes, required fileName}) {
+          capturedLoaded = loaded;
+          capturedFileName = fileName;
+          return Builder(
+            builder: (ctx) {
+              return TextButton(
+                key: const Key('fetch_bytes_btn'),
+                onPressed: () async {
+                  capturedBytes = await getPdfBytes();
+                },
+                child: const Text('Fetch PDF'),
+              );
+            },
+          );
+        },
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('fetch_bytes_btn')), findsOneWidget);
+      expect(capturedLoaded, isNotNull);
+      expect(capturedFileName, 'JobWork-WO__101-Report.pdf');
+
+      await tester.tap(find.byKey(const Key('fetch_bytes_btn')));
+      await tester.pumpAndSettle();
+
+      expect(capturedBytes, isNotNull);
+      expect(capturedBytes!.isNotEmpty, isTrue);
+    });
+  });
 }
+

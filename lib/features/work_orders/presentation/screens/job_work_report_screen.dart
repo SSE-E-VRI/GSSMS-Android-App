@@ -51,8 +51,33 @@ class JobWorkReportScreen extends ConsumerStatefulWidget {
       _JobWorkReportScreenState();
 }
 
+typedef JobWorkReportPreviewBuilder = Widget Function(
+  BuildContext context, {
+  required LoadedJobWorkReport loaded,
+  required Future<Uint8List> Function() getPdfBytes,
+  required String fileName,
+});
+
+final jobWorkReportPreviewBuilderProvider =
+    Provider<JobWorkReportPreviewBuilder>((ref) {
+  return (context, {required loaded, required getPdfBytes, required fileName}) {
+    return PdfPreview(
+      build: (_) => getPdfBytes(),
+      useActions: false,
+      allowPrinting: false,
+      allowSharing: false,
+      canChangePageFormat: false,
+      canChangeOrientation: false,
+      canDebug: false,
+      pdfFileName: fileName,
+      scrollViewDecoration: BoxDecoration(color: context.gssms.surfaceInset),
+    );
+  };
+});
+
 class _JobWorkReportScreenState extends ConsumerState<JobWorkReportScreen> {
   Future<LoadedJobWorkReport>? _future;
+  Future<Uint8List>? _pdfBytesFuture;
   bool _busy = false;
 
   Future<LoadedJobWorkReport> _load() =>
@@ -61,6 +86,7 @@ class _JobWorkReportScreenState extends ConsumerState<JobWorkReportScreen> {
   void _reload() {
     setState(() {
       _future = _load();
+      _pdfBytesFuture = null;
     });
   }
 
@@ -69,16 +95,22 @@ class _JobWorkReportScreenState extends ConsumerState<JobWorkReportScreen> {
     return 'JobWork-$safe-Report.pdf';
   }
 
+  Future<Uint8List> _getPdfBytes(LoadedJobWorkReport loaded) {
+    return _pdfBytesFuture ??= () async {
+      final doc = await JobWorkReportPdfService.build(
+        loaded.report,
+        photos: loaded.photos,
+      );
+      return doc.save();
+    }();
+  }
+
   Future<void> _export(LoadedJobWorkReport loaded,
       {required bool share}) async {
     if (_busy) return;
     setState(() => _busy = true);
     try {
-      final doc = await JobWorkReportPdfService.build(
-        loaded.report,
-        photos: loaded.photos,
-      );
-      final bytes = await doc.save();
+      final bytes = await _getPdfBytes(loaded);
       final name = _fileName(loaded.report);
       if (share) {
         await Printing.sharePdf(bytes: bytes, filename: name);
@@ -185,12 +217,21 @@ class _JobWorkReportScreenState extends ConsumerState<JobWorkReportScreen> {
         title: 'No details available for this report.',
       );
     }
-    return _ReportBody(loaded: loaded);
+    final builder = ref.watch(jobWorkReportPreviewBuilderProvider);
+    return builder(
+      context,
+      loaded: loaded,
+      getPdfBytes: () => _getPdfBytes(loaded),
+      fileName: _fileName(loaded.report),
+    );
   }
 }
 
-class _ReportBody extends StatelessWidget {
-  const _ReportBody({required this.loaded});
+/// Fallback / widget tree representation of the report content, exposed
+/// for widget testing without headless rasterization.
+@visibleForTesting
+class JobWorkReportBody extends StatelessWidget {
+  const JobWorkReportBody({super.key, required this.loaded});
 
   final LoadedJobWorkReport loaded;
 
