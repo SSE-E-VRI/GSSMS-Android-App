@@ -46,3 +46,4 @@ app.*.map.json
 android/.gradle/
 GSSMS/
 tool/report_parity/web/node_modules/
+tool/report_parity/web/dist/
