@@ -20,13 +20,14 @@ const _deficiencyDarkRed = PdfColor(0.4980, 0.1137, 0.1137); // #7f1d1d
 const _deficiencyYellowBar = PdfColor(1.0, 0.7569, 0.0275); // #ffc107
 
 pw.Widget _pad(pw.Widget child) => pw.Padding(
-      padding: const pw.EdgeInsets.symmetric(horizontal: 14.4),
+      padding: const pw.EdgeInsets.symmetric(horizontal: 15.0),
       child: child,
     );
 
 List<pw.Widget> buildChecklistReportPdf(
     ChecklistJobWorkReport r, Map<String, Uint8List?> photos, DateTime at) {
   return [
+    pw.SizedBox(height: 15.0),
     _pad(_buildChecklistHeader(r)),
     _pad(_buildChecklistMeta(r)),
     if (r.isEmpty)
@@ -43,61 +44,108 @@ List<pw.Widget> buildChecklistReportPdf(
 }
 
 pw.Widget _buildChecklistHeader(ChecklistJobWorkReport r) {
-  return pw.Container(
-    width: double.infinity,
-    padding: const pw.EdgeInsets.only(bottom: 9.0),
-    decoration: const pw.BoxDecoration(
-      border: pw.Border(
-        bottom: pw.BorderSide(color: ReportPdfTheme.accent, width: 1.5),
-      ),
-    ),
-    child: pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.center,
-      children: [
-        cssText(
-          r.org.railwayName,
-          sizePx: 20.0,
-          weight: 700,
-          upper: true,
-          letterSpacingEm: 0.03,
-          color: ReportPdfTheme.inkPrint,
-          align: pw.TextAlign.center,
-        ),
-        pw.SizedBox(height: 2.4),
-        cssText(
-          r.org.divisionName,
-          sizePx: 16.0,
-          weight: 600,
-          color: ReportPdfTheme.inkPrint,
-          align: pw.TextAlign.center,
-        ),
-        pw.SizedBox(height: 1.8),
-        cssText(
-          r.org.depotName,
-          sizePx: 16.0,
-          weight: 600,
-          color: ReportPdfTheme.inkPrint,
-          align: pw.TextAlign.center,
-        ),
-        pw.SizedBox(height: 3.0),
-        cssText(
-          r.title,
-          sizePx: 17.6,
-          weight: 700,
-          upper: true,
-          color: ReportPdfTheme.inkPrint,
-          letterSpacingEm: 0.05,
-          align: pw.TextAlign.center,
-        ),
-      ],
-    ),
+  return reportHeader(
+    org: r.org,
+    title: r.title,
   );
 }
 
 pw.Widget _buildChecklistMeta(ChecklistJobWorkReport r) {
   final hasJobWork = r.showJobWork;
+  if (!hasJobWork) {
+    return pw.Container(
+      margin: const pw.EdgeInsets.only(bottom: 18.0),
+      child: pw.Row(
+        crossAxisAlignment: pw.CrossAxisAlignment.center,
+        children: [
+          pw.SizedBox(
+            width: 164.0,
+            child: pw.Align(
+              alignment: pw.Alignment.centerLeft,
+              child: pw.RichText(
+                text: pw.TextSpan(children: [
+                  pw.TextSpan(
+                    text: 'Location: ',
+                    style: pw.TextStyle(
+                      font: ReportFonts.bold,
+                      fontSize: 12.0,
+                      color: ReportPdfTheme.inkPrint,
+                    ),
+                  ),
+                  pw.TextSpan(
+                    text: pdfSafe(r.station),
+                    style: pw.TextStyle(
+                      font: ReportFonts.regular,
+                      fontSize: 12.0,
+                      color: ReportPdfTheme.inkPrint,
+                    ),
+                  ),
+                ]),
+              ),
+            ),
+          ),
+          pw.SizedBox(width: 9.0),
+          pw.SizedBox(
+            width: 164.0,
+            child: pw.Align(
+              alignment: pw.Alignment.center,
+              child: pw.RichText(
+                textAlign: pw.TextAlign.center,
+                text: pw.TextSpan(children: [
+                  pw.TextSpan(
+                    text: 'Schedule: ',
+                    style: pw.TextStyle(
+                      font: ReportFonts.bold,
+                      fontSize: 12.0,
+                      color: ReportPdfTheme.inkPrint,
+                    ),
+                  ),
+                  pw.TextSpan(
+                    text: pdfSafe(r.schedule),
+                    style: pw.TextStyle(
+                      font: ReportFonts.regular,
+                      fontSize: 12.0,
+                      color: ReportPdfTheme.inkPrint,
+                    ),
+                  ),
+                ]),
+              ),
+            ),
+          ),
+          pw.SizedBox(width: 9.0),
+          pw.SizedBox(
+            width: 164.0,
+            child: pw.Align(
+              alignment: pw.Alignment.centerRight,
+              child: pw.RichText(
+                textAlign: pw.TextAlign.right,
+                text: pw.TextSpan(children: [
+                  pw.TextSpan(
+                    text: 'Date: ',
+                    style: pw.TextStyle(
+                      font: ReportFonts.bold,
+                      fontSize: 12.0,
+                      color: ReportPdfTheme.inkPrint,
+                    ),
+                  ),
+                  pw.TextSpan(
+                    text: pdfSafe(r.dateLabel),
+                    style: pw.TextStyle(
+                      font: ReportFonts.regular,
+                      fontSize: 12.0,
+                      color: ReportPdfTheme.inkPrint,
+                    ),
+                  ),
+                ]),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
   return pw.Container(
-    margin: const pw.EdgeInsets.only(top: 14.0, bottom: 20.0),
+    margin: const pw.EdgeInsets.only(bottom: 18.0),
     child: pw.Row(
       crossAxisAlignment: pw.CrossAxisAlignment.center,
       children: [
@@ -154,34 +202,33 @@ pw.Widget _buildChecklistMeta(ChecklistJobWorkReport r) {
             ),
           ),
         ),
-        if (hasJobWork)
-          pw.Expanded(
-            flex: 1,
-            child: pw.Align(
-              alignment: pw.Alignment.center,
-              child: pw.RichText(
-                textAlign: pw.TextAlign.center,
-                text: pw.TextSpan(children: [
-                  pw.TextSpan(
-                    text: 'Job Work: ',
-                    style: pw.TextStyle(
-                      font: ReportFonts.bold,
-                      fontSize: 12.0,
-                      color: ReportPdfTheme.inkPrint,
-                    ),
+        pw.Expanded(
+          flex: 1,
+          child: pw.Align(
+            alignment: pw.Alignment.center,
+            child: pw.RichText(
+              textAlign: pw.TextAlign.center,
+              text: pw.TextSpan(children: [
+                pw.TextSpan(
+                  text: 'Job Work: ',
+                  style: pw.TextStyle(
+                    font: ReportFonts.bold,
+                    fontSize: 12.0,
+                    color: ReportPdfTheme.inkPrint,
                   ),
-                  pw.TextSpan(
-                    text: pdfSafe(r.ticket),
-                    style: pw.TextStyle(
-                      font: ReportFonts.regular,
-                      fontSize: 12.0,
-                      color: ReportPdfTheme.inkPrint,
-                    ),
+                ),
+                pw.TextSpan(
+                  text: pdfSafe(r.ticket),
+                  style: pw.TextStyle(
+                    font: ReportFonts.regular,
+                    fontSize: 12.0,
+                    color: ReportPdfTheme.inkPrint,
                   ),
-                ]),
-              ),
+                ),
+              ]),
             ),
           ),
+        ),
         pw.Expanded(
           flex: 1,
           child: pw.Align(
@@ -220,7 +267,7 @@ List<pw.Widget> _buildAssetGroup(ChecklistReportGroup g) {
     margin: const pw.EdgeInsets.only(bottom: 7.0),
     padding: const pw.EdgeInsets.symmetric(horizontal: 6.0, vertical: 4.5),
     decoration: pw.BoxDecoration(
-      color: PdfColors.white,
+      color: ReportPdfTheme.surface,
       border: pw.Border.all(color: _cardBorderColor, width: 0.75),
     ),
     child: cssText(
@@ -236,7 +283,7 @@ List<pw.Widget> _buildAssetGroup(ChecklistReportGroup g) {
       pw.NewPage(),
       _pad(headerBox),
       ..._buildGroupNestedTable(g),
-      pw.SizedBox(height: 22.0),
+      pw.SizedBox(height: 18.0),
     ];
   }
 
@@ -247,7 +294,7 @@ List<pw.Widget> _buildAssetGroup(ChecklistReportGroup g) {
         children: [
           _pad(headerBox),
           ..._buildGroupNestedTable(g),
-          pw.SizedBox(height: 22.0),
+          pw.SizedBox(height: 18.0),
         ],
       ),
     ),
@@ -287,7 +334,7 @@ List<pw.Widget> _buildGroupNestedTable(ChecklistReportGroup g) {
                   left: _tableBorderSide,
                   right: _tableBorderSide,
                 ),
-                padding: const pw.EdgeInsets.symmetric(horizontal: 6.0, vertical: 3.5),
+                padding: const pw.EdgeInsets.symmetric(horizontal: 6.0, vertical: 4.4),
               ),
               _cell(
                 cssText('Checkpoint/Parameter', sizePx: 13.0, weight: 700),
@@ -296,7 +343,7 @@ List<pw.Widget> _buildGroupNestedTable(ChecklistReportGroup g) {
                   bottom: _tableBorderSide,
                   right: _tableBorderSide,
                 ),
-                padding: const pw.EdgeInsets.symmetric(horizontal: 6.0, vertical: 3.5),
+                padding: const pw.EdgeInsets.symmetric(horizontal: 6.0, vertical: 4.4),
               ),
               _cell(
                 cssText('Status', sizePx: 13.0, weight: 700),
@@ -305,7 +352,7 @@ List<pw.Widget> _buildGroupNestedTable(ChecklistReportGroup g) {
                   bottom: _tableBorderSide,
                   right: _tableBorderSide,
                 ),
-                padding: const pw.EdgeInsets.symmetric(horizontal: 6.0, vertical: 3.5),
+                padding: const pw.EdgeInsets.symmetric(horizontal: 6.0, vertical: 4.4),
               ),
               _cell(
                 cssText('Action Taken', sizePx: 13.0, weight: 700),
@@ -314,7 +361,7 @@ List<pw.Widget> _buildGroupNestedTable(ChecklistReportGroup g) {
                   bottom: _tableBorderSide,
                   right: _tableBorderSide,
                 ),
-                padding: const pw.EdgeInsets.symmetric(horizontal: 6.0, vertical: 3.5),
+                padding: const pw.EdgeInsets.symmetric(horizontal: 6.0, vertical: 4.4),
               ),
             ],
           ),
@@ -334,7 +381,7 @@ pw.Widget _buildItemSpanRow(ChecklistReportGroup g, List<ChecklistReportRow> spa
   final leftCell = pw.Container(
     color: PdfColors.white,
     alignment: pw.Alignment.centerLeft,
-    padding: const pw.EdgeInsets.symmetric(horizontal: 6.0, vertical: 3.5),
+    padding: const pw.EdgeInsets.symmetric(horizontal: 6.0, vertical: 4.4),
     child: cssText(
       itemName,
       sizePx: 13.0,
@@ -407,17 +454,17 @@ pw.TableRow _buildInnerTableRow(ChecklistReportRow row, {required bool isLast}) 
       _cell(
         col0,
         border: const pw.Border(right: _tableBorderSide, bottom: bottomBorder),
-        padding: const pw.EdgeInsets.symmetric(horizontal: 6.0, vertical: 3.5),
+        padding: const pw.EdgeInsets.symmetric(horizontal: 6.0, vertical: 4.4),
       ),
       _cell(
         col1,
         border: const pw.Border(right: _tableBorderSide, bottom: bottomBorder),
-        padding: const pw.EdgeInsets.symmetric(horizontal: 6.0, vertical: 3.5),
+        padding: const pw.EdgeInsets.symmetric(horizontal: 6.0, vertical: 4.4),
       ),
       _cell(
         col2,
         border: const pw.Border(right: _tableBorderSide, bottom: bottomBorder),
-        padding: const pw.EdgeInsets.symmetric(horizontal: 6.0, vertical: 3.5),
+        padding: const pw.EdgeInsets.symmetric(horizontal: 6.0, vertical: 4.4),
       ),
     ],
   );
@@ -432,8 +479,118 @@ pw.Widget _buildDeficiencySummary(List<ChecklistDeficiencyRow> defs) {
     4: pw.FlexColumnWidth(14),
   };
 
+  final headerTable = pw.Table(
+    columnWidths: colWidths,
+    children: [
+      pw.TableRow(
+        decoration: const pw.BoxDecoration(color: _headerTint),
+        children: [
+          _cell(
+            cssText('Asset/Equipment', sizePx: 13.0, weight: 700),
+            border: const pw.Border(
+              top: _tableBorderSide,
+              bottom: _tableBorderSide,
+              left: _tableBorderSide,
+              right: _tableBorderSide,
+            ),
+            padding: const pw.EdgeInsets.symmetric(horizontal: 6.0, vertical: 4.4),
+          ),
+          _cell(
+            cssText('Checkpoint', sizePx: 13.0, weight: 700),
+            border: const pw.Border(
+              top: _tableBorderSide,
+              bottom: _tableBorderSide,
+              right: _tableBorderSide,
+            ),
+            padding: const pw.EdgeInsets.symmetric(horizontal: 6.0, vertical: 4.4),
+          ),
+          _cell(
+            pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                cssText('Deficiency', sizePx: 13.0, weight: 700),
+                cssText('Finding', sizePx: 13.0, weight: 700),
+              ],
+            ),
+            border: const pw.Border(
+              top: _tableBorderSide,
+              bottom: _tableBorderSide,
+              right: _tableBorderSide,
+            ),
+            padding: const pw.EdgeInsets.symmetric(horizontal: 6.0, vertical: 4.4),
+          ),
+          _cell(
+            cssText('Action Taken', sizePx: 13.0, weight: 700),
+            border: const pw.Border(
+              top: _tableBorderSide,
+              bottom: _tableBorderSide,
+              right: _tableBorderSide,
+            ),
+            padding: const pw.EdgeInsets.symmetric(horizontal: 6.0, vertical: 4.4),
+          ),
+          _cell(
+            cssText('Severity', sizePx: 13.0, weight: 700),
+            border: const pw.Border(
+              top: _tableBorderSide,
+              bottom: _tableBorderSide,
+              right: _tableBorderSide,
+            ),
+            padding: const pw.EdgeInsets.symmetric(horizontal: 6.0, vertical: 4.4),
+          ),
+        ],
+      ),
+      if (defs.isNotEmpty)
+        for (final d in defs)
+          pw.TableRow(
+            children: [
+              _cell(
+                cssText(d.asset, sizePx: 13.0, weight: 600, color: _deficiencyDarkRed),
+                border: const pw.Border(
+                  bottom: _tableBorderSide,
+                  left: _tableBorderSide,
+                  right: _tableBorderSide,
+                ),
+                padding: const pw.EdgeInsets.symmetric(horizontal: 6.0, vertical: 4.4),
+              ),
+              _cell(
+                cssText(d.checkpoint, sizePx: 13.0, weight: 600, color: ReportPdfTheme.inkPrint),
+                border: const pw.Border(
+                  bottom: _tableBorderSide,
+                  right: _tableBorderSide,
+                ),
+                padding: const pw.EdgeInsets.symmetric(horizontal: 6.0, vertical: 4.4),
+              ),
+              _cell(
+                cssText(d.finding, sizePx: 13.0, weight: 600, color: _deficiencyDarkRed),
+                border: const pw.Border(
+                  bottom: _tableBorderSide,
+                  right: _tableBorderSide,
+                ),
+                padding: const pw.EdgeInsets.symmetric(horizontal: 6.0, vertical: 4.4),
+              ),
+              _cell(
+                cssText(d.action, sizePx: 13.0, weight: 600, color: _deficiencyDarkRed),
+                border: const pw.Border(
+                  bottom: _tableBorderSide,
+                  right: _tableBorderSide,
+                ),
+                padding: const pw.EdgeInsets.symmetric(horizontal: 6.0, vertical: 4.4),
+              ),
+              _cell(
+                cssText(d.severity, sizePx: 13.0, weight: 600, color: _deficiencyDarkRed),
+                border: const pw.Border(
+                  bottom: _tableBorderSide,
+                  right: _tableBorderSide,
+                ),
+                padding: const pw.EdgeInsets.symmetric(horizontal: 6.0, vertical: 4.4),
+              ),
+            ],
+          ),
+    ],
+  );
+
   return pw.Container(
-    margin: const pw.EdgeInsets.only(top: 24.0, bottom: 20.0),
+    margin: const pw.EdgeInsets.only(top: 18.0, bottom: 36.0),
     child: pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.stretch,
       children: [
@@ -460,141 +617,27 @@ pw.Widget _buildDeficiencySummary(List<ChecklistDeficiencyRow> defs) {
           ),
         ),
         pw.SizedBox(height: 6.0),
-        // Deficiency Table
-        pw.Table(
-          columnWidths: colWidths,
-          children: [
-            pw.TableRow(
-              decoration: const pw.BoxDecoration(color: _headerTint),
-              children: [
-                _cell(
-                  cssText('Asset/Equipment', sizePx: 13.0, weight: 700),
-                  border: const pw.Border(
-                    top: _tableBorderSide,
-                    bottom: _tableBorderSide,
-                    left: _tableBorderSide,
-                    right: _tableBorderSide,
-                  ),
-                  padding: const pw.EdgeInsets.symmetric(horizontal: 6.0, vertical: 3.5),
-                ),
-                _cell(
-                  cssText('Checkpoint', sizePx: 13.0, weight: 700),
-                  border: const pw.Border(
-                    top: _tableBorderSide,
-                    bottom: _tableBorderSide,
-                    right: _tableBorderSide,
-                  ),
-                  padding: const pw.EdgeInsets.symmetric(horizontal: 6.0, vertical: 3.5),
-                ),
-                _cell(
-                  pw.Column(
-                    crossAxisAlignment: pw.CrossAxisAlignment.start,
-                    children: [
-                      cssText('Deficiency', sizePx: 13.0, weight: 700),
-                      cssText('Finding', sizePx: 13.0, weight: 700),
-                    ],
-                  ),
-                  border: const pw.Border(
-                    top: _tableBorderSide,
-                    bottom: _tableBorderSide,
-                    right: _tableBorderSide,
-                  ),
-                  padding: const pw.EdgeInsets.symmetric(horizontal: 6.0, vertical: 3.5),
-                ),
-                _cell(
-                  cssText('Action Taken', sizePx: 13.0, weight: 700),
-                  border: const pw.Border(
-                    top: _tableBorderSide,
-                    bottom: _tableBorderSide,
-                    right: _tableBorderSide,
-                  ),
-                  padding: const pw.EdgeInsets.symmetric(horizontal: 6.0, vertical: 3.5),
-                ),
-                _cell(
-                  cssText('Severity', sizePx: 13.0, weight: 700),
-                  border: const pw.Border(
-                    top: _tableBorderSide,
-                    bottom: _tableBorderSide,
-                    right: _tableBorderSide,
-                  ),
-                  padding: const pw.EdgeInsets.symmetric(horizontal: 6.0, vertical: 3.5),
-                ),
-              ],
+        headerTable,
+        if (defs.isEmpty)
+          pw.Container(
+            width: double.infinity,
+            padding: const pw.EdgeInsets.symmetric(horizontal: 6.0, vertical: 6.0),
+            decoration: const pw.BoxDecoration(
+              border: pw.Border(
+                bottom: _tableBorderSide,
+                left: _tableBorderSide,
+                right: _tableBorderSide,
+              ),
             ),
-            if (defs.isEmpty)
-              pw.TableRow(
-                children: [
-                  _cell(
-                    cssText(
-                      'No deficiencies selected.',
-                      sizePx: 13.0,
-                      weight: 400,
-                      color: ReportPdfTheme.faint,
-                      align: pw.TextAlign.center,
-                    ),
-                    border: const pw.Border(
-                      bottom: _tableBorderSide,
-                      left: _tableBorderSide,
-                      right: _tableBorderSide,
-                    ),
-                    padding: const pw.EdgeInsets.symmetric(horizontal: 6.0, vertical: 6.0),
-                    alignment: pw.Alignment.center,
-                  ),
-                  _cell(pw.SizedBox(), border: const pw.Border(bottom: _tableBorderSide, right: _tableBorderSide)),
-                  _cell(pw.SizedBox(), border: const pw.Border(bottom: _tableBorderSide, right: _tableBorderSide)),
-                  _cell(pw.SizedBox(), border: const pw.Border(bottom: _tableBorderSide, right: _tableBorderSide)),
-                  _cell(pw.SizedBox(), border: const pw.Border(bottom: _tableBorderSide, right: _tableBorderSide)),
-                ],
-              )
-            else
-              for (final d in defs)
-                pw.TableRow(
-                  children: [
-                    _cell(
-                      cssText(d.asset, sizePx: 13.0, weight: 600, color: _deficiencyDarkRed),
-                      border: const pw.Border(
-                        bottom: _tableBorderSide,
-                        left: _tableBorderSide,
-                        right: _tableBorderSide,
-                      ),
-                      padding: const pw.EdgeInsets.symmetric(horizontal: 6.0, vertical: 3.5),
-                    ),
-                    _cell(
-                      cssText(d.checkpoint, sizePx: 13.0, weight: 600, color: ReportPdfTheme.inkPrint),
-                      border: const pw.Border(
-                        bottom: _tableBorderSide,
-                        right: _tableBorderSide,
-                      ),
-                      padding: const pw.EdgeInsets.symmetric(horizontal: 6.0, vertical: 3.5),
-                    ),
-                    _cell(
-                      cssText(d.finding, sizePx: 13.0, weight: 600, color: _deficiencyDarkRed),
-                      border: const pw.Border(
-                        bottom: _tableBorderSide,
-                        right: _tableBorderSide,
-                      ),
-                      padding: const pw.EdgeInsets.symmetric(horizontal: 6.0, vertical: 3.5),
-                    ),
-                    _cell(
-                      cssText(d.action, sizePx: 13.0, weight: 600, color: _deficiencyDarkRed),
-                      border: const pw.Border(
-                        bottom: _tableBorderSide,
-                        right: _tableBorderSide,
-                      ),
-                      padding: const pw.EdgeInsets.symmetric(horizontal: 6.0, vertical: 3.5),
-                    ),
-                    _cell(
-                      cssText(d.severity, sizePx: 13.0, weight: 600, color: _deficiencyDarkRed),
-                      border: const pw.Border(
-                        bottom: _tableBorderSide,
-                        right: _tableBorderSide,
-                      ),
-                      padding: const pw.EdgeInsets.symmetric(horizontal: 6.0, vertical: 3.5),
-                    ),
-                  ],
-                ),
-          ],
-        ),
+            alignment: pw.Alignment.center,
+            child: cssText(
+              'No deficiencies selected.',
+              sizePx: 13.0,
+              weight: 400,
+              color: ReportPdfTheme.faint,
+              align: pw.TextAlign.center,
+            ),
+          ),
       ],
     ),
   );
@@ -605,7 +648,7 @@ pw.Widget _buildAdditionalDetailsAndSignOff(ChecklistJobWorkReport r, DateTime a
 
   return keepTogether([
     pw.Container(
-      margin: const pw.EdgeInsets.only(top: 24.0, bottom: 14.0),
+      margin: const pw.EdgeInsets.only(top: 0.0, bottom: 18.0),
       padding: const pw.EdgeInsets.all(12.0),
       decoration: pw.BoxDecoration(
         color: PdfColors.white,
