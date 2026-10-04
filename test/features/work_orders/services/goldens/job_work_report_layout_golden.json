@@ -1,0 +1,134 @@
+{
+  "checklist_pm_full": {
+    "pageCount": 2,
+    "pageSizes": [
+      {
+        "width": 595.28,
+        "height": 841.89
+      },
+      {
+        "width": 595.28,
+        "height": 841.89
+      }
+    ],
+    "objectCount": 21
+  },
+  "checklist_pm_minimal": {
+    "pageCount": 1,
+    "pageSizes": [
+      {
+        "width": 595.28,
+        "height": 841.89
+      }
+    ],
+    "objectCount": 19
+  },
+  "checklist_pm_long": {
+    "pageCount": 5,
+    "pageSizes": [
+      {
+        "width": 595.28,
+        "height": 841.89
+      },
+      {
+        "width": 595.28,
+        "height": 841.89
+      },
+      {
+        "width": 595.28,
+        "height": 841.89
+      },
+      {
+        "width": 595.28,
+        "height": 841.89
+      },
+      {
+        "width": 595.28,
+        "height": 841.89
+      }
+    ],
+    "objectCount": 27
+  },
+  "breakdown_deficiency": {
+    "pageCount": 2,
+    "pageSizes": [
+      {
+        "width": 595.28,
+        "height": 841.89
+      },
+      {
+        "width": 595.28,
+        "height": 841.89
+      }
+    ],
+    "objectCount": 21
+  },
+  "breakdown_complaint": {
+    "pageCount": 1,
+    "pageSizes": [
+      {
+        "width": 595.28,
+        "height": 841.89
+      }
+    ],
+    "objectCount": 19
+  },
+  "breakdown_jobwork": {
+    "pageCount": 1,
+    "pageSizes": [
+      {
+        "width": 595.28,
+        "height": 841.89
+      }
+    ],
+    "objectCount": 19
+  },
+  "inspection_pointwise": {
+    "pageCount": 2,
+    "pageSizes": [
+      {
+        "width": 595.28,
+        "height": 841.89
+      },
+      {
+        "width": 595.28,
+        "height": 841.89
+      }
+    ],
+    "objectCount": 21
+  },
+  "inspection_legacy": {
+    "pageCount": 1,
+    "pageSizes": [
+      {
+        "width": 595.28,
+        "height": 841.89
+      }
+    ],
+    "objectCount": 19
+  },
+  "rectification_mixed": {
+    "pageCount": 2,
+    "pageSizes": [
+      {
+        "width": 595.28,
+        "height": 841.89
+      },
+      {
+        "width": 595.28,
+        "height": 841.89
+      }
+    ],
+    "objectCount": 21
+  },
+  "rectification_single": {
+    "pageCount": 1,
+    "pageSizes": [
+      {
+        "width": 595.28,
+        "height": 841.89
+      }
+    ],
+    "objectCount": 19
+  }
+}

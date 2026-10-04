@@ -266,6 +266,41 @@ def run_comparison(target_fixture=None, update_golden=False, check_golden=False)
             r_res = compare_rasters(doc_web[p], doc_and[p], prefix)
             raster_pages.append(r_res)
 
+        # Golden raster update / verification
+        if update_golden:
+            os.makedirs(GOLDEN_DIR, exist_ok=True)
+            mat = fitz.Matrix(SCALE, SCALE)
+            for p in range(pages_and):
+                pix_and = doc_and[p].get_pixmap(matrix=mat, alpha=False)
+                g_path = os.path.join(GOLDEN_DIR, f"{fid}_p{p+1}.png")
+                pix_and.save(g_path)
+            print(f"Updated golden for {fid} ({pages_and} page(s)) in {GOLDEN_DIR}")
+
+        if check_golden:
+            mat = fitz.Matrix(SCALE, SCALE)
+            for p in range(pages_and):
+                g_path = os.path.join(GOLDEN_DIR, f"{fid}_p{p+1}.png")
+                if not os.path.exists(g_path):
+                    print(f"ERROR: Missing golden file {g_path}")
+                    all_passed = False
+                    continue
+                pix_and = doc_and[p].get_pixmap(matrix=mat, alpha=False)
+                img_and = Image.frombytes("RGB", [pix_and.width, pix_and.height], pix_and.samples)
+                img_gold = Image.open(g_path)
+                if img_and.size != img_gold.size:
+                    print(f"ERROR: Golden size mismatch for {fid} p{p+1}: {img_and.size} vs {img_gold.size}")
+                    all_passed = False
+                    continue
+                diff = ImageChops.difference(img_and, img_gold)
+                diff_grey = diff.convert("L")
+                diff_count = sum(1 for px in diff_grey.getdata() if px > 0)
+                if diff_count > 0:
+                    pct = (diff_count / (img_and.width * img_and.height)) * 100.0
+                    print(f"GOLDEN REGRESSION: {fid} p{p+1} differs from golden by {diff_count} px ({pct:.2f}%)")
+                    all_passed = False
+                else:
+                    print(f"Golden match: {fid} p{p+1} matches golden reference (0 px difference)")
+
         avg_raw = round(sum(r["raw_mismatch_pct"] for r in raster_pages) / len(raster_pages), 2) if raster_pages else 0.0
         avg_blur = round(sum(r["blurred_mismatch_pct"] for r in raster_pages) / len(raster_pages), 2) if raster_pages else 0.0
 
@@ -306,7 +341,7 @@ def run_comparison(target_fixture=None, update_golden=False, check_golden=False)
         json.dump(results, f, indent=2)
     print(f"Summary written to {summary_file}")
 
-    return results
+    return results, all_passed
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -315,4 +350,7 @@ if __name__ == "__main__":
     parser.add_argument("--golden", action="store_true", help="Compare against golden references")
     args = parser.parse_args()
 
-    run_comparison(args.fixture, update_golden=args.update_golden, check_golden=args.golden)
+    results, ok = run_comparison(args.fixture, update_golden=args.update_golden, check_golden=args.golden)
+    if args.golden and not ok:
+        sys.exit(1)
+
