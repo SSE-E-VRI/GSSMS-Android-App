@@ -60,7 +60,7 @@ class FixtureLoader {
         report = RectificationJobWorkReport.fromJson(
           payloadJson,
           fallbackTicket: wo.displayReference,
-          fallbackStation: wo.stationName ?? wo.depotName,
+          fallbackStation: null,
         );
       default:
         throw ArgumentError('Unknown fixture kind: $kind');

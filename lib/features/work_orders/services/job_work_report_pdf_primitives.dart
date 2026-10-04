@@ -151,9 +151,17 @@ class AvoidBreakInside extends pw.SingleChildWidget {
   void layout(pw.Context context, pw.BoxConstraints constraints,
       {bool parentUsesSize = false}) {
     super.layout(context, constraints, parentUsesSize: parentUsesSize);
-    if (box != null) {
-      _tooTall = box!.height > context.page.pageFormat.availableHeight;
+    if (box != null && context.page != null) {
+      if (box!.height > context.page.pageFormat.availableHeight) {
+        _tooTall = true;
+      }
     }
+  }
+
+  @override
+  void paint(pw.Context context) {
+    super.paint(context);
+    paintChild(context);
   }
 }
 
@@ -332,7 +340,7 @@ pw.Widget photoRow(
       for (final p in list)
         thumb(
           photos[p.key],
-          caption: captions ? [p.kind, p.caption].where((s) => s.isNotEmpty).join(' - ') : null,
+          caption: captions ? (p.caption.isNotEmpty ? p.caption : null) : null,
         ),
     ],
   );
@@ -368,7 +376,15 @@ pw.Widget reportHeader({
         ),
         pw.SizedBox(height: 2),
         cssText(
-          '${org.divisionName} / ${org.depotName}',
+          org.divisionName,
+          sizePx: 16.0,
+          weight: 600,
+          color: ReportPdfTheme.muted,
+          align: pw.TextAlign.center,
+        ),
+        pw.SizedBox(height: 1),
+        cssText(
+          org.depotName,
           sizePx: 16.0,
           weight: 600,
           color: ReportPdfTheme.muted,
@@ -467,14 +483,24 @@ pw.Widget letterhead(
   String title, {
   List<(String, String)> meta = const [],
   String? subtitle,
-}) =>
-    reportHeader(
-      org: org,
-      title: title,
-      subtitle: subtitle,
-      metaLeft: meta.take(2).toList(),
-      metaRight: meta.skip(2).toList(),
-    );
+}) {
+  final List<(String, String)> left;
+  final List<(String, String)> right;
+  if (meta.length == 2) {
+    left = [meta[0]];
+    right = [meta[1]];
+  } else {
+    left = meta.take(2).toList();
+    right = meta.skip(2).toList();
+  }
+  return reportHeader(
+    org: org,
+    title: title,
+    subtitle: subtitle,
+    metaLeft: left,
+    metaRight: right,
+  );
+}
 
 /// Sign-off per theme:189-228 and reportPrimitives.jsx:46-83:
 /// Technician, [Maintenance Staff], Supervisor side by side (gap 12pt),
@@ -496,53 +522,113 @@ pw.Widget signOff({
         crossAxisAlignment: pw.CrossAxisAlignment.start,
         children: [
           pw.Expanded(
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                cssText('TECHNICIAN', sizePx: 11.5, weight: 600, color: ReportPdfTheme.muted),
-                pw.SizedBox(height: 2),
-                cssText(tech, sizePx: 12.8),
-              ],
+            child: pw.RichText(
+              text: pw.TextSpan(
+                children: [
+                  pw.TextSpan(
+                    text: 'Technician: ',
+                    style: pw.TextStyle(
+                      font: ReportFonts.semibold,
+                      fontSize: ReportPdfTheme.px(12.8),
+                      color: ReportPdfTheme.muted,
+                    ),
+                  ),
+                  pw.TextSpan(
+                    text: pdfSafe(tech),
+                    style: pw.TextStyle(
+                      font: ReportFonts.regular,
+                      fontSize: ReportPdfTheme.px(12.8),
+                      color: ReportPdfTheme.inkPrint,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
           if (maintenanceStaff != null && maintenanceStaff.trim().isNotEmpty) ...[
             pw.SizedBox(width: 12),
             pw.Expanded(
-              child: pw.Column(
-                crossAxisAlignment: pw.CrossAxisAlignment.start,
-                children: [
-                  cssText('MAINTENANCE STAFF', sizePx: 11.5, weight: 600, color: ReportPdfTheme.muted),
-                  pw.SizedBox(height: 2),
-                  cssText(maintenanceStaff.trim(), sizePx: 12.8),
-                ],
+              child: pw.RichText(
+                text: pw.TextSpan(
+                  children: [
+                    pw.TextSpan(
+                      text: 'Maintenance Staff: ',
+                      style: pw.TextStyle(
+                        font: ReportFonts.semibold,
+                        fontSize: ReportPdfTheme.px(12.8),
+                        color: ReportPdfTheme.muted,
+                      ),
+                    ),
+                    pw.TextSpan(
+                      text: pdfSafe(maintenanceStaff.trim()),
+                      style: pw.TextStyle(
+                        font: ReportFonts.regular,
+                        fontSize: ReportPdfTheme.px(12.8),
+                        color: ReportPdfTheme.inkPrint,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ],
           pw.SizedBox(width: 12),
           pw.Expanded(
-            child: pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                cssText('SUPERVISOR', sizePx: 11.5, weight: 600, color: ReportPdfTheme.muted),
-                pw.SizedBox(height: 2),
-                cssText(
-                  verification == null
-                      ? 'Pending verification'
-                      : verification.verifiedAtLabel.isNotEmpty
-                          ? '${verification.verifiedByName} · ${verification.verifiedAtLabel}'
-                          : verification.verifiedByName,
-                  sizePx: 12.8,
-                ),
-              ],
+            child: pw.RichText(
+              text: pw.TextSpan(
+                children: [
+                  pw.TextSpan(
+                    text: 'Supervisor: ',
+                    style: pw.TextStyle(
+                      font: ReportFonts.semibold,
+                      fontSize: ReportPdfTheme.px(12.8),
+                      color: ReportPdfTheme.muted,
+                    ),
+                  ),
+                  pw.TextSpan(
+                    text: pdfSafe(
+                      verification == null
+                          ? 'Pending verification'
+                          : verification.verifiedAtLabel.isNotEmpty
+                              ? '${verification.verifiedByName} · ${verification.verifiedAtLabel}'
+                              : verification.verifiedByName,
+                    ),
+                    style: pw.TextStyle(
+                      font: ReportFonts.regular,
+                      fontSize: ReportPdfTheme.px(12.8),
+                      color: ReportPdfTheme.inkPrint,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ],
       ),
       if (verification != null && verification.remarks.trim().isNotEmpty) ...[
         pw.SizedBox(height: 6),
-        cssText('SUPERVISOR REMARKS', sizePx: 11.5, weight: 600, color: ReportPdfTheme.muted),
-        pw.SizedBox(height: 2),
-        cssText(verification.remarks.trim(), sizePx: 12.8),
+        pw.RichText(
+          text: pw.TextSpan(
+            children: [
+              pw.TextSpan(
+                text: 'Supervisor Remarks: ',
+                style: pw.TextStyle(
+                  font: ReportFonts.semibold,
+                  fontSize: ReportPdfTheme.px(12.8),
+                  color: ReportPdfTheme.muted,
+                ),
+              ),
+              pw.TextSpan(
+                text: pdfSafe(verification.remarks.trim()),
+                style: pw.TextStyle(
+                  font: ReportFonts.regular,
+                  fontSize: ReportPdfTheme.px(12.8),
+                  color: ReportPdfTheme.inkPrint,
+                ),
+              ),
+            ],
+          ),
+        ),
       ],
       pw.SizedBox(height: 8),
       pw.Row(
@@ -629,14 +715,18 @@ pw.Widget textBox(String text, {String empty = 'None recorded'}) {
 }
 
 pw.Widget kvGrid(List<(String, String)> items) {
-  pw.Widget cell((String, String) kv) => pw.Expanded(
+  pw.Widget cell((String, String) kv) {
+    final label = kv.$1.trim();
+    final hasColon = label.endsWith(':');
+    final labelText = hasColon ? label : '$label:';
+    return pw.Expanded(
         child: pw.Padding(
           padding: const pw.EdgeInsets.only(right: 8, bottom: 3),
           child: pw.RichText(
             text: pw.TextSpan(
               children: [
                 pw.TextSpan(
-                  text: '${pdfSafe(kv.$1)}: ',
+                  text: '${pdfSafe(labelText)} ',
                   style: pw.TextStyle(
                     font: ReportFonts.semibold,
                     fontSize: ReportPdfTheme.px(12.0),
@@ -656,6 +746,7 @@ pw.Widget kvGrid(List<(String, String)> items) {
           ),
         ),
       );
+  }
 
   return pw.Column(children: [
     for (var i = 0; i < items.length; i += 2)

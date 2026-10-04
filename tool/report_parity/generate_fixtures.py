@@ -392,11 +392,11 @@ f4 = {
                     {"parameter_name": "Charging Time", "recorded_value": "42", "unit": "sec"}
                 ],
                 "photos": [
-                    {"image": "/parity-images/before_1.jpg", "photo_type": "BEFORE", "caption": "Leaking manifold connector"},
-                    {"image": "/parity-images/portrait_1.jpg", "photo_type": "BEFORE", "caption": "Cracked O-ring"},
-                    {"image": "/parity-images/after_1.jpg", "photo_type": "AFTER", "caption": "New gasket assembly installed"},
-                    {"image": "/parity-images/evidence_1.jpg", "photo_type": "AFTER", "caption": "Pressure gauge at 15 bar"},
-                    {"image": "/parity-images/wide_1.jpg", "photo_type": "AFTER", "caption": "Overall completed cabinet"}
+                    {"image": "/parity-images/before_1.jpg", "kind": "BEFORE", "photo_type": "BEFORE", "caption": "Leaking manifold connector"},
+                    {"image": "/parity-images/portrait_1.jpg", "kind": "BEFORE", "photo_type": "BEFORE", "caption": "Cracked O-ring"},
+                    {"image": "/parity-images/after_1.jpg", "kind": "AFTER", "photo_type": "AFTER", "caption": "New gasket assembly installed"},
+                    {"image": "/parity-images/evidence_1.jpg", "kind": "AFTER", "photo_type": "AFTER", "caption": "Pressure gauge at 15 bar"},
+                    {"image": "/parity-images/wide_1.jpg", "kind": "AFTER", "photo_type": "AFTER", "caption": "Overall completed cabinet"}
                 ]
             }
         ],

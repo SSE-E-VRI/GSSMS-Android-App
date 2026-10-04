@@ -26,8 +26,8 @@ List<pw.Widget> buildInspectionReportPdf(
       textBox(r.inspectionRemarks),
     ],
     if (r.generalEvidencePhotos.isNotEmpty) ...[
-      sectionHeading('General Evidence Photos'),
-      photoRow(r.generalEvidencePhotos, photos, ''),
+      subHeading('General Evidence Photos'),
+      photoRow(r.generalEvidencePhotos, photos, '', captions: true),
     ],
     for (final p in r.points) ..._inspectionPoint(r, p, photos),
     signOff(
@@ -91,15 +91,16 @@ List<pw.Widget> _inspectionPoint(InspectionJobWorkReport r,
     ],
     if (!p.isLegacy) ...[
       subHeading('Before Photos (From Inspection)'),
-      photoRow(p.inspectionEvidencePhotos, photos, 'None'),
+      photoRow(p.inspectionEvidencePhotos, photos, 'None', captions: true),
     ],
     subHeading('Before Photos'),
-    photoRow(p.beforePhotos, photos, 'None uploaded'),
+    photoRow(p.beforePhotos, photos, 'None uploaded', captions: true),
     subHeading('After Photos'),
     if (observationOnly)
-      pdfText('Observation only - no corrective action required',
+      pdfText('Observation only — no corrective action required',
           size: 8.5, color: PdfColors.grey700),
     photoRow(p.afterPhotos, photos,
-        observationOnly ? 'Not applicable' : 'None uploaded'),
+        observationOnly ? 'Not applicable' : 'None uploaded',
+        captions: true),
   ];
 }

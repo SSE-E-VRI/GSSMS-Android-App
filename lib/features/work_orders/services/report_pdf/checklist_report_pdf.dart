@@ -15,12 +15,97 @@ const _checklistWidths = <int, pw.TableColumnWidth>{
 List<pw.Widget> buildChecklistReportPdf(
     ChecklistJobWorkReport r, Map<String, Uint8List?> photos, DateTime at) {
   return [
-    letterhead(r.org, r.title, meta: [
-      ('Location', r.station),
-      ('Schedule', r.schedule),
-      if (r.showJobWork) ('Job Work', r.ticket),
-      ('Date', r.dateLabel),
-    ]),
+    reportHeader(org: r.org, title: r.title),
+    pw.Container(
+      margin: const pw.EdgeInsets.only(top: 4, bottom: 12),
+      child: pw.Row(
+        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+        children: [
+          pw.RichText(
+            text: pw.TextSpan(children: [
+              pw.TextSpan(
+                text: 'Location: ',
+                style: pw.TextStyle(
+                  font: ReportFonts.bold,
+                  fontSize: ReportPdfTheme.px(12.0),
+                  color: ReportPdfTheme.inkPrint,
+                ),
+              ),
+              pw.TextSpan(
+                text: pdfSafe(r.station),
+                style: pw.TextStyle(
+                  font: ReportFonts.regular,
+                  fontSize: ReportPdfTheme.px(12.0),
+                  color: ReportPdfTheme.inkPrint,
+                ),
+              ),
+            ]),
+          ),
+          pw.RichText(
+            textAlign: pw.TextAlign.center,
+            text: pw.TextSpan(children: [
+              pw.TextSpan(
+                text: 'Schedule: ',
+                style: pw.TextStyle(
+                  font: ReportFonts.bold,
+                  fontSize: ReportPdfTheme.px(12.0),
+                  color: ReportPdfTheme.inkPrint,
+                ),
+              ),
+              pw.TextSpan(
+                text: pdfSafe(r.schedule),
+                style: pw.TextStyle(
+                  font: ReportFonts.regular,
+                  fontSize: ReportPdfTheme.px(12.0),
+                  color: ReportPdfTheme.inkPrint,
+                ),
+              ),
+            ]),
+          ),
+          if (r.showJobWork)
+            pw.RichText(
+              text: pw.TextSpan(children: [
+                pw.TextSpan(
+                  text: 'Job Work: ',
+                  style: pw.TextStyle(
+                    font: ReportFonts.bold,
+                    fontSize: ReportPdfTheme.px(12.0),
+                    color: ReportPdfTheme.inkPrint,
+                  ),
+                ),
+                pw.TextSpan(
+                  text: pdfSafe(r.ticket),
+                  style: pw.TextStyle(
+                    font: ReportFonts.regular,
+                    fontSize: ReportPdfTheme.px(12.0),
+                    color: ReportPdfTheme.inkPrint,
+                  ),
+                ),
+              ]),
+            ),
+          pw.RichText(
+            text: pw.TextSpan(children: [
+              pw.TextSpan(
+                text: 'Date: ',
+                style: pw.TextStyle(
+                  font: ReportFonts.bold,
+                  fontSize: ReportPdfTheme.px(12.0),
+                  color: ReportPdfTheme.inkPrint,
+                ),
+              ),
+              pw.TextSpan(
+                text: pdfSafe(r.dateLabel),
+                style: pw.TextStyle(
+                  font: ReportFonts.regular,
+                  fontSize: ReportPdfTheme.px(12.0),
+                  color: ReportPdfTheme.inkPrint,
+                ),
+              ),
+            ]),
+          ),
+        ],
+      ),
+    ),
     if (r.isEmpty)
       pw.Padding(
         padding: const pw.EdgeInsets.symmetric(vertical: 12),
@@ -36,7 +121,14 @@ List<pw.Widget> buildChecklistReportPdf(
       _groupTable(g, photos),
       pw.SizedBox(height: 12),
     ],
-    sectionHeading('Deficiency Summary (${r.deficiencies.length})'),
+    pw.Row(
+      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+      children: [
+        cssText('Deficiency Summary', sizePx: 16.92, weight: 700, color: PdfColor.fromHex('7f1d1d')),
+        statusBadge('warn', '${r.deficiencies.length}'),
+      ],
+    ),
+    pw.SizedBox(height: 4),
     simpleTable(
       const [
         'Asset/Equipment',
@@ -56,7 +148,8 @@ List<pw.Widget> buildChecklistReportPdf(
     ),
     pw.SizedBox(height: 10),
     pw.Column(children: [
-      sectionHeading('Additional Details'),
+      cssText('Additional Details', sizePx: 15.0, weight: 700),
+      pw.SizedBox(height: 4),
       textBox(
         r.remarks.isEmpty ? '' : 'Technician Remarks: ${r.remarks}',
         empty: 'Technician Remarks: No remarks recorded.',

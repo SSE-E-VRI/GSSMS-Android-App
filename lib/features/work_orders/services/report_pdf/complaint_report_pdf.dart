@@ -19,7 +19,7 @@ List<pw.Widget> buildComplaintReportPdf(
           ('Asset / Equipment', d.equipment),
           ('Checkpoint', d.checkpoint),
         ]),
-        subHeading('Finding'),
+        subHeading('Finding:'),
         textBox(d.finding, empty: 'No finding recorded'),
       ];
     case ComplaintSection1Kind.complaint:
@@ -32,7 +32,7 @@ List<pw.Widget> buildComplaintReportPdf(
           ('Complainant', c.complainant),
           ('Reported Asset', c.reportedAsset),
         ]),
-        subHeading('Original Description'),
+        subHeading('Original Description:'),
         textBox(c.description, empty: 'None recorded'),
       ];
     case ComplaintSection1Kind.jobWork:
@@ -42,7 +42,7 @@ List<pw.Widget> buildComplaintReportPdf(
           ('Location', r.station),
           ('Asset / Equipment', r.assetName),
         ]),
-        subHeading('Work to be done'),
+        subHeading('Work to be done:'),
         textBox(r.workToBeDone, empty: 'None recorded'),
       ];
   }
