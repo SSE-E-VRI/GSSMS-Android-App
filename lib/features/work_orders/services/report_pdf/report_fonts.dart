@@ -1,8 +1,10 @@
 import 'package:flutter/services.dart';
+import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
 /// Manages and caches the bundled Microsoft Selawik font family
-/// (metric-compatible with Segoe UI).
+/// (Regular and Bold are advance-compatible with Segoe UI; Semibold is not,
+/// see tool/report_parity/BASELINE.md).
 class ReportFonts {
   ReportFonts._();
 
@@ -27,13 +29,43 @@ class ReportFonts {
     _bold = pw.Font.ttf(boldData);
   }
 
-  /// Weight helper mapping CSS font-weight:
-  /// 400 / 500 -> regular
-  /// 600 -> semibold
+  /// Weight helper mapping CSS font-weight to the bundled faces:
+  /// 400 -> regular
+  /// 500 / 600 -> semibold (Chrome on Windows renders CSS 500 as Segoe UI
+  ///   Semibold, measured in the reference PDFs)
   /// 700+ -> bold
   static pw.Font fontForWeight(int weight) {
     if (weight >= 700) return bold;
-    if (weight >= 600) return semibold;
+    if (weight >= 500) return semibold;
     return regular;
+  }
+
+  static final Map<pw.Font, TtfParser> _parsers = {};
+
+  static TtfParser? _parserFor(pw.Font font) {
+    if (font is! pw.TtfFont) return null;
+    return _parsers.putIfAbsent(font, () => TtfParser(font.data));
+  }
+
+  /// Advance width in pt of [text] (a single line) set in the face for
+  /// [weight] at [sizePt], using the font's real glyph advances (no kerning,
+  /// exactly as the pdf package typesets it).
+  static double advance(
+    String text,
+    double sizePt, {
+    int weight = 400,
+    double letterSpacingPt = 0,
+  }) {
+    if (text.isEmpty) return 0;
+    final parser = _parserFor(fontForWeight(weight));
+    if (parser == null) return text.runes.length * sizePt * 0.55;
+    var em = 0.0;
+    var count = 0;
+    for (final code in text.runes) {
+      final gid = parser.charToGlyphIndexMap[code] ?? 0;
+      em += parser.glyphInfoMap[gid]?.advanceWidth ?? 0;
+      count++;
+    }
+    return em * sizePt + letterSpacingPt * (count - 1);
   }
 }

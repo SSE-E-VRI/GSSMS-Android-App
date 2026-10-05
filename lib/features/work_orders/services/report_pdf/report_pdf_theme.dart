@@ -11,7 +11,7 @@ class ReportPdfTheme {
   // CSS rem to PDF pt (1 rem = 16px = 12pt)
   static double rem(double v) => v * 12.0;
 
-  // Colors from reportTheme.module.css lines 12-35
+  // Colors from reportTheme.module.css (.reportRoot block)
   static const inkPrint = PdfColor.fromInt(0xFF000000);
   static const ink = PdfColor.fromInt(0xFF111827);
   static const muted = PdfColor.fromInt(0xFF4B5563);
@@ -23,24 +23,35 @@ class ReportPdfTheme {
   static const accent = PdfColor.fromInt(0xFF1F4E79);
   static const accentTint = PdfColor.fromInt(0xFFE8EEF5);
 
-  // Status badge colors
-  static const okFg = PdfColor.fromInt(0xFF166534);
+  /// Slate heading ink used by the inspection h2 and rectification item
+  /// titles (#1e293b).
+  static const headingInk = PdfColor.fromInt(0xFF1E293B);
+
+  // Status badge colours: --rpt-{ok,bad,warn,neutral}-{fg,bg,border}
+  static const okFg = PdfColor.fromInt(0xFF14532D);
   static const okBg = PdfColor.fromInt(0xFFDCFCE7);
-  static const okBorder = PdfColor.fromInt(0xFF86EFAC);
+  static const okBorder = PdfColor.fromInt(0xFF15803D);
 
-  static const badFg = PdfColor.fromInt(0xFF991B1B);
+  static const badFg = PdfColor.fromInt(0xFF7F1D1D);
   static const badBg = PdfColor.fromInt(0xFFFEE2E2);
-  static const badBorder = PdfColor.fromInt(0xFFFCA5A5);
+  static const badBorder = PdfColor.fromInt(0xFFB91C1C);
 
-  static const warnFg = PdfColor.fromInt(0xFF854D0E);
-  static const warnBg = PdfColor.fromInt(0xFFFEF9C3);
-  static const warnBorder = PdfColor.fromInt(0xFFFDE047);
+  static const warnFg = PdfColor.fromInt(0xFF78350F);
+  static const warnBg = PdfColor.fromInt(0xFFFEF3C7);
+  static const warnBorder = PdfColor.fromInt(0xFFB45309);
 
   static const neutralFg = PdfColor.fromInt(0xFF374151);
   static const neutralBg = PdfColor.fromInt(0xFFF3F4F6);
-  static const neutralBorder = PdfColor.fromInt(0xFFD1D5DB);
+  static const neutralBorder = PdfColor.fromInt(0xFF6B7280);
 
   // Bootstrap secondary & warning border
   static const textSecondary = PdfColor.fromInt(0xFF6C757D);
   static const borderWarning = PdfColor.fromInt(0xFFFFC107);
+
+  // Badge metrics (.badge): 0.75rem bold, lh 1.3, padding 0.1rem 0.45rem.
+  static const double badgeFontPt = 9.0;
+  static const double badgeLineHeight = 1.3;
+  static const double badgePadV = 1.2;
+  static const double badgePadH = 5.4;
+  static const double badgeRadius = 2.25;
 }

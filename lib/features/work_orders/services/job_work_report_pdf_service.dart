@@ -8,6 +8,7 @@ import 'package:gssms_mobile/features/work_orders/services/report_pdf/checklist_
 import 'package:gssms_mobile/features/work_orders/services/report_pdf/complaint_report_pdf.dart';
 import 'package:gssms_mobile/features/work_orders/services/report_pdf/inspection_report_pdf.dart';
 import 'package:gssms_mobile/features/work_orders/services/report_pdf/rectification_report_pdf.dart';
+import 'package:gssms_mobile/features/work_orders/services/job_work_report_pdf_primitives.dart';
 import 'package:gssms_mobile/features/work_orders/services/report_pdf/report_fonts.dart';
 
 /// Builds the printable Job Work report (technician "Report Preview") for the
@@ -25,6 +26,13 @@ class JobWorkReportPdfService {
   }) async {
     await ReportFonts.load();
     final at = generatedAt ?? DateTime.now();
+    // The web report root's inherited line-height: Bootstrap body 1.5 for the
+    // Checklist and Inspection reports, `.reportContainer` 1.4 for Breakdown
+    // and Rectification.
+    ReportRoot.lineHeight = switch (r) {
+      ChecklistJobWorkReport() || InspectionJobWorkReport() => 1.5,
+      ComplaintJobWorkReport() || RectificationJobWorkReport() => 1.4,
+    };
     final List<pw.Widget> body = switch (r) {
       ChecklistJobWorkReport() => buildChecklistReportPdf(r, photos, at),
       ComplaintJobWorkReport() => buildComplaintReportPdf(r, photos, at),
