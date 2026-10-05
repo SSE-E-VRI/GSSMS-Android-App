@@ -48,10 +48,18 @@ abstract class IWorkOrderRepository {
     String? type,
     String? dateFrom,
     String? dateTo,
+    String? updatedFrom,
+    String? updatedTo,
+    String? completionFrom,
+    String? completionTo,
     int? zoneId,
     int? divisionId,
     int? depotId,
     int? stationId,
+    int? lcGateId,
+    int? serviceBuildingId,
+    int? staffQuarterId,
+    String? infraType,
     bool assignedToMe = false,
   });
 
@@ -138,6 +146,14 @@ abstract class IWorkOrderRepository {
   });
 
   Future<MaintenanceRecord> fetchMaintenanceRecord(int recordId);
+
+  /// Raw record rows for report resolution (`?work_order=` then `?schedule=`
+  /// fallback, mirroring web ReportsView). Returns decoded maps because
+  /// report shaping consumes the raw nested lines/options.
+  Future<List<Map<String, dynamic>>> fetchMaintenanceRecords({
+    int? workOrderId,
+    int? scheduleId,
+  });
   Future<MutationOutcome> submitChecklistLine(
       int recordId, Map<String, dynamic> lineData);
 
@@ -234,10 +250,18 @@ class WorkOrderRepository implements IWorkOrderRepository {
     String? type,
     String? dateFrom,
     String? dateTo,
+    String? updatedFrom,
+    String? updatedTo,
+    String? completionFrom,
+    String? completionTo,
     int? zoneId,
     int? divisionId,
     int? depotId,
     int? stationId,
+    int? lcGateId,
+    int? serviceBuildingId,
+    int? staffQuarterId,
+    String? infraType,
     bool assignedToMe = false,
   }) async {
     // Only the unfiltered list is cached/restored — caching per filter
@@ -250,10 +274,18 @@ class WorkOrderRepository implements IWorkOrderRepository {
         type != null ||
         dateFrom != null ||
         dateTo != null ||
+        updatedFrom != null ||
+        updatedTo != null ||
+        completionFrom != null ||
+        completionTo != null ||
         zoneId != null ||
         divisionId != null ||
         depotId != null ||
         stationId != null ||
+        lcGateId != null ||
+        serviceBuildingId != null ||
+        staffQuarterId != null ||
+        infraType != null ||
         assignedToMe;
     try {
       final orders = await _apiService.getWorkOrders(
@@ -261,10 +293,18 @@ class WorkOrderRepository implements IWorkOrderRepository {
         type: type,
         dateFrom: dateFrom,
         dateTo: dateTo,
+        updatedFrom: updatedFrom,
+        updatedTo: updatedTo,
+        completionFrom: completionFrom,
+        completionTo: completionTo,
         zoneId: zoneId,
         divisionId: divisionId,
         depotId: depotId,
         stationId: stationId,
+        lcGateId: lcGateId,
+        serviceBuildingId: serviceBuildingId,
+        staffQuarterId: staffQuarterId,
+        infraType: infraType,
         assignedToMe: assignedToMe,
       );
       if (!hasFilters) await _cacheService.cacheWorkOrders(orders);
@@ -614,6 +654,19 @@ class WorkOrderRepository implements IWorkOrderRepository {
       }
       rethrow;
     }
+  }
+
+  @override
+  Future<List<Map<String, dynamic>>> fetchMaintenanceRecords({
+    int? workOrderId,
+    int? scheduleId,
+  }) {
+    // Report resolution is online-only (like the Register export itself):
+    // a stale cached record must never render as a signed report.
+    return _apiService.fetchMaintenanceRecords(
+      workOrderId: workOrderId,
+      scheduleId: scheduleId,
+    );
   }
 
   @override

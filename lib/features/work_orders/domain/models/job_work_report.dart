@@ -423,10 +423,14 @@ class ChecklistJobWorkReport extends JobWorkReport {
       );
 
   /// Ports web `viewJobWork` (checklist branch) + `FormPreview` shaping.
+  /// [preferReportCompletedAt] selects the Register date rule
+  /// (`report_completed_at || date_of_maintenance`); the Job Work report
+  /// keeps `date_of_maintenance` first and must not change.
   factory ChecklistJobWorkReport.fromRecordJson(
     Map<dynamic, dynamic> record,
     WorkOrder wo, {
     bool showJobWork = false,
+    bool preferReportCompletedAt = false,
   }) {
     final rec = _map(record) ?? const <String, dynamic>{};
     final lines = _maps(rec['lines']);
@@ -502,15 +506,16 @@ class ChecklistJobWorkReport extends JobWorkReport {
     }
 
     final sched = _map(rec['schedule_details']);
+    final maintenanceDate = asJsonDateTime(rec['date_of_maintenance']);
     return ChecklistJobWorkReport(
       ticket: wo.displayReference,
       org: ReportOrganization.fromJson(_map(sched?['organization']),
           useRegisterTitle: true),
       station: _firstText(
           [sched?['station_name'], wo.stationName, wo.depotName], 'Unknown'),
-      date: asJsonDateTime(rec['date_of_maintenance']) ??
-          wo.reportCompletedAt ??
-          wo.createdAt,
+      date: preferReportCompletedAt
+          ? (wo.reportCompletedAt ?? maintenanceDate ?? wo.createdAt)
+          : (maintenanceDate ?? wo.reportCompletedAt ?? wo.createdAt),
       schedule: sched != null
           ? _firstText([sched['template_name']], 'Scheduled Maintenance')
           : (wo.title ?? ''),

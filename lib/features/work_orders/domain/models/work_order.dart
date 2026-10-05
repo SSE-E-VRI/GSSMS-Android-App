@@ -247,6 +247,27 @@ class WorkOrder extends Equatable {
     return type.displayName;
   }
 
+  /// Report register "Schedule" column, mirroring web's
+  /// `jobWorkScheduleCategory`: PM / Breakdown / Inspection / Deficiency
+  /// Rectification, else the stored type label. Display only — the stored
+  /// [type] is untouched.
+  String get scheduleCategory {
+    if (originalDeficiencyId != null ||
+        executionMode?.toUpperCase() == 'RECTIFICATION') {
+      return 'Deficiency Rectification';
+    }
+    if (originalComplaintId != null) return 'Breakdown';
+    if (originalInspectionId != null ||
+        executionMode?.toUpperCase() == 'INSPECTION') {
+      return 'Inspection';
+    }
+    if (originalScheduleId != null || type == WorkOrderType.preventive) {
+      return 'PM';
+    }
+    if (type == WorkOrderType.breakdown) return 'Breakdown';
+    return type == WorkOrderType.unknown ? '-' : type.displayName;
+  }
+
   /// Ticket number when the server issued one, otherwise the numeric id.
   String get displayReference =>
       (ticketNumber != null && ticketNumber!.trim().isNotEmpty)

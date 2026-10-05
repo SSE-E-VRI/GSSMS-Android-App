@@ -52,15 +52,30 @@ class WorkOrderApiService {
   ///
   /// [assignedToMe] uses the staff-scoped endpoint, which returns only the
   /// technician's own work — the mobile equivalent of the web "My Work Orders".
+  /// [status] accepts a single value or a comma-separated list (backend
+  /// `status__in`). [completionFrom]/[completionTo] filter the
+  /// `report_completed_at` range (web Register query); [updatedFrom]/
+  /// [updatedTo] filter `updated_at`. Infra id params mirror
+  /// `filter_legacy_infrastructure_params` (`station_id`, `lc_gate_id`,
+  /// `service_building_id`, `staff_quarter_id`) plus the `infra_type`
+  /// fallback web sends.
   Future<List<WorkOrder>> getWorkOrders({
     String? status,
     String? type,
     String? dateFrom,
     String? dateTo,
+    String? updatedFrom,
+    String? updatedTo,
+    String? completionFrom,
+    String? completionTo,
     int? zoneId,
     int? divisionId,
     int? depotId,
     int? stationId,
+    int? lcGateId,
+    int? serviceBuildingId,
+    int? staffQuarterId,
+    String? infraType,
     bool assignedToMe = false,
   }) async {
     final queryParams = <String, dynamic>{};
@@ -78,6 +93,18 @@ class WorkOrderApiService {
       if (dateFrom != null && dateFrom.isNotEmpty) queryParams['date_from'] = dateFrom;
       if (dateTo != null && dateTo.isNotEmpty) queryParams['date_to'] = dateTo;
     }
+    if (updatedFrom != null && updatedFrom.isNotEmpty) {
+      queryParams['updated_from'] = updatedFrom;
+    }
+    if (updatedTo != null && updatedTo.isNotEmpty) {
+      queryParams['updated_to'] = updatedTo;
+    }
+    if (completionFrom != null && completionFrom.isNotEmpty) {
+      queryParams['completion_from'] = completionFrom;
+    }
+    if (completionTo != null && completionTo.isNotEmpty) {
+      queryParams['completion_to'] = completionTo;
+    }
     // depot_id/division_id/zone_id are mutually exclusive server-side (most
     // specific wins — WorkOrderViewSet.get_queryset), so sending all three
     // that are set is harmless; the server picks the narrowest.
@@ -85,6 +112,16 @@ class WorkOrderApiService {
     if (divisionId != null) queryParams['division_id'] = divisionId;
     if (depotId != null) queryParams['depot_id'] = depotId;
     if (stationId != null) queryParams['station_id'] = stationId;
+    if (lcGateId != null) queryParams['lc_gate_id'] = lcGateId;
+    if (serviceBuildingId != null) {
+      queryParams['service_building_id'] = serviceBuildingId;
+    }
+    if (staffQuarterId != null) {
+      queryParams['staff_quarter_id'] = staffQuarterId;
+    }
+    if (infraType != null && infraType.isNotEmpty) {
+      queryParams['infra_type'] = infraType;
+    }
 
     // Walk `next` links like the other CMMS lists so a paginated register is
     // not silently truncated to page 1. Single-shot envelopes still work:
@@ -356,6 +393,29 @@ class WorkOrderApiService {
       );
     }
     return MaintenanceRecord.fromJson(data);
+  }
+
+  /// Raw maintenance-record rows for report resolution — `GET
+  /// /api/v1/maintenance/records/` with `?work_order=<id>` and/or
+  /// `?schedule=<id>` (same filters web's ReportsView uses to resolve a Job
+  /// Work's record, including the verification context on work_order
+  /// queries). Returns decoded maps (not [MaintenanceRecord]) because
+  /// report shaping consumes the raw nested lines/options.
+  Future<List<Map<String, dynamic>>> fetchMaintenanceRecords({
+    int? workOrderId,
+    int? scheduleId,
+  }) async {
+    final query = <String, dynamic>{};
+    if (workOrderId != null) query['work_order'] = workOrderId;
+    if (scheduleId != null) query['schedule'] = scheduleId;
+    final response = await _dio.get(
+      '$_records/',
+      queryParameters: query.isEmpty ? null : query,
+    );
+    return _asList(response.data)
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
   }
 
   Future<void> submitLine(int recordId, Map<String, dynamic> lineData, {String? idempotencyKey}) async {
