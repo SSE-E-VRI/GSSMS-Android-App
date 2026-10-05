@@ -1,69 +1,80 @@
 import 'dart:typed_data';
 
-import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:gssms_mobile/features/work_orders/domain/models/job_work_report.dart';
 import 'package:gssms_mobile/features/work_orders/services/job_work_report_pdf_primitives.dart';
 
+/// `.reportContainer` line-height of RectificationReportPreview.
+const double _root = 1.4;
+
+/// `.contentBody` / `.reasonBody` / `.outcomeBody` line-height.
+const double _bodyLh = 1.35;
+
+/// Builds the printable Deficiency Rectification report
+/// (RectificationReportPreview.jsx + .module.css, print rules applied).
 List<pw.Widget> buildRectificationReportPdf(
     RectificationJobWorkReport r, Map<String, Uint8List?> photos, DateTime at) {
+  final hasRemarks = r.finalRemarks.trim().isNotEmpty;
   return [
-    letterhead(r.org, r.title, meta: [
-      ('Location', r.station),
-      ('Date', r.dateLabel),
-    ], subtitle: 'Job Work ${r.ticket}'),
-    pw.Container(
-      width: double.infinity,
-      margin: const pw.EdgeInsets.only(bottom: 12.0),
-      alignment: pw.Alignment.center,
-      child: cssText(
-        r.summaryLine,
-        sizePx: 13.2,
-        color: ReportPdfTheme.muted,
-        align: pw.TextAlign.center,
+    letterhead(
+      r.org,
+      r.title,
+      meta: [
+        ('Location', r.station),
+        ('Date', r.dateLabel),
+      ],
+      subtitle: 'Job Work ${r.ticket}',
+      lineHeight: _root,
+    ),
+    // .reportSummaryBar: 0.825rem muted, centred, margin-bottom 1rem.
+    pw.Padding(
+      padding: const pw.EdgeInsets.only(bottom: 12.0),
+      child: pw.SizedBox(
+        width: double.infinity,
+        child: cssText(
+          r.summaryLine,
+          sizePt: 9.9,
+          color: ReportPdfTheme.muted,
+          lineHeight: _root,
+          align: pw.TextAlign.center,
+        ),
       ),
     ),
     for (var i = 0; i < r.items.length; i++)
       _buildItemCard(r.items[i], i, photos),
     keepTogether([
+      // .outcomeSection: margin-top 0.5rem collapses with the last item
+      // card's 0.85rem margin-bottom, so only the bottom margin is laid out.
       reportCard(
         [
-          pw.Container(
-            width: double.infinity,
+          // .outcomeHeader
+          CssBox(
             padding: const pw.EdgeInsets.only(bottom: 4.2),
             margin: const pw.EdgeInsets.only(bottom: 4.8),
-            decoration: const pw.BoxDecoration(
-              border: pw.Border(
-                bottom:
-                    pw.BorderSide(color: ReportPdfTheme.accentTint, width: 0.75),
-              ),
-            ),
+            bottom: const CssSide(0.75, ReportPdfTheme.accentTint),
             child: cssText(
               'Final Outcome',
-              sizePx: 13.6,
+              sizePt: 10.2,
               weight: 700,
               upper: true,
               color: ReportPdfTheme.accent,
+              lineHeight: _root,
             ),
           ),
-          cssText(
-            r.finalRemarks.trim().isNotEmpty
-                ? r.finalRemarks
-                : 'No final remarks recorded',
-            sizePx: 13.6,
-            italic: r.finalRemarks.trim().isEmpty,
-            color: r.finalRemarks.trim().isNotEmpty
-                ? ReportPdfTheme.inkPrint
-                : ReportPdfTheme.faint,
-          ),
+          // .outcomeBody
+          _body(hasRemarks ? r.finalRemarks : 'No final remarks recorded',
+              has: hasRemarks, padH: 0),
         ],
         margin: const pw.EdgeInsets.only(bottom: 6.0),
       ),
+      // signoffCard margin-top 9 collapses with the outcome card's 6.
       signOff(
         technician: r.technician,
         maintenanceStaff: r.otherStaff,
         verification: r.verification,
         generatedAt: at,
+        lineHeight: _root,
+        collapseWith: 6.0,
       ),
     ]),
   ];
@@ -82,127 +93,53 @@ pw.Widget _buildItemCard(
 
   return reportCard(
     [
-      // Item Header
-      pw.Container(
+      // .itemHeader: flex, space-between, centred; rule 0.75 #4b5563 (print),
+      // padding-bottom 0.4rem, margin-bottom 0.5rem. h5 keeps Bootstrap's 1.2.
+      CssBox(
         padding: const pw.EdgeInsets.only(bottom: 4.8),
         margin: const pw.EdgeInsets.only(bottom: 6.0),
-        decoration: const pw.BoxDecoration(
-          border: pw.Border(
-            bottom: pw.BorderSide(color: ReportPdfTheme.border, width: 0.75),
-          ),
-        ),
+        bottom: const CssSide(0.75, ReportPdfTheme.borderPrint),
         child: pw.Row(
-          mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: pw.CrossAxisAlignment.center,
           children: [
             pw.Expanded(
-              child: cssText('Item ${index + 1}: ${item.asset}',
-                  sizePx: 15.2, weight: 700),
+              child: cssText(
+                'Item ${index + 1}: ${item.asset}',
+                sizePt: 11.4,
+                weight: 700,
+                color: ReportPdfTheme.headingInk,
+                lineHeight: 1.2,
+              ),
             ),
-            pw.SizedBox(width: 6),
             statusBadge(tone, label),
           ],
         ),
       ),
 
-      // Metadata Bar
-      pw.Container(
-        padding: const pw.EdgeInsets.symmetric(vertical: 4.8, horizontal: 7.2),
+      // .itemMetaGrid: 3 auto-fit columns, gap 0.35rem 0.75rem.
+      CssBox.bordered(
         margin: const pw.EdgeInsets.only(bottom: 6.0),
-        decoration: pw.BoxDecoration(
-          color: ReportPdfTheme.surface,
-          border: pw.Border.all(color: ReportPdfTheme.border, width: 0.75),
-          borderRadius: const pw.BorderRadius.all(pw.Radius.circular(2.25)),
-        ),
+        padding: const pw.EdgeInsets.symmetric(vertical: 4.8, horizontal: 7.2),
+        side: const CssSide(0.75, ReportPdfTheme.borderPrint),
+        radius: 2.25,
+        background: ReportPdfTheme.surface,
         child: pw.Row(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
-            pw.Expanded(
-              child: pw.RichText(
-                text: pw.TextSpan(
-                  children: [
-                    pw.TextSpan(
-                      text: 'Source: ',
-                      style: pw.TextStyle(
-                        font: ReportFonts.semibold,
-                        fontSize: ReportPdfTheme.px(12.8),
-                        color: ReportPdfTheme.muted,
-                      ),
-                    ),
-                    pw.TextSpan(
-                      text: pdfSafe(item.sourceLabel),
-                      style: pw.TextStyle(
-                        font: ReportFonts.regular,
-                        fontSize: ReportPdfTheme.px(12.8),
-                        color: ReportPdfTheme.inkPrint,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            pw.Expanded(child: _meta('Source:', item.sourceLabel)),
+            pw.SizedBox(width: 9.0),
+            pw.Expanded(child: _meta('Checkpoint:', item.checkpoint)),
             pw.SizedBox(width: 9.0),
             pw.Expanded(
-              child: pw.RichText(
-                text: pw.TextSpan(
-                  children: [
-                    pw.TextSpan(
-                      text: 'Checkpoint: ',
-                      style: pw.TextStyle(
-                        font: ReportFonts.semibold,
-                        fontSize: ReportPdfTheme.px(12.8),
-                        color: ReportPdfTheme.muted,
-                      ),
-                    ),
-                    pw.TextSpan(
-                      text: pdfSafe(
-                          item.checkpoint.isEmpty ? 'N/A' : item.checkpoint),
-                      style: pw.TextStyle(
-                        font: ReportFonts.regular,
-                        fontSize: ReportPdfTheme.px(12.8),
-                        color: ReportPdfTheme.inkPrint,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            pw.SizedBox(width: 9.0),
-            pw.Expanded(
-              child: pw.RichText(
-                text: pw.TextSpan(
-                  children: [
-                    pw.TextSpan(
-                      text: 'Severity: ',
-                      style: pw.TextStyle(
-                        font: ReportFonts.semibold,
-                        fontSize: ReportPdfTheme.px(12.8),
-                        color: ReportPdfTheme.muted,
-                      ),
-                    ),
-                    pw.TextSpan(
-                      text: pdfSafe(item.severity.isEmpty ? 'N/A' : item.severity),
-                      style: pw.TextStyle(
-                        font: ReportFonts.regular,
-                        fontSize: ReportPdfTheme.px(12.8),
-                        color: ReportPdfTheme.inkPrint,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+                child: _meta('Severity:',
+                    item.severity.isEmpty ? 'N/A' : item.severity)),
           ],
         ),
       ),
 
-      // Finding
       _contentBlock('Finding', item.finding, empty: 'No finding recorded'),
-
-      // Action Taken
       _contentBlock('Action Taken', item.actionTaken,
           empty: 'No action recorded'),
-
-      // Reason it could not be rectified
       if (item.outcome == RectificationOutcome.notRectified)
         _contentBlock(
           'Reason it could not be rectified',
@@ -211,29 +148,56 @@ pw.Widget _buildItemCard(
           isReason: true,
         ),
 
-      // Evidence Grid
-      pw.Container(
-        margin: const pw.EdgeInsets.only(top: 4.8),
+      // .evidenceGrid: margin-top 0.4rem collapses with the preceding
+      // contentBlock's 0.5rem margin-bottom (no extra gap).
+      CssBox.bordered(
         padding: const pw.EdgeInsets.symmetric(vertical: 6.0, horizontal: 9.0),
-        decoration: pw.BoxDecoration(
-          color: ReportPdfTheme.surface,
-          border: pw.Border.all(color: ReportPdfTheme.border, width: 0.75),
-          borderRadius: const pw.BorderRadius.all(pw.Radius.circular(3.0)),
-        ),
+        side: const CssSide(0.75, ReportPdfTheme.borderPrint),
+        radius: 3.0,
+        background: ReportPdfTheme.surface,
         child: pw.Row(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
-            _evidenceCol('Before Evidence', item.beforePhotos, photos,
-                'No before photo'),
+            pw.Expanded(
+                child: _evidenceCol('Before Evidence', item.beforePhotos,
+                    photos, 'No before photo')),
             pw.SizedBox(width: 9.0),
-            _evidenceCol(
-                'After Evidence', item.afterPhotos, photos, 'No after photo'),
+            pw.Expanded(
+                child: _evidenceCol('After Evidence', item.afterPhotos, photos,
+                    'No after photo')),
           ],
         ),
       ),
     ],
     margin: const pw.EdgeInsets.only(bottom: 10.2),
   );
+}
+
+/// `.metaLabel` (semibold muted, margin-right 0.25rem) + `.metaVal` (weight
+/// 500, which Chrome/Windows renders as Segoe UI Semibold).
+pw.Widget _meta(String label, String value) => cssRich(
+      [
+        CssSpan(label,
+            weight: 600, color: ReportPdfTheme.muted, trailingGapPt: 1.25),
+        CssSpan(value, weight: 600),
+      ],
+      sizePt: 9.6,
+      lineHeight: _root,
+    );
+
+/// Body text: 0.85rem, line-height 1.35, pre-wrap. Empty states are
+/// `text-muted fst-italic`.
+pw.Widget _body(String text, {required bool has, double padH = 1.2}) {
+  final t = cssText(
+    text,
+    sizePt: 10.2,
+    italic: !has,
+    color: has ? ReportPdfTheme.inkPrint : ReportPdfTheme.muted,
+    lineHeight: _bodyLh,
+  );
+  return padH == 0
+      ? t
+      : pw.Padding(padding: pw.EdgeInsets.symmetric(horizontal: padH), child: t);
 }
 
 pw.Widget _contentBlock(
@@ -246,56 +210,48 @@ pw.Widget _contentBlock(
   return pw.Padding(
     padding: const pw.EdgeInsets.only(bottom: 6.0),
     child: pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
       mainAxisSize: pw.MainAxisSize.min,
       children: [
-        pw.Container(
-          width: double.infinity,
+        // .contentLabel: dashed 0.75 #d1d5db rule, padding-bottom 0.15rem,
+        // margin-bottom 0.25rem.
+        CssBox(
           padding: const pw.EdgeInsets.only(bottom: 1.8),
           margin: const pw.EdgeInsets.only(bottom: 3.0),
-          decoration: const pw.BoxDecoration(
-            border: pw.Border(
-              bottom: pw.BorderSide(color: ReportPdfTheme.border, width: 0.75),
-            ),
-          ),
+          bottom: const CssSide(0.75, ReportPdfTheme.border, dashed: true),
           child: cssText(
             label,
-            sizePx: 12.4,
+            sizePt: 9.3,
             weight: 700,
             upper: true,
             letterSpacingEm: 0.03,
             color: ReportPdfTheme.muted,
+            lineHeight: _root,
           ),
         ),
         if (isReason)
-          pw.Container(
-            width: double.infinity,
+          // .reasonBody: left border only (the pink fill is not printed).
+          CssBox(
+            left: const CssSide(2.25, ReportPdfTheme.badBorder),
             padding:
                 const pw.EdgeInsets.symmetric(vertical: 3.0, horizontal: 6.0),
-            decoration: const pw.BoxDecoration(
-              color: ReportPdfTheme.badBg,
-              border: pw.Border(
-                left: pw.BorderSide(color: ReportPdfTheme.badBorder, width: 3.0),
-              ),
-            ),
             child: cssText(
               has ? value : empty,
-              sizePx: 13.6,
+              sizePt: 10.2,
               italic: !has,
-              color: has ? ReportPdfTheme.badFg : ReportPdfTheme.faint,
+              color: has ? ReportPdfTheme.badFg : ReportPdfTheme.muted,
+              lineHeight: _bodyLh,
             ),
           )
         else
-          cssText(
-            has ? value : empty,
-            sizePx: 13.6,
-            italic: !has,
-            color: has ? ReportPdfTheme.inkPrint : ReportPdfTheme.faint,
-          ),
+          _body(has ? value : empty, has: has),
       ],
     ),
   );
 }
+
+/// Column width inside the evidence grid: (517.5 - 2 * 0.75 - 2 * 9 - 9) / 2.
+const double _evidenceColW = 244.5;
 
 pw.Widget _evidenceCol(
   String heading,
@@ -303,36 +259,39 @@ pw.Widget _evidenceCol(
   Map<String, Uint8List?> photos,
   String emptyLabel,
 ) {
-  return pw.Expanded(
-    child: pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      mainAxisSize: pw.MainAxisSize.min,
-      children: [
-        cssText(
+  return pw.Column(
+    crossAxisAlignment: pw.CrossAxisAlignment.start,
+    mainAxisSize: pw.MainAxisSize.min,
+    children: [
+      // .evidenceHeading: 0.75rem bold uppercase, letter-spacing 0.04em,
+      // margin-bottom 0.35rem.
+      pw.Padding(
+        padding: const pw.EdgeInsets.only(bottom: 4.2),
+        child: cssText(
           heading,
-          sizePx: 12.0,
+          sizePt: 9.0,
           weight: 700,
           upper: true,
           letterSpacingEm: 0.04,
           color: ReportPdfTheme.muted,
+          lineHeight: _root,
         ),
-        pw.SizedBox(height: 4.2),
-        if (list.isEmpty)
-          cssText(
-            emptyLabel,
-            sizePx: 12.4,
-            italic: true,
-            color: ReportPdfTheme.faint,
-          )
-        else
-          pw.Wrap(
-            spacing: 6.0,
-            runSpacing: 6.0,
-            children: [
-              for (final p in list) thumb(photos[p.key]),
-            ],
-          ),
-      ],
-    ),
+      ),
+      if (list.isEmpty)
+        // .emptyPhotoText: 0.775rem italic, line-height 1.8.
+        cssText(
+          emptyLabel,
+          sizePt: 9.3,
+          italic: true,
+          color: ReportPdfTheme.faint,
+          lineHeight: 1.8,
+        )
+      else
+        ...photoGridLines(
+          [for (final p in list) PhotoTile(photos[p.key])],
+          _evidenceColW,
+          lineHeight: _root,
+        ),
+    ],
   );
 }
