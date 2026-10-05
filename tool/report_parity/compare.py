@@ -32,7 +32,7 @@ from PIL import Image, ImageChops, ImageFilter
 
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 WEB_PDF_DIR = os.path.join(ROOT_DIR, 'build', 'report_parity', 'web')
-ANDROID_PDF_DIR = os.path.join(ROOT_DIR, 'build', 'report_parity', 'android')
+ANDROID_PDF_DIR = os.environ.get('REPORT_PARITY_ANDROID_DIR') or os.path.join(ROOT_DIR, 'build', 'report_parity', 'android')
 OUT_DIR = os.environ.get('REPORT_PARITY_OUTDIR') or os.path.join(ROOT_DIR, 'build', 'report_parity')
 THRESHOLDS_FILE = os.path.join(os.path.dirname(__file__), 'thresholds.json')
 GOLDEN_DIR = os.path.join(os.path.dirname(__file__), 'golden', 'android')
