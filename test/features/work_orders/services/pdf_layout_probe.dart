@@ -264,7 +264,7 @@ Map<String, dynamic> probePdfLayout(Uint8List bytes) {
     }
   }
 
-  int _cmapForRes(String res) {
+  int cmapForRes(String res) {
     final obj = resFonts[res] ?? -1;
     for (final e in cmapOwner.entries) {
       if (e.value == obj) return e.key;
@@ -273,7 +273,7 @@ Map<String, dynamic> probePdfLayout(Uint8List bytes) {
   }
 
   String decodeForRes(String res, String hex) {
-    final cmapObj = _cmapForRes(res);
+    final cmapObj = cmapForRes(res);
     final cmap = cmaps[cmapObj];
     final clean = hex.replaceAll(RegExp(r'\s'), '');
     if (cmap == null || cmap.isEmpty || clean.isEmpty) return '?$clean?';
