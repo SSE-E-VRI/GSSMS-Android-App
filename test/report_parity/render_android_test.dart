@@ -19,6 +19,7 @@ const _fixtureIds = [
   'checklist_pm_stress',
   'breakdown_long',
   'rectification_long',
+  'register_checklist',
 ];
 
 void main() {

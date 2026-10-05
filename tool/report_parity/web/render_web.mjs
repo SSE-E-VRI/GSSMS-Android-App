@@ -32,6 +32,7 @@ const FIXTURE_IDS = [
   'checklist_pm_stress',
   'breakdown_long',
   'rectification_long',
+  'register_checklist',
 ];
 
 async function main() {

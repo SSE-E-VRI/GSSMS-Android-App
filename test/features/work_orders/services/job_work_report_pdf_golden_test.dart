@@ -22,6 +22,7 @@ const _fixtureIds = [
   'checklist_pm_stress',
   'breakdown_long',
   'rectification_long',
+  'register_checklist',
 ];
 
 const _expectedPageCounts = {
@@ -38,6 +39,7 @@ const _expectedPageCounts = {
   'checklist_pm_stress': 2,
   'breakdown_long': 2,
   'rectification_long': 3,
+  'register_checklist': 2,
 };
 
 /// Geometry tolerance (pt) for word/rect/line positions against the

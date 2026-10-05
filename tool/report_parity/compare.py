@@ -51,6 +51,7 @@ ALL_FIXTURES = [
     ('checklist_pm_stress', 'Checklist'),
     ('breakdown_long', 'Breakdown'),
     ('rectification_long', 'Rectification'),
+    ('register_checklist', 'Checklist'),
 ]
 
 DPI = 150

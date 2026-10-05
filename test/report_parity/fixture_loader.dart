@@ -45,6 +45,15 @@ class FixtureLoader {
     switch (kind) {
       case 'checklist':
         report = ChecklistJobWorkReport.fromRecordJson(payloadJson, wo);
+      case 'register':
+        // Maintenance Register export: same shaping with the Register
+        // presentation rules (Job Work meta row, completion date first).
+        report = ChecklistJobWorkReport.fromRecordJson(
+          payloadJson,
+          wo,
+          showJobWork: true,
+          preferReportCompletedAt: true,
+        );
       case 'complaint':
         report = ComplaintJobWorkReport.fromJson(
           payloadJson,

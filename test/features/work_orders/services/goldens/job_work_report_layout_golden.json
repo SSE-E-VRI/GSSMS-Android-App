@@ -176,5 +176,19 @@
       }
     ],
     "objectCount": 23
+  },
+  "register_checklist": {
+    "pageCount": 2,
+    "pageSizes": [
+      {
+        "width": 595.92,
+        "height": 842.88
+      },
+      {
+        "width": 595.92,
+        "height": 842.88
+      }
+    ],
+    "objectCount": 21
   }
 }

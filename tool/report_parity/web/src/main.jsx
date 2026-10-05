@@ -20,6 +20,7 @@ import {
   shapeInspectionData,
   shapeRectificationData,
 } from './shape';
+import { formatDate } from '../../../../GSSMS/frontend/src/utils/date';
 
 const fixtures = import.meta.glob('../../fixtures/*.json', { eager: true });
 
@@ -73,13 +74,23 @@ function App() {
 
   let reportElement = null;
 
-  if (kind === 'checklist') {
+  if (kind === 'checklist' || kind === 'register') {
     const { groups, deficiencies, metadata } = shapeChecklistData(payload, workOrder);
+    // Register export (ReportsView.jsx:454-467): the Job Work number is
+    // shown and the completion date wins over date_of_maintenance.
+    const registerMeta =
+      kind === 'register'
+        ? {
+            ...metadata,
+            date: formatDate(workOrder.report_completed_at || payload.date_of_maintenance),
+            jobWorkNumber: workOrder.ticket_number,
+          }
+        : {};
     reportElement = (
       <FormPreview
         data={groups}
         stationName={metadata.stationName}
-        date={metadata.date}
+        date={registerMeta.date || metadata.date}
         schedule={metadata.schedule}
         organization={metadata.organization}
         technician={metadata.technician}
@@ -87,6 +98,7 @@ function App() {
         remarks={metadata.remarks}
         otherStaff={metadata.otherStaff}
         deficiencies={deficiencies}
+        jobWorkNumber={registerMeta.jobWorkNumber}
       />
     );
   } else if (kind === 'complaint') {

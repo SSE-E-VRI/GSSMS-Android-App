@@ -100,9 +100,11 @@ All floors are well inside the blurred (1.5 / 2.0) and raw (6 / 7) thresholds.
 | `checklist_pm_stress` | 2/2 | YES | 100.0 | 0.98/1.40 | 98.0/96.4 | 100 | 0.67/3.11 | PASS |
 | `breakdown_long` | 2/2 | YES | 100.0 | 0.60/1.47 | 98.4/96.7 | 100 | 0.14/1.58 | PASS |
 | `rectification_long` | 3/3 | YES | 100.0 | 0.75/2.46 | 95.5/91.7 | 100 | 0.19/1.99 | **FAIL: precision 91.7 < 95.0** |
+| `register_checklist` | 2/2 | YES | 100.0 | 1.00/4.66 | 98.4/96.4 | 100 | 0.85/4.33 | PASS (Register export via `showJobWork` + completion-date rule) |
 
 ## Per-fixture residuals (why the numbers stop here)
 
+- **Register export (`register_checklist`, new).** Passes Checklist thresholds on every axis. The max word delta (4.66pt on the trailing `(V)` of the RYB value `B: 221, R: 219, Y: 218 (V)`, threshold max 5.0) is accumulated Selawik-Semibold digit-advance error along a digit-heavy 600-weight run (`'1'` is ~40% wider than Segoe's; central `-0.010em` tracking cannot fix per-glyph excess). Same accepted D1 family as the rectification maxima; recorded as open, not tuned.
 - **Words.** Every remaining ledger step is a ±0.75pt alternation (Chrome whole-px row/box-edge snapping, e.g. `rectification_long` BEFORE/FINDING/ACTION rows) — no first step above 0.5pt is actionable layout drift. Maxima (2.28–2.47 on rectification fixtures) sit on Semibold runs and kerned uppercase headings: accepted D1 residuals (no derived font).
 - **Style 100%, image 100%, pages equal, words identical** on all 13 fixtures.
 - **Vector.** 12/13 fixtures pass recall and precision. The single failure is `rectification_long` precision 91.7 (recall 95.5 passes). Per-colour analysis: losing colours are badge fills (`#fee2e2` pink 83%, `#dcfce7` green 92%), metaGrid fill (`#f9fafb` 91%) and neutral borders (`#6b7280` 80%), concentrated on pages with item badges. Measured cause: Chrome lays out some badge boxes ~0.7pt (1px) shorter than the CSS box model predicts (a "Pending" badge path of 14.26pt vs our 15.0pt with identical text metrics, baselines and tops — verified with an isolated Chrome probe: badge heights alternate 19/20px by position, i.e. Chrome pixel-snapping of box edges). Our boxes match the CSS values; chasing sub-pixel box heights the CSS does not determine would be tuning to noise. Recorded as **open**: Chrome pixel-snapping residual, geometry agrees within ~0.75pt.
