@@ -173,12 +173,12 @@ pw.Widget _buildItemCard(
   );
 }
 
-/// `.metaLabel` (semibold muted, margin-right 0.25rem) + `.metaVal` (weight
+/// `.metaLabel` (semibold muted, margin-right 0.25rem = 3pt) + `.metaVal` (weight
 /// 500, which Chrome/Windows renders as Segoe UI Semibold).
 pw.Widget _meta(String label, String value) => cssRich(
       [
         CssSpan(label,
-            weight: 600, color: ReportPdfTheme.muted, trailingGapPt: 1.25),
+            weight: 600, color: ReportPdfTheme.muted, trailingGapPt: 3.0),
         CssSpan(value, weight: 600),
       ],
       sizePt: 9.6,

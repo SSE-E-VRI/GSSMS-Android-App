@@ -1,7 +1,6 @@
 import 'dart:typed_data';
 
 import 'package:meta/meta.dart';
-import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:gssms_mobile/features/work_orders/domain/models/job_work_report.dart';
 import 'package:gssms_mobile/features/work_orders/services/report_pdf/checklist_report_pdf.dart';
@@ -42,8 +41,7 @@ class JobWorkReportPdfService {
     final doc = pw.Document(compress: compress);
     doc.addPage(
       pw.MultiPage(
-        pageFormat: PdfPageFormat.a4,
-        margin: const pw.EdgeInsets.all(27.75),
+        pageFormat: reportPageFormat,
         theme: pw.ThemeData.withFont(
           base: ReportFonts.regular,
           bold: ReportFonts.bold,

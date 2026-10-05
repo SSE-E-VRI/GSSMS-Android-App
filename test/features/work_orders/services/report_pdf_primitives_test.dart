@@ -91,15 +91,22 @@ void main() {
 
   setUpAll(() async => ReportFonts.load());
 
+  // Chrome paints text baselines on whole px: the first baseline is snapped,
+  // the following lines keep the exact pitch.
+  double snapPx(double v) => (v / 0.75).roundToDouble() * 0.75;
   double expected(double top, double lh, double s, int k) =>
-      top + (lh / 2 + 0.41405) * s + k * lh * s;
+      snapPx(top + cssBaselinePt(lh, s)) + k * lh * s;
 
-  test('cssBaselineEm matches the Segoe line box', () {
-    expect(cssBaselineEm(1.5), closeTo(1.16405, 1e-9));
-    expect(cssBaselineEm(1.2), closeTo(1.01405, 1e-9));
+  test('cssBaselinePt reproduces the Chrome integer-px line box', () {
+    // Measured in the web reference PDFs (baseline offset from the line top).
+    expect(cssBaselinePt(1.5, 12.0), closeTo(13.5, 1e-9)); // 16px / 24px: 1 + 17 px
+    expect(cssBaselinePt(1.2, 15.0), closeTo(15.0, 1e-9)); // h2 20px / 24px: -2 + 22 px
+    expect(cssBaselinePt(1.4, 10.2), closeTo(0.75 * 15, 1e-9)); // 13.6px: 0 + 15 px
+    expect(cssBaselinePt(1.2, 10.5), closeTo(9.75, 1e-9)); // 14px / 16.8px: -2 + 15 px
+    expect(cssBaselinePt(1.2, 12.0), closeTo(12.0, 1e-9)); // 16px / 19.2px: -1 + 17 px
   });
 
-  test('single line baseline = top + (L/2 + 0.41405) * s', () async {
+  test('single line baseline = top + Chrome baseline offset', () async {
     for (final (lh, s) in [(1.5, 10.2), (1.4, 12.0), (1.35, 10.2), (1.3, 9.0)]) {
       final w = await _render(
           pw.SizedBox(width: 300, child: cssText('Hello', sizePt: s, lineHeight: lh)));
@@ -211,8 +218,112 @@ void main() {
 
   test('statusBadge is padded 1.2 + 0.75 border above a 1.3 line box', () async {
     final w = await _render(statusBadge('ok', 'OK'));
-    // baseline = border + padding + (1.3 / 2 + 0.41405) * 9
-    expect(w.first.y, closeTo(0.75 + 1.2 + (0.65 + 0.41405) * 9, 0.05));
+    // baseline = border + padding + Chrome baseline offset of a 1.3 line
+    expect(w.first.y, closeTo(snapPx(0.75 + 1.2 + cssBaselinePt(1.3, 9)), 0.05));
     expect(w.first.size, 9.0);
+  });
+
+  group('cssRich spacing is exact', () {
+    // The pdf package starts one text object (Td) per word, so the distance
+    // between the first and the last word origin is the advance of
+    // everything in between.
+    Future<List<_Word>> run(List<CssSpan> spans, {double size = 10}) =>
+        _render(pw.SizedBox(
+            width: 400,
+            child: cssRich(spans, sizePt: size, lineHeight: 1.4, weight: 700)));
+
+    test('trailingGapPt moves the next run by exactly the gap', () async {
+      const label = 'Label';
+      final base = await run([const CssSpan(label), const CssSpan('Value')]);
+      final natural = base.last.x - base.first.x;
+      expect(natural,
+          closeTo(ReportFonts.advance(label, 10, weight: 700), 0.01));
+      for (final gap in [3.0, 1.8, 0.5, -1.5, -0.7]) {
+        final w = await run([
+          CssSpan(label, trailingGapPt: gap),
+          const CssSpan('Value'),
+        ]);
+        expect(w.last.x - w.first.x, closeTo(natural + gap, 0.01),
+            reason: 'gap $gap (the old code applied it twice)');
+      }
+    });
+
+    test('per-span letterSpacingEm is CSS letter-spacing on every glyph',
+        () async {
+      for (final text in ['AB', 'RAILWAY', 'AB CD', 'AB CD EF GH']) {
+        const ls = 0.05;
+        final w = await run([
+          CssSpan(text, letterSpacingEm: ls),
+          const CssSpan('Z'),
+        ]);
+        final lsPt = ls * 10;
+        // Chrome: advance of every glyph (spaces included) + ls after each.
+        final chrome = ReportFonts.advance(text, 10,
+                weight: 700, letterSpacingPt: lsPt) +
+            lsPt;
+        expect(w.last.x - w.first.x, closeTo(chrome, 0.02), reason: text);
+      }
+    });
+
+    test('word starts inside a letter-spaced run match CSS', () async {
+      const ls = 0.066 * 10;
+      final w = await _render(pw.SizedBox(
+          width: 400,
+          child: cssText('AB CD EF GH',
+              sizePt: 10, weight: 700, letterSpacingEm: 0.066, lineHeight: 1.2)));
+      final starts = [w[0].x, w[1].x, w[2].x, w[3].x]; // AB CD EF GH
+      for (var i = 0; i < 4; i++) {
+        final prefix = 'AB CD EF GH'.split(' ').take(i).join(' ');
+        final expectX = i == 0
+            ? 0.0
+            : ReportFonts.advance('$prefix ', 10,
+                    weight: 700, letterSpacingPt: ls) +
+                ls;
+        expect(starts[i] - starts[0], closeTo(expectX, 0.02), reason: 'word $i');
+      }
+    });
+
+    test('Semibold runs carry the central tracking', () {
+      final plain = ReportFonts.advance('Technician', 10, weight: 400);
+      final semi = ReportFonts.advance('Technician', 10, weight: 600);
+      // advance() adds the tracking, so it must reflect it for Semibold only.
+      expect(ReportFonts.trackingEm(600), lessThan(0));
+      expect(ReportFonts.trackingEm(500), ReportFonts.trackingEm(600));
+      expect(ReportFonts.trackingEm(400), 0);
+      expect(ReportFonts.trackingEm(700), 0);
+      expect(semi, isNot(plain));
+    });
+  });
+
+  test('AvoidBreakInside only spans a group taller than the page content area',
+      () {
+    // 728.5pt is the content height of PdfPageFormat.a4 (2cm margins) and is
+    // what the old check compared against; the report page has 27.75pt
+    // margins, 787.38pt of content height.
+    bool canSpan(double h) {
+      final doc = pw.Document();
+      final page = PdfPage(doc.document, pageFormat: reportPageFormat);
+      final ctx = pw.Context(
+          document: doc.document, page: page, canvas: page.getGraphics());
+      final w = AvoidBreakInside(
+        child: pw.Column(children: [
+          pw.SizedBox(width: 100, height: h / 2),
+          pw.SizedBox(width: 100, height: h / 2),
+        ]),
+      );
+      w.layout(ctx, const pw.BoxConstraints(maxWidth: 500));
+      return w.canSpan;
+    }
+
+    expect(canSpan(750), isFalse, reason: 'fits a page: keep together');
+    expect(canSpan(787), isFalse, reason: 'fits the 787.38pt content area');
+    expect(canSpan(790), isTrue, reason: 'taller than a page: may break');
+  });
+
+  test('report page is Chrome A4 with 27.75pt margins', () {
+    expect(reportPageFormat.width, 595.92);
+    expect(reportPageFormat.height, 842.88);
+    expect(reportPageFormat.marginTop, 27.75);
+    expect(reportPageFormat.availableHeight, closeTo(842.88 - 55.5, 1e-9));
   });
 }

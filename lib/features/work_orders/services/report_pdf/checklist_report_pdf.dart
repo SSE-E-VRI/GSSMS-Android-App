@@ -13,8 +13,8 @@ import 'package:gssms_mobile/features/work_orders/services/job_work_report_pdf_p
 const _line = pw.BorderSide(color: ReportPdfTheme.borderPrint, width: 0.75);
 
 /// Table borders are drawn once per grid line (like Chrome's collapsed
-/// borders): stacked tables share an edge, so only the owner of an edge
-/// paints it, otherwise the overlapping strokes darken the anti-aliasing.
+/// borders, see [CssTableBorder]): stacked tables share an edge, so only the
+/// owner of an edge paints it.
 pw.TableBorder _tb(
         {bool left = false,
         bool right = false,
@@ -22,7 +22,7 @@ pw.TableBorder _tb(
         bool bottom = false,
         bool hIn = false,
         bool vIn = false}) =>
-    pw.TableBorder(
+    CssTableBorder(
       left: left ? _line : pw.BorderSide.none,
       right: right ? _line : pw.BorderSide.none,
       top: top ? _line : pw.BorderSide.none,
@@ -31,12 +31,6 @@ pw.TableBorder _tb(
       verticalInside: vIn ? _line : pw.BorderSide.none,
     );
 
-const _cellBottom = pw.BoxDecoration(
-  border: pw.Border(
-    bottom: pw.BorderSide(color: ReportPdfTheme.borderPrint, width: 0.75),
-  ),
-);
-
 /// `.reportTable` column widths (22 / 38 / 16 / 24 %).
 const _grid = [0.22, 0.38, 0.16, 0.24];
 
@@ -44,11 +38,6 @@ const _grid = [0.22, 0.38, 0.16, 0.24];
 const _cellPad = pw.EdgeInsets.symmetric(horizontal: 6.375, vertical: 4.575);
 
 const _tdSizePt = 9.75;
-
-/// Selawik Semibold is ~1.5% wider than Segoe UI Semibold (Chrome's face for
-/// CSS weight 500); a small negative tracking brings line breaks and word
-/// positions of the semibold table text back in line with the web print.
-const _semiboldTrack = -0.011;
 
 /// Table cells are vertically centred (UA `tbody { vertical-align: middle }`).
 const _middle = pw.TableCellVerticalAlignment.middle;
@@ -94,37 +83,6 @@ class _GapContext extends pw.WidgetContext {
 
   @override
   void apply(pw.WidgetContext other) {}
-}
-
-/// `break-inside: avoid` for an asset group: moves to the next page when it
-/// does not fit, and only breaks across pages once it is taller than a whole
-/// page content area (latched, like Chrome). The shared [AvoidBreakInside]
-/// compares against the page *format's* own margins, which is 56pt too
-/// strict for the 27.75pt margins the report pages use.
-class _KeepGroup extends pw.SingleChildWidget {
-  _KeepGroup({required pw.Widget child}) : super(child: child);
-
-  static const _pageMargins = 55.5;
-  bool _tooTall = false;
-
-  @override
-  bool get canSpan => _tooTall && super.canSpan;
-
-  @override
-  void layout(pw.Context context, pw.BoxConstraints constraints,
-      {bool parentUsesSize = false}) {
-    super.layout(context, constraints, parentUsesSize: parentUsesSize);
-    if (box != null &&
-        box!.height > context.page.pageFormat.height - _pageMargins) {
-      _tooTall = true;
-    }
-  }
-
-  @override
-  void paint(pw.Context context) {
-    super.paint(context);
-    paintChild(context);
-  }
 }
 
 /// Column width for tables whose borders must line up on the shared 22 / 38 /
@@ -278,7 +236,6 @@ pw.Widget _td(String text,
         color: color,
         softWrap: softWrap,
         align: align,
-        letterSpacingEm: weight == 600 ? _semiboldTrack : null,
       ),
     );
 
@@ -393,7 +350,7 @@ List<pw.Widget> _buildGroupWidgets(ChecklistReportGroup g) {
           pw.EdgeInsets.only(left: 0.375, right: 0.375, top: top ? 0.375 : 0),
       child: w);
   return [
-    _KeepGroup(
+    AvoidBreakInside(
       child: _pad(pw.Column(
         crossAxisAlignment: pw.CrossAxisAlignment.stretch,
         mainAxisSize: pw.MainAxisSize.min,
@@ -413,9 +370,9 @@ List<pw.Widget> _buildGroupWidgets(ChecklistReportGroup g) {
 /// span), so it can paginate between rows and repeat its header row.
 pw.Widget _buildFlatTable(ChecklistReportGroup g, List<(int, int)> spans,
     List<double> extras, String Function(int) nameOf) {
-  pw.Widget bordered(pw.Widget child, {required bool bottom}) => pw.Container(
+  pw.Widget bordered(pw.Widget child, {required bool bottom}) => CssBox(
       alignment: pw.Alignment.centerLeft,
-      decoration: bottom ? _cellBottom : null,
+      bottom: bottom ? const CssSide(0.75, ReportPdfTheme.borderPrint) : null,
       child: child);
 
   final trs = <pw.TableRow>[
@@ -478,31 +435,8 @@ int _lines(String text, int weight, double colFraction) =>
     _wrapLines(text, weight, colFraction * 510.0 - 12.75);
 
 /// Number of lines [text] wraps to in [width]pt of text area.
-int _wrapLines(String text, int weight, double width) {
-  final track = weight == 600 ? _semiboldTrack * _tdSizePt : 0.0;
-  double w(String t) =>
-      measureText(t, _tdSizePt, weight: weight, letterSpacingPt: track);
-  final space = w(' ');
-  var n = 0;
-  for (final line in pdfSafe(text).split('\n')) {
-    var cur = 0.0;
-    var lines = 1;
-    for (final word in line.split(RegExp(r'\s+'))) {
-      if (word.isEmpty) continue;
-      final ww = w(word);
-      if (cur == 0) {
-        cur = ww;
-      } else if (cur + space + ww <= width) {
-        cur += space + ww;
-      } else {
-        lines++;
-        cur = ww;
-      }
-    }
-    n += lines;
-  }
-  return math.max(1, n);
-}
+int _wrapLines(String text, int weight, double width) =>
+    cssWrapLineCount(text, width, _tdSizePt, weight: weight);
 
 /// Line count of the tallest cell of [row].
 int _rowLines(ChecklistReportRow row) {
@@ -514,9 +448,8 @@ int _rowLines(ChecklistReportRow row) {
   return lines;
 }
 
-/// Height in css px of a table row of [lines] text lines (line-height 19.5px,
-/// padding 2 x 5.59375px, one collapsed 1px border; Chrome quantises to 1/64px).
-double _rowPx(int lines) => lines * 19.5 + 12.1875;
+/// Height in css px of a table row of [lines] text lines (see [cssRowPx]).
+double _rowPx(int lines) => cssRowPx(lines, lineHeight: ReportRoot.lineHeight);
 
 /// The height pdf layout gives a row of [lines] lines (padding 4.575 x 2).
 double _naturalPt(int lines) => lines * 14.625 + 9.15;
@@ -535,19 +468,11 @@ List<double> _spanRowPx(String name, List<ChecklistReportRow> span) {
 }
 
 /// Snaps the cumulative row edges (row heights [px], css px) to whole px, as
-/// Chrome paints them, and returns, per row, the extra height in pt over the
-/// row's [natural] (content + padding) height in pt.
+/// Chrome paints them ([cssSnapRowsPt]), and returns, per row, the extra
+/// height in pt over the row's [natural] (content + padding) height in pt.
 List<double> _snapExtras(List<double> px, List<double> natural) {
-  final out = <double>[];
-  var sum = 0.0;
-  var prev = 0;
-  for (var i = 0; i < px.length; i++) {
-    sum += px[i];
-    final edge = (sum - 0.01).round();
-    out.add(((edge - prev) * 0.75) - natural[i]);
-    prev = edge;
-  }
-  return out;
+  final snapped = cssSnapRowsPt(px);
+  return [for (var i = 0; i < px.length; i++) snapped[i] - natural[i]];
 }
 
 /// (text, weight) for the three right-hand columns of a regular row.
@@ -599,7 +524,6 @@ pw.Widget _centredCell(String text) => pw.Container(
         text,
         sizePt: _tdSizePt,
         weight: 600,
-        letterSpacingEm: _semiboldTrack,
       ),
     );
 
@@ -730,173 +654,27 @@ List<pw.Widget> _buildDeficiencySummary(List<ChecklistDeficiencyRow> defs) {
     'Action Taken',
     'Severity',
   ];
-  final body = defs.isEmpty
-      ? const [
-          ['No deficiencies selected.'],
-        ]
-      : [
-          for (final d in defs)
-            [d.asset, d.checkpoint, d.finding, d.action, d.severity],
-        ];
-  final fractions = _autoFractions(headers, defs.isEmpty ? const [] : body);
-  final cols = {
-    for (var c = 0; c < headers.length; c++)
-      c: _FracCol(fractions, c) as pw.TableColumnWidth,
-  };
-
-  // Row heights snapped to whole css px like Chrome (see _buildGroup).
-  final textW = [
-    for (var c = 0; c < headers.length; c++)
-      fractions[c] * 510.0 -
-          12.75 -
-          ((c == 0 || c == headers.length - 1) ? 0.375 : 0.0),
-  ];
-  int linesOf(List<String> row, int weight) {
-    var n = 1;
-    for (var c = 0; c < row.length; c++) {
-      n = math.max(n, _wrapLines(row[c], weight, textW[c]));
-    }
-    return n;
-  }
-
-  final lineCounts = <int>[
-    linesOf(headers, 700),
-    if (defs.isEmpty)
-      1
-    else
-      for (final row in body) linesOf(row, 600),
-  ];
-  final extras = _snapExtras(
-    [for (final n in lineCounts) _rowPx(n)],
-    [for (final n in lineCounts) _naturalPt(n)],
+  final table = cssTable(
+    headers,
+    defs.isEmpty
+        ? const [
+            ['No deficiencies selected.'],
+          ]
+        : [
+            for (final d in defs)
+              [d.asset, d.checkpoint, d.finding, d.action, d.severity],
+          ],
+    lineHeight: ReportRoot.lineHeight,
+    bodyWeight: 600,
+    bodyColor: _deficiencyInk,
+    // The checkpoint cell wraps its text in a div, which the print rule
+    // forces back to black.
+    cellStyles: (r, c) => c == 1 && defs.isNotEmpty
+        ? const CssCellStyle(color: ReportPdfTheme.inkPrint)
+        : null,
   );
-
-  pw.Widget cell(String text, int rowIndex,
-          {int weight = 600,
-          PdfColor color = _deficiencyInk,
-          pw.TextAlign? align}) =>
-      _td(text,
-          weight: weight,
-          color: color,
-          align: align,
-          extraV: extras[rowIndex + 1]);
-
-  final headerRow = pw.TableRow(
-    repeat: true,
-    verticalAlignment: _middle,
-    decoration: const pw.BoxDecoration(color: ReportPdfTheme.accentTint),
-    children: [
-      for (final h in headers)
-        _td(h, weight: 700, color: ReportPdfTheme.inkPrint, extraV: extras[0]),
-    ],
-  );
-
-  final pw.Widget table;
-  if (defs.isEmpty) {
-    table = pw.Padding(
-      padding: const pw.EdgeInsets.all(0.375),
-      child: pw.Column(
-        crossAxisAlignment: pw.CrossAxisAlignment.stretch,
-        mainAxisSize: pw.MainAxisSize.min,
-        children: [
-          pw.Table(
-              border: _tb(
-                  left: true, right: true, top: true, bottom: true, vIn: true),
-              columnWidths: cols,
-              children: [headerRow]),
-          pw.Table(
-            border: _tb(left: true, right: true, bottom: true),
-            children: [
-              pw.TableRow(children: [
-                cell('No deficiencies selected.', 0,
-                    align: pw.TextAlign.center),
-              ]),
-            ],
-          ),
-        ],
-      ),
-    );
-  } else {
-    table = pw.Padding(
-      padding: const pw.EdgeInsets.all(0.375),
-      child: pw.Table(
-        border: _tb(
-            left: true,
-            right: true,
-            top: true,
-            bottom: true,
-            hIn: true,
-            vIn: true),
-        columnWidths: cols,
-        children: [
-          headerRow,
-          for (var r = 0; r < body.length; r++)
-            pw.TableRow(verticalAlignment: _middle, children: [
-              cell(body[r][0], r),
-              // The checkpoint cell wraps its text in a div, which the print
-              // rule forces back to black.
-              cell(body[r][1], r, color: ReportPdfTheme.inkPrint),
-              cell(body[r][2], r),
-              cell(body[r][3], r),
-              cell(body[r][4], r),
-            ]),
-        ],
-      ),
-    );
-  }
 
   return [_pad(heading), _pad(table)];
-}
-
-/// Column of a table whose widths are fixed fractions of the 510pt box.
-class _FracCol extends pw.TableColumnWidth {
-  const _FracCol(this.fractions, this.index);
-
-  final List<double> fractions;
-  final int index;
-
-  @override
-  pw.ColumnLayout layout(
-      pw.Widget child, pw.Context context, pw.BoxConstraints? constraints) {
-    final frame = constraints != null && constraints.hasBoundedWidth
-        ? constraints.maxWidth
-        : 509.25;
-    var w = fractions[index] * (frame + 0.75);
-    if (index == 0) w -= 0.375;
-    if (index == fractions.length - 1) w -= 0.375;
-    return pw.ColumnLayout(w, 0);
-  }
-}
-
-/// CSS auto table layout (width 100% of 510pt) as fractions of the table
-/// width. Chrome's first and last columns also carry the outer half border
-/// (0.375pt), which `cssTable`'s own auto layout omits (it would wrap a
-/// header that Chrome keeps on one line), so the widths are planned here.
-List<double> _autoFractions(List<String> headers, List<List<String>> rows) {
-  final n = headers.length;
-  final mins = List<double>.filled(n, 0);
-  final maxs = List<double>.filled(n, 0);
-  void measure(String text, int col, int weight) {
-    final safe = pdfSafe(text);
-    maxs[col] =
-        math.max(maxs[col], measureText(safe, _tdSizePt, weight: weight));
-    for (final word in safe.split(RegExp(r'\s+'))) {
-      mins[col] =
-          math.max(mins[col], measureText(word, _tdSizePt, weight: weight));
-    }
-  }
-
-  for (var c = 0; c < n; c++) {
-    measure(headers[c], c, 700);
-    for (final r in rows) {
-      measure(r[c], c, 600);
-    }
-    final extra = 12.75 + ((c == 0 || c == n - 1) ? 0.375 : 0.0);
-    mins[c] += extra;
-    maxs[c] += extra;
-  }
-  const total = 510.0;
-  return [for (final w in autoColumnWidths(mins, maxs, total)) w / total];
 }
 
 // ---------------------------------------------------------------------------
@@ -946,73 +724,13 @@ pw.Widget _buildAdditionalDetailsAndSignOff(
   return keepTogether([
     details,
     pw.SizedBox(height: 18.0), // mb-4; collapses with the sign-off's mt 9
-    _buildSignOff(r, at),
+    signOff(
+      technician: r.technician,
+      maintenanceStaff: r.otherStaff,
+      verification: r.verification,
+      generatedAt: at,
+      lineHeight: ReportRoot.lineHeight,
+      forceBlack: true,
+    ),
   ]);
-}
-
-/// `.signoffCard` with every text forced to black (the Checklist's print rule
-/// overrides the muted label colour and the accent heading colour), laid out
-/// like the shared `signOff`.
-pw.Widget _buildSignOff(ChecklistJobWorkReport r, DateTime at) {
-  final lh = ReportRoot.lineHeight;
-  final tech = r.technician.trim().isEmpty ? '—' : r.technician.trim();
-  final v = r.verification;
-  final supervisor = v == null
-      ? 'Pending verification'
-      : v.verifiedAtLabel.isNotEmpty
-          ? '${v.verifiedByName} · ${v.verifiedAtLabel}'
-          : v.verifiedByName;
-  final staff = r.otherStaff.trim();
-
-  pw.Widget item(String label, String value) => cssRich(
-        [
-          CssSpan('$label:', weight: 600),
-          CssSpan(' $value'),
-        ],
-        sizePt: 9.6,
-        lineHeight: lh,
-      );
-
-  final items = <pw.Widget>[
-    item('Technician', tech),
-    if (staff.isNotEmpty) item('Maintenance Staff', staff),
-    item('Supervisor', supervisor),
-  ];
-
-  return reportCard(
-    margin: const pw.EdgeInsets.only(bottom: 9.0),
-    [
-      CssBox(
-        margin: const pw.EdgeInsets.only(bottom: 4.8),
-        padding: const pw.EdgeInsets.only(bottom: 3.0),
-        bottom: const CssSide(0.75, ReportPdfTheme.accentTint),
-        child: cssText('SIGN-OFF',
-            sizePt: 10.2, weight: 700, upper: true, lineHeight: lh),
-      ),
-      pw.Padding(
-        padding: const pw.EdgeInsets.only(bottom: 4.8),
-        child: pw.Row(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: [
-            for (var i = 0; i < items.length; i++) ...[
-              if (i > 0) pw.SizedBox(width: 12),
-              pw.Expanded(child: items[i]),
-            ],
-          ],
-        ),
-      ),
-      if (v != null && v.remarks.trim().isNotEmpty)
-        pw.Padding(
-          padding: const pw.EdgeInsets.only(bottom: 4.8),
-          child: item('Supervisor Remarks', v.remarks.trim()),
-        ),
-      pw.Row(
-        mainAxisAlignment: pw.MainAxisAlignment.end,
-        children: [
-          cssText('Generated: ${formatGeneratedAt(at)}',
-              sizePt: 9.0, lineHeight: lh),
-        ],
-      ),
-    ],
-  );
 }

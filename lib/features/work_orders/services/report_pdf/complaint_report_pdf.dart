@@ -12,9 +12,6 @@ const double _gridRowGap = 4.8; // 0.4rem
 const double _metaSizePt = 9.9; // 0.825rem
 const double _bodySizePt = 10.2; // 0.85rem
 const double _bodyLineHeight = 1.35;
-/// Selawik Semibold is ~1.5% wider than Segoe UI Semibold on average; a small
-/// negative tracking brings run widths back in line.
-const double _semiboldTrack = -0.0088;
 const double _evidenceGap = 9.0; // 0.75rem
 // Evidence grid content: card content - border 1.5 - padding 2 * 9.
 const double _evidenceContentW = _cardContentW - 1.5 - 18.0;
@@ -70,7 +67,14 @@ List<pw.Widget> buildComplaintReportPdf(
   }
 
   return [
-    _header(r, root),
+    reportHeader(
+      org: r.org,
+      title: r.title,
+      subtitle: 'Ticket #${r.ticket}',
+      metaLeft: [('Location', r.station)],
+      metaRight: [('Date', r.dateLabel)],
+      lineHeight: root,
+    ),
     section1Card,
     reportCard([
       sectionHeading('Initial Assessment & Findings', lineHeight: root),
@@ -126,16 +130,13 @@ pw.Widget _sectionBody(String text, {required String empty}) {
             lineHeight: _bodyLineHeight,
             color: ReportPdfTheme.inkPrint,
           )
-        : pw.Padding(
-            // Strut baseline (0.675 + 0.41405) * 10.2 vs the span's * 9.9.
-            padding: const pw.EdgeInsets.only(top: 0.33, bottom: 0.075),
-            child: cssText(
-              empty,
-              sizePt: _metaSizePt,
-              lineHeight: _bodyLineHeight,
-              italic: true,
-              color: ReportPdfTheme.faint,
-            ),
+        : cssText(
+            empty,
+            sizePt: _metaSizePt,
+            strutSizePt: _bodySizePt,
+            lineHeight: _bodyLineHeight,
+            italic: true,
+            color: ReportPdfTheme.faint,
           ),
   );
 }
@@ -175,7 +176,6 @@ pw.Widget _metaGrid(List<(String, String)> items,
               m.$1,
               sizePt: _metaSizePt,
               weight: 600,
-              letterSpacingEm: _semiboldTrack,
               color: ReportPdfTheme.muted,
               lineHeight: lineHeight,
               softWrap: false,
@@ -186,7 +186,6 @@ pw.Widget _metaGrid(List<(String, String)> items,
                 m.$2,
                 sizePt: _metaSizePt,
                 weight: 600,
-                letterSpacingEm: _semiboldTrack,
                 lineHeight: lineHeight,
               ),
             ),
@@ -282,92 +281,6 @@ pw.Widget _evidencePhotos(
       _evidenceColW,
       gap: 6.0, // 0.5rem
       lineHeight: root,
-    ),
-  );
-}
-
-/// `ReportHeader` as printed for this report. Same metrics as the shared
-/// `reportHeader` (pb 9, 1.5pt #1f4e79 rule, mb 12; h2 15pt, h3 12pt, meta 10.2pt,
-/// title 13.2pt, subtitle 10.8pt) except the railway h2 is `#1e293b` in the
-/// web print; the shared primitive has no colour parameter for it.
-// TODO(primitives): drop this once reportHeader takes a railway colour.
-pw.Widget _header(ComplaintJobWorkReport r, double root) {
-  pw.Widget metaItem(String label, String value, pw.TextAlign align) =>
-      cssRich(
-        [CssSpan('$label: ', weight: 700), CssSpan(value)],
-        sizePt: 10.2,
-        lineHeight: root,
-        align: align,
-      );
-
-  return CssBox(
-    padding: const pw.EdgeInsets.only(bottom: 9.0),
-    margin: const pw.EdgeInsets.only(bottom: 12.0),
-    bottom: const CssSide(1.5, ReportPdfTheme.accent),
-    child: pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
-      mainAxisSize: pw.MainAxisSize.min,
-      children: [
-        cssText(
-          r.org.railwayName,
-          sizePt: 15.0,
-          weight: 700,
-          upper: true,
-          lineHeight: 1.2,
-          letterSpacingEm: 0.03,
-          color: ReportPdfTheme.headingInk,
-          align: pw.TextAlign.center,
-        ),
-        pw.SizedBox(height: 2.4),
-        cssText(
-          r.org.divisionName,
-          sizePt: 12.0,
-          weight: 600,
-          lineHeight: 1.2,
-          color: ReportPdfTheme.muted,
-          align: pw.TextAlign.center,
-        ),
-        pw.SizedBox(height: 1.8),
-        cssText(
-          r.org.depotName,
-          sizePt: 12.0,
-          weight: 600,
-          lineHeight: 1.2,
-          color: ReportPdfTheme.muted,
-          align: pw.TextAlign.center,
-        ),
-        // depot mb 1.8 collapses with the meta row's margin 6.
-        pw.SizedBox(height: 6.0),
-        pw.Row(
-          crossAxisAlignment: pw.CrossAxisAlignment.start,
-          children: [
-            pw.Expanded(
-                child: metaItem('Location', r.station, pw.TextAlign.left)),
-            pw.SizedBox(width: 9.0),
-            pw.Expanded(
-                child: metaItem('Date', r.dateLabel, pw.TextAlign.right)),
-          ],
-        ),
-        pw.SizedBox(height: 6.0),
-        cssText(
-          r.title,
-          sizePt: 13.2,
-          weight: 700,
-          upper: true,
-          lineHeight: 1.2,
-          color: ReportPdfTheme.accent,
-          letterSpacingEm: 0.05,
-          align: pw.TextAlign.center,
-        ),
-        pw.SizedBox(height: 3.0),
-        cssText(
-          'Ticket #${r.ticket}',
-          sizePt: 10.8,
-          weight: 600,
-          lineHeight: root,
-          align: pw.TextAlign.center,
-        ),
-      ],
     ),
   );
 }

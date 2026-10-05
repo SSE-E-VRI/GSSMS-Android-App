@@ -20,6 +20,22 @@ String pdfSafe(String? s) {
   return s.replaceAll('₹', 'Rs.');
 }
 
+/// Chrome's A4 (595.92 x 842.88pt) with the 1cm print margin (27.75pt), the
+/// page the web report is printed on. `PdfPageFormat.a4` is 595.28 x 841.89.
+const PdfPageFormat reportPageFormat = PdfPageFormat(
+  595.92,
+  842.88,
+  marginLeft: 27.75,
+  marginTop: 27.75,
+  marginBottom: 27.75,
+  // Chrome lays the report out 720px (540pt) wide from the left margin: the
+  // right margin takes the remaining 0.42pt of the page.
+  marginRight: 595.92 - 27.75 - reportContentWidth,
+);
+
+/// Width in pt of the report content column (720 css px).
+const double reportContentWidth = 540.0;
+
 const pdfBorderColor = ReportPdfTheme.border;
 const pdfBorderSide = pw.BorderSide(color: pdfBorderColor, width: 0.75);
 
@@ -40,27 +56,54 @@ class ReportRoot {
 /// natural (pdf `Text`) line is 1.2002 em and its baseline sits 0.98975 em
 /// below the line top.
 const double _selawikLineHeight = 1.2002;
+const double _selawikBaseline = 0.98975;
 
-/// Distance from the top of a CSS line box (line-height [lineHeight]) to its
-/// baseline for Segoe UI (content area 1.3301 em, ascent 1.079 em), in em.
-double cssBaselineEm(double lineHeight) => lineHeight / 2 + 0.41405;
+/// Segoe UI hhea ascent / descent in em (2210 / 514 per 2048).
+const double _segoeAscent = 2210 / 2048;
+const double _segoeDescent = 514 / 2048;
+
+/// CSS px -> pt.
+const double _pxToPt = 0.75;
+
+/// Chrome's rounding of a font metric in px (Skia `SkScalarRoundToScalar`).
+double _roundPx(double v) => (v + 0.5).floorToDouble();
+
+/// Distance in pt from the top of a CSS line box (line-height [lineHeight],
+/// inherited as a number) to its baseline for Segoe UI at [sizePt], following
+/// Chrome's integer-px model: ascent and descent are rounded to whole px, the
+/// half-leading is `floor((line-height - (ascent + descent)) / 2)` px (LayoutNG
+/// `CalculateLeadingSpace`), and the baseline is half-leading + ascent. This
+/// reproduces the web print exactly, e.g. 13.5pt for 12pt text at 1.5.
+double cssBaselinePt(double lineHeight, double sizePt) {
+  final px = sizePt / _pxToPt;
+  final ascent = _roundPx(_segoeAscent * px);
+  final descent = _roundPx(_segoeDescent * px);
+  // LayoutUnit precision is 1/64 px.
+  final lhPx = (lineHeight * px * 64).floorToDouble() / 64;
+  final halfLeading = ((lhPx - (ascent + descent)) / 2).floorToDouble();
+  return (halfLeading + ascent) * _pxToPt;
+}
 
 /// `TextStyle.lineSpacing` that turns pdf's 1.2002 em natural line pitch into
 /// a CSS pitch of [lineHeight] * [sizePt].
 double cssLineSpacing(double lineHeight, double sizePt) =>
     (lineHeight - _selawikLineHeight) * sizePt;
 
-/// Space above the first line so its baseline matches CSS (0.98975 em is the
-/// pdf baseline offset).
-double cssInsetTop(double lineHeight, double sizePt) =>
-    (lineHeight / 2 - 0.5757) * sizePt;
+/// Space above the first line so its baseline matches CSS. [strutSizePt] is
+/// the font size of the line's strut (the block's own font) when it differs
+/// from the text [sizePt] (a small inline span in a larger block).
+double cssInsetTop(double lineHeight, double sizePt, {double? strutSizePt}) =>
+    cssBaselinePt(lineHeight, strutSizePt ?? sizePt) -
+    _selawikBaseline * sizePt;
 
 /// Space below the last line so a block of n lines is exactly
-/// n * lineHeight * size tall. Negative for line-height 1.2 (-0.0245 em); the
+/// n * lineHeight * strut size tall. Can be negative (line-height 1.2): the
 /// negative padding is honoured by [pw.Padding] (box shrinks, child paints
 /// below its box by the same amount).
-double cssInsetBottom(double lineHeight, double sizePt) =>
-    (lineHeight / 2 - 0.6245) * sizePt;
+double cssInsetBottom(double lineHeight, double sizePt, {double? strutSizePt}) =>
+    lineHeight * (strutSizePt ?? sizePt) -
+    cssInsetTop(lineHeight, sizePt, strutSizePt: strutSizePt) -
+    _selawikLineHeight * sizePt;
 
 /// One run of a [cssRich] paragraph. Unset fields inherit from the paragraph.
 class CssSpan {
@@ -71,6 +114,7 @@ class CssSpan {
     this.sizePx,
     this.sizePt,
     this.trailingGapPt = 0,
+    this.letterSpacingEm,
   });
 
   final String text;
@@ -79,13 +123,49 @@ class CssSpan {
   final double? sizePx;
   final double? sizePt;
 
-  /// CSS `margin-right` on an inline label: extra space after the last glyph.
+  /// Extra space in pt after the last glyph (CSS `margin-right` on an inline
+  /// label). The gap is exact; it may be negative. The text must not end in
+  /// whitespace.
   final double trailingGapPt;
+
+  /// CSS `letter-spacing` in em for this run (overrides the paragraph's).
+  final double? letterSpacingEm;
 }
+
+/// Letter spacings below this (pt) are applied as plain `letterSpacing` (the
+/// Semibold tracking compensation); larger ones get the exact CSS treatment
+/// described at [_cssSpans].
+const double _exactSpacingPt = 0.2;
+
+/// One styled run of a [cssRich] paragraph with every inherited value
+/// resolved (text already upper-cased / pdf-safe).
+class _Run {
+  const _Run(this.text, this.weight, this.color, this.pt, this.lsPt, this.gap);
+  final String text;
+  final int weight;
+  final PdfColor color;
+  final double pt;
+  final double lsPt;
+  final double gap;
+  _Run withText(String t, {double? gap}) =>
+      _Run(t, weight, color, pt, lsPt, gap ?? 0);
+}
+
+/// Slant of Segoe UI Italic (post.italicAngle -12 degrees): tan(12 deg).
+const double _italicSlant = 0.2126;
 
 /// A paragraph of mixed-weight runs with CSS line-height semantics: every
 /// line box is [lineHeight] * size tall and the first baseline sits exactly
 /// where Chrome puts it. Replaces `pw.RichText`.
+///
+/// [strutSizePt] is the block's own font size when the text is a smaller
+/// inline span inside a larger block (line box and baseline follow the strut).
+///
+/// Italic text (Selawik has no italic) is Regular sheared by Segoe UI
+/// Italic's 12 degrees about each line's baseline, so it is wrapped here
+/// (greedy, with Segoe-compatible advances, kerning and tracking) and every
+/// line sheared on its own; a single shear of the whole paragraph would shift
+/// each line by its height.
 pw.Widget cssRich(
   List<CssSpan> spans, {
   double sizePx = 13.0,
@@ -93,6 +173,7 @@ pw.Widget cssRich(
   int weight = 400,
   PdfColor color = ReportPdfTheme.inkPrint,
   required double lineHeight,
+  double? strutSizePt,
   bool upper = false,
   double? letterSpacingEm,
   bool italic = false,
@@ -101,59 +182,278 @@ pw.Widget cssRich(
   bool softWrap = true,
 }) {
   final basePt = sizePt ?? ReportPdfTheme.px(sizePx);
-  final lineSpacing = cssLineSpacing(lineHeight, basePt);
-  final lsPt = letterSpacingEm != null ? letterSpacingEm * basePt : null;
+  final strutPt = strutSizePt ?? basePt;
+  final lineSpacing = lineHeight * strutPt - _selawikLineHeight * basePt;
 
-  pw.TextSpan make(String text, CssSpan s, {double? extraLs}) {
+  final runs = <_Run>[];
+  for (final s in spans) {
+    if (s.text.isEmpty) continue;
     final pt = s.sizePt ??
         (s.sizePx != null ? ReportPdfTheme.px(s.sizePx!) : basePt);
-    final safe = pdfSafe(text);
-    return pw.TextSpan(
-      text: upper ? safe.toUpperCase() : safe,
-      style: pw.TextStyle(
-        font: ReportFonts.fontForWeight(s.weight ?? weight),
-        fontSize: pt,
-        color: s.color ?? color,
-        letterSpacing: extraLs ?? lsPt,
+    final text = upper ? pdfSafe(s.text).toUpperCase() : pdfSafe(s.text);
+    runs.add(_Run(text, s.weight ?? weight, s.color ?? color, pt,
+        (s.letterSpacingEm ?? letterSpacingEm ?? 0) * pt, s.trailingGapPt));
+  }
+
+  pw.Widget plain(List<_Run> line, {required bool wrap}) {
+    final children = <pw.TextSpan>[];
+    for (final r in line) {
+      children.addAll(_cssSpans(
+        r.text,
+        font: ReportFonts.fontForWeight(r.weight),
+        weight: r.weight,
+        sizePt: r.pt,
+        color: r.color,
+        letterSpacingPt: r.lsPt,
+        trackingPt: ReportFonts.trackingEm(r.weight, italic: italic) * r.pt,
+        gapPt: r.gap,
         lineSpacing: lineSpacing,
+      ));
+    }
+    return _SnapBaseline(
+      baseline: cssBaselinePt(lineHeight, strutPt),
+      child: pw.Padding(
+        padding: pw.EdgeInsets.only(
+          top: cssInsetTop(lineHeight, basePt, strutSizePt: strutSizePt),
+          bottom: cssInsetBottom(lineHeight, basePt, strutSizePt: strutSizePt),
+        ),
+        child: pw.RichText(
+          text: pw.TextSpan(
+            style: pw.TextStyle(font: ReportFonts.regular),
+            children: children,
+          ),
+          textAlign: align,
+          maxLines: maxLines,
+          softWrap: wrap,
+        ),
       ),
     );
   }
 
-  final children = <pw.TextSpan>[];
-  for (final s in spans) {
-    if (s.text.isEmpty) continue;
-    if (s.trailingGapPt > 0 && s.text.length > 1) {
-      children.add(make(s.text.substring(0, s.text.length - 1), s));
-      children.add(make(s.text.substring(s.text.length - 1), s,
-          extraLs: s.trailingGapPt));
+  if (!italic) return plain(runs, wrap: softWrap);
+
+  final shear = Matrix4.identity()
+    ..setEntry(0, 1, _italicSlant)
+    // Keep the first baseline in place (the pivot is the top-left corner).
+    ..setEntry(0, 3, _italicSlant * cssBaselinePt(lineHeight, strutPt));
+  return pw.LayoutBuilder(builder: (context, constraints) {
+    final maxW = softWrap && constraints != null && constraints.hasBoundedWidth
+        ? constraints.maxWidth
+        : double.infinity;
+    var lines = _wrapRuns(runs, maxW);
+    if (maxLines != null && lines.length > maxLines) {
+      lines = lines.sublist(0, maxLines);
+    }
+    final stretch = align != null &&
+        align != pw.TextAlign.left &&
+        align != pw.TextAlign.start &&
+        maxW.isFinite;
+    return pw.Column(
+      crossAxisAlignment:
+          stretch ? pw.CrossAxisAlignment.stretch : pw.CrossAxisAlignment.start,
+      mainAxisSize: pw.MainAxisSize.min,
+      children: [
+        for (final line in lines)
+          pw.Transform(
+            alignment: pw.Alignment.topLeft,
+            transform: shear,
+            child: plain(line, wrap: false),
+          ),
+      ],
+    );
+  });
+}
+
+/// Greedy line breaking of [runs] at spaces within [maxW] (CSS `normal` /
+/// `pre-wrap`: a newline breaks, a word wider than the line stays whole), measured
+/// with the Segoe-compatible advances ([ReportFonts.advance]).
+List<List<_Run>> _wrapRuns(List<_Run> runs, double maxW) {
+  final lines = <List<_Run>>[[]];
+  var x = 0.0;
+  var lineHasWord = false;
+
+  double width(_Run r, String t, {bool gap = false}) =>
+      ReportFonts.advance(t, r.pt,
+          weight: r.weight, letterSpacingPt: r.lsPt, italic: true) +
+      r.lsPt +
+      (gap ? r.gap : 0);
+
+  void add(_Run r, String t, {double gap = 0}) {
+    final line = lines.last;
+    if (line.isNotEmpty &&
+        line.last.weight == r.weight &&
+        line.last.color == r.color &&
+        line.last.pt == r.pt &&
+        line.last.lsPt == r.lsPt &&
+        line.last.gap == 0) {
+      line[line.length - 1] = line.last.withText(line.last.text + t, gap: gap);
     } else {
-      children.add(make(s.text, s,
-          extraLs: s.trailingGapPt > 0 ? s.trailingGapPt : null));
+      line.add(r.withText(t, gap: gap));
     }
   }
 
-  pw.Widget widget = pw.RichText(
-    text: pw.TextSpan(
-      style: pw.TextStyle(font: ReportFonts.regular),
-      children: children,
-    ),
-    textAlign: align,
-    maxLines: maxLines,
-    softWrap: softWrap,
-  );
-
-  if (italic) {
-    widget = pw.Transform(transform: Matrix4.skewX(-0.2), child: widget);
+  void newLine() {
+    // Trailing spaces hang off the end of a wrapped line.
+    final line = lines.last;
+    while (line.isNotEmpty && line.last.text.trim().isEmpty) {
+      line.removeLast();
+    }
+    if (line.isNotEmpty && line.last.text.endsWith(' ')) {
+      final l = line.last;
+      line[line.length - 1] = l.withText(l.text.trimRight(), gap: l.gap);
+    }
+    lines.add([]);
+    x = 0;
+    lineHasWord = false;
   }
 
-  return pw.Padding(
-    padding: pw.EdgeInsets.only(
-      top: cssInsetTop(lineHeight, basePt),
-      bottom: cssInsetBottom(lineHeight, basePt),
-    ),
-    child: widget,
-  );
+  for (final r in runs) {
+    final tokens = RegExp(r'\n|[^\S\n]+|[^\s]+')
+        .allMatches(r.text)
+        .map((m) => m[0]!)
+        .toList();
+    for (var i = 0; i < tokens.length; i++) {
+      final t = tokens[i];
+      final last = i == tokens.length - 1;
+      if (t == '\n') {
+        newLine();
+        continue;
+      }
+      final isSpace = t.trim().isEmpty;
+      final w = width(r, t, gap: last);
+      if (!isSpace && lineHasWord && x + w > maxW + 0.001) newLine();
+      if (isSpace && !lineHasWord && lines.length > 1) {
+        // Spaces at the start of a wrapped line are dropped.
+        continue;
+      }
+      add(r, t, gap: last ? r.gap : 0);
+      x += w;
+      if (!isSpace) lineHasWord = true;
+    }
+  }
+  return lines;
+}
+
+/// Longest word (glyphs) whose kerning is applied pair by pair; longer words
+/// spread it evenly over their glyphs.
+const int _kernSplitMaxGlyphs = 4;
+
+/// Turns one CSS run into pdf [pw.TextSpan]s with CSS spacing and kerning.
+///
+/// The pdf package advances a span of one word by `advance + (n + 1) * ls`
+/// (n glyphs: `n - 1` between glyphs plus two from its end-of-span
+/// bookkeeping) and has no kerning, whereas CSS adds `ls` after every glyph
+/// (spaces included) and Chrome applies Segoe UI's pair kerning. So:
+///  * a letter-spaced word is a span of its own with
+///    `ls = (kerning + n * css-ls [+ gap]) / (n + 1)`, which advances exactly as
+///    CSS does (kerning spread evenly); its spaces grow by `ls` through
+///    `wordSpacing`;
+///  * in unspaced text a kerned word of up to [_kernSplitMaxGlyphs] glyphs, or
+///    a word with a [CssSpan.trailingGapPt], is split so each glyph that
+///    precedes a kern (or the gap) is a one-glyph span with `ls = kern / 2`
+///    (pdf doubles it): glyph positions stay exact. Longer kerned words are one
+///    span with the even spread;
+///  * everything else stays in plain runs (`ls` 0, or the tiny Semibold
+///    tracking), which are exact.
+List<pw.TextSpan> _cssSpans(
+  String text, {
+  required pw.Font font,
+  required int weight,
+  required double sizePt,
+  required PdfColor color,
+  required double letterSpacingPt,
+  required double trackingPt,
+  required double gapPt,
+  required double lineSpacing,
+}) {
+  pw.TextSpan make(String t, {double ls = 0, double? wordSpacing}) =>
+      pw.TextSpan(
+        text: t,
+        style: pw.TextStyle(
+          font: font,
+          fontSize: sizePt,
+          color: color,
+          letterSpacing: ls,
+          wordSpacing: wordSpacing,
+          lineSpacing: lineSpacing,
+        ),
+      );
+
+  final ls = letterSpacingPt + trackingPt;
+  final exactLs = letterSpacingPt.abs() >= _exactSpacingPt;
+  final tokens =
+      RegExp(r'\S+|\s+').allMatches(text).map((m) => m[0]!).toList();
+  var lastWord = -1;
+  final kerned = <int>{};
+  for (var i = 0; i < tokens.length; i++) {
+    if (tokens[i].trim().isEmpty) continue;
+    lastWord = i;
+    if (ReportFonts.kerningEm(tokens[i], weight: weight) != 0) kerned.add(i);
+  }
+  if (!exactLs && gapPt == 0 && kerned.isEmpty) return [make(text, ls: ls)];
+
+  final spaceWs = exactLs ? _spaceScale(font, sizePt, ls) : null;
+  final out = <pw.TextSpan>[];
+  final plain = StringBuffer();
+  void flush() {
+    if (plain.isEmpty) return;
+    out.add(make(plain.toString(), ls: ls));
+    plain.clear();
+  }
+
+  // Kerning in pt between glyph j and j + 1 of [glyphs].
+  double pairKern(List<String> glyphs, int j) =>
+      ReportFonts.kerningEm(glyphs[j] + glyphs[j + 1], weight: weight) *
+      sizePt;
+
+  for (var i = 0; i < tokens.length; i++) {
+    final t = tokens[i];
+    if (t.trim().isEmpty) {
+      if (exactLs) {
+        flush();
+        out.add(make(t, ls: 0, wordSpacing: spaceWs));
+      } else {
+        plain.write(t);
+      }
+      continue;
+    }
+    final gap = i == lastWord ? gapPt : 0.0;
+    final glyphs = [for (final r in t.runes) String.fromCharCode(r)];
+    final n = glyphs.length;
+    if (exactLs) {
+      flush();
+      final k = ReportFonts.kerningEm(t, weight: weight) * sizePt;
+      out.add(make(t, ls: (k + n * ls + gap) / (n + 1)));
+    } else if (gap != 0 || (kerned.contains(i) && n <= _kernSplitMaxGlyphs)) {
+      // One-glyph spans for the glyphs followed by a kern or the gap.
+      for (var j = 0; j < n; j++) {
+        final after = (j + 1 < n ? pairKern(glyphs, j) : 0.0) +
+            (j == n - 1 ? gap : 0.0);
+        if (after == 0) {
+          plain.write(glyphs[j]);
+        } else {
+          flush();
+          out.add(make(glyphs[j], ls: ls + after / 2));
+        }
+      }
+    } else if (kerned.contains(i)) {
+      flush();
+      final k = ReportFonts.kerningEm(t, weight: weight) * sizePt;
+      out.add(make(t, ls: (k + n * ls) / (n + 1)));
+    } else {
+      plain.write(t);
+    }
+  }
+  flush();
+  return out;
+}
+
+/// `TextStyle.wordSpacing` (a multiplier of the space advance) that makes each
+/// space [extraPt] wider.
+double _spaceScale(pw.Font font, double sizePt, double extraPt) {
+  if (extraPt == 0) return 1.0;
+  final space = ReportFonts.spaceAdvance(font, sizePt);
+  return space <= 0 ? 1.0 : 1.0 + extraPt / space;
 }
 
 /// Styled text matching CSS font-size, line-height, letter-spacing, and
@@ -166,6 +466,7 @@ pw.Widget cssText(
   int weight = 400,
   PdfColor color = ReportPdfTheme.inkPrint,
   double? lineHeight,
+  double? strutSizePt,
   bool upper = false,
   double? letterSpacingEm,
   bool italic = false,
@@ -180,6 +481,7 @@ pw.Widget cssText(
       weight: weight,
       color: color,
       lineHeight: lineHeight ?? ReportRoot.lineHeight,
+      strutSizePt: strutSizePt,
       upper: upper,
       letterSpacingEm: letterSpacingEm,
       italic: italic,
@@ -190,13 +492,13 @@ pw.Widget cssText(
 
 /// Width in pt of [text] (single line) at [sizePt] in the face for [weight].
 double measureText(String text, double sizePt,
-    {int weight = 400, double letterSpacingPt = 0}) {
+    {int weight = 400, double letterSpacingPt = 0, bool italic = false}) {
   var w = 0.0;
   for (final line in pdfSafe(text).split('\n')) {
     w = math.max(
         w,
         ReportFonts.advance(line, sizePt,
-            weight: weight, letterSpacingPt: letterSpacingPt));
+            weight: weight, letterSpacingPt: letterSpacingPt, italic: italic));
   }
   return w;
 }
@@ -215,6 +517,205 @@ class CssSide {
   final double width;
   final PdfColor color;
   final bool dashed;
+}
+
+// ---------------------------------------------------------------------------
+// Pixel snapping
+// ---------------------------------------------------------------------------
+
+/// Chrome paints boxes, borders, images and text baselines on whole device
+/// px (1px = 0.75pt, the page origin is a px boundary) whatever the fractional
+/// layout position. [PxSnap] snaps local paint coordinates the same way using
+/// the canvas transform to find their absolute position on the page.
+class PxSnap {
+  PxSnap._(this._tx, this._ty, this._pageH, this._okX, this._okY);
+
+  factory PxSnap.of(pw.Context context) {
+    if (!kPixelSnap) return PxSnap._(0, 0, 0, false, false);
+    final m = context.canvas.getTransform().storage;
+    return PxSnap._(
+      m[12],
+      m[13],
+      context.page.pageFormat.height,
+      (m[0] - 1).abs() < 1e-9 && m[4].abs() < 1e-9 && m[1].abs() < 1e-9,
+      (m[5] - 1).abs() < 1e-9 && m[1].abs() < 1e-9,
+    );
+  }
+
+  final double _tx;
+  final double _ty;
+  final double _pageH;
+  final bool _okX;
+  final bool _okY;
+
+  /// Snaps a local x (pt) to the px grid.
+  double x(double v) =>
+      !_okX ? v : ((v + _tx) / _pxToPt).roundToDouble() * _pxToPt - _tx;
+
+  /// Snaps a local y (pt, pdf y-up) to the px grid measured from the page top.
+  double y(double v) => !_okY
+      ? v
+      : _pageH -
+          ((_pageH - (v + _ty)) / _pxToPt).roundToDouble() * _pxToPt -
+          _ty;
+
+  /// Absolute distance in pt from the page top of local y [v].
+  double downFromTop(double v) => _pageH - (v + _ty);
+
+  /// Snaps the rect (x, y up-from-bottom, w, h) edge by edge, like Chrome's
+  /// pixel-snapped box.
+  PdfRect rect(double x0, double y0, double w, double h) {
+    final sx0 = x(x0);
+    final sx1 = x(x0 + w);
+    final sy0 = y(y0);
+    final sy1 = y(y0 + h);
+    return PdfRect(sx0, sy0, sx1 - sx0, sy1 - sy0);
+  }
+}
+
+/// Switch for [PxSnap] (off = the unsnapped fractional positions).
+const bool kPixelSnap = true;
+
+/// Snaps the first baseline of a text block to a whole px like Chrome (the
+/// block's top is where [baseline] pt below it the first baseline sits).
+class _SnapBaseline extends pw.SingleChildWidget {
+  _SnapBaseline({required this.baseline, required pw.Widget child})
+      : super(child: child);
+
+  final double baseline;
+
+  @override
+  void paint(pw.Context context) {
+    super.paint(context);
+    if (child == null) return;
+    final snap = PxSnap.of(context);
+    final top = box!.y + box!.height;
+    final base = snap.downFromTop(top) + baseline;
+    final snapped = (base / _pxToPt).roundToDouble() * _pxToPt;
+    final shift = snap._okY ? base - snapped : 0.0;
+    final mat = Matrix4.identity()..translate(box!.x, box!.y + shift);
+    context.canvas
+      ..saveContext()
+      ..setTransform(mat);
+    child!.paint(context);
+    context.canvas.restoreContext();
+  }
+}
+
+/// Snaps the rect of an image to whole px (edge by edge, so size changes by
+/// up to a px like Chrome's pixel-snapped image rect).
+class _SnapRect extends pw.SingleChildWidget {
+  _SnapRect({required pw.Widget child}) : super(child: child);
+
+  @override
+  void paint(pw.Context context) {
+    super.paint(context);
+    if (child == null) return;
+    final snap = PxSnap.of(context);
+    final b = box!;
+    final r = snap.rect(b.x, b.y, b.width, b.height);
+    final sx = b.width > 0 ? r.width / b.width : 1.0;
+    final sy = b.height > 0 ? r.height / b.height : 1.0;
+    final mat = Matrix4.identity()
+      ..translate(r.x, r.y)
+      ..scale(sx, sy, 1);
+    context.canvas
+      ..saveContext()
+      ..setTransform(mat);
+    child!.paint(context);
+    context.canvas.restoreContext();
+  }
+}
+
+/// A `pw.Table` border painted the way Chrome paints collapsed borders: every
+/// grid line is one filled rect on the pixel grid ([PxSnap]), horizontal lines
+/// run the full width and the vertical lines run between them, so no joint is
+/// painted twice (stacked, centred, anti-aliased strokes would darken it).
+/// Sides that are [pw.BorderSide.none] are not painted; the lines are centred
+/// on the table box edges and on the cell edges, as pw.Table's strokes were.
+class CssTableBorder extends pw.TableBorder {
+  const CssTableBorder({
+    pw.BorderSide left = pw.BorderSide.none,
+    pw.BorderSide top = pw.BorderSide.none,
+    pw.BorderSide right = pw.BorderSide.none,
+    pw.BorderSide bottom = pw.BorderSide.none,
+    pw.BorderSide horizontalInside = pw.BorderSide.none,
+    pw.BorderSide verticalInside = pw.BorderSide.none,
+  }) : super(
+          left: left,
+          top: top,
+          right: right,
+          bottom: bottom,
+          horizontalInside: horizontalInside,
+          verticalInside: verticalInside,
+        );
+
+  bool _on(pw.BorderSide s) => s.style.paint && s.width > 0;
+
+  @override
+  void paintTable(pw.Context context, PdfRect box,
+      [List<double?>? widths, List<double>? heights]) {
+    final canvas = context.canvas;
+    final snap = PxSnap.of(context);
+
+    // Horizontal lines (centre y, side), top to bottom.
+    final hs = <(double, pw.BorderSide)>[];
+    if (_on(top)) hs.add((box.top, top));
+    if (_on(horizontalInside) && heights != null) {
+      var y = box.top;
+      for (final h in heights.sublist(0, heights.length - 1)) {
+        y -= h;
+        hs.add((y, horizontalInside));
+      }
+    }
+    if (_on(bottom)) hs.add((box.y, bottom));
+
+    // Vertical lines (centre x, side), left to right.
+    final vs = <(double, pw.BorderSide)>[];
+    if (_on(left)) vs.add((box.x, left));
+    if (_on(verticalInside) && widths != null) {
+      var x = box.x;
+      for (final w in widths.sublist(0, widths.length - 1)) {
+        x += w!;
+        vs.add((x, verticalInside));
+      }
+    }
+    if (_on(right)) vs.add((box.right, right));
+
+    void fill(PdfColor c, double x, double y, double w, double h) {
+      final r = snap.rect(x, y, w, h);
+      canvas
+        ..setFillColor(c)
+        ..drawRect(r.x, r.y, r.width, r.height)
+        ..fillPath();
+    }
+
+    // Extent of the horizontals: out to the outer verticals' half widths.
+    final xl = box.x - (_on(left) ? left.width / 2 : 0);
+    final xr = box.right + (_on(right) ? right.width / 2 : 0);
+    for (final (y, side) in hs) {
+      fill(side.color, xl, y - side.width / 2, xr - xl, side.width);
+    }
+    // Verticals run between consecutive horizontals (or the box edges).
+    final ys = <(double, double)>[]; // (top edge, bottom edge) of each gap
+    var gapTop = box.top;
+    for (final (y, side) in hs) {
+      final edgeTop = y + side.width / 2;
+      if (y >= box.top - 1e-6) {
+        gapTop = y - side.width / 2;
+        continue;
+      }
+      if (edgeTop < gapTop) ys.add((gapTop, edgeTop));
+      gapTop = y - side.width / 2;
+    }
+    ys.add((gapTop, box.y + (_on(bottom) ? bottom.width / 2 : 0)));
+    for (final (x, side) in vs) {
+      for (final (t, b) in ys) {
+        if (t <= b) continue;
+        fill(side.color, x - side.width / 2, b, side.width, t - b);
+      }
+    }
+  }
 }
 
 /// A CSS box (`box-sizing: border-box`). Unlike `pw.Container`, borders take
@@ -377,6 +878,8 @@ class CssBox extends pw.Widget {
     final y0 = box!.y + margin.bottom;
     final w = box!.width - margin.horizontal;
     final h = box!.height - margin.vertical;
+    // Backgrounds and borders paint on the pixel-snapped box.
+    final sr = PxSnap.of(context).rect(x0, y0, w, h);
 
     final uniform = top != null &&
         top!.width > 0 &&
@@ -391,9 +894,9 @@ class CssBox extends pw.Widget {
       canvas.setFillColor(background!);
       if (radius > 0) {
         pw.BorderRadius.all(pw.Radius.circular(radius))
-            .paint(context, PdfRect(x0, y0, w, h));
+            .paint(context, sr);
       } else {
-        canvas.drawRect(x0, y0, w, h);
+        canvas.drawRect(sr.x, sr.y, sr.width, sr.height);
       }
       canvas.fillPath();
     }
@@ -407,7 +910,8 @@ class CssBox extends pw.Widget {
         ..setLineWidth(bw);
       if (top!.dashed) canvas.setLineDashPattern([bw * 3, bw * 3], 0);
       pw.BorderRadius.all(pw.Radius.circular(math.max(0.0, radius - bw / 2)))
-          .paint(context, PdfRect(x0 + bw / 2, y0 + bw / 2, w - bw, h - bw));
+          .paint(context,
+              PdfRect(sr.x + bw / 2, sr.y + bw / 2, sr.width - bw, sr.height - bw));
       canvas
         ..strokePath()
         ..restoreContext();
@@ -438,10 +942,12 @@ class CssBox extends pw.Widget {
           ..fillPath();
       }
 
-      edge(top, x0, y0 + h - _bt, w, _bt, horizontal: true);
-      edge(bottom, x0, y0, w, _bb, horizontal: true);
-      edge(left, x0, y0 + _bb, _bl, h - _bt - _bb, horizontal: false);
-      edge(right, x0 + w - _br, y0 + _bb, _br, h - _bt - _bb,
+      edge(top, sr.x, sr.y + sr.height - _bt, sr.width, _bt, horizontal: true);
+      edge(bottom, sr.x, sr.y, sr.width, _bb, horizontal: true);
+      edge(left, sr.x, sr.y + _bb, _bl, sr.height - _bt - _bb,
+          horizontal: false);
+      edge(right, sr.x + sr.width - _br, sr.y + _bb, _br,
+          sr.height - _bt - _bb,
           horizontal: false);
     }
 
@@ -464,8 +970,17 @@ class CssBox extends pw.Widget {
 // Page-break helpers
 // ---------------------------------------------------------------------------
 
-/// Single-child container that avoids page break inside when possible.
-/// Modeled on pdf's Inseparable widget.
+/// Height of the area content can flow in on the page being laid out: the
+/// page height minus the margins carried by its [PdfPageFormat]. The report
+/// pages are `reportPageFormat` (27.75pt margins, ~787pt usable); a MultiPage
+/// built on `PdfPageFormat.a4` would carry 2cm margins and read as 728.5pt.
+double _usablePageHeight(pw.Context context) =>
+    context.page.pageFormat.availableHeight;
+
+/// Single-child container that avoids page break inside when possible: it
+/// moves to the next page when it does not fit and only spans pages once it
+/// is taller than a whole page content area (latched, like Chrome's
+/// `break-inside: avoid`). Modeled on pdf's Inseparable widget.
 class AvoidBreakInside extends pw.SingleChildWidget {
   AvoidBreakInside({required pw.Widget child}) : super(child: child);
 
@@ -478,10 +993,8 @@ class AvoidBreakInside extends pw.SingleChildWidget {
   void layout(pw.Context context, pw.BoxConstraints constraints,
       {bool parentUsesSize = false}) {
     super.layout(context, constraints, parentUsesSize: parentUsesSize);
-    if (box != null) {
-      if (box!.height > context.page.pageFormat.availableHeight) {
-        _tooTall = true;
-      }
+    if (box != null && box!.height > _usablePageHeight(context)) {
+      _tooTall = true;
     }
   }
 
@@ -533,7 +1046,9 @@ pw.Widget reportCard(
 /// Section heading per `.sectionHeading`: 10.2pt bold UPPERCASE #1f4e79,
 /// 0.75pt #e8eef5 bottom rule, padding-bottom 3pt, margin-bottom 4.8pt, with
 /// the inherited line-height.
-pw.Widget sectionHeading(String text, {double? lineHeight}) => CssBox(
+pw.Widget sectionHeading(String text,
+        {double? lineHeight, PdfColor color = ReportPdfTheme.accent}) =>
+    CssBox(
       margin: const pw.EdgeInsets.only(bottom: 4.8),
       padding: const pw.EdgeInsets.only(bottom: 3.0),
       bottom: const CssSide(0.75, ReportPdfTheme.accentTint),
@@ -543,7 +1058,7 @@ pw.Widget sectionHeading(String text, {double? lineHeight}) => CssBox(
         weight: 700,
         upper: true,
         lineHeight: lineHeight,
-        color: ReportPdfTheme.accent,
+        color: color,
       ),
     );
 
@@ -609,7 +1124,9 @@ const double thumbBoxW = 82.5;
 const double thumbBoxH = 63.75;
 
 /// Truncates photo caption to the tile content width (102px = 76.5pt),
-/// matching Bootstrap `.text-truncate`, using the real Selawik advances.
+/// matching Bootstrap `.text-truncate`: the longest prefix that fits with the
+/// ellipsis (a trailing space before it stays, as in Chrome), measured with
+/// the Segoe-compatible advances and pair kerning of [measureText].
 String truncateCaption(String text,
     {double maxWidthPt = 76.5, double fontSizePt = 10.5}) {
   final safe = pdfSafe(text).trim();
@@ -617,7 +1134,7 @@ String truncateCaption(String text,
   if (measureText(safe, fontSizePt) <= maxWidthPt) return safe;
   const ellipsis = '…';
   for (var i = safe.length - 1; i >= 1; i--) {
-    final candidate = '${safe.substring(0, i).trimRight()}$ellipsis';
+    final candidate = '${safe.substring(0, i)}$ellipsis';
     if (measureText(candidate, fontSizePt) <= maxWidthPt) return candidate;
   }
   return ellipsis;
@@ -637,8 +1154,9 @@ pw.Widget thumb(Uint8List? bytes, {String? caption}) {
       final nw = (image.width ?? 1).toDouble() * 0.75;
       final nh = (image.height ?? 1).toDouble() * 0.75;
       final scale = math.min(1.0, math.min(imgW / nw, imgH / nh));
-      inner = pw.Image(image,
-          width: nw * scale, height: nh * scale, fit: pw.BoxFit.fill);
+      inner = _SnapRect(
+          child: pw.Image(image,
+              width: nw * scale, height: nh * scale, fit: pw.BoxFit.fill));
     } catch (_) {
       inner = _unavailable(imgW, imgH);
     }
@@ -810,7 +1328,9 @@ pw.Widget photoRow(
 /// #1f4e79 (lh 1.2, mb 3); subtitle 10.8pt semibold.
 ///
 /// [lineHeight] is the report's inherited line-height (meta row, subtitle).
-/// [forceBlack] renders division, depot and title in black (Checklist).
+/// [forceBlack] renders railway, division, depot and title in black
+/// (Checklist); otherwise the railway h2 is [ReportPdfTheme.headingInk] (the
+/// web print's `#1e293b`) unless [railwayColor] says otherwise.
 pw.Widget reportHeader({
   required ReportOrganization org,
   required String title,
@@ -819,8 +1339,11 @@ pw.Widget reportHeader({
   List<(String, String)> metaRight = const [],
   double? lineHeight,
   bool forceBlack = false,
+  PdfColor? railwayColor,
 }) {
   final root = lineHeight ?? ReportRoot.lineHeight;
+  final h2Color = railwayColor ??
+      (forceBlack ? ReportPdfTheme.inkPrint : ReportPdfTheme.headingInk);
   final hasMeta = metaLeft.isNotEmpty || metaRight.isNotEmpty;
   final h3Color = forceBlack ? ReportPdfTheme.inkPrint : ReportPdfTheme.muted;
   final titleColor = forceBlack ? ReportPdfTheme.inkPrint : ReportPdfTheme.accent;
@@ -858,6 +1381,7 @@ pw.Widget reportHeader({
           upper: true,
           lineHeight: 1.2,
           letterSpacingEm: 0.03,
+          color: h2Color,
           align: pw.TextAlign.center,
         ),
         pw.SizedBox(height: 2.4),
@@ -923,6 +1447,7 @@ pw.Widget letterhead(
   String? subtitle,
   double? lineHeight,
   bool forceBlack = false,
+  PdfColor? railwayColor,
 }) {
   final List<(String, String)> left;
   final List<(String, String)> right;
@@ -941,6 +1466,7 @@ pw.Widget letterhead(
     metaRight: right,
     lineHeight: lineHeight,
     forceBlack: forceBlack,
+    railwayColor: railwayColor,
   );
 }
 
@@ -953,6 +1479,9 @@ pw.Widget letterhead(
 /// ([collapseWith], 9pt for a card), a SIGN-OFF heading, a row of equal
 /// columns (gap 12, 9.6pt; semibold muted "Label:" + 1.8pt + value), an
 /// optional remarks row (pre-line), and a 9pt muted meta row.
+///
+/// [forceBlack] prints the heading, the labels and the meta row in black (the
+/// Checklist's print rule overrides the muted and accent colours).
 pw.Widget signOff({
   String? technician,
   String? maintenanceStaff,
@@ -961,15 +1490,17 @@ pw.Widget signOff({
   required DateTime generatedAt,
   double? lineHeight,
   double collapseWith = 9.0,
+  bool forceBlack = false,
 }) {
   final root = lineHeight ?? ReportRoot.lineHeight;
+  final muted = forceBlack ? ReportPdfTheme.inkPrint : ReportPdfTheme.muted;
   String tech = (technician ?? '').trim();
   if (tech.isEmpty) tech = '—';
 
   pw.Widget item(String label, String value) => cssRich(
         [
-          CssSpan('$label:',
-              weight: 600, color: ReportPdfTheme.muted, trailingGapPt: 1.8),
+          // `.signoffLabel`: margin-right 0.15rem (1.8pt) + the JSX space.
+          CssSpan('$label:', weight: 600, color: muted, trailingGapPt: 1.8),
           CssSpan(' $value'),
         ],
         sizePt: 9.6,
@@ -994,7 +1525,9 @@ pw.Widget signOff({
   return reportCard(
     margin: pw.EdgeInsets.only(top: topGap, bottom: 9.0),
     [
-      sectionHeading('SIGN-OFF', lineHeight: root),
+      sectionHeading('SIGN-OFF',
+          lineHeight: root,
+          color: forceBlack ? ReportPdfTheme.inkPrint : ReportPdfTheme.accent),
       pw.Padding(
         padding: const pw.EdgeInsets.only(bottom: 4.8),
         child: pw.Row(
@@ -1021,7 +1554,7 @@ pw.Widget signOff({
                   ? 'Submission #${submission.number} · ${submission.timestampLabel}'
                   : 'Submission #${submission.number}',
               sizePt: 9.0,
-              color: ReportPdfTheme.muted,
+              color: muted,
               lineHeight: root,
             )
           else
@@ -1029,7 +1562,7 @@ pw.Widget signOff({
           cssText(
             'Generated: ${formatGeneratedAt(generatedAt)}',
             sizePt: 9.0,
-            color: ReportPdfTheme.muted,
+            color: muted,
             lineHeight: root,
           ),
         ],
@@ -1071,53 +1604,330 @@ List<double> autoColumnWidths(
   return [for (var i = 0; i < n; i++) mins[i] + (maxs[i] - mins[i]) * f];
 }
 
-class _TablePlan {
-  _TablePlan(this.mins, this.maxs, this.fractions);
-  final List<double> mins;
-  final List<double> maxs;
-  final List<double>? fractions;
-
-  /// Column widths in the pw.Table frame (table box = Chrome's border box
-  /// minus 0.375 on each side, because collapsed outer borders are centred
-  /// 0.375 inside the border box).
-  List<double> widths(double boxWidth) {
-    final total = boxWidth + 0.75;
-    final w = fractions != null
-        ? [for (final f in fractions!) f * total]
-        : autoColumnWidths(mins, maxs, total);
-    final out = List<double>.from(w);
-    out[0] -= 0.375;
-    out[out.length - 1] -= 0.375;
-    return out;
+/// Number of lines [text] wraps to in [widthPt] of text area (CSS
+/// `white-space: normal`, greedy at spaces; a newline also breaks), measured
+/// with the Segoe-compatible advances of [measureText].
+int cssWrapLineCount(String text, double widthPt, double sizePt,
+    {int weight = 400, bool italic = false}) {
+  double w(String t) => measureText(t, sizePt, weight: weight, italic: italic);
+  final space = w(' ');
+  var n = 0;
+  for (final line in pdfSafe(text).split('\n')) {
+    var cur = 0.0;
+    var lines = 1;
+    for (final word in line.split(RegExp(r'\s+'))) {
+      if (word.isEmpty) continue;
+      final ww = w(word);
+      if (cur == 0) {
+        cur = ww;
+      } else if (cur + space + ww <= widthPt) {
+        cur += space + ww;
+      } else {
+        lines++;
+        cur = ww;
+      }
+    }
+    n += lines;
   }
+  return math.max(1, n);
 }
 
-class _PlannedColumn extends pw.TableColumnWidth {
-  const _PlannedColumn(this.plan, this.index);
-  final _TablePlan plan;
-  final int index;
+/// Height in css px of a table row of [lines] text lines as Chrome lays it
+/// out: line-height (LayoutUnit-quantised) per line, 2 x padding (also
+/// quantised to 1/64 px) and one collapsed 1px border. A 9.75pt / 1.5 body row
+/// of one line is 19.5 + 12.1875 = 31.6875px.
+double cssRowPx(int lines,
+    {required double lineHeight, double sizePt = 9.75, double padVPt = 4.2}) {
+  double q(double v) => (v * 64).floorToDouble() / 64;
+  final lh = q(lineHeight * sizePt / _pxToPt);
+  return lines * lh + 2 * q(padVPt / _pxToPt) + 1;
+}
+
+/// Chrome paints table row edges on whole px: the cumulative row edges of
+/// rows [px] tall (css px, from the table top) are snapped, so equal rows
+/// alternate 24 / 23.25pt. Returns the snapped row heights in pt.
+List<double> cssSnapRowsPt(List<double> px) {
+  final out = <double>[];
+  var sum = 0.0;
+  var prev = 0.0;
+  for (final h in px) {
+    sum += h;
+    final edge = (sum - 0.01).roundToDouble();
+    out.add((edge - prev) * _pxToPt);
+    prev = edge;
+  }
+  return out;
+}
+
+/// One row of a [cssTable]: [cells] (already laid out text blocks) between the
+/// vertical grid lines [xs] (centres of 0.75pt collapsed borders, `xs.first`
+/// is 0), the row being at least [minPitch] tall measured between the centres
+/// of its top and bottom grid lines. Borders are painted the way Chrome does:
+/// every grid line exactly once, as a filled 0.75pt rect (horizontal lines
+/// span the full table width including the outer half borders, vertical ones
+/// run between the horizontals), so nothing is stroked twice and no
+/// anti-aliased overlap darkens a joint. The th fill is a per-cell rect inset
+/// inside the borders and cells are vertically centred.
+///
+/// The widget is [xs].last + 0.75 wide (the outer half borders) and, for the
+/// first / last row, 0.375 taller at the top / bottom.
+class _CssTableRow extends pw.Widget {
+  _CssTableRow({
+    required this.xs,
+    required this.cells,
+    required this.minPitch,
+    required this.first,
+    required this.last,
+    required this.borderColor,
+    this.fill,
+  });
+
+  final List<double> xs;
+  final List<pw.Widget> cells;
+  final double minPitch;
+  final bool first;
+  final bool last;
+  final PdfColor borderColor;
+  final PdfColor? fill;
+
+  /// Cell padding (0.5rem x 0.35rem) and half a collapsed border.
+  static const double padH = 6.0;
+  static const double padV = 4.2;
+  static const double _half = 0.375;
+  double _pitch = 0;
+  final List<double> _childH = [];
 
   @override
-  pw.ColumnLayout layout(
-      pw.Widget child, pw.Context context, pw.BoxConstraints? constraints) {
-    final bounded = constraints != null && constraints.hasBoundedWidth;
-    final double w;
-    if (bounded) {
-      w = plan.widths(constraints.maxWidth)[index];
-    } else {
-      w = plan.maxs[index];
+  void layout(pw.Context context, pw.BoxConstraints constraints,
+      {bool parentUsesSize = false}) {
+    var contentH = 0.0;
+    _childH.clear();
+    for (var j = 0; j < cells.length; j++) {
+      final w = math.max(0.0, xs[j + 1] - xs[j] - 2 * _half - 2 * padH);
+      cells[j].layout(
+        context,
+        pw.BoxConstraints(minWidth: w, maxWidth: w),
+        parentUsesSize: true,
+      );
+      _childH.add(cells[j].box!.height);
+      contentH = math.max(contentH, cells[j].box!.height);
     }
-    return pw.ColumnLayout(w, 0);
+    _pitch = math.max(minPitch, contentH + 2 * padV + 2 * _half);
+    box = PdfRect(
+      0,
+      0,
+      xs.last + 2 * _half,
+      _pitch + (first ? _half : 0) + (last ? _half : 0),
+    );
+  }
+
+  @override
+  void paint(pw.Context context) {
+    super.paint(context);
+    final canvas = context.canvas;
+    final b = box!;
+    // Local origin: the left grid line centre sits at b.x + _half; the
+    // bottom grid line centre at b.y + (last ? _half : 0).
+    final ox = b.x + _half;
+    final yBottom = b.y + (last ? _half : 0);
+    final yTop = yBottom + _pitch;
+
+    final snap = PxSnap.of(context);
+    void fillRect(double x, double y, double w, double h) {
+      final r = snap.rect(x, y, w, h);
+      canvas.drawRect(r.x, r.y, r.width, r.height);
+    }
+
+    if (fill != null) {
+      canvas.setFillColor(fill!);
+      for (var j = 0; j < cells.length; j++) {
+        fillRect(ox + xs[j] + _half, yBottom + _half, xs[j + 1] - xs[j] - 2 * _half,
+            _pitch - 2 * _half);
+      }
+      canvas.fillPath();
+    }
+
+    canvas.setFillColor(borderColor);
+    // Horizontal grid lines: bottom always, top for the first row only.
+    fillRect(b.x, yBottom - _half, b.width, 2 * _half);
+    if (first) fillRect(b.x, yTop - _half, b.width, 2 * _half);
+    // Vertical grid lines between the horizontals.
+    for (final x in xs) {
+      fillRect(ox + x - _half, yBottom + _half, 2 * _half, _pitch - 2 * _half);
+    }
+    canvas.fillPath();
+
+    for (var j = 0; j < cells.length; j++) {
+      final contentH = _pitch - 2 * _half - 2 * padV;
+      final dy = (contentH - _childH[j]) / 2;
+      final mat = Matrix4.identity()
+        ..translate(
+          ox + xs[j] + _half + padH,
+          yTop - _half - padV - dy - _childH[j],
+        );
+      canvas
+        ..saveContext()
+        ..setTransform(mat);
+      cells[j].paint(context);
+      canvas.restoreContext();
+    }
   }
 }
 
-/// A report data table per `.table`: 9.75pt, cell padding 4.2 x 6pt,
-/// collapsed 0.75pt #4b5563 borders (each row is content + padding + one
-/// border width tall), th bold on #e8eef5, header row repeated on every
-/// page. Widths follow CSS auto layout unless [percentWidths] (fractions of
-/// the table width) is given. A row with a single cell in a table of more
-/// columns is a full-width (colspan) row; such tables are returned as a
-/// non-breaking stack of segments.
+/// The rows of a CSS data table `.table` (9.75pt, cell padding 4.2 x 6pt,
+/// collapsed 0.75pt `#4b5563` borders, th bold on `#e8eef5`, text vertically
+/// centred) laid out in a table [width] wide, as separate widgets so a
+/// `MultiPage` can break between any two rows.
+///
+/// Column widths follow CSS auto layout unless [percentWidths] (fractions of
+/// the table width) is given; the first and last column also carry the outer
+/// half border (0.375pt) in their min / max content width. A row with a
+/// single cell in a table of more columns is a full-width (colspan) row. With
+/// [snapRows] (default) row heights follow Chrome's whole-px row edges (see
+/// [cssSnapRowsPt]).
+List<pw.Widget> cssTableRows(
+  List<String> headers,
+  List<List<String>> rows, {
+  required double width,
+  required double lineHeight,
+  List<double>? percentWidths,
+  double sizePt = 9.75,
+  int bodyWeight = 400,
+  PdfColor bodyColor = ReportPdfTheme.inkPrint,
+  CssCellStyle? Function(int row, int col)? cellStyles,
+  PdfColor borderColor = ReportPdfTheme.borderPrint,
+  bool snapRows = true,
+}) {
+  final n = headers.length;
+  const padH = _CssTableRow.padH;
+  const half = 0.375;
+  bool isSpan(int r) => rows[r].length == 1 && n > 1;
+
+  // Column widths.
+  final List<double> colW;
+  if (percentWidths != null) {
+    colW = [for (final f in percentWidths) f * width];
+  } else {
+    final mins = List<double>.filled(n, 0);
+    final maxs = List<double>.filled(n, 0);
+    void measure(String text, int col, int weight) {
+      final safe = pdfSafe(text);
+      maxs[col] =
+          math.max(maxs[col], measureText(safe, sizePt, weight: weight));
+      for (final word in safe.split(RegExp(r'\s+'))) {
+        mins[col] =
+            math.max(mins[col], measureText(word, sizePt, weight: weight));
+      }
+    }
+
+    for (var c = 0; c < n; c++) {
+      measure(headers[c], c, 700);
+    }
+    for (var r = 0; r < rows.length; r++) {
+      if (isSpan(r)) continue;
+      for (var c = 0; c < n && c < rows[r].length; c++) {
+        measure(rows[r][c], c, cellStyles?.call(r, c)?.weight ?? bodyWeight);
+      }
+    }
+    for (var c = 0; c < n; c++) {
+      final extra = 2 * padH + 0.75 + (c == 0 || c == n - 1 ? half : 0);
+      mins[c] += extra;
+      maxs[c] += extra;
+    }
+    colW = autoColumnWidths(mins, maxs, width);
+  }
+  // Grid line centres: the outer lines sit half a border inside the box.
+  final xs = <double>[0];
+  for (var c = 0; c < n; c++) {
+    final pitch = colW[c] - (c == 0 || c == n - 1 ? half : 0);
+    xs.add(xs.last + pitch);
+  }
+
+  // Row heights: lines per cell from the wrap model, snapped like Chrome.
+  int linesOf(List<String> texts, List<int> weights, List<double> cellW) {
+    var lines = 1;
+    for (var c = 0; c < texts.length; c++) {
+      lines = math.max(
+          lines,
+          cssWrapLineCount(texts[c], cellW[c], sizePt, weight: weights[c]));
+    }
+    return lines;
+  }
+
+  final textW = [
+    for (var c = 0; c < n; c++) xs[c + 1] - xs[c] - 2 * half - 2 * padH,
+  ];
+  final spanW = [xs.last - 2 * half - 2 * padH];
+  final linesPerRow = <int>[
+    linesOf(headers, List.filled(n, 700), textW),
+    for (var r = 0; r < rows.length; r++)
+      isSpan(r)
+          ? linesOf([rows[r][0]], [cellStyles?.call(r, 0)?.weight ?? bodyWeight],
+              spanW)
+          : linesOf(
+              [for (var c = 0; c < n; c++) c < rows[r].length ? rows[r][c] : ''],
+              [for (var c = 0; c < n; c++) cellStyles?.call(r, c)?.weight ?? bodyWeight],
+              textW),
+  ];
+  final minPitch = snapRows
+      ? cssSnapRowsPt([
+          for (final l in linesPerRow)
+            cssRowPx(l, lineHeight: lineHeight, sizePt: sizePt),
+        ])
+      : List<double>.filled(linesPerRow.length, 0);
+
+  pw.Widget cell(String text, int weight, PdfColor color,
+          {pw.TextAlign? align, bool italic = false}) =>
+      cssText(text,
+          sizePt: sizePt,
+          weight: weight,
+          color: color,
+          lineHeight: lineHeight,
+          align: align,
+          italic: italic);
+
+  final total = rows.length + 1;
+  final out = <pw.Widget>[
+    _CssTableRow(
+      xs: xs,
+      cells: [for (final h in headers) cell(h, 700, ReportPdfTheme.inkPrint)],
+      minPitch: minPitch[0],
+      first: true,
+      last: rows.isEmpty,
+      borderColor: borderColor,
+      fill: ReportPdfTheme.accentTint,
+    ),
+  ];
+  for (var r = 0; r < rows.length; r++) {
+    final s0 = cellStyles?.call(r, 0);
+    out.add(_CssTableRow(
+      xs: isSpan(r) ? [0, xs.last] : xs,
+      cells: isSpan(r)
+          ? [
+              cell(rows[r][0], s0?.weight ?? bodyWeight, s0?.color ?? bodyColor,
+                  align: s0?.align ?? pw.TextAlign.center,
+                  italic: s0?.italic ?? false),
+            ]
+          : [
+              for (var c = 0; c < n; c++)
+                () {
+                  final s = cellStyles?.call(r, c);
+                  return cell(c < rows[r].length ? rows[r][c] : '',
+                      s?.weight ?? bodyWeight, s?.color ?? bodyColor,
+                      align: s?.align, italic: s?.italic ?? false);
+                }(),
+            ],
+      minPitch: minPitch[r + 1],
+      first: false,
+      last: r + 1 == total - 1,
+      borderColor: borderColor,
+    ));
+  }
+  return out;
+}
+
+/// A report data table (see [cssTableRows]) filling the available width, as
+/// one column of rows. The header row is not repeated across pages.
 pw.Widget cssTable(
   List<String> headers,
   List<List<String>> rows, {
@@ -1128,134 +1938,29 @@ pw.Widget cssTable(
   PdfColor bodyColor = ReportPdfTheme.inkPrint,
   CssCellStyle? Function(int row, int col)? cellStyles,
   PdfColor borderColor = ReportPdfTheme.borderPrint,
-}) {
-  final n = headers.length;
-  const padH = 6.0;
-  const padV = 4.2;
-  const hv = padH * 2 + 0.75; // horizontal extra per column
-  final useFractions = percentWidths != null;
-
-  final mins = List<double>.filled(n, 0);
-  final maxs = List<double>.filled(n, 0);
-  void measure(String text, int col, int weight) {
-    final safe = pdfSafe(text);
-    maxs[col] = math.max(maxs[col], measureText(safe, sizePt, weight: weight));
-    for (final word in safe.split(RegExp(r'\s+'))) {
-      mins[col] =
-          math.max(mins[col], measureText(word, sizePt, weight: weight));
-    }
-  }
-
-  for (var c = 0; c < n; c++) {
-    measure(headers[c], c, 700);
-  }
-  for (var r = 0; r < rows.length; r++) {
-    if (rows[r].length == 1 && n > 1) continue;
-    for (var c = 0; c < n && c < rows[r].length; c++) {
-      measure(rows[r][c], c, cellStyles?.call(r, c)?.weight ?? bodyWeight);
-    }
-  }
-  for (var c = 0; c < n; c++) {
-    mins[c] += hv;
-    maxs[c] += hv;
-  }
-
-  final plan = _TablePlan(mins, maxs, useFractions ? percentWidths : null);
-  final columns = {
-    for (var c = 0; c < n; c++) c: _PlannedColumn(plan, c),
-  };
-  final border = pw.TableBorder.all(color: borderColor, width: 0.75);
-
-  pw.Widget cell(String text, int weight, PdfColor color,
-          {pw.TextAlign? align, bool italic = false}) =>
-      pw.Padding(
-        padding: const pw.EdgeInsets.symmetric(
-            horizontal: padH + 0.375, vertical: padV + 0.375),
-        child: cssText(text,
-            sizePt: sizePt,
-            weight: weight,
-            color: color,
-            lineHeight: lineHeight,
-            align: align,
-            italic: italic),
-      );
-
-  final headerRow = pw.TableRow(
-    repeat: true,
-    decoration: const pw.BoxDecoration(color: ReportPdfTheme.accentTint),
-    children: [
-      for (final h in headers) cell(h, 700, ReportPdfTheme.inkPrint),
-    ],
-  );
-
-  pw.TableRow bodyRow(int r) => pw.TableRow(
-        children: [
-          for (var c = 0; c < n; c++)
-            () {
-              final s = cellStyles?.call(r, c);
-              final text = c < rows[r].length ? rows[r][c] : '';
-              return cell(text, s?.weight ?? bodyWeight,
-                  s?.color ?? bodyColor,
-                  align: s?.align, italic: s?.italic ?? false);
-            }(),
-        ],
-      );
-
-  final hasSpan = [
-    for (final r in rows)
-      if (r.length == 1 && n > 1) true
-  ].isNotEmpty;
-
-  if (!hasSpan) {
-    return pw.Padding(
-      padding: const pw.EdgeInsets.all(0.375),
-      child: pw.Table(
-        border: border,
-        columnWidths: columns,
-        children: [headerRow, for (var r = 0; r < rows.length; r++) bodyRow(r)],
+  bool snapRows = true,
+}) =>
+    pw.LayoutBuilder(
+      builder: (context, constraints) => pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.start,
+        mainAxisSize: pw.MainAxisSize.min,
+        children: cssTableRows(
+          headers,
+          rows,
+          width: constraints != null && constraints.hasBoundedWidth
+              ? constraints.maxWidth
+              : 540.0,
+          lineHeight: lineHeight,
+          percentWidths: percentWidths,
+          sizePt: sizePt,
+          bodyWeight: bodyWeight,
+          bodyColor: bodyColor,
+          cellStyles: cellStyles,
+          borderColor: borderColor,
+          snapRows: snapRows,
+        ),
       ),
     );
-  }
-
-  // Segments: consecutive normal rows share a table; each colspan row is a
-  // single-column table of full width.
-  final segments = <pw.Widget>[];
-  var pending = <pw.TableRow>[headerRow];
-  void flush() {
-    if (pending.isEmpty) return;
-    segments.add(pw.Table(
-        border: border, columnWidths: columns, children: pending));
-    pending = [];
-  }
-
-  for (var r = 0; r < rows.length; r++) {
-    if (rows[r].length == 1 && n > 1) {
-      flush();
-      final s = cellStyles?.call(r, 0);
-      segments.add(pw.Table(
-        border: border,
-        children: [
-          pw.TableRow(children: [
-            cell(rows[r][0], s?.weight ?? bodyWeight, s?.color ?? bodyColor,
-                align: s?.align ?? pw.TextAlign.center,
-                italic: s?.italic ?? false),
-          ]),
-        ],
-      ));
-    } else {
-      pending.add(bodyRow(r));
-    }
-  }
-  flush();
-  return pw.Padding(
-    padding: const pw.EdgeInsets.all(0.375),
-    child: pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
-      mainAxisSize: pw.MainAxisSize.min,
-      children: segments,
-    ),
-  );
-}
 
 pw.Widget paramTable(List<ReportParameter> params, {double? lineHeight}) =>
     cssTable(
