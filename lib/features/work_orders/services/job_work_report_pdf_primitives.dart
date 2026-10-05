@@ -891,12 +891,24 @@ class CssBox extends pw.Widget {
         bottom?.color == left?.color;
 
     if (background != null) {
+      // Measured Chrome print behaviour (badges, metaGrids, thumbs across
+      // all four kinds): the background fill path sits half a border inside
+      // the border box per side — e.g. a 0.75pt border at x 39.0 paints its
+      // fill at 39.4 — with the border centred on the same path. A
+      // full-bleed fill paints ~0.4pt of colour where Chrome has border ink
+      // and costs vector precision, so inset here (layout is untouched).
+      final il = _bl / 2, ir = _br / 2, it = _bt / 2, ib = _bb / 2;
+      final fx = sr.x + il, fy = sr.y + ib;
+      final fw = math.max(0.0, sr.width - il - ir);
+      final fh = math.max(0.0, sr.height - it - ib);
       canvas.setFillColor(background!);
       if (radius > 0) {
-        pw.BorderRadius.all(pw.Radius.circular(radius))
-            .paint(context, sr);
+        final bw =
+            math.max(math.max(_bt, _bb), math.max(_bl, _br));
+        pw.BorderRadius.all(pw.Radius.circular(math.max(0.0, radius - bw / 2)))
+            .paint(context, PdfRect(fx, fy, fw, fh));
       } else {
-        canvas.drawRect(sr.x, sr.y, sr.width, sr.height);
+        canvas.drawRect(fx, fy, fw, fh);
       }
       canvas.fillPath();
     }
