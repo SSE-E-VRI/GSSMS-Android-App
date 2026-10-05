@@ -1,0 +1,161 @@
+{
+  "id": "breakdown_long",
+  "kind": "complaint",
+  "generatedAt": "2026-10-03T04:00:00Z",
+  "ticket": "JW-2026-000112",
+  "workOrder": {
+    "id": 112,
+    "ticket_number": "JW-2026-000112",
+    "station_name": "Chengalpattu",
+    "depot_name": "CGL Depot",
+    "assigned_to_name": "V. Murugan",
+    "title": "Deficiency Rectification - Circuit Breaker",
+    "description": "Fix air pressure leakage in pneumatic drive",
+    "asset_name": "CB-CGL-01",
+    "execution_mode": "COMPLAINT",
+    "status": "COMPLETED",
+    "original_deficiency_details": {
+      "asset_unique_id": "CB-CGL-01",
+      "asset_category": "Circuit Breakers",
+      "inspection_point": "Pneumatic pressure check",
+      "severity": "High",
+      "status_label": "Pressure Low",
+      "action_label": "Replace seal gasket",
+      "finding": "Air leaking from manifold connector during charging cycle."
+    }
+  },
+  "payload": {
+    "id": 612,
+    "work_order": 112,
+    "organization": {
+      "railway_name": "Southern Railway",
+      "division_name": "Chennai Division",
+      "depot_name": "CGL Depot"
+    },
+    "initial_findings": "Found cracked nitrile O-ring on air manifold inlet pipe and a loose compression fitting on the secondary line, causing a slow audible leak during the charging cycle.\n\nThe pressure switch was also found chattering because of moisture in the sensing line.\n\nNo other abnormality was seen on the drive mechanism.",
+    "action_taken": "Depressurized the cylinder, isolated the supply and removed the worn gasket.\n\nInstalled a new seal kit, replaced the compression fitting and drained the sensing line.\n\nLeak-tested at 15 bar for two hours with soap solution and a calibrated gauge.",
+    "final_remarks": "Operating smoothly without pressure drop over 2 hours.\n\nBreaker closed and opened five times with normal charging time.\n\nAdvised the station staff to drain the air receiver every shift.",
+    "parameters": [
+      {
+        "parameter_name": "Initial Pressure",
+        "recorded_value": "8.5",
+        "unit": "bar"
+      },
+      {
+        "parameter_name": "Holding Pressure",
+        "recorded_value": "15.0",
+        "unit": "bar"
+      },
+      {
+        "parameter_name": "Charging Time",
+        "recorded_value": "42",
+        "unit": "sec"
+      }
+    ],
+    "submission_history": [
+      {
+        "submission_no": 1,
+        "timestamp": "2026-09-29T11:00:00Z",
+        "updated_by_name": "V. Murugan",
+        "initial_findings": "Initial draft findings.",
+        "action_taken": "Work in progress.",
+        "final_remarks": "",
+        "photos": []
+      },
+      {
+        "submission_no": 2,
+        "timestamp": "2026-09-29T16:45:00Z",
+        "updated_by_name": "V. Murugan",
+        "initial_findings": "Found cracked nitrile O-ring on air manifold inlet pipe and a loose compression fitting on the secondary line, causing a slow audible leak during the charging cycle.\n\nThe pressure switch was also found chattering because of moisture in the sensing line.\n\nNo other abnormality was seen on the drive mechanism.",
+        "action_taken": "Depressurized the cylinder, isolated the supply and removed the worn gasket.\n\nInstalled a new seal kit, replaced the compression fitting and drained the sensing line.\n\nLeak-tested at 15 bar for two hours with soap solution and a calibrated gauge.",
+        "final_remarks": "Operating smoothly without pressure drop over 2 hours.\n\nBreaker closed and opened five times with normal charging time.\n\nAdvised the station staff to drain the air receiver every shift.",
+        "parameters": [
+          {
+            "parameter_name": "Initial Pressure",
+            "recorded_value": "8.5",
+            "unit": "bar"
+          },
+          {
+            "parameter_name": "Holding Pressure",
+            "recorded_value": "15.0",
+            "unit": "bar"
+          },
+          {
+            "parameter_name": "Charging Time",
+            "recorded_value": "42",
+            "unit": "sec"
+          }
+        ],
+        "photos": [
+          {
+            "image": "/parity-images/before_1.jpg",
+            "kind": "BEFORE",
+            "photo_type": "BEFORE",
+            "caption": "Before photo 1 of 7: manifold area"
+          },
+          {
+            "image": "/parity-images/portrait_1.jpg",
+            "kind": "BEFORE",
+            "photo_type": "BEFORE",
+            "caption": "Before photo 2 of 7: manifold area"
+          },
+          {
+            "image": "/parity-images/before_2.jpg",
+            "kind": "BEFORE",
+            "photo_type": "BEFORE",
+            "caption": "Before photo 3 of 7: manifold area"
+          },
+          {
+            "image": "/parity-images/before_1.jpg",
+            "kind": "BEFORE",
+            "photo_type": "BEFORE",
+            "caption": "Before photo 4 of 7: manifold area"
+          },
+          {
+            "image": "/parity-images/portrait_1.jpg",
+            "kind": "BEFORE",
+            "photo_type": "BEFORE",
+            "caption": "Before photo 5 of 7: manifold area"
+          },
+          {
+            "image": "/parity-images/before_2.jpg",
+            "kind": "BEFORE",
+            "photo_type": "BEFORE",
+            "caption": "Before photo 6 of 7: manifold area"
+          },
+          {
+            "image": "/parity-images/before_1.jpg",
+            "kind": "BEFORE",
+            "photo_type": "BEFORE",
+            "caption": "Before photo 7 of 7: manifold area"
+          },
+          {
+            "image": "/parity-images/after_1.jpg",
+            "kind": "AFTER",
+            "photo_type": "AFTER",
+            "caption": "After photo 1 of 4: completed work"
+          },
+          {
+            "image": "/parity-images/wide_1.jpg",
+            "kind": "AFTER",
+            "photo_type": "AFTER",
+            "caption": "After photo 2 of 4: completed work"
+          },
+          {
+            "image": "/parity-images/after_2.jpg",
+            "kind": "AFTER",
+            "photo_type": "AFTER",
+            "caption": "After photo 3 of 4: completed work"
+          },
+          {
+            "image": "/parity-images/after_1.jpg",
+            "kind": "AFTER",
+            "photo_type": "AFTER",
+            "caption": "After photo 4 of 4: completed work"
+          }
+        ]
+      }
+    ],
+    "verification": null
+  }
+}

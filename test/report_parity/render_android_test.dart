@@ -16,6 +16,9 @@ const _fixtureIds = [
   'inspection_legacy',
   'rectification_mixed',
   'rectification_single',
+  'checklist_pm_stress',
+  'breakdown_long',
+  'rectification_long',
 ];
 
 void main() {

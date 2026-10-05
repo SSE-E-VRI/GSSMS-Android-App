@@ -1,0 +1,193 @@
+{
+  "id": "checklist_pm_stress",
+  "kind": "checklist",
+  "generatedAt": "2026-10-03T04:00:00Z",
+  "ticket": "JW-2026-000111",
+  "workOrder": {
+    "id": 111,
+    "ticket_number": "JW-2026-000111",
+    "station_name": "Thalanallur",
+    "depot_name": "Depot 1",
+    "assigned_to_name": "R. Kumar",
+    "title": "Monthly Transformer PM",
+    "description": "Routine monthly transformer maintenance",
+    "asset_name": "TR-01",
+    "updated_at": "2026-10-02T10:00:00Z",
+    "execution_mode": "CHECKLIST",
+    "status": "COMPLETED",
+    "assigned_to": 12
+  },
+  "payload": {
+    "id": 511,
+    "work_order": 111,
+    "date_of_maintenance": "2026-10-02",
+    "technician_name": "R. Kumar",
+    "remarks": "Completed successfully across all bays.\nOil sample drawn from main tank and sent to the divisional lab.\nSilica gel breather replaced; old stock returned to store.\nNext PM due after the monsoon inspection round.",
+    "other_staff": "S. Sharma, K. Patel",
+    "schedule_details": {
+      "station_name": "Thalanallur",
+      "template_name": "Quarterly Traction Substation Transformer, Bushing, Breather, Cooling Fan and Protection Relay Preventive Maintenance Checklist (Rev. 7)",
+      "organization": {
+        "railway_name": "Southern Railway",
+        "division_name": "Chennai Division",
+        "depot_name": "Tambaram Depot",
+        "register_title": "Monthly PM Register"
+      }
+    },
+    "verification": {
+      "verified_by_name": "M. Supervisor",
+      "verified_at": "2026-10-02T15:30:00Z",
+      "remarks": "Approved with recommendations.\nRe-check breather colour after 15 days."
+    },
+    "lines": [
+      {
+        "id": 1001,
+        "asset_unique_id": "TR-BODY-01",
+        "asset_category": "Transformer Main",
+        "item_name": "Oil Level, Temperature and Winding Temperature Indicator Assembly",
+        "inspection_point": "Check oil level gauge glass, magnetic oil gauge and the winding temperature thermometer pocket for leakage",
+        "status": "OK",
+        "status_label_snapshot": "Observed within permissible limits but seepage noted at the gasket joint",
+        "action_label_snapshot": "Tighten flange bolts and re-check after loading for twenty four hours",
+        "recorded_value": null,
+        "checked_out": true,
+        "excluded": false,
+        "line_attachments": [
+          {
+            "file_path": "/parity-images/evidence_1.jpg",
+            "caption": "Gauge photo"
+          }
+        ],
+        "remarks": "Seepage at gasket.\nPhoto attached.\nRe-torque on next visit."
+      },
+      {
+        "id": 1002,
+        "asset_unique_id": "TR-BODY-01",
+        "asset_category": "Transformer Main",
+        "item_name": "Oil Level, Temperature and Winding Temperature Indicator Assembly",
+        "inspection_point": "Verify alarm and trip contacts of the temperature indicators",
+        "status": "NOT_OK",
+        "status_option": 10,
+        "action_option": 20,
+        "status_label_snapshot": "Contacts operated correctly at the preset values",
+        "action_label_snapshot": "No action needed",
+        "deficiency_severity_label": "High",
+        "status_options": [
+          {
+            "id": 10,
+            "label": "High Temp",
+            "is_deficiency": true,
+            "action_options": [
+              {
+                "id": 20,
+                "label": "Calibrate sensor",
+                "is_deficiency": false
+              }
+            ]
+          }
+        ],
+        "recorded_value": null,
+        "checked_out": true,
+        "excluded": false,
+        "remarks": "Alarm set 85 C, trip 95 C.\nVerified with calibrated injector."
+      },
+      {
+        "id": 1003,
+        "asset_unique_id": "TR-BODY-01",
+        "asset_category": "Transformer Main",
+        "item_name": "Oil Level & Temperature",
+        "inspection_point": "Inspect silica gel breather colour",
+        "status": "NOT_OK",
+        "status_option": 11,
+        "action_option": 21,
+        "status_label_snapshot": "Pinkish (Wet)",
+        "action_label_snapshot": "Replace silica gel",
+        "status_options": [
+          {
+            "id": 11,
+            "label": "Pinkish (Wet)",
+            "is_deficiency": false,
+            "action_options": [
+              {
+                "id": 21,
+                "label": "Replace silica gel",
+                "is_deficiency": true
+              }
+            ]
+          }
+        ],
+        "recorded_value": null,
+        "checked_out": true,
+        "excluded": false,
+        "observation_action": "Silica gel pink for about 70% of the volume.\nReplaced with fresh charge.\nOld gel sent to regeneration."
+      },
+      {
+        "id": 1004,
+        "asset_unique_id": "TR-BODY-01",
+        "asset_category": "Transformer Main",
+        "item_name": "Voltage Check",
+        "inspection_point": "Phase voltages",
+        "status": "OK",
+        "recorded_value": "{\"R\": \"230\", \"Y\": \"231\"}",
+        "unit": "V",
+        "checked_out": true,
+        "excluded": false
+      },
+      {
+        "id": 1005,
+        "asset_unique_id": "TR-BODY-01",
+        "asset_category": "Transformer Main",
+        "item_name": "Voltage Check",
+        "inspection_point": "Line to line voltage",
+        "status": "OK",
+        "recorded_value": "415",
+        "unit": "V",
+        "checked_out": true,
+        "excluded": false
+      },
+      {
+        "id": 1006,
+        "asset_unique_id": "TR-BODY-01",
+        "asset_category": "Transformer Main",
+        "item_name": "Voltage Check",
+        "inspection_point": "Neutral offset",
+        "status": "OK",
+        "recorded_value": "",
+        "unit": "V",
+        "checked_out": true,
+        "excluded": false
+      },
+      {
+        "id": 1007,
+        "asset_unique_id": "TR-BODY-01",
+        "asset_category": "Transformer Main",
+        "item_name": "Skipped Line",
+        "inspection_point": "Unchecked line",
+        "status": "OK",
+        "checked_out": false,
+        "excluded": false
+      },
+      {
+        "id": 1008,
+        "asset_unique_id": "TR-BODY-01",
+        "asset_category": "Transformer Main",
+        "item_name": "Excluded Line",
+        "inspection_point": "Supervisor excluded line",
+        "status": "OK",
+        "checked_out": true,
+        "excluded": true
+      },
+      {
+        "id": 1009,
+        "asset_unique_id": "TR-BUSH-02",
+        "asset_category": "Bushings",
+        "item_name": "HV Bushings",
+        "inspection_point": "Clean porcelain insulators",
+        "status": "OK",
+        "status_label_snapshot": "Cleaned",
+        "checked_out": true,
+        "excluded": false
+      }
+    ]
+  }
+}

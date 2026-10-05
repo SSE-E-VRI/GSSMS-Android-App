@@ -1,6 +1,6 @@
 /**
  * render_web.mjs
- * Renders all 10 fixtures through Vite and Playwright (Chrome) to PDF.
+ * Renders all fixtures through Vite and Playwright (Chrome) to PDF.
  */
 
 import { chromium } from 'playwright-core';
@@ -29,6 +29,9 @@ const FIXTURE_IDS = [
   'inspection_legacy',
   'rectification_mixed',
   'rectification_single',
+  'checklist_pm_stress',
+  'breakdown_long',
+  'rectification_long',
 ];
 
 async function main() {
