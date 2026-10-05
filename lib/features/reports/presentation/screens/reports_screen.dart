@@ -11,10 +11,10 @@ import 'package:gssms_mobile/features/auth/domain/rbac.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:gssms_mobile/features/auth/presentation/widgets/permission_denied_view.dart';
 import 'package:gssms_mobile/features/reports/domain/models/infrastructure_option.dart';
-import 'package:gssms_mobile/features/reports/domain/models/maintenance_register_entry.dart';
 import 'package:gssms_mobile/features/reports/presentation/controllers/reports_controller.dart';
 import 'package:gssms_mobile/features/reports/presentation/controllers/reports_state.dart';
-import 'package:gssms_mobile/features/reports/presentation/screens/register_entry_detail_screen.dart';
+import 'package:gssms_mobile/features/reports/presentation/screens/register_job_work_detail_screen.dart';
+import 'package:gssms_mobile/features/work_orders/domain/models/work_order.dart';
 
 class ReportsScreen extends ConsumerStatefulWidget {
   const ReportsScreen({super.key});
@@ -59,10 +59,10 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
             OrgScopeAppBarFilter(
               scope: session.scope,
               selection: loaded?.orgScope ?? OrgScopeSelection.empty,
-              // register_report now accepts zone_id/division_id too
-              // (most-specific-wins with depot_id). Station stays disabled:
-              // it's already covered by the Infrastructure Type/Item filter
-              // (Type=Station + item) elsewhere on this screen.
+              // The work-order list accepts zone/division/depot (narrowest
+              // wins server-side). Station stays disabled: it's already
+              // covered by the Infrastructure Type/Item filter (Type=Station
+              // + item) elsewhere on this screen.
               enableStation: false,
               onChanged: (selection) {
                 ref
@@ -123,7 +123,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                 ? Center(
                     child: Padding(
                       padding: const EdgeInsets.all(24),
-                      child: Text('No maintenance register entries found for selected date range.', textAlign: TextAlign.center, style: TextStyle(color: context.gssms.textSecondary)),
+                      child: Text('No completed Job Works found for the selected date range.', textAlign: TextAlign.center, style: TextStyle(color: context.gssms.textSecondary)),
                     ),
                   )
                 : ListView.builder(
@@ -223,10 +223,17 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     );
   }
 
-  Widget _buildRegisterCard(MaintenanceRegisterEntry entry, int slNo) {
-    final dateStr = entry.date != null ? DateFormat('dd/MM/yyyy').format(entry.date!) : 'N/A';
+  Widget _buildRegisterCard(WorkOrder order, int slNo) {
+    final dateStr = order.reportCompletedAt != null
+        ? DateFormat('dd/MM/yyyy').format(order.reportCompletedAt!.toLocal())
+        : 'N/A';
+    final location = [
+      order.stationName,
+      order.assetName,
+    ].where((v) => v != null && v.trim().isNotEmpty).join(' · ');
 
     return Card(
+      key: Key('register_card_${order.id}'),
       margin: const EdgeInsets.only(bottom: 12),
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -237,23 +244,32 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
           child: Text('#$slNo', style: TextStyle(fontWeight: FontWeight.bold, color: context.gssms.link, fontSize: 12)),
         ),
         title: Text(
-          entry.masterName,
+          order.title?.trim().isNotEmpty == true
+              ? order.title!
+              : order.displayReference,
           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 4),
-            Text('Completed: $dateStr · ${entry.stationName ?? "Not specified"}', style: TextStyle(fontSize: 12, color: context.gssms.textSecondary)),
-            if (entry.technician != null)
-              Text('Technician: ${entry.technician}', style: TextStyle(fontSize: 11, color: context.gssms.textSecondary)),
+            Text(
+                '${order.displayReference} · ${order.scheduleCategory} · Completed: $dateStr',
+                style: TextStyle(fontSize: 12, color: context.gssms.textSecondary)),
+            Text(
+                location.isNotEmpty
+                    ? location
+                    : (order.depotName ?? 'Location not set'),
+                style: TextStyle(fontSize: 11, color: context.gssms.textSecondary)),
+            if (order.assignedToName != null)
+              Text('Technician: ${order.assignedToName}', style: TextStyle(fontSize: 11, color: context.gssms.textSecondary)),
           ],
         ),
         trailing: Icon(Icons.arrow_forward_ios, size: 16, color: context.gssms.textSecondary),
         onTap: () {
           Navigator.of(context).push(
             MaterialPageRoute<void>(
-              builder: (_) => RegisterEntryDetailScreen(entry: entry),
+              builder: (_) => RegisterJobWorkDetailScreen(workOrder: order),
             ),
           );
         },

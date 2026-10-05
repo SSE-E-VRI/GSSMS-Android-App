@@ -71,6 +71,43 @@ void main() {
       expect(orders[0].status, WorkOrderStatus.assigned);
     });
 
+    test('getWorkOrders sends the web Register query (status list, completion range, infra)', () async {
+      dio.httpClientAdapter = MockAdapter((options) async {
+        expect(options.path, '/api/v1/maintenance/work-orders/');
+        expect(options.queryParameters['status'], 'TECH_COMPLETED,VERIFIED,CLOSED');
+        expect(options.queryParameters['completion_from'], '2026-09-01');
+        expect(options.queryParameters['completion_to'], '2026-09-07');
+        expect(options.queryParameters['depot_id'], 9);
+        expect(options.queryParameters['station_id'], 48);
+        expect(options.queryParameters['infra_type'], 'STATION');
+        return _json([], 200);
+      });
+
+      final orders = await apiService.getWorkOrders(
+        status: 'TECH_COMPLETED,VERIFIED,CLOSED',
+        completionFrom: '2026-09-01',
+        completionTo: '2026-09-07',
+        depotId: 9,
+        stationId: 48,
+        infraType: 'STATION',
+      );
+      expect(orders, isEmpty);
+    });
+
+    test('fetchMaintenanceRecords queries by work order then schedule', () async {
+      final seen = <String>[];
+      dio.httpClientAdapter = MockAdapter((options) async {
+        expect(options.path, '/api/v1/maintenance/records/');
+        seen.add(options.queryParameters['work_order']?.toString() ??
+            'schedule:${options.queryParameters['schedule']}');
+        return _json([], 200);
+      });
+
+      await apiService.fetchMaintenanceRecords(workOrderId: 42);
+      await apiService.fetchMaintenanceRecords(scheduleId: 7);
+      expect(seen, ['42', 'schedule:7']);
+    });
+
     test('startExecution calls POST /api/v1/staff-workorders/{id}/execute/ and returns record_id', () async {
       dio.httpClientAdapter = MockAdapter((options) async {
         expect(options.path, '/api/v1/staff-workorders/101/execute/');

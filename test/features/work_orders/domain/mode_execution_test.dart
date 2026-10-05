@@ -59,6 +59,22 @@ void main() {
       expect(_wo(mode: 'RECTIFICATION').displayTypeLabel,
           'Deficiency Rectification');
     });
+
+    test('scheduleCategory mirrors web jobWorkScheduleCategory', () {
+      expect(_wo(deficiency: 6).scheduleCategory, 'Deficiency Rectification');
+      expect(_wo(mode: 'RECTIFICATION').scheduleCategory,
+          'Deficiency Rectification');
+      expect(_wo(complaint: 5).scheduleCategory, 'Breakdown');
+      expect(_wo(inspection: 7).scheduleCategory, 'Inspection');
+      expect(_wo(mode: 'INSPECTION').scheduleCategory, 'Inspection');
+      expect(
+          _wo(mode: 'CHECKLIST', type: 'PREVENTIVE').scheduleCategory, 'PM');
+      expect(_wo(mode: 'CHECKLIST', type: 'BREAKDOWN').scheduleCategory,
+          'Breakdown');
+      expect(
+          _wo(mode: 'CHECKLIST', type: 'CALIBRATION').scheduleCategory,
+          'Calibration');
+    });
   });
 
   group('ComplaintExecution', () {

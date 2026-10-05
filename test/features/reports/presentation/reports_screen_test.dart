@@ -4,52 +4,59 @@ import 'package:mocktail/mocktail.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
-import 'package:gssms_mobile/features/reports/data/reports_repository.dart';
+import 'package:gssms_mobile/features/reports/data/infrastructure_options_service.dart';
 import 'package:gssms_mobile/features/reports/domain/models/infrastructure_option.dart';
-import 'package:gssms_mobile/features/reports/domain/models/maintenance_register_entry.dart';
 import 'package:gssms_mobile/features/reports/presentation/controllers/reports_controller.dart';
 import 'package:gssms_mobile/features/reports/presentation/screens/reports_screen.dart';
+import 'package:gssms_mobile/features/work_orders/data/work_order_repository.dart';
+import 'package:gssms_mobile/features/work_orders/domain/models/work_order.dart';
+import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_order_controllers.dart';
 import '../../../helpers/fake_auth.dart';
 
-class MockReportsRepository extends Mock implements IReportsRepository {}
+class MockWorkOrderRepository extends Mock implements IWorkOrderRepository {}
+
+class MockInfrastructureOptionsService extends Mock
+    implements InfrastructureOptionsService {}
 
 void main() {
-  late MockReportsRepository mockRepo;
+  late MockWorkOrderRepository mockRepo;
+  late MockInfrastructureOptionsService mockOptions;
 
   setUpAll(() {
     registerFallbackValue(InfraFilterType.all);
   });
 
   setUp(() {
-    mockRepo = MockReportsRepository();
+    mockRepo = MockWorkOrderRepository();
+    mockOptions = MockInfrastructureOptionsService();
   });
 
   group('ReportsScreen Widget Tests', () {
     testWidgets('renders Reports & Audit date filter and register list cards under AppTheme', (tester) async {
-      final entries = [
-        MaintenanceRegisterEntry(
+      const orders = [
+        WorkOrder(
           id: 101,
-          masterName: 'Monthly Transformer Maintenance',
+          status: WorkOrderStatus.verified,
+          type: WorkOrderType.preventive,
+          ticketNumber: 'VRI-202609-0042',
+          title: 'Station Monthly Maintenance',
           stationName: 'Sendurai',
-          technician: 'Krishna',
-          date: DateTime(2026, 9, 7),
-          items: const [
-            RegisterLineItem(assetName: 'Transformer #1', inspection: 'Check Oil Level', status: 'OK'),
-          ],
+          depotName: 'Vriddhachalam Depot',
+          assignedToName: 'Krishna',
         ),
       ];
 
-      when(() => mockRepo.fetchMaintenanceRegister(
-            startDate: any(named: 'startDate'),
-            endDate: any(named: 'endDate'),
-            infraType: any(named: 'infraType'),
-            infraId: any(named: 'infraId'),
-          )).thenAnswer((_) async => entries);
+      when(() => mockRepo.fetchWorkOrders(
+            status: any(named: 'status'),
+            completionFrom: any(named: 'completionFrom'),
+            completionTo: any(named: 'completionTo'),
+          )).thenAnswer((_) async => orders);
 
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            reportsRepositoryProvider.overrideWithValue(mockRepo),
+            workOrderRepositoryProvider.overrideWithValue(mockRepo),
+            infrastructureOptionsServiceProvider.overrideWithValue(mockOptions),
             authControllerProvider.overrideWith(
               () => FakeAuthenticatedController(fakeSession(
                 permissions: const ['reports.view'],
@@ -69,8 +76,9 @@ void main() {
       expect(find.byKey(const Key('reports_infra_type')), findsOneWidget);
       expect(find.byKey(const Key('reports_infra_item')), findsOneWidget);
       expect(find.byKey(const Key('date_range_from')), findsOneWidget);
-      expect(find.text('Monthly Transformer Maintenance'), findsOneWidget);
+      expect(find.text('Station Monthly Maintenance'), findsOneWidget);
       expect(find.text('#1'), findsOneWidget);
+      expect(find.byKey(const Key('register_card_101')), findsOneWidget);
     });
   });
 }
