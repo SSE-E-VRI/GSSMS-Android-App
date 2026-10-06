@@ -126,6 +126,7 @@ class Complaint extends Equatable {
     this.workOrderId,
     this.workOrderStatus,
     this.workOrderTicketNumber,
+    this.woAssignedToName,
     this.photos = const [],
   });
 
@@ -182,6 +183,11 @@ class Complaint extends Equatable {
 
   /// From `wo_ticket_number` — the linked Job Work's human reference.
   final String? workOrderTicketNumber;
+
+  /// From `wo_assigned_to_name` — who holds the linked Job Work, if anyone.
+  /// The server sends `''` for "nobody" and old payloads omit the key; both
+  /// read as null.
+  final String? woAssignedToName;
 
   /// Registration-time evidence photos (max 5, JPEG, OPEN only server-side).
   final List<ComplaintPhoto> photos;
@@ -255,6 +261,7 @@ class Complaint extends Equatable {
       workOrderId: asJsonInt(json['wo_id']),
       workOrderStatus: asJsonString(json['wo_status']),
       workOrderTicketNumber: asJsonString(json['wo_ticket_number']),
+      woAssignedToName: asJsonNonBlankString(json['wo_assigned_to_name']),
       photos: parsePhotos(json['photos']),
     );
   }
@@ -293,6 +300,7 @@ class Complaint extends Equatable {
       workOrderId: workOrderId ?? this.workOrderId,
       workOrderStatus: workOrderStatus,
       workOrderTicketNumber: workOrderTicketNumber,
+      woAssignedToName: woAssignedToName,
       photos: photos,
     );
   }
@@ -329,6 +337,7 @@ class Complaint extends Equatable {
         workOrderId,
         workOrderStatus,
         workOrderTicketNumber,
+        woAssignedToName,
         photos,
       ];
 }

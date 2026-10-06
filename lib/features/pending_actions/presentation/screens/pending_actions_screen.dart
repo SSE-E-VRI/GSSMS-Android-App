@@ -13,6 +13,7 @@ import 'package:gssms_mobile/features/deficiencies/domain/models/deficiency.dart
 import 'package:gssms_mobile/features/inspections/domain/models/inspection.dart';
 import 'package:gssms_mobile/features/inspections/presentation/screens/inspection_detail_screen.dart';
 import 'package:gssms_mobile/features/pending_actions/presentation/controllers/pending_actions_controllers.dart';
+import 'package:gssms_mobile/features/work_orders/presentation/pending_action_status_labels.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/screens/work_order_detail_screen.dart';
 import 'package:intl/intl.dart';
 
@@ -165,18 +166,12 @@ class _PendingActionsScreenState extends ConsumerState<PendingActionsScreen> {
   }
 }
 
-/// "IN_PROGRESS" -> "In Progress" for the linked Job Work status chip.
-String _prettyStatus(String raw) => raw
-    .trim()
-    .split('_')
-    .where((w) => w.isNotEmpty)
-    .map((w) => w[0].toUpperCase() + w.substring(1).toLowerCase())
-    .join(' ');
-
-/// Chip for the linked Job Work's status on converted rows.
-Widget? _woStatusChip(String? status) {
+/// Chip for the linked Job Work's status on converted rows, with the
+/// technician's name when the server sent one (`wo_assigned_to_name`).
+Widget? _woStatusChip(String? status, {String? assignedToName}) {
   if (status == null || status.trim().isEmpty) return null;
-  return StatusChip(label: _prettyStatus(status));
+  return StatusChip(
+      label: pendingActionStatusLabelWithAssignee(status, assignedToName));
 }
 
 /// Per-filter empty text, as on web ("No breakdowns need action." etc.).
@@ -473,7 +468,10 @@ class _ComplaintsTab extends ConsumerWidget {
             title: Text(c.title, style: const TextStyle(fontWeight: FontWeight.bold)),
             subtitle: Text(
                 '${c.reference} • ${c.locationLabel ?? c.depotName ?? 'Location not set'}'),
-            trailing: c.isConverted ? _woStatusChip(c.workOrderStatus) : null,
+            trailing: c.isConverted
+                ? _woStatusChip(c.workOrderStatus,
+                    assignedToName: c.woAssignedToName)
+                : null,
             onTap: () => Navigator.of(context).push(MaterialPageRoute(
                 builder: (_) => ComplaintDetailScreen(complaint: c))),
           ),
@@ -522,8 +520,10 @@ class _InspectionsTab extends ConsumerWidget {
                 Text(insp.title, style: const TextStyle(fontWeight: FontWeight.bold)),
             subtitle: Text(
                 '${insp.reference} • ${insp.locationLabel ?? insp.depotName ?? 'Location not set'}'),
-            trailing:
-                insp.isConverted ? _woStatusChip(insp.workOrderStatus) : null,
+            trailing: insp.isConverted
+                ? _woStatusChip(insp.workOrderStatus,
+                    assignedToName: insp.woAssignedToName)
+                : null,
             onTap: () => Navigator.of(context).push(MaterialPageRoute(
                 builder: (_) => InspectionDetailScreen(inspection: insp))),
           ),
@@ -617,6 +617,16 @@ class _DeficienciesTabState extends ConsumerState<_DeficienciesTab> {
         final Deficiency d = deficiencies[index];
         final selected = state.selectedDeficiencyIds.contains(d.id);
         final statusColor = _deficiencyStatusColor(context, d.status);
+        // With a live remedial Job Work the badge tracks it (web's
+        // deficiencyStatusKey: remedial status + its assignee); otherwise
+        // the deficiency's own status reads exactly as before.
+        final statusLabel = d.hasActiveRemedial &&
+                (d.activeRemedialWorkOrderStatus?.trim().isNotEmpty ?? false)
+            ? pendingActionStatusLabelWithAssignee(
+                d.activeRemedialWorkOrderStatus,
+                d.activeRemedialWorkOrderAssignedToName,
+              )
+            : d.status.displayName;
         // Same priority web's `openDeficiency`/"View report" use: the
         // linked Job Work first (there's no mobile "Reports" screen to open
         // a report by work-order id the way web's `/reports?work_order=`
@@ -680,7 +690,7 @@ class _DeficienciesTabState extends ConsumerState<_DeficienciesTab> {
                           borderRadius: BorderRadius.circular(6),
                           border: Border.all(color: statusColor),
                         ),
-                        child: Text(d.status.displayName,
+                        child: Text(statusLabel,
                             style: TextStyle(
                                 fontSize: 11,
                                 fontWeight: FontWeight.bold,

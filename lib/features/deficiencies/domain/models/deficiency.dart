@@ -52,6 +52,7 @@ class Deficiency extends Equatable {
     this.detectedAt,
     this.activeRemedialWorkOrderId,
     this.activeRemedialWorkOrderStatus,
+    this.activeRemedialWorkOrderAssignedToName,
   });
 
   final int id;
@@ -80,6 +81,10 @@ class Deficiency extends Equatable {
   /// `active_remedial_work_order.id` — an open remedial Job Work, if any.
   final int? activeRemedialWorkOrderId;
   final String? activeRemedialWorkOrderStatus;
+
+  /// `active_remedial_work_order.assigned_to_name` — who holds that Job Work.
+  /// The server sends `''` for "nobody"; absent and blank both read as null.
+  final String? activeRemedialWorkOrderAssignedToName;
 
   bool get hasActiveRemedial => activeRemedialWorkOrderId != null;
 
@@ -121,7 +126,11 @@ class Deficiency extends Equatable {
       activeRemedialWorkOrderId:
           remedial is Map ? asJsonInt(remedial['id']) : null,
       activeRemedialWorkOrderStatus:
-          remedial is Map ? asJsonString(remedial['status']) : null,    );
+          remedial is Map ? asJsonString(remedial['status']) : null,
+      activeRemedialWorkOrderAssignedToName: remedial is Map
+          ? asJsonNonBlankString(remedial['assigned_to_name'])
+          : null,
+    );
   }
 
   @override
@@ -144,5 +153,6 @@ class Deficiency extends Equatable {
         detectedAt,
         activeRemedialWorkOrderId,
         activeRemedialWorkOrderStatus,
+        activeRemedialWorkOrderAssignedToName,
       ];
 }

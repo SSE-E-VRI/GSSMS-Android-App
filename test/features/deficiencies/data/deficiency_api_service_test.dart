@@ -83,6 +83,7 @@ void main() {
             'active_remedial_work_order': {
               'id': 99,
               'status': 'IN_PROGRESS',
+              'assigned_to_name': 'krishna',
             },
           }
         ], 200);
@@ -95,6 +96,38 @@ void main() {
       expect(results.first.hasActiveRemedial, isTrue);
       expect(results.first.activeRemedialWorkOrderId, 99);
       expect(results.first.activeRemedialWorkOrderStatus, 'IN_PROGRESS');
+      expect(results.first.activeRemedialWorkOrderAssignedToName, 'krishna');
+    });
+
+    test('active remedial assignee is null when absent or blank', () async {
+      dio.httpClientAdapter = MockAdapter((options) async {
+        return _json([
+          {
+            'id': 12,
+            'description': 'Worn contact',
+            'status': 'ASSIGNED',
+            'active_remedial_work_order': {
+              'id': 100,
+              'status': 'ASSIGNED',
+            },
+          },
+          {
+            'id': 13,
+            'description': 'Loose terminal',
+            'status': 'ASSIGNED',
+            'active_remedial_work_order': {
+              'id': 101,
+              'status': 'ASSIGNED',
+              'assigned_to_name': '  ',
+            },
+          }
+        ], 200);
+      });
+
+      final results = await apiService.getPendingDeficiencies();
+      expect(results.length, 2);
+      expect(results[0].activeRemedialWorkOrderAssignedToName, isNull);
+      expect(results[1].activeRemedialWorkOrderAssignedToName, isNull);
     });
 
     test('getDeficienciesForAsset queries /api/v1/deficiencies/ with asset param',

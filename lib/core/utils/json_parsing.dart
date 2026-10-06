@@ -71,3 +71,14 @@ bool? asJsonBool(dynamic value) {
   }
   return null;
 }
+
+/// Trimmed string, or null when the value is absent **or blank**.
+///
+/// Several serializer `*_name` fields (e.g. `wo_assigned_to_name`,
+/// `active_remedial_work_order.assigned_to_name`) send `''` for "nobody"
+/// instead of omitting the key — callers treat null as "no assignee", so a
+/// blank must not surface as an empty name.
+String? asJsonNonBlankString(dynamic value) {
+  final text = asJsonString(value)?.trim() ?? '';
+  return text.isEmpty ? null : text;
+}

@@ -263,7 +263,7 @@ class _MaintenanceScreenState extends ConsumerState<MaintenanceScreen> {
   ) {
     final tiles = <Widget>[];
     if (sessionAllows(session, 'maintenance.view')) {
-      final count = stats.pendingTaskCount;
+      final count = stats.scheduledTasksDisplay;
       final noun = count == 1 ? 'Job Work' : 'Job Works';
       tiles.add(ListTile(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/config/app_version.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../controllers/auth_controller.dart';
 import '../controllers/auth_state.dart';
@@ -85,6 +86,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     _buildOtpChallengeView(authState)
                   else
                     _buildStandardLoginForm(authState, isGeneralLoading),
+                  const SizedBox(height: 24),
+                  Text(
+                    'Version $appVersion',
+                    key: const Key('login_version_footer'),
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
                 ],
               ),
             ),

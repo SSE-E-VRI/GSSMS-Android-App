@@ -62,6 +62,7 @@ class Inspection extends Equatable {
     this.isConverted = false,
     this.workOrderId,
     this.workOrderStatus,
+    this.woAssignedToName,
     this.pointsCount = 0,
     this.unassignedPointsCount = 0,
     this.points = const [],
@@ -121,6 +122,11 @@ class Inspection extends Equatable {
 
   /// From `wo_status` — raw status of the linked Job Work.
   final String? workOrderStatus;
+
+  /// From `wo_assigned_to_name` — who holds the linked Job Work, if anyone.
+  /// Only the legacy single-Job-Work serializer path sends this; `''` and
+  /// absent both read as null.
+  final String? woAssignedToName;
 
   /// Structured points (full retrieve; list rows stub to `[]` server-side).
   final int pointsCount;
@@ -257,6 +263,7 @@ class Inspection extends Equatable {
       isConverted: asJsonBool(json['is_converted']) ?? false,
       workOrderId: asJsonInt(json['wo_id']),
       workOrderStatus: asJsonString(json['wo_status']),
+      woAssignedToName: asJsonNonBlankString(json['wo_assigned_to_name']),
       pointsCount: pointsCount,
       unassignedPointsCount: asJsonInt(json['unassigned_points_count']) ?? 0,
       points: points,
@@ -298,6 +305,7 @@ class Inspection extends Equatable {
       isConverted: true,
       workOrderId: workOrderId ?? this.workOrderId,
       workOrderStatus: workOrderStatus,
+      woAssignedToName: woAssignedToName,
       pointsCount: pointsCount,
       unassignedPointsCount: unassignedPointsCount,
       points: points,
@@ -315,6 +323,7 @@ class Inspection extends Equatable {
     bool? isConverted,
     int? workOrderId,
     String? workOrderStatus,
+    String? woAssignedToName,
   }) {
     return Inspection(
       id: id,
@@ -346,6 +355,7 @@ class Inspection extends Equatable {
       isConverted: isConverted ?? this.isConverted,
       workOrderId: workOrderId ?? this.workOrderId,
       workOrderStatus: workOrderStatus ?? this.workOrderStatus,
+      woAssignedToName: woAssignedToName ?? this.woAssignedToName,
       pointsCount: points != null ? points.length : pointsCount,
       unassignedPointsCount: unassignedPointsCount,
       points: points ?? this.points,
@@ -387,6 +397,7 @@ class Inspection extends Equatable {
         isConverted,
         workOrderId,
         workOrderStatus,
+        woAssignedToName,
         pointsCount,
         unassignedPointsCount,
         points,

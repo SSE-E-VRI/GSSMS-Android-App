@@ -41,6 +41,7 @@ class MaintenanceSchedule extends Equatable {
     this.workOrderId,
     this.workOrderTicket,
     this.workOrderStatus,
+    this.isBreakdown = false,
   });
 
   final int id;
@@ -58,6 +59,9 @@ class MaintenanceSchedule extends Equatable {
   final int? workOrderId;
   final String? workOrderTicket;
   final String? workOrderStatus;
+
+  /// Backing row of a breakdown (corrective) job, not a scheduled task.
+  final bool isBreakdown;
 
   bool get isConverted => workOrderId != null;
 
@@ -82,6 +86,7 @@ class MaintenanceSchedule extends Equatable {
       workOrderId: asJsonInt(json['work_order_id']),
       workOrderTicket: asJsonString(json['work_order_ticket']),
       workOrderStatus: asJsonString(json['work_order_status']),
+      isBreakdown: asJsonBool(json['is_breakdown']) ?? false,
     );
   }
 
@@ -97,5 +102,6 @@ class MaintenanceSchedule extends Equatable {
         workOrderId,
         workOrderTicket,
         workOrderStatus,
+        isBreakdown,
       ];
 }

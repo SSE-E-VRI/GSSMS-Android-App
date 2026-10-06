@@ -112,6 +112,8 @@ class _ComplaintDetailScreenState extends ConsumerState<ComplaintDetailScreen> {
   bool _canDelete(UserSession? session) {
     if (session == null) return false;
     if (_complaint.isClosed) return false;
+    // Depot incharges close/reject breakdowns rather than delete them.
+    if (session.roles.contains(AuthRole.depotIncharge)) return false;
     return sessionAllows(session, 'complaints.delete');
   }
 

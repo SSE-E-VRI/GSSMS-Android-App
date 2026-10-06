@@ -178,6 +178,65 @@ void main() {
       expect(find.text('Open'), findsOneWidget);
     });
 
+    group('detail delete icon', () {
+      UserSession sessionFor(AuthRole role) => UserSession(
+            accessToken: 'test_token',
+            username: 'user',
+            primaryRole: role,
+            roles: [role],
+            permissions: const ['complaints.view', 'complaints.delete'],
+            scope: const OrgScope(level: OrgScopeLevel.depot),
+          );
+
+      Future<void> pumpDetail(
+        WidgetTester tester,
+        AuthRole role, {
+        ComplaintStatus status = ComplaintStatus.open,
+      }) async {
+        final complaint = Complaint(
+          id: 1,
+          title: 'Transformer Leakage',
+          status: status,
+          stationName: 'VRI',
+        );
+        when(() => mockRepo.fetchComplaintById(1))
+            .thenAnswer((_) async => complaint);
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              complaintRepositoryProvider.overrideWithValue(mockRepo),
+              authControllerProvider.overrideWith(
+                () => _FakeAuthenticatedController(sessionFor(role)),
+              ),
+            ],
+            child: MaterialApp(
+              theme: AppTheme.lightTheme,
+              home: ComplaintDetailScreen(complaint: complaint),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+      }
+
+      testWidgets('is hidden for DEPOT_INCHARGE even with complaints.delete',
+          (tester) async {
+        await pumpDetail(tester, AuthRole.depotIncharge);
+        expect(find.byKey(const Key('delete_breakdown_button')), findsNothing);
+      });
+
+      testWidgets('is shown for SUPER_ADMIN with complaints.delete',
+          (tester) async {
+        await pumpDetail(tester, AuthRole.superAdmin);
+        expect(find.byKey(const Key('delete_breakdown_button')), findsOneWidget);
+      });
+
+      testWidgets('stays hidden for a closed complaint', (tester) async {
+        await pumpDetail(tester, AuthRole.superAdmin,
+            status: ComplaintStatus.closed);
+        expect(find.byKey(const Key('delete_breakdown_button')), findsNothing);
+      });
+    });
+
     testWidgets('ComplaintCreateScreen validates inputs and submits', (tester) async {
       final mockLookups = MockLookupOptionsService();
       final mockInfra = MockInfrastructureOptionsService();

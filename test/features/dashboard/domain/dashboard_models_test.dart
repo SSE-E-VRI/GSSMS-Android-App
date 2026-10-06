@@ -92,5 +92,44 @@ void main() {
       expect(summary.pendingTasks[1].kind, PendingActionKind.complaint);
       expect(summary.pendingTasks[1].complaintId, 7);
     });
+
+    test('scheduled_task_count parses and drives scheduledTasksDisplay', () {
+      final stats = DashboardStats.fromJson(const {
+        'pending_task_count': 5,
+        'scheduled_task_count': 3,
+      });
+      expect(stats.scheduledTaskCount, 3);
+      expect(stats.scheduledTasksDisplay, 3);
+      expect(stats.pendingTaskCount, 5);
+    });
+
+    test('scheduledTasksDisplay falls back to pending_task_count when key is absent or null', () {
+      final absent = DashboardStats.fromJson(const {'pending_task_count': 5});
+      expect(absent.scheduledTaskCount, isNull);
+      expect(absent.scheduledTasksDisplay, 5);
+
+      final explicitNull = DashboardStats.fromJson(
+          const {'pending_task_count': 5, 'scheduled_task_count': null});
+      expect(explicitNull.scheduledTaskCount, isNull);
+      expect(explicitNull.scheduledTasksDisplay, 5);
+    });
+
+    test('scheduledTaskCount participates in equality', () {
+      expect(const DashboardStats(scheduledTaskCount: 1),
+          isNot(const DashboardStats(scheduledTaskCount: 2)));
+    });
+
+    test('PendingAction.isBreakdown parses and defaults to false', () {
+      expect(
+          PendingAction.fromJson(const {'id': 1, 'title': 'x', 'is_breakdown': true})
+              .isBreakdown,
+          isTrue);
+      expect(PendingAction.fromJson(const {'id': 1, 'title': 'x'}).isBreakdown,
+          isFalse);
+      expect(
+          PendingAction.fromJson(const {'id': 1, 'title': 'x', 'is_breakdown': null})
+              .isBreakdown,
+          isFalse);
+    });
   });
 }

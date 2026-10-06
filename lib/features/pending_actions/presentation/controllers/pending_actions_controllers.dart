@@ -123,10 +123,13 @@ bool _matchesSub(PendingSubFilter f, PendingBucket? b) => switch (f) {
       PendingSubFilter.awaitingClosure => b == PendingBucket.awaitingClosure,
     };
 
-/// Applies [f] to [schedules].
+/// Applies [f] to [schedules]. Breakdown-backing rows are excluded so the
+/// Schedules tab agrees with the dashboard's scheduled-task count.
 List<MaintenanceSchedule> filterSchedules(
         List<MaintenanceSchedule> schedules, PendingSubFilter f) =>
-    schedules.where((s) => _matchesSub(f, scheduleBucket(s))).toList();
+    schedules
+        .where((s) => !s.isBreakdown && _matchesSub(f, scheduleBucket(s)))
+        .toList();
 
 List<Complaint> filterComplaints(
         List<Complaint> complaints, PendingSubFilter f) =>

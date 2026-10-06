@@ -25,6 +25,7 @@ void main() {
       'wo_id': 501,
       'wo_status': 'IN_PROGRESS',
       'wo_ticket_number': 'VRI-202609-0042',
+      'wo_assigned_to_name': 'Krishna Kumar',
     };
 
     test('Complaint.fromJson parses the serializer payload', () {
@@ -42,6 +43,22 @@ void main() {
       expect(c.workOrderId, 501);
       expect(c.workOrderStatus, 'IN_PROGRESS');
       expect(c.workOrderTicketNumber, 'VRI-202609-0042');
+      expect(c.woAssignedToName, 'Krishna Kumar');
+    });
+
+    test('wo_assigned_to_name is null when absent or blank (old servers)', () {
+      final withoutKey = Map<String, dynamic>.from(json)
+        ..remove('wo_assigned_to_name');
+      Map<String, dynamic> payload(String? name) => {
+            ...json,
+            'wo_assigned_to_name': name,
+          };
+      expect(Complaint.fromJson(withoutKey).woAssignedToName, isNull);
+      expect(Complaint.fromJson(payload(null)).woAssignedToName, isNull);
+      expect(Complaint.fromJson(payload('')).woAssignedToName, isNull);
+      expect(Complaint.fromJson(payload('   ')).woAssignedToName, isNull);
+      expect(Complaint.fromJson(payload('  krishna  ')).woAssignedToName,
+          'krishna');
     });
 
     // Regression B11: DRF sends `+05:30`; Dart parses that to UTC, and the

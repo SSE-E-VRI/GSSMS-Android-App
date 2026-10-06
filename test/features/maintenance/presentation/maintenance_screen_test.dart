@@ -177,6 +177,19 @@ void main() {
       expect(find.text('1 need action'), findsOneWidget);
     });
 
+    testWidgets('Job Works tile uses scheduled_task_count when the payload has it', (tester) async {
+      await tester.pumpWidget(pumpWith(
+        _sessionWithPermissions(const ['maintenance.view']),
+        summary: const DashboardSummary(
+          stats: DashboardStats(pendingTaskCount: 5, scheduledTaskCount: 2),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('2 pending Job Works'), findsOneWidget);
+      expect(find.text('5 pending Job Works'), findsNothing);
+    });
+
     testWidgets('hides shortcuts when the session lacks their permissions', (tester) async {
       await tester.pumpWidget(pumpWith(
         _sessionWithPermissions(const ['maintenance.view']),

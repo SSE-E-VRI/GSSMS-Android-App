@@ -138,7 +138,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               _buildTypeStatsRow(stats),
             ],
             const SizedBox(height: 16),
-            _buildPendingActions(stats, state.summary.pendingTasks, session),
+            _buildPendingActions(
+              stats,
+              state.summary.pendingTasks.where((t) => !t.isBreakdown).toList(),
+              session,
+            ),
             const SizedBox(height: 16),
             _buildKpiGrid(stats),
           ],
@@ -393,11 +397,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           onTap: () => openList(const WorkOrderListScreen()),
         ));
       }
-      if (stats.pendingTaskCount > 0 && canWorkOrders) {
+      if (stats.scheduledTasksDisplay > 0 && canWorkOrders) {
         rows.add(_pendingRow(
           icon: Icons.hourglass_empty_outlined,
           color: context.gssms.warning.foreground,
-          title: '${stats.pendingTaskCount} pending job works',
+          title: '${stats.scheduledTasksDisplay} pending job works',
           subtitle: 'Open assignments needing execution',
           onTap: () => openList(const WorkOrderListScreen()),
         ));
@@ -575,7 +579,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Expanded(
-                child: _buildKpiCard('Pending Tasks', '${stats.pendingTaskCount}',
+                child: _buildKpiCard('Pending Tasks', '${stats.scheduledTasksDisplay}',
                     Icons.hourglass_empty_outlined, context.gssms.warning.foreground),
               ),
               const SizedBox(width: 10),

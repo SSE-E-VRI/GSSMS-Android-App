@@ -16,6 +16,29 @@ void main() {
     });
   });
 
+  group('MaintenanceSchedule.isBreakdown', () {
+    test('parses is_breakdown true', () {
+      final s = MaintenanceSchedule.fromJson(
+          {'id': 1, 'template_name': 'T', 'status': 'PENDING', 'is_breakdown': true});
+      expect(s.isBreakdown, isTrue);
+    });
+
+    test('defaults to false when absent or null', () {
+      expect(
+          MaintenanceSchedule.fromJson(
+              {'id': 1, 'template_name': 'T', 'status': 'PENDING'}).isBreakdown,
+          isFalse);
+      expect(
+          MaintenanceSchedule.fromJson({
+            'id': 1,
+            'template_name': 'T',
+            'status': 'PENDING',
+            'is_breakdown': null,
+          }).isBreakdown,
+          isFalse);
+    });
+  });
+
   group('MaintenanceSchedule.isSkipped', () {
     MaintenanceSchedule scheduleWith(String status) {
       return MaintenanceSchedule.fromJson({

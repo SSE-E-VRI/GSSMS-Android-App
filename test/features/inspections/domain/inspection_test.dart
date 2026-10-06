@@ -75,6 +75,23 @@ void main() {
       expect(InspectionStatus.fromString('CANCELLED'), InspectionStatus.unknown);
     });
 
+    test('wo_assigned_to_name parses when present; absent or blank is null',
+        () {
+      Map<String, dynamic> payload(String? name) => {
+            ...json,
+            'is_converted': true,
+            'wo_id': 7,
+            'wo_status': 'ASSIGNED',
+            'wo_assigned_to_name': name,
+          };
+      expect(
+          Inspection.fromJson(payload('krishna')).woAssignedToName, 'krishna');
+      expect(Inspection.fromJson(json).woAssignedToName, isNull);
+      expect(Inspection.fromJson(payload(null)).woAssignedToName, isNull);
+      expect(Inspection.fromJson(payload('')).woAssignedToName, isNull);
+      expect(Inspection.fromJson(payload('  ')).woAssignedToName, isNull);
+    });
+
     test('markConverted sets status and Job Work id', () {
       final converted = Inspection.fromJson(json).markConverted(workOrderId: 7);
       expect(converted.status, InspectionStatus.converted);

@@ -123,6 +123,7 @@ class DashboardStats extends Equatable {
     this.complianceRate = 0.0,
     this.pendingVerificationCount = 0,
     this.pendingTaskCount = 0,
+    this.scheduledTaskCount,
     this.openComplaintCount = 0,
     this.inspectionCount = 0,
     this.statusSegments = const [],
@@ -133,6 +134,10 @@ class DashboardStats extends Equatable {
   final double complianceRate;
   final int pendingVerificationCount;
   final int pendingTaskCount;
+
+  /// Pending tasks excluding breakdown-backing rows. Absent on older servers,
+  /// in which case [scheduledTasksDisplay] falls back to [pendingTaskCount].
+  final int? scheduledTaskCount;
   final int openComplaintCount;
   final int inspectionCount;
   final List<WorkOrderStatusSegment> statusSegments;
@@ -147,6 +152,7 @@ class DashboardStats extends Equatable {
       complianceRate: (json['compliance_rate'] as num?)?.toDouble() ?? 0.0,
       pendingVerificationCount: asJsonInt(json['pending_verification_count']) ?? 0,
       pendingTaskCount: asJsonInt(json['pending_task_count']) ?? 0,
+      scheduledTaskCount: asJsonInt(json['scheduled_task_count']),
       openComplaintCount: asJsonInt(json['open_complaint_count']) ?? 0,
       inspectionCount: asJsonInt(json['inspection_count']) ?? 0,
       statusSegments: rawSegments.whereType<Map<String, dynamic>>().map(WorkOrderStatusSegment.fromJson).toList(),
@@ -154,12 +160,15 @@ class DashboardStats extends Equatable {
     );
   }
 
+  int get scheduledTasksDisplay => scheduledTaskCount ?? pendingTaskCount;
+
   @override
   List<Object?> get props => [
         totalWorkOrders,
         complianceRate,
         pendingVerificationCount,
         pendingTaskCount,
+        scheduledTaskCount,
         openComplaintCount,
         inspectionCount,
         statusSegments,
@@ -206,6 +215,7 @@ class PendingAction extends Equatable {
     this.complaintId,
     this.inspectionId,
     this.dueDate,
+    this.isBreakdown = false,
   });
 
   final int id;
@@ -216,6 +226,9 @@ class PendingAction extends Equatable {
   final int? complaintId;
   final int? inspectionId;
   final DateTime? dueDate;
+
+  /// Backing row of a breakdown (corrective) job, not a scheduled task.
+  final bool isBreakdown;
 
   static int? _fkId(dynamic v) =>
       v is Map ? asJsonInt(v['id']) : asJsonInt(v);
@@ -256,12 +269,22 @@ class PendingAction extends Equatable {
           : (json['created_at'] != null
               ? asJsonDateTime(json['created_at'])
               : null),
+      isBreakdown: asJsonBool(json['is_breakdown']) ?? false,
     );
   }
 
   @override
-  List<Object?> get props =>
-      [id, kind, title, subtitle, workOrderId, complaintId, inspectionId, dueDate];
+  List<Object?> get props => [
+        id,
+        kind,
+        title,
+        subtitle,
+        workOrderId,
+        complaintId,
+        inspectionId,
+        dueDate,
+        isBreakdown,
+      ];
 }
 
 class DashboardSummary extends Equatable {
