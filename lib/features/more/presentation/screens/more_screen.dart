@@ -154,7 +154,7 @@ class MoreScreen extends ConsumerWidget {
               subtitle: 'Compliance & job work distribution',
               screen: const MaintenanceScreen(),
             ),
-          if (sessionAllows(currentSession, 'assets.view'))
+          if (canViewDeficiencyModule(currentSession))
             moduleTile(
               key: const Key('more_menu_deficiencies'),
               icon: Icons.rule_outlined,

@@ -51,8 +51,8 @@ class _DeficiencyListScreenState extends ConsumerState<DeficiencyListScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      if (!sessionAllows(
-          sessionFromAuth(ref.read(authControllerProvider)), 'assets.view')) {
+      if (!canViewDeficiencyModule(
+          sessionFromAuth(ref.read(authControllerProvider)))) {
         return;
       }
       final current = ref.read(deficiencyListControllerProvider);
@@ -174,7 +174,7 @@ class _DeficiencyListScreenState extends ConsumerState<DeficiencyListScreen> {
     final listState = ref.watch(deficiencyListControllerProvider);
     final session = sessionFromAuth(ref.watch(authControllerProvider));
 
-    if (!sessionAllows(session, 'assets.view')) {
+    if (!canViewDeficiencyModule(session)) {
       return widget.isEmbedded
           ? const PermissionDeniedView()
           : Scaffold(

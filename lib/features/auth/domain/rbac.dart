@@ -196,3 +196,26 @@ bool canReplaceAssets(UserSession? s) => sessionAllows(s, 'assets.replace');
 /// replace_asset additionally requires the MAINTENANCE_STAFF role (assets/views.py:2277).
 bool canReplaceWholeAsset(UserSession? s) =>
     canReplaceAssets(s) && (s?.roles.contains(AuthRole.maintenanceStaff) ?? false);
+
+const _deficiencyModuleRoles = {AuthRole.depotIncharge, AuthRole.depotUser};
+
+/// Whether this session may access the Deficiencies operational module.
+///
+/// Web parity with `MaintenanceView.jsx:91-96,128-135`: on web, operational
+/// tabs ('schedules', 'complaints', 'inspections', 'deficiencies') are hidden
+/// from MAINTENANCE_STAFF and restricted away from users whose scope level is
+/// not DEPOT (`restrictedForAdmin = ['schedules', 'complaints', 'inspections', 'deficiencies']`).
+/// In the GSSMS domain model, holding a depot role ([AuthRole.depotIncharge]
+/// or [AuthRole.depotUser]) inherently implies DEPOT scope level
+/// ([OrgScopeLevel.depot]). Therefore, checking that the session holds at least
+/// one of these depot roles maintains web parity without redundant scope checks.
+/// Multi-role sessions holding a depot role alongside an admin role retain
+/// access (role union).
+///
+/// Fails closed for null sessions or sessions lacking `assets.view`.
+bool canViewDeficiencyModule(UserSession? s) {
+  if (s == null) return false;
+  if (!sessionAllows(s, 'assets.view')) return false;
+  return s.roles.any(_deficiencyModuleRoles.contains) ||
+      _deficiencyModuleRoles.contains(s.primaryRole);
+}

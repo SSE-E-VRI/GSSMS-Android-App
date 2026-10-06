@@ -52,7 +52,7 @@ class WorkScreen extends ConsumerWidget {
       ));
       views.add(const InspectionListScreen(isEmbedded: true));
     }
-    if (sessionAllows(effectiveSession, 'assets.view')) {
+    if (canViewDeficiencyModule(effectiveSession)) {
       tabs.add(const Tab(
         text: 'Deficiencies',
         icon: Icon(Icons.rule_outlined),

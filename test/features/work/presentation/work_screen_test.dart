@@ -165,6 +165,49 @@ void main() {
       expect(tabBar.tabs.length, 3);
     });
 
+    testWidgets(
+        'hides Deficiencies tab for technician session with assets.view',
+        (tester) async {
+      final session = fakeSession(
+        role: AuthRole.maintenanceStaff,
+        permissions: const [
+          'maintenance.view',
+          'maintenance.edit',
+          'assets.view',
+          'assets.replace',
+        ],
+      );
+
+      await tester.pumpWidget(createTestWidget(session));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Deficiencies'), findsNothing);
+      // With only maintenance.view among tabs, single-tab rule applies
+      expect(find.byType(TabBar), findsNothing);
+      expect(find.text('Work Hub'), findsNothing);
+    });
+
+    testWidgets(
+        'shows Deficiencies tab for Depot Incharge with assets.view and all permissions',
+        (tester) async {
+      final session = fakeSession(
+        role: AuthRole.depotIncharge,
+        permissions: const [
+          'maintenance.view',
+          'assets.view',
+        ],
+      );
+
+      await tester.pumpWidget(createTestWidget(session));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Work Hub'), findsOneWidget);
+      expect(find.text('Job Works'), findsOneWidget);
+      expect(find.text('Deficiencies'), findsOneWidget);
+      final tabBar = tester.widget<TabBar>(find.byType(TabBar));
+      expect(tabBar.tabs.length, 2);
+    });
+
     testWidgets('single-tab rule: shows Deficiencies screen directly without TabBar when only assets.view',
         (tester) async {
       final session = fakeSession(

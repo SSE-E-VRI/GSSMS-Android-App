@@ -189,6 +189,39 @@ void main() {
       expect(find.text('Deficiencies'), findsNothing);
     });
 
+    testWidgets('hides Deficiencies card for technician session with assets.view', (tester) async {
+      const technicianSession = UserSession(
+        accessToken: 'tech_token',
+        username: 'tech_user',
+        primaryRole: AuthRole.maintenanceStaff,
+        roles: [AuthRole.maintenanceStaff],
+        permissions: [
+          'maintenance.view',
+          'maintenance.edit',
+          'assets.view',
+          'assets.replace',
+        ],
+      );
+
+      await tester.pumpWidget(pumpWith(technicianSession));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Deficiencies'), findsNothing);
+      expect(find.text('Job Works'), findsOneWidget);
+    });
+
+    testWidgets('shows Deficiencies card for Depot Incharge with assets.view', (tester) async {
+      await tester.pumpWidget(pumpWith(
+        _sessionWithPermissions(const [
+          'maintenance.view',
+          'assets.view',
+        ]),
+      ));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Deficiencies'), findsOneWidget);
+    });
+
     testWidgets('Deficiencies subtitle shows All clear when 0 need action', (tester) async {
       await tester.pumpWidget(pumpWith(
         _sessionWithPermissions(const [

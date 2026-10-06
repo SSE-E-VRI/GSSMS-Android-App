@@ -190,14 +190,8 @@ void main() {
       expect(find.byKey(const Key('deficiency_create_1')), findsOneWidget);
     });
 
-    testWidgets('Maintenance Staff does not see checkboxes or Create buttons',
+    testWidgets('Maintenance Staff is denied access and sees PermissionDeniedView',
         (tester) async {
-      when(() => mockRepo.fetchPendingDeficiencies(
-            zoneId: any(named: 'zoneId'),
-            divisionId: any(named: 'divisionId'),
-            depotId: any(named: 'depotId'),
-          )).thenAnswer((_) async => testDeficiencies);
-
       await tester.pumpWidget(createTestWidget(
         repository: mockRepo,
         role: AuthRole.maintenanceStaff,
@@ -205,8 +199,14 @@ void main() {
       ));
       await tester.pumpAndSettle();
 
+      expect(find.byType(PermissionDeniedView), findsOneWidget);
       expect(find.byKey(const Key('deficiency_check_1')), findsNothing);
       expect(find.byKey(const Key('deficiency_create_1')), findsNothing);
+      verifyNever(() => mockRepo.fetchPendingDeficiencies(
+            zoneId: any(named: 'zoneId'),
+            divisionId: any(named: 'divisionId'),
+            depotId: any(named: 'depotId'),
+          ));
     });
 
     testWidgets('single create calls API and shows success snackbar',

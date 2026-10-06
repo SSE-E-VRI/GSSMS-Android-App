@@ -592,7 +592,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       );
     }
 
-    if (sessionAllows(session, 'assets.view')) {
+    if (canViewDeficiencyModule(session)) {
       add(
         key: const Key('module_deficiencies'),
         title: 'Deficiencies',

@@ -262,5 +262,49 @@ void main() {
       expect(canReplaceAssets(null), isFalse);
       expect(canReplaceWholeAsset(null), isFalse);
     });
+
+    group('canViewDeficiencyModule', () {
+      const assets = ['assets.view'];
+
+      test('MAINTENANCE_STAFF with assets.view is false (hidden from technicians)', () {
+        expect(canViewDeficiencyModule(sess(AuthRole.maintenanceStaff, assets)), isFalse);
+      });
+
+      test('DEPOT_INCHARGE and DEPOT_USER with assets.view are true', () {
+        expect(canViewDeficiencyModule(sess(AuthRole.depotIncharge, assets)), isTrue);
+        expect(canViewDeficiencyModule(sess(AuthRole.depotUser, assets)), isTrue);
+      });
+
+      test('DIV_ADMIN / ZR_ADMIN / SUPER_ADMIN / DIV_HQ_USER are false', () {
+        expect(canViewDeficiencyModule(sess(AuthRole.divAdmin, assets)), isFalse);
+        expect(canViewDeficiencyModule(sess(AuthRole.zrAdmin, assets)), isFalse);
+        expect(canViewDeficiencyModule(sess(AuthRole.superAdmin, assets)), isFalse);
+        expect(canViewDeficiencyModule(sess(AuthRole.superAdmin, const ['*'])), isFalse);
+        expect(canViewDeficiencyModule(sess(AuthRole.divHqUser, assets)), isFalse);
+      });
+
+      test('depot role without assets.view is false', () {
+        expect(
+          canViewDeficiencyModule(sess(AuthRole.depotIncharge, const ['maintenance.view'])),
+          isFalse,
+        );
+        expect(canViewDeficiencyModule(sess(AuthRole.depotUser, const [])), isFalse);
+      });
+
+      test('DIV_ADMIN + DEPOT_INCHARGE multi-role with assets.view is true (role union)', () {
+        const multi = UserSession(
+          accessToken: 't',
+          username: 'u',
+          primaryRole: AuthRole.divAdmin,
+          roles: [AuthRole.divAdmin, AuthRole.depotIncharge],
+          permissions: assets,
+        );
+        expect(canViewDeficiencyModule(multi), isTrue);
+      });
+
+      test('null session is false (fail closed)', () {
+        expect(canViewDeficiencyModule(null), isFalse);
+      });
+    });
   });
 }

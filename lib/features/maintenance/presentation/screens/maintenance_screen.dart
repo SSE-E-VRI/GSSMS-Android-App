@@ -40,7 +40,7 @@ class _MaintenanceScreenState extends ConsumerState<MaintenanceScreen> {
   }
 
   Future<void> _handleRefresh(UserSession? session) async {
-    if (sessionAllows(session, 'assets.view')) {
+    if (canViewDeficiencyModule(session)) {
       ref.refresh(deficiencyNeedsActionCountProvider);
     }
     await ref.read(dashboardControllerProvider.notifier).loadDashboard();
@@ -303,7 +303,7 @@ class _MaintenanceScreenState extends ConsumerState<MaintenanceScreen> {
       ));
     }
 
-    if (sessionAllows(session, 'assets.view')) {
+    if (canViewDeficiencyModule(session)) {
       final deficiencyCountAsync = ref.watch(deficiencyNeedsActionCountProvider);
       final subtitleText = deficiencyCountAsync.when(
         data: (count) => count > 0 ? '$count need action' : 'All clear',
