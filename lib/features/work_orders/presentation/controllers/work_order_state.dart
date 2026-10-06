@@ -314,6 +314,43 @@ class ChecklistLoaded extends ChecklistState {
   /// Whether all required lines are completed and the record can be submitted.
   bool get canSubmit => remainingRequired == 0;
 
+  /// The first incomplete required line in display order of [displayedGroups]
+  /// or [record.assetGroups] (checked-out, non-excluded lines; reuses
+  /// [record.activeLines] and the same isRequired/isCompleted rules as
+  /// [remainingRequired]).
+  MaintenanceRecordLine? get firstIncompleteRequiredLine {
+    final active = record.activeLines;
+    if (active.isEmpty) return null;
+    final hasExplicit = active.any((l) => l.isRequired);
+    bool isIncompleteRequired(MaintenanceRecordLine l) {
+      if (l.isCompleted) return false;
+      return hasExplicit ? l.isRequired : true;
+    }
+
+    // Check displayedGroups first (if user is viewing an active subsystem filter):
+    for (final group in displayedGroups) {
+      final legacy = group.lines.every((l) => l.checkedOut == null);
+      if (!legacy && !group.checkedOut) continue;
+      for (final line in group.lines) {
+        if (!line.excluded && line.isCheckedOut && isIncompleteRequired(line)) {
+          return line;
+        }
+      }
+    }
+
+    // Check across all record.assetGroups if nothing incomplete in displayedGroups:
+    for (final group in record.assetGroups) {
+      final legacy = group.lines.every((l) => l.checkedOut == null);
+      if (!legacy && !group.checkedOut) continue;
+      for (final line in group.lines) {
+        if (!line.excluded && line.isCheckedOut && isIncompleteRequired(line)) {
+          return line;
+        }
+      }
+    }
+    return null;
+  }
+
   ChecklistLoaded copyWith({
     MaintenanceRecord? record,
     bool? isSubmitting,

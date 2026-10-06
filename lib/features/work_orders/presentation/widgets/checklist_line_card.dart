@@ -42,6 +42,7 @@ class ChecklistLineCard extends ConsumerStatefulWidget {
     this.onDeletePhoto,
     this.onRetryPhoto,
     this.showAttachments = true,
+    this.isHighlighted = false,
   });
 
   final MaintenanceRecordLine line;
@@ -55,6 +56,9 @@ class ChecklistLineCard extends ConsumerStatefulWidget {
   /// False when the photos are shown once per asset group instead (the group
   /// evidence strip), so the per-line photo section is left out.
   final bool showAttachments;
+
+  /// True when this card was jumped to as the first incomplete required line.
+  final bool isHighlighted;
 
   @override
   ConsumerState<ChecklistLineCard> createState() => _ChecklistLineCardState();
@@ -248,11 +252,25 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
   @override
   Widget build(BuildContext context) {
     final line = _line;
+    final isHighlighted = widget.isHighlighted;
 
     return Card(
-      key: Key('checklist_line_${line.id}'),
+      key: isHighlighted
+          ? Key('checklist_line_${line.id}_highlighted')
+          : Key('checklist_line_${line.id}'),
+      color: isHighlighted ? context.gssms.accent.background : null,
+      shape: isHighlighted
+          ? RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(GssmsRadius.r12),
+              side: BorderSide(
+                color: context.gssms.accent.solid,
+                width: 2,
+              ),
+            )
+          : null,
       margin: EdgeInsets.zero,
       child: Padding(
+        key: isHighlighted ? const Key('checklist_line_highlighted') : null,
         padding: const EdgeInsets.symmetric(
           horizontal: GssmsSpacing.s12,
           vertical: GssmsSpacing.s8,

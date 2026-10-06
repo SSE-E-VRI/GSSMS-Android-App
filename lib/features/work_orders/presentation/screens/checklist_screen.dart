@@ -38,6 +38,71 @@ class ChecklistScreen extends ConsumerStatefulWidget {
 }
 
 class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
+  /// Scroll targets for line cards, by line id.
+  final Map<int, GlobalKey> _lineScrollKeys = {};
+
+  /// Currently highlighted (jumped-to) line id, cleared after a few seconds.
+  int? _highlightedLineId;
+  int _highlightSeq = 0;
+  Timer? _highlightTimer;
+
+  @override
+  void dispose() {
+    _highlightTimer?.cancel();
+    super.dispose();
+  }
+
+  void _highlightLine(int lineId) {
+    _highlightTimer?.cancel();
+    final seq = ++_highlightSeq;
+    setState(() {
+      _highlightedLineId = lineId;
+    });
+    _highlightTimer = Timer(const Duration(seconds: 3), () {
+      if (!mounted || _highlightSeq != seq) return;
+      setState(() {
+        _highlightedLineId = null;
+      });
+    });
+  }
+
+  void _jumpToIncompleteLine(ChecklistLoaded state) {
+    final targetLine = state.firstIncompleteRequiredLine;
+    if (targetLine == null) return;
+
+    final remaining = state.remainingRequired;
+    showGssmsSnackBar(
+      context,
+      'Complete the highlighted item first ($remaining left).',
+      tone: GssmsTone.warning,
+    );
+
+    final isHidden = state.activeSubCategory != null &&
+        !state.displayedGroups
+            .any((g) => g.lines.any((l) => l.id == targetLine.id));
+
+    if (isHidden) {
+      ref
+          .read(checklistControllerProvider(widget.recordId).notifier)
+          .setActiveSubCategory(null);
+    }
+
+    _highlightLine(targetLine.id);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final keyContext = _lineScrollKeys[targetLine.id]?.currentContext;
+      if (keyContext != null) {
+        Scrollable.ensureVisible(
+          keyContext,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+          alignment: 0.1,
+        );
+      }
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -133,6 +198,7 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
           ? ChecklistActionBar(
               state: state,
               onSignAndSubmit: _showCompletionDialog,
+              onIncompleteTap: () => _jumpToIncompleteLine(state),
             )
           : null,
     );
@@ -301,24 +367,29 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
 
   Widget _lineCard(MaintenanceRecordLine line, MaintenanceRecord record,
       {required bool showAttachments}) {
-    return ChecklistLineCard(
-      key: ValueKey(line.id),
-      line: line,
-      recordId: widget.recordId,
-      showAttachments: showAttachments,
-      isPastTechCompleted: record.isPastTechCompleted,
-      onSave: (edit) {
-        unawaited(ref
-            .read(checklistControllerProvider(widget.recordId).notifier)
-            .submitLineObservation(
-              lineId: line.id,
-              value: edit.value,
-              status: edit.status,
-              statusOptionId: edit.statusOptionId,
-              actionOptionId: edit.actionOptionId,
-              remarks: edit.remarks,
-            ));
-      },
+    final scrollKey = _lineScrollKeys.putIfAbsent(line.id, () => GlobalKey());
+    return KeyedSubtree(
+      key: scrollKey,
+      child: ChecklistLineCard(
+        key: ValueKey(line.id),
+        line: line,
+        isHighlighted: _highlightedLineId == line.id,
+        recordId: widget.recordId,
+        showAttachments: showAttachments,
+        isPastTechCompleted: record.isPastTechCompleted,
+        onSave: (edit) {
+          unawaited(ref
+              .read(checklistControllerProvider(widget.recordId).notifier)
+              .submitLineObservation(
+                lineId: line.id,
+                value: edit.value,
+                status: edit.status,
+                statusOptionId: edit.statusOptionId,
+                actionOptionId: edit.actionOptionId,
+                remarks: edit.remarks,
+              ));
+        },
+      ),
     );
   }
 
