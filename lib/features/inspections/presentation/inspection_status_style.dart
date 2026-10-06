@@ -9,6 +9,21 @@ import 'package:gssms_mobile/features/work_orders/presentation/work_order_status
 /// OPEN waits for action (warning), ACTION_REQUIRED is escalated (danger),
 /// CONVERTED has become a Job Work (info), CLOSED is done (success).
 extension InspectionStatusStyle on InspectionStatus {
+  String get webLabel {
+    switch (this) {
+      case InspectionStatus.open:
+        return 'Open';
+      case InspectionStatus.actionRequired:
+        return 'Action Required';
+      case InspectionStatus.converted:
+        return 'Converted';
+      case InspectionStatus.closed:
+        return 'Closed';
+      case InspectionStatus.unknown:
+        return 'Unknown';
+    }
+  }
+
   GssmsTone get tone {
     switch (this) {
       case InspectionStatus.open:
@@ -171,7 +186,7 @@ class InspectionStatusChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final status = inspection.status;
     return StatusChip(
-      label: status.displayName,
+      label: status.webLabel,
       tone: status.tone,
       icon: status.icon,
       semanticPrefix: 'Record status',

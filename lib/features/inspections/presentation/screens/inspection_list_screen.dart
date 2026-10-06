@@ -14,11 +14,11 @@ import 'package:gssms_mobile/features/auth/domain/rbac.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:gssms_mobile/features/auth/presentation/widgets/permission_denied_view.dart';
 import 'package:gssms_mobile/features/inspections/domain/models/inspection.dart';
-import 'package:gssms_mobile/features/inspections/domain/models/inspection_effective_status.dart';
 import 'package:gssms_mobile/features/inspections/presentation/controllers/inspection_controllers.dart';
 import 'package:gssms_mobile/features/inspections/presentation/inspection_status_style.dart';
 import 'package:gssms_mobile/features/inspections/presentation/screens/inspection_create_screen.dart';
 import 'package:gssms_mobile/features/inspections/presentation/screens/inspection_detail_screen.dart';
+import 'package:gssms_mobile/features/work_orders/presentation/widgets/linked_job_work_line.dart';
 import 'package:intl/intl.dart';
 
 class InspectionListScreen extends ConsumerStatefulWidget {
@@ -67,7 +67,6 @@ class _InspectionListScreenState extends ConsumerState<InspectionListScreen> {
   bool _hasActiveFilters(InspectionListLoaded? s) =>
       s != null &&
       (s.selectedStatus != null ||
-          s.selectedEffectiveStatus != null ||
           s.searchQuery.isNotEmpty ||
           s.dateFrom != null ||
           s.dateTo != null);
@@ -132,7 +131,7 @@ class _InspectionListScreenState extends ConsumerState<InspectionListScreen> {
                   children: [
                     GssmsSearchField(
                       controller: _searchController,
-                      hintText: 'Search by number, title, location, asset…',
+                      hintText: 'Search number, title, place',
                       onChanged: _controller.setSearchQuery,
                     ),
                     const SizedBox(height: GssmsSpacing.s8),
@@ -146,11 +145,6 @@ class _InspectionListScreenState extends ConsumerState<InspectionListScreen> {
                     _StatusFilter(
                       state: loaded,
                       onChanged: _controller.setStatusFilter,
-                    ),
-                    const SizedBox(height: GssmsSpacing.s8),
-                    _EffectiveStatusFilter(
-                      state: loaded,
-                      onChanged: _controller.setEffectiveStatusFilter,
                     ),
                   ],
                 ),
@@ -262,8 +256,7 @@ class _InspectionListScreenState extends ConsumerState<InspectionListScreen> {
   }
 }
 
-/// Record-status filter (server-side narrowing). A chip row clipped
-/// "Action Required" at 360dp, so this stays a dropdown.
+/// Single status filter matching web inspection register tabs: All, Open, Action Required, Converted, Closed.
 class _StatusFilter extends StatelessWidget {
   const _StatusFilter({required this.state, required this.onChanged});
 
@@ -291,7 +284,7 @@ class _StatusFilter extends StatelessWidget {
       isExpanded: true,
       value: s?.selectedStatus,
       decoration: const InputDecoration(
-        labelText: 'Record status',
+        labelText: 'Status',
         isDense: true,
         contentPadding: EdgeInsets.symmetric(
           horizontal: GssmsSpacing.s12,
@@ -318,72 +311,22 @@ class _StatusFilter extends StatelessWidget {
   }
 }
 
-/// Effective-status filter (client-side computed aggregate, mirrors web).
-class _EffectiveStatusFilter extends StatelessWidget {
-  const _EffectiveStatusFilter({required this.state, required this.onChanged});
-
-  final InspectionListLoaded? state;
-  final ValueChanged<EffectiveInspectionStatus?> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final s = state;
-    int countFor(EffectiveInspectionStatus? status) {
-      if (s == null) return 0;
-      if (status == null) return s.inspections.length;
-      return s.inspections.where((i) => i.effectiveStatus == status).length;
-    }
-
-    const statuses = [
-      EffectiveInspectionStatus.open,
-      EffectiveInspectionStatus.partiallyConverted,
-      EffectiveInspectionStatus.assigned,
-      EffectiveInspectionStatus.inProgress,
-      EffectiveInspectionStatus.underSupervisorReview,
-      EffectiveInspectionStatus.reworkRequired,
-      EffectiveInspectionStatus.replacementPendingApproval,
-      EffectiveInspectionStatus.replacementApproved,
-      EffectiveInspectionStatus.closed,
-    ];
-
-    return DropdownButtonFormField<EffectiveInspectionStatus?>(
-      key: const Key('inspection_effective_status_filter_dropdown'),
-      isExpanded: true,
-      value: s?.selectedEffectiveStatus,
-      decoration: const InputDecoration(
-        labelText: 'Effective status',
-        isDense: true,
-        contentPadding: EdgeInsets.symmetric(
-          horizontal: GssmsSpacing.s12,
-          vertical: GssmsSpacing.s12,
-        ),
-      ),
-      items: [
-        DropdownMenuItem(
-          value: null,
-          child: Text('All (${countFor(null)})'),
-        ),
-        for (final status in statuses)
-          DropdownMenuItem(
-            value: status,
-            child: Text(
-              '${status.displayName} (${countFor(status)})',
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-      ],
-      onChanged: onChanged,
-    );
-  }
-}
-
 class _InspectionCard extends StatelessWidget {
   const _InspectionCard({required this.inspection, required this.onTap});
 
   final Inspection inspection;
   final VoidCallback onTap;
 
-  static final DateFormat _dateFormat = DateFormat('dd MMM yyyy, hh:mm a');
+  static final DateFormat _dateTimeFormat = DateFormat('dd MMM yyyy, hh:mm a');
+  static final DateFormat _dateOnlyFormat = DateFormat('dd MMM yyyy');
+
+  static String _formatWhen(DateTime when) {
+    final local = when.toLocal();
+    if (local.hour == 0 && local.minute == 0 && local.second == 0) {
+      return _dateOnlyFormat.format(local);
+    }
+    return _dateTimeFormat.format(local);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -391,6 +334,9 @@ class _InspectionCard extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final metaStyle = textTheme.bodySmall?.copyWith(color: tokens.textSecondary);
     final when = inspection.inspectionDate ?? inspection.createdAt;
+    final linkedJobWork = inspection.jobWorks.firstOrNull;
+    final effectiveWorkOrderId = inspection.workOrderId ?? linkedJobWork?.id;
+    final effectiveTicketNumber = linkedJobWork?.ticketNumber;
 
     return Card(
       key: Key('inspection_card_${inspection.id}'),
@@ -414,19 +360,13 @@ class _InspectionCard extends StatelessWidget {
                       inspection.reference,
                       style: textTheme.labelMedium?.copyWith(color: tokens.link),
                     ),
-                    InspectionPointsBadge(inspection: inspection),
+                    if (inspection.pointsCount > 0)
+                      InspectionPointsBadge(inspection: inspection),
                   ],
                 ),
               ),
               const SizedBox(height: GssmsSpacing.s4),
-              Wrap(
-                spacing: GssmsSpacing.s8,
-                runSpacing: GssmsSpacing.s4,
-                children: [
-                  InspectionStatusChip(inspection: inspection),
-                  InspectionEffectiveStatusChip(inspection: inspection),
-                ],
-              ),
+              InspectionStatusChip(inspection: inspection),
               const SizedBox(height: GssmsSpacing.s8),
               Text(
                 inspection.title,
@@ -455,23 +395,29 @@ class _InspectionCard extends StatelessWidget {
                         'Location not set',
                     style: metaStyle,
                   ),
-                  if (inspection.createdByName != null)
+                  if (inspection.createdByName != null &&
+                      inspection.createdByName!.trim().isNotEmpty)
                     _Meta(
                       icon: Icons.person_outline,
-                      text: inspection.createdByName!,
+                      text: inspection.createdByName!.trim(),
                       style: metaStyle,
                     ),
                   if (when != null)
                     _Meta(
                       icon: Icons.schedule,
-                      text: _dateFormat.format(when),
+                      text: _formatWhen(when),
                       style: metaStyle,
                     ),
                 ],
               ),
-              if (inspection.isConverted) ...[
+              if ((inspection.isConverted || inspection.jobWorks.isNotEmpty) &&
+                  effectiveWorkOrderId != null) ...[
                 const SizedBox(height: GssmsSpacing.s8),
-                InspectionJobWorkChip(inspection: inspection),
+                LinkedJobWorkLine(
+                  workOrderId: effectiveWorkOrderId,
+                  ticketNumber: effectiveTicketNumber,
+                  workOrderStatus: inspection.workOrderStatus ?? linkedJobWork?.status,
+                ),
               ],
             ],
           ),

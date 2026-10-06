@@ -9,6 +9,7 @@ import 'package:gssms_mobile/features/auth/presentation/controllers/auth_control
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_state.dart';
 import 'package:gssms_mobile/features/inspections/data/inspection_repository.dart';
 import 'package:gssms_mobile/features/inspections/domain/models/inspection.dart';
+import 'package:gssms_mobile/features/inspections/domain/models/inspection_effective_status.dart';
 import 'package:gssms_mobile/features/inspections/domain/models/inspection_evidence_photo.dart';
 import 'package:gssms_mobile/features/inspections/domain/models/inspection_point.dart';
 import 'package:gssms_mobile/features/inspections/presentation/controllers/inspection_controllers.dart';
@@ -106,13 +107,67 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Inspections'), findsOneWidget);
+      expect(find.text('Search number, title, place'), findsOneWidget);
       expect(find.byKey(const Key('date_range_from')), findsOneWidget);
       expect(find.text('EB Bunk Monthly Check'), findsOneWidget);
       expect(find.text('#1'), findsOneWidget);
       // Inspections carry no priority in the API — no fabricated badge.
       expect(find.text('High'), findsNothing);
       expect(find.text('Medium'), findsNothing);
+      // Points badge is hidden when pointsCount == 0
+      expect(find.text('0 Points'), findsNothing);
       expect(find.byKey(const Key('fab_create_inspection')), findsOneWidget);
+    });
+
+    testWidgets('InspectionListScreen displays single status, non-zero points, date-only, and linked job work line',
+        (tester) async {
+      final inspectionWithPointsAndJobWork = Inspection(
+        id: 77,
+        inspectionNumber: 'INSP-2026-77',
+        title: 'Platform High Mast Inspection',
+        status: InspectionStatus.converted,
+        stationName: 'Neyveli',
+        createdByName: 'SSE Electrical',
+        pointsCount: 3,
+        inspectionDate: DateTime(2026, 10, 5), // midnight date-only
+        isConverted: true,
+        workOrderId: 900,
+        workOrderStatus: 'IN_PROGRESS',
+        jobWorks: const [
+          InspectionJobWorkRef(
+            id: 900,
+            ticketNumber: 'JW-2026-900',
+            status: 'IN_PROGRESS',
+          ),
+        ],
+      );
+
+      when(() => mockRepo.fetchInspections())
+          .thenAnswer((_) async => [inspectionWithPointsAndJobWork]);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            inspectionRepositoryProvider.overrideWithValue(mockRepo),
+            authControllerProvider.overrideWith(
+              () => _FakeAuthenticatedController(_sessionWithInspectionsAdd),
+            ),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.lightTheme,
+            home: const InspectionListScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('INSP-2026-77'), findsOneWidget);
+      expect(find.text('3 Points'), findsOneWidget);
+      expect(find.text('Converted'), findsOneWidget);
+      expect(find.text('SSE Electrical'), findsOneWidget);
+      expect(find.text('05 Oct 2026'), findsOneWidget);
+      expect(find.textContaining('12:00 AM'), findsNothing);
+      expect(find.text('Job Work JW-2026-900 · In Progress'), findsOneWidget);
     });
 
     testWidgets(
