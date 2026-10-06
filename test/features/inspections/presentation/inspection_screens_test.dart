@@ -108,7 +108,7 @@ void main() {
 
       expect(find.text('Inspections'), findsOneWidget);
       expect(find.text('Search number, title, place'), findsOneWidget);
-      expect(find.byKey(const Key('date_range_from')), findsOneWidget);
+      expect(find.byKey(const Key('inspection_filters_button')), findsOneWidget);
       expect(find.text('EB Bunk Monthly Check'), findsOneWidget);
       expect(find.text('#1'), findsOneWidget);
       // Inspections carry no priority in the API — no fabricated badge.
@@ -117,6 +117,13 @@ void main() {
       // Points badge is hidden when pointsCount == 0
       expect(find.text('0 Points'), findsNothing);
       expect(find.byKey(const Key('fab_create_inspection')), findsOneWidget);
+
+      // Open filter bottom sheet
+      await tester.tap(find.byKey(const Key('inspection_filters_button')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('date_range_from')), findsOneWidget);
+      expect(find.byKey(const Key('date_range_to')), findsOneWidget);
+      expect(find.byKey(const Key('inspection_status_filter_dropdown')), findsOneWidget);
     });
 
     testWidgets('InspectionListScreen displays single status, non-zero points, date-only, and linked job work line',
