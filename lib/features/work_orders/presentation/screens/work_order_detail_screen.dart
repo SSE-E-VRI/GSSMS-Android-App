@@ -439,6 +439,12 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
             // maintenance record); a second raw "Start" button would offer a
             // path that skips the record.
             .where((a) => !(canStart && a.targetStatus.toUpperCase() == 'IN_PROGRESS'))
+            // Completion must only happen through the Sign & Submit of the
+            // checklist screen / execution forms (web parity): a raw "Tech
+            // Completed" button here would let a technician complete the Job
+            // Work with only remarks, bypassing the checklist, photo and
+            // signature validation the submit endpoints enforce.
+            .where((a) => a.targetStatus.toUpperCase() != 'TECH_COMPLETED')
             .toList()
         : const <WorkOrderAction>[];
 

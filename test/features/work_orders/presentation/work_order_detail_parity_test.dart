@@ -199,4 +199,46 @@ void main() {
       expect(find.byKey(const Key('action_view_report')), findsNothing);
     });
   });
+
+  group('raw Tech Completed action is hidden (completion only via Sign & Submit)', () {
+    const techCompleted = WorkOrderAction(
+        targetStatus: 'TECH_COMPLETED', label: 'Tech Completed', enabled: true);
+    const onHold = WorkOrderAction(
+        targetStatus: 'ON_HOLD', label: 'On Hold', enabled: true);
+
+    UserSession tech() => fakeSession(
+          role: AuthRole.maintenanceStaff,
+          userId: 9,
+          permissions: const ['maintenance.view', 'maintenance.edit'],
+        );
+
+    testWidgets(
+        'technician on IN_PROGRESS checklist Job Work gets Open Checklist, not Tech Completed',
+        (tester) async {
+      await _pump(
+        tester,
+        _wo(status: WorkOrderStatus.inProgress),
+        tech(),
+        allowed: const [techCompleted, onHold],
+        currentStatus: 'IN_PROGRESS',
+      );
+      expect(find.byKey(const Key('action_tech_completed')), findsNothing);
+      expect(find.byKey(const Key('action_open_checklist')), findsOneWidget);
+    });
+
+    testWidgets(
+        'technician on IN_PROGRESS complaint-mode Job Work gets Open Breakdown Execution, not Tech Completed',
+        (tester) async {
+      await _pump(
+        tester,
+        _wo(status: WorkOrderStatus.inProgress, executionMode: 'COMPLAINT'),
+        tech(),
+        allowed: const [techCompleted, onHold],
+        currentStatus: 'IN_PROGRESS',
+      );
+      expect(find.byKey(const Key('action_tech_completed')), findsNothing);
+      expect(find.byKey(const Key('action_open_checklist')), findsOneWidget);
+      expect(find.text('Open Breakdown Execution'), findsOneWidget);
+    });
+  });
 }
