@@ -94,7 +94,7 @@ void main() {
 
       expect(find.text('Breakdowns'), findsOneWidget);
       expect(find.text('Search number, title, place'), findsOneWidget);
-      expect(find.byKey(const Key('date_range_from')), findsOneWidget);
+      expect(find.byKey(const Key('complaint_filters_button')), findsOneWidget);
       expect(find.text('Transformer Leakage'), findsOneWidget);
       expect(find.text('#1'), findsOneWidget);
       // Status is always visible on the card (B7); there is no complaint
@@ -103,6 +103,13 @@ void main() {
       expect(find.text('High'), findsNothing);
       expect(find.text('Medium'), findsNothing);
       expect(find.byKey(const Key('fab_create_complaint')), findsOneWidget);
+
+      // Open filter bottom sheet
+      await tester.tap(find.byKey(const Key('complaint_filters_button')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('date_range_from')), findsOneWidget);
+      expect(find.byKey(const Key('date_range_to')), findsOneWidget);
+      expect(find.byKey(const Key('complaint_status_filter_dropdown')), findsOneWidget);
     });
 
     testWidgets('ComplaintListScreen displays converted breakdown with linked Job Work line', (tester) async {
