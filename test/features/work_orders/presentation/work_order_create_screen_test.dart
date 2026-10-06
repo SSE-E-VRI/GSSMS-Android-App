@@ -183,11 +183,16 @@ void main() {
     expect(find.text('Panel Monthly (Monthly)'), findsOneWidget);
     expect(find.text('DG Set AMC (Quarterly)'), findsNothing);
 
-    // The open menu consumes the first tap outside it to dismiss; tap the
-    // AMC segment text again to actually select it.
-    await tester.tap(find.text('AMC'));
+    // Dismiss the dropdown menu first by tapping barrier / outside
+    await tester.tapAt(const Offset(10, 10));
     await tester.pumpAndSettle();
-    await tester.ensureVisible(find.text('AMC'));
+
+    // Scroll AMC into view inside its horizontal scroll view
+    await tester.scrollUntilVisible(
+      find.text('AMC'),
+      50,
+      scrollable: find.byType(Scrollable).last,
+    );
     await tester.tap(find.text('AMC'));
     await tester.pumpAndSettle();
 
@@ -250,9 +255,13 @@ void main() {
     // 1. General breakdown hint is visible
     expect(find.text('Report breakdowns in the Breakdowns module.'), findsOneWidget);
 
-    // 2. In PREVENTIVE mode: Checklist header is required with asterisk
+    // 2. In PREVENTIVE mode: Checklist header is required with asterisk and web helper text
     expect(find.text('Checklist *'), findsOneWidget);
-    expect(find.text('Scheduled PM is created from Schedules → Convert. Use this only for ad-hoc checklists not assigned to this location.'), findsOneWidget);
+    expect(
+        find.text(
+            'Maintenance checklist to attach — determines what the technician is asked to fill in when closing the job work. Scheduled PM is created from Schedules → Convert.'),
+        findsOneWidget);
+    expect(find.text('Filter by schedule type'), findsOneWidget);
 
     // 3. Open type dropdown and verify only Preventive is offered
     await tester.tap(find.byKey(const Key('wo_type_dropdown')));
@@ -306,5 +315,65 @@ void main() {
           scheduledDate: null,
           maintenanceMasterId: 10,
         )).called(1);
+  });
+
+  testWidgets('WorkOrderCreateScreen action buttons fit without overflow at 360dp width and 1.3 text scale', (tester) async {
+    final mockRepo = MockWorkOrderRepository();
+    final mockOrg = MockOrgScopeOptionsService();
+    final mockInfra = MockInfraOptionsService();
+    final mockAssets = MockAssetApiService();
+
+    when(() => mockInfra.fetchOptions(any(), depotId: any(named: 'depotId')))
+        .thenAnswer((_) async => const []);
+    when(() => mockRepo.fetchMaintenanceMasters())
+        .thenAnswer((_) async => const []);
+
+    final originalOnError = FlutterError.onError;
+    FlutterErrorDetails? caughtDetails;
+    FlutterError.onError = (details) {
+      caughtDetails = details;
+    };
+    addTearDown(() {
+      FlutterError.onError = originalOnError;
+    });
+
+    tester.view.physicalSize = const Size(360, 720);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          workOrderRepositoryProvider.overrideWithValue(mockRepo),
+          authControllerProvider.overrideWith(() => _FakeAuth(_session)),
+          orgScopeOptionsServiceProvider.overrideWithValue(mockOrg),
+          infrastructureOptionsServiceProvider.overrideWithValue(mockInfra),
+          assetApiServiceProvider.overrideWithValue(mockAssets),
+        ],
+        child: MaterialApp(
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              textScaler: const TextScaler.linear(1.3),
+            ),
+            child: child!,
+          ),
+          home: const WorkOrderCreateScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Verify AppBar title is 'New Job Work'
+    expect(find.descendant(of: find.byType(AppBar), matching: find.text('New Job Work')), findsOneWidget);
+
+    // Verify Action buttons are visible and did not overflow
+    await tester.ensureVisible(find.byKey(const Key('submit_wo_button')));
+    expect(find.byKey(const Key('cancel_wo_button')), findsOneWidget);
+    expect(find.byKey(const Key('submit_wo_button')), findsOneWidget);
+    expect(caughtDetails, isNull);
+    expect(tester.takeException(), isNull);
   });
 }
