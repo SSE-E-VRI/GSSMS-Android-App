@@ -92,7 +92,8 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      expect(find.text('Breakdowns & Issues'), findsOneWidget);
+      expect(find.text('Breakdowns'), findsOneWidget);
+      expect(find.text('Search number, title, place'), findsOneWidget);
       expect(find.byKey(const Key('date_range_from')), findsOneWidget);
       expect(find.text('Transformer Leakage'), findsOneWidget);
       expect(find.text('#1'), findsOneWidget);
@@ -102,6 +103,44 @@ void main() {
       expect(find.text('High'), findsNothing);
       expect(find.text('Medium'), findsNothing);
       expect(find.byKey(const Key('fab_create_complaint')), findsOneWidget);
+    });
+
+    testWidgets('ComplaintListScreen displays converted breakdown with linked Job Work line', (tester) async {
+      const convertedComplaint = Complaint(
+        id: 42,
+        title: 'Signal Light Failure',
+        description: 'Bulb fused',
+        status: ComplaintStatus.converted,
+        stationName: 'VRI',
+        complainantName: 'Station Master',
+        isConverted: true,
+        workOrderId: 101,
+        workOrderTicketNumber: 'JW-2026-101',
+        workOrderStatus: 'IN_PROGRESS',
+      );
+
+      when(() => mockRepo.fetchComplaints()).thenAnswer((_) async => [convertedComplaint]);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            complaintRepositoryProvider.overrideWithValue(mockRepo),
+            authControllerProvider.overrideWith(
+              () => _FakeAuthenticatedController(_sessionWithComplaintsAdd),
+            ),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.lightTheme,
+            home: const ComplaintListScreen(),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+
+      expect(find.text('Converted'), findsOneWidget);
+      expect(find.text('Station Master'), findsOneWidget);
+      expect(find.text('Job Work JW-2026-101 · In Progress'), findsOneWidget);
     });
 
     testWidgets('tapping a logged complaint opens its detail screen', (tester) async {

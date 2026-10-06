@@ -18,6 +18,7 @@ import 'package:gssms_mobile/features/complaints/presentation/complaint_status_s
 import 'package:gssms_mobile/features/complaints/presentation/controllers/complaint_controllers.dart';
 import 'package:gssms_mobile/features/complaints/presentation/screens/complaint_create_screen.dart';
 import 'package:gssms_mobile/features/complaints/presentation/screens/complaint_detail_screen.dart';
+import 'package:gssms_mobile/features/work_orders/presentation/widgets/linked_job_work_line.dart';
 import 'package:intl/intl.dart';
 
 class ComplaintListScreen extends ConsumerStatefulWidget {
@@ -82,7 +83,7 @@ class _ComplaintListScreenState extends ConsumerState<ComplaintListScreen> {
 
     if (!sessionAllows(session, 'complaints.view')) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Breakdowns & Issues')),
+        appBar: AppBar(title: const Text('Breakdowns')),
         body: const PermissionDeniedView(),
       );
     }
@@ -95,7 +96,7 @@ class _ComplaintListScreenState extends ConsumerState<ComplaintListScreen> {
       appBar: widget.isEmbedded
           ? null
           : AppBar(
-              title: const Text('Breakdowns & Issues'),
+              title: const Text('Breakdowns'),
               actions: [
                 if (session != null)
                   OrgScopeAppBarFilter(
@@ -120,7 +121,7 @@ class _ComplaintListScreenState extends ConsumerState<ComplaintListScreen> {
                   children: [
                     GssmsSearchField(
                       controller: _searchController,
-                      hintText: 'Search by #, title, location, asset…',
+                      hintText: 'Search number, title, place',
                       onChanged: _controller.setSearchQuery,
                     ),
                     const SizedBox(height: GssmsSpacing.s8),
@@ -301,7 +302,16 @@ class _ComplaintCard extends StatelessWidget {
 
   final Complaint complaint;
 
-  static final DateFormat _dateFormat = DateFormat('dd MMM yyyy, hh:mm a');
+  static final DateFormat _dateTimeFormat = DateFormat('dd MMM yyyy, hh:mm a');
+  static final DateFormat _dateOnlyFormat = DateFormat('dd MMM yyyy');
+
+  static String _formatWhen(DateTime when) {
+    final local = when.toLocal();
+    if (local.hour == 0 && local.minute == 0 && local.second == 0) {
+      return _dateOnlyFormat.format(local);
+    }
+    return _dateTimeFormat.format(local);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -380,17 +390,28 @@ class _ComplaintCard extends StatelessWidget {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
+                  if (complaint.complainantName != null &&
+                      complaint.complainantName!.trim().isNotEmpty)
+                    _Meta(
+                      icon: Icons.person_outline,
+                      text: complaint.complainantName!.trim(),
+                      style: metaStyle,
+                    ),
                   if (complaint.createdAt != null)
                     _Meta(
                       icon: Icons.schedule,
-                      text: _dateFormat.format(complaint.createdAt!.toLocal()),
+                      text: _formatWhen(complaint.createdAt!),
                       style: metaStyle,
                     ),
                 ],
               ),
-              if (complaint.isConverted) ...[
+              if (complaint.isConverted && complaint.workOrderId != null) ...[
                 const SizedBox(height: GssmsSpacing.s8),
-                ComplaintJobWorkChip(complaint: complaint),
+                LinkedJobWorkLine(
+                  workOrderId: complaint.workOrderId!,
+                  ticketNumber: complaint.workOrderTicketNumber,
+                  workOrderStatus: complaint.workOrderStatus,
+                ),
               ],
             ],
           ),
