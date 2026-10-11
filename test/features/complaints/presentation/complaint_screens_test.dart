@@ -178,7 +178,7 @@ void main() {
       expect(find.text('Open'), findsOneWidget);
     });
 
-    group('detail delete icon', () {
+    group('detail has no delete icon (recorded breakdowns are immutable)', () {
       UserSession sessionFor(AuthRole role) => UserSession(
             accessToken: 'test_token',
             username: 'user',
@@ -224,10 +224,10 @@ void main() {
         expect(find.byKey(const Key('delete_breakdown_button')), findsNothing);
       });
 
-      testWidgets('is shown for SUPER_ADMIN with complaints.delete',
+      testWidgets('is hidden for SUPER_ADMIN even with complaints.delete',
           (tester) async {
         await pumpDetail(tester, AuthRole.superAdmin);
-        expect(find.byKey(const Key('delete_breakdown_button')), findsOneWidget);
+        expect(find.byKey(const Key('delete_breakdown_button')), findsNothing);
       });
 
       testWidgets('stays hidden for a closed complaint', (tester) async {

@@ -239,70 +239,6 @@ class _InspectionDetailScreenState
     });
   }
 
-  Future<void> _deletePhoto(InspectionEvidencePhoto photo) async {
-    final confirmed = await showConfirmationDialog(
-      context,
-      title: 'Delete photo?',
-      icon: Icons.delete_outline,
-      message: 'This evidence photo will be permanently deleted.',
-      confirmLabel: 'Delete',
-      confirmKey: Key('confirm_delete_insp_photo_${photo.id}'),
-    );
-    if (!confirmed || !mounted) return;
-    await _mutate(() async {
-      try {
-        await ref
-            .read(inspectionRepositoryProvider)
-            .deletePhoto(photo.id);
-        _snack('Photo deleted.');
-      } catch (e) {
-        _snack('Could not delete: ${userFacingError(e)}');
-      }
-    });
-  }
-
-  Future<void> _editPhotoCaption(InspectionEvidencePhoto photo) async {
-    final controller = TextEditingController(text: photo.caption ?? '');
-    try {
-      final caption = await showDialog<String>(
-        context: context,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Edit caption'),
-          content: TextField(
-            controller: controller,
-            maxLines: 2,
-            decoration: const InputDecoration(
-                labelText: 'Caption (optional)'),
-          ),
-          actions: [
-            TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text('Cancel')),
-            FilledButton(
-              key: Key('confirm_photo_caption_${photo.id}'),
-              onPressed: () =>
-                  Navigator.of(ctx).pop(controller.text.trim()),
-              child: const Text('Save'),
-            ),
-          ],
-        ),
-      );
-      if (caption == null || !mounted) return;
-      await _mutate(() async {
-        try {
-          await ref
-              .read(inspectionRepositoryProvider)
-              .updatePhotoCaption(photoId: photo.id, caption: caption);
-          _snack('Caption updated.');
-        } catch (e) {
-          _snack('Could not update: ${userFacingError(e)}');
-        }
-      });
-    } finally {
-      controller.dispose();
-    }
-  }
-
   Future<void> _confirmConvert() async {
     final confirmed = await showConfirmationDialog(
       context,
@@ -360,29 +296,6 @@ class _InspectionDetailScreenState
       _snack('Could not close: ${userFacingError(e)}');
     } finally {
       if (mounted) setState(() => _closing = false);
-    }
-  }
-
-  Future<void> _deleteInspection() async {
-    final confirmed = await showConfirmationDialog(
-      context,
-      title: 'Delete inspection?',
-      icon: Icons.delete_outline,
-      message:
-          'Inspection ${_inspection.reference} will be permanently deleted.',
-      confirmLabel: 'Delete',
-      confirmKey: const Key('confirm_delete_inspection_button'),
-    );
-    if (!confirmed || !mounted) return;
-    try {
-      await ref
-          .read(inspectionRepositoryProvider)
-          .deleteInspection(_inspection.id);
-      if (!mounted) return;
-      Navigator.of(context).pop(true);
-    } catch (e) {
-      if (!mounted) return;
-      _snack('Could not delete: ${userFacingError(e)}');
     }
   }
 
@@ -908,21 +821,10 @@ class _InspectionDetailScreenState
         .toList();
     final closeReason = _closeBlockReason;
     final showClose = _canClose(session);
-    final canDelete =
-        sessionAllows(session, 'inspections.delete') && !inspection.isClosed;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(title),
-        actions: [
-          if (canDelete)
-            IconButton(
-              key: const Key('delete_inspection_button'),
-              icon: const Icon(Icons.delete_outline),
-              tooltip: 'Delete inspection',
-              onPressed: _deleteInspection,
-            ),
-        ],
       ),
       body: RefreshIndicator(
         onRefresh: _refreshDetail,
@@ -1085,18 +987,11 @@ class _InspectionDetailScreenState
                         ? () => _escalateDialog(point)
                         : null,
                     session: session,
-                    canManagePhotos: _canManagePhotos(session),
                     onAddPhoto: _canManagePhotos(session) &&
                             point.canUploadPointPhoto(
                                 inspectionClosed: inspection.isClosed) &&
                             point.evidencePhotos.length < _kMaxPointPhotos
                         ? () => _addPointPhoto(point)
-                        : null,
-                    onDeletePhoto: _canManagePhotos(session)
-                        ? (photo) => _deletePhoto(photo)
-                        : null,
-                    onEditPhotoCaption: _canManagePhotos(session)
-                        ? (photo) => _editPhotoCaption(photo)
                         : null,
                   ),
                 if (canEdit && eligibleJw1.length >= 2) ...[
@@ -1147,10 +1042,6 @@ class _InspectionDetailScreenState
                 for (final photo in inspection.generalEvidencePhotos)
                   _EvidencePhotoRow(
                     photo: photo,
-                    canManage: _canManagePhotos(session) && !photo.isLocked,
-                    acting: _acting,
-                    onEdit: () => _editPhotoCaption(photo),
-                    onDelete: () => _deletePhoto(photo),
                   ),
                 if (_canManagePhotos(session) &&
                     inspection.generalEvidencePhotos.length <
@@ -1226,22 +1117,14 @@ class _InspectionDetailScreenState
   }
 }
 
-/// One evidence-photo row: caption (or fallback), lock/uploader meta, and
-/// edit/delete affordances while the caller allows management.
+/// One evidence-photo row: caption (or fallback), lock/uploader meta.
+/// Read-only: recorded inspections cannot be edited or deleted.
 class _EvidencePhotoRow extends StatelessWidget {
   const _EvidencePhotoRow({
     required this.photo,
-    required this.canManage,
-    required this.acting,
-    required this.onEdit,
-    required this.onDelete,
   });
 
   final InspectionEvidencePhoto photo;
-  final bool canManage;
-  final bool acting;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -1274,20 +1157,6 @@ class _EvidencePhotoRow extends StatelessWidget {
           ),
           if (photo.isLocked)
             const Icon(Icons.lock_outline, size: 18)
-          else if (canManage) ...[
-            IconButton(
-              key: Key('edit_insp_photo_${photo.id}'),
-              icon: const Icon(Icons.edit_outlined, size: 18),
-              tooltip: 'Edit caption',
-              onPressed: acting ? null : onEdit,
-            ),
-            IconButton(
-              key: Key('delete_insp_photo_${photo.id}'),
-              icon: const Icon(Icons.delete_outline, size: 18),
-              tooltip: 'Delete photo',
-              onPressed: acting ? null : onDelete,
-            ),
-          ],
         ],
       ),
     );
@@ -1310,10 +1179,7 @@ class _PointCard extends StatelessWidget {
     this.onCreateJw2,
     this.onEscalate,
     this.session,
-    this.canManagePhotos = false,
     this.onAddPhoto,
-    this.onDeletePhoto,
-    this.onEditPhotoCaption,
   });
 
   final InspectionPoint point;
@@ -1333,10 +1199,7 @@ class _PointCard extends StatelessWidget {
 
   /// Evidence-photo management (upload while UNASSIGNED, edit/delete while
   /// unlocked) — mirrors web's per-point evidence gate.
-  final bool canManagePhotos;
   final VoidCallback? onAddPhoto;
-  final ValueChanged<InspectionEvidencePhoto>? onDeletePhoto;
-  final ValueChanged<InspectionEvidencePhoto>? onEditPhotoCaption;
 
   /// Chronological attempt history: JW-001 → verdict → approval → JW-002 →
   /// escalation, from assignments + disposition audit fields. Mirrors web's
@@ -1480,14 +1343,6 @@ class _PointCard extends StatelessWidget {
             for (final photo in point.evidencePhotos)
               _EvidencePhotoRow(
                 photo: photo,
-                canManage: canManagePhotos && !photo.isLocked,
-                acting: acting,
-                onEdit: onEditPhotoCaption != null
-                    ? () => onEditPhotoCaption!(photo)
-                    : () {},
-                onDelete: onDeletePhoto != null
-                    ? () => onDeletePhoto!(photo)
-                    : () {},
               ),
             if (onAddPhoto != null) ...[
               const SizedBox(height: GssmsSpacing.s4),

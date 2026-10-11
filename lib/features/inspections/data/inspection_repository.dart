@@ -69,7 +69,6 @@ abstract class IInspectionRepository {
     String? description,
   });
   Future<Inspection> closeInspection(int inspectionId);
-  Future<void> deleteInspection(int inspectionId);
 
   Future<InspectionPoint> resolvePoint(int pointId, {required String remarks});
   Future<InspectionPoint> disposePoint(int pointId,
@@ -99,11 +98,6 @@ abstract class IInspectionRepository {
     required MultipartFile file,
     String caption = '',
   });
-  Future<InspectionEvidencePhoto> updatePhotoCaption({
-    required int photoId,
-    required String caption,
-  });
-  Future<void> deletePhoto(int photoId);
 }
 
 class InspectionRepository implements IInspectionRepository {
@@ -205,10 +199,6 @@ class InspectionRepository implements IInspectionRepository {
       _apiService.closeInspection(inspectionId);
 
   @override
-  Future<void> deleteInspection(int inspectionId) =>
-      _apiService.deleteInspection(inspectionId);
-
-  @override
   Future<InspectionPoint> resolvePoint(int pointId,
           {required String remarks}) =>
       _apiService.resolveInspectionPoint(pointId, remarks: remarks);
@@ -270,14 +260,4 @@ class InspectionRepository implements IInspectionRepository {
   }) =>
       _apiService.uploadPointPhoto(
           pointId: pointId, file: file, caption: caption);
-
-  @override
-  Future<InspectionEvidencePhoto> updatePhotoCaption({
-    required int photoId,
-    required String caption,
-  }) =>
-      _apiService.updatePhotoCaption(photoId: photoId, caption: caption);
-
-  @override
-  Future<void> deletePhoto(int photoId) => _apiService.deletePhoto(photoId);
 }

@@ -109,14 +109,6 @@ class _ComplaintDetailScreenState extends ConsumerState<ComplaintDetailScreen> {
     return session.roles.contains(AuthRole.depotIncharge);
   }
 
-  bool _canDelete(UserSession? session) {
-    if (session == null) return false;
-    if (_complaint.isClosed) return false;
-    // Depot incharges close/reject breakdowns rather than delete them.
-    if (session.roles.contains(AuthRole.depotIncharge)) return false;
-    return sessionAllows(session, 'complaints.delete');
-  }
-
   bool _canManagePhotos(UserSession? session) {
     if (session == null) return false;
     if (_complaint.status != ComplaintStatus.open) return false;
@@ -261,28 +253,6 @@ class _ComplaintDetailScreenState extends ConsumerState<ComplaintDetailScreen> {
     }
   }
 
-  Future<void> _deleteComplaint() async {
-    final confirmed = await showConfirmationDialog(
-      context,
-      title: 'Delete breakdown?',
-      icon: Icons.delete_outline,
-      message:
-          'Breakdown ${_complaint.reference} will be permanently deleted.',
-      confirmLabel: 'Delete',
-      confirmKey: const Key('confirm_delete_breakdown_button'),
-    );
-    if (!confirmed || !mounted) return;
-    try {
-      await ref
-          .read(complaintRepositoryProvider)
-          .deleteComplaint(_complaint.id);
-      if (!mounted) return;
-      Navigator.of(context).pop(true);
-    } catch (e) {
-      _snack('Could not delete: ${workOrderReadableError(e)}');
-    }
-  }
-
   Future<void> _addPhoto() async {
     XFile? picked;
     try {
@@ -324,29 +294,6 @@ class _ComplaintDetailScreenState extends ConsumerState<ComplaintDetailScreen> {
     });
   }
 
-  Future<void> _deletePhoto(ComplaintPhoto photo) async {
-    final confirmed = await showConfirmationDialog(
-      context,
-      title: 'Delete photo?',
-      icon: Icons.delete_outline,
-      message: 'This evidence photo will be permanently deleted.',
-      confirmLabel: 'Delete',
-      confirmKey: Key('confirm_delete_photo_${photo.id}'),
-    );
-    if (!confirmed || !mounted) return;
-    await _mutate(() async {
-      try {
-        await ref.read(complaintRepositoryProvider).deletePhoto(
-              complaintId: _complaint.id,
-              photoId: photo.id,
-            );
-        _snack('Photo deleted.');
-      } catch (e) {
-        _snack('Could not delete: ${workOrderReadableError(e)}');
-      }
-    });
-  }
-
   void _openJobWork(int workOrderId) {
     openWorkOrderGuarded(
       context: context,
@@ -376,15 +323,6 @@ class _ComplaintDetailScreenState extends ConsumerState<ComplaintDetailScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(title),
-        actions: [
-          if (_canDelete(session))
-            IconButton(
-              key: const Key('delete_breakdown_button'),
-              icon: const Icon(Icons.delete_outline),
-              tooltip: 'Delete breakdown',
-              onPressed: _deleteComplaint,
-            ),
-        ],
       ),
       body: RefreshIndicator(
         onRefresh: _refreshDetail,
@@ -509,16 +447,6 @@ class _ComplaintDetailScreenState extends ConsumerState<ComplaintDetailScreen> {
                             ],
                           ),
                         ),
-                        if (_canManagePhotos(session))
-                          IconButton(
-                            key: Key('delete_photo_${photo.id}'),
-                            icon:
-                                const Icon(Icons.delete_outline, size: 18),
-                            tooltip: 'Delete photo',
-                            onPressed: _acting
-                                ? null
-                                : () => _deletePhoto(photo),
-                          ),
                       ],
                     ),
                   ),

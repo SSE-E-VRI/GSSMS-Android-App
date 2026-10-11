@@ -151,16 +151,4 @@ class ComplaintApiService {
     }
     return ComplaintPhoto.fromJson(data);
   }
-
-  /// Remove a registration-time evidence photo (OPEN complaints only).
-  Future<void> deletePhoto({
-    required int complaintId,
-    required int photoId,
-  }) async {
-    await _dio.delete('/api/v1/complaints/$complaintId/photos/$photoId/');
-  }
-
-  Future<void> deleteComplaint(int complaintId) async {
-    await _dio.delete('/api/v1/complaints/$complaintId/');
-  }
 }

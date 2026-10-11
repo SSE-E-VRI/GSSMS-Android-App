@@ -203,10 +203,6 @@ class InspectionApiService {
     return Inspection.fromJson(data);
   }
 
-  Future<void> deleteInspection(int inspectionId) async {
-    await _dio.delete('/api/v1/inspections/$inspectionId/');
-  }
-
   // ——— Point disposition (Slice I5/I7.5) ———
 
   Future<InspectionPoint> resolveInspectionPoint(
@@ -381,28 +377,5 @@ class InspectionApiService {
       );
     }
     return InspectionEvidencePhoto.fromJson(data);
-  }
-
-  Future<InspectionEvidencePhoto> updatePhotoCaption({
-    required int photoId,
-    required String caption,
-  }) async {
-    final response = await _dio.patch(
-        '/api/v1/inspection-evidence-photos/$photoId/',
-        data: {'caption': caption});
-    final data = _asObject(response.data);
-    if (data == null) {
-      throw DioException(
-        requestOptions: response.requestOptions,
-        response: response,
-        type: DioExceptionType.badResponse,
-        message: 'Unexpected photo payload',
-      );
-    }
-    return InspectionEvidencePhoto.fromJson(data);
-  }
-
-  Future<void> deletePhoto(int photoId) async {
-    await _dio.delete('/api/v1/inspection-evidence-photos/$photoId/');
   }
 }

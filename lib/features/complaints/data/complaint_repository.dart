@@ -40,11 +40,6 @@ abstract class IComplaintRepository {
     required int complaintId,
     required MultipartFile file,
   });
-  Future<void> deletePhoto({
-    required int complaintId,
-    required int photoId,
-  });
-  Future<void> deleteComplaint(int complaintId);
 }
 
 class ComplaintRepository implements IComplaintRepository {
@@ -135,15 +130,4 @@ class ComplaintRepository implements IComplaintRepository {
     required MultipartFile file,
   }) =>
       _apiService.uploadPhoto(complaintId: complaintId, file: file);
-
-  @override
-  Future<void> deletePhoto({
-    required int complaintId,
-    required int photoId,
-  }) =>
-      _apiService.deletePhoto(complaintId: complaintId, photoId: photoId);
-
-  @override
-  Future<void> deleteComplaint(int complaintId) =>
-      _apiService.deleteComplaint(complaintId);
 }
