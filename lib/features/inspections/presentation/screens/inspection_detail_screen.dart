@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -6,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:gssms_mobile/core/network/api_error.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
+import 'package:gssms_mobile/core/utils/json_parsing.dart';
 import 'package:gssms_mobile/core/widgets/confirmation_dialog.dart';
 import 'package:gssms_mobile/core/widgets/section_card.dart';
 import 'package:gssms_mobile/core/widgets/status_chip.dart';
@@ -54,6 +56,8 @@ class _InspectionDetailScreenState
   bool _closing = false;
   bool _acting = false;
   final Set<int> _selectedJw1 = {};
+
+  bool get _busy => _converting || _acting || _closing;
 
   static final DateFormat _dateFormat = DateFormat('dd MMM yyyy, hh:mm a');
 
@@ -149,7 +153,7 @@ class _InspectionDetailScreenState
   }
 
   Future<void> _mutate(Future<void> Function() action) async {
-    if (_acting) return;
+    if (_busy) return;
     setState(() => _acting = true);
     try {
       await action();
@@ -240,6 +244,7 @@ class _InspectionDetailScreenState
   }
 
   Future<void> _confirmConvert() async {
+    if (_busy) return;
     final confirmed = await showConfirmationDialog(
       context,
       title: 'Convert to Job Work?',
@@ -259,12 +264,15 @@ class _InspectionDetailScreenState
           .read(inspectionRepositoryProvider)
           .convertToWorkOrder(_inspection.id);
       if (!mounted) return;
-      final workOrderId = result['work_order_id'] as int?;
+      final workOrderId = asJsonInt(result['work_order_id']);
       setState(() {
         _converting = false;
         _inspection = _inspection.markConverted(workOrderId: workOrderId);
       });
       _snack('Converted. A Job Work has been created.');
+      // Pull the full record so the Job Work card fills in the server
+      // ticket/status beyond the optimistic id.
+      unawaited(_refreshDetail());
     } catch (e) {
       if (!mounted) return;
       setState(() => _converting = false);
@@ -273,6 +281,7 @@ class _InspectionDetailScreenState
   }
 
   Future<void> _closeInspection() async {
+    if (_busy) return;
     final confirmed = await showConfirmationDialog(
       context,
       title: 'Close inspection?',
@@ -945,7 +954,7 @@ class _InspectionDetailScreenState
                     inspectionClosed: inspection.isClosed,
                     canEdit: canEdit,
                     canApproveJw2: _canApproveJw2(session),
-                    acting: _acting,                    jw1Selected: _selectedJw1.contains(point.id),
+                    acting: _busy,                    jw1Selected: _selectedJw1.contains(point.id),
                     onToggleJw1: eligibleJw1.any((p) => p.id == point.id)
                         ? () => setState(() {
                               if (_selectedJw1.contains(point.id)) {
@@ -998,7 +1007,7 @@ class _InspectionDetailScreenState
                   const SizedBox(height: GssmsSpacing.s8),
                   FilledButton.icon(
                     key: const Key('create_clubbed_jw1_button'),
-                    onPressed: _acting || _selectedJw1.isEmpty
+                    onPressed: _busy || _selectedJw1.isEmpty
                         ? null
                         : () {
                             final selected = points
@@ -1018,7 +1027,7 @@ class _InspectionDetailScreenState
                   const SizedBox(height: GssmsSpacing.s8),
                   FilledButton.icon(
                     key: const Key('create_single_jw1_button'),
-                    onPressed: _acting
+                    onPressed: _busy
                         ? null
                         : () => _createJwDialog(
                             points: eligibleJw1, isJw2: false),
@@ -1049,7 +1058,7 @@ class _InspectionDetailScreenState
                   const SizedBox(height: GssmsSpacing.s8),
                   OutlinedButton.icon(
                     key: const Key('add_general_evidence_button'),
-                    onPressed: _acting ? null : _addGeneralPhoto,
+                    onPressed: _busy ? null : _addGeneralPhoto,
                     icon: const Icon(Icons.photo_camera_outlined, size: 16),
                     label: const Text('Add Photo (JPEG only)'),
                   ),
@@ -1079,7 +1088,7 @@ class _InspectionDetailScreenState
                   FilledButton.icon(
                     key: const Key('close_inspection_button'),
                     onPressed:
-                        closeReason != null || _closing ? null : _closeInspection,
+                        closeReason != null || _busy ? null : _closeInspection,
                     icon: _closing
                         ? const SizedBox(
                             width: 18,
@@ -1101,7 +1110,7 @@ class _InspectionDetailScreenState
           ? StickyActionBar(
               child: FilledButton.icon(
                 key: const Key('convert_to_work_order_button'),
-                onPressed: _converting ? null : _confirmConvert,
+                onPressed: _busy ? null : _confirmConvert,
                 icon: _converting
                     ? const SizedBox(
                         width: 18,

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
@@ -6,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:gssms_mobile/core/data/lookup_options_service.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
+import 'package:gssms_mobile/core/utils/json_parsing.dart';
 import 'package:gssms_mobile/core/widgets/confirmation_dialog.dart';
 import 'package:gssms_mobile/core/widgets/section_card.dart';
 import 'package:gssms_mobile/core/widgets/status_chip.dart';
@@ -46,6 +48,8 @@ class _ComplaintDetailScreenState extends ConsumerState<ComplaintDetailScreen> {
   bool _converting = false;
   bool _acting = false;
 
+  bool get _busy => _converting || _acting;
+
   static final DateFormat _dateFormat = DateFormat('dd MMM yyyy, hh:mm a');
 
   @override
@@ -82,7 +86,7 @@ class _ComplaintDetailScreenState extends ConsumerState<ComplaintDetailScreen> {
   }
 
   Future<void> _mutate(Future<void> Function() action) async {
-    if (_acting) return;
+    if (_busy) return;
     setState(() => _acting = true);
     try {
       await action();
@@ -116,6 +120,7 @@ class _ComplaintDetailScreenState extends ConsumerState<ComplaintDetailScreen> {
   }
 
   Future<void> _confirmConvert() async {
+    if (_busy) return;
     final confirmed = await showConfirmationDialog(
       context,
       title: 'Convert to Job Work?',
@@ -135,7 +140,7 @@ class _ComplaintDetailScreenState extends ConsumerState<ComplaintDetailScreen> {
           .read(complaintRepositoryProvider)
           .convertToWorkOrder(_complaint.id);
       if (!mounted) return;
-      final workOrderId = result['work_order_id'] as int?;
+      final workOrderId = asJsonInt(result['work_order_id']);
       setState(() {
         _converting = false;
         _complaint = _complaint.markConverted(workOrderId: workOrderId);
@@ -153,7 +158,9 @@ class _ComplaintDetailScreenState extends ConsumerState<ComplaintDetailScreen> {
         ),
       );
       // Stay on this screen: it now shows the converted state, and the list
-      // behind it re-fetches when the user backs out.
+      // behind it re-fetches when the user backs out. Pull the full record
+      // so the Job Work card fills in the server ticket/status.
+      unawaited(_refreshDetail());
     } catch (e) {
       if (!mounted) return;
       setState(() => _converting = false);
@@ -166,6 +173,7 @@ class _ComplaintDetailScreenState extends ConsumerState<ComplaintDetailScreen> {
   }
 
   Future<void> _closeDialog() async {
+    if (_busy) return;
     String reason = ComplaintClosureReasons.values.first;
     final remarksController = TextEditingController();
     try {
@@ -455,7 +463,7 @@ class _ComplaintDetailScreenState extends ConsumerState<ComplaintDetailScreen> {
                   const SizedBox(height: GssmsSpacing.s8),
                   OutlinedButton.icon(
                     key: const Key('add_breakdown_photo_button'),
-                    onPressed: _acting ? null : _addPhoto,
+                    onPressed: _busy ? null : _addPhoto,
                     icon: const Icon(Icons.photo_camera_outlined, size: 16),
                     label: const Text('Add Photo (JPEG only)'),
                   ),
@@ -486,7 +494,7 @@ class _ComplaintDetailScreenState extends ConsumerState<ComplaintDetailScreen> {
                   const SizedBox(height: GssmsSpacing.s8),
                   FilledButton.icon(
                     key: const Key('close_breakdown_button'),
-                    onPressed: _acting ? null : _closeDialog,
+                    onPressed: _busy ? null : _closeDialog,
                     icon: const Icon(Icons.check_circle_outline),
                     label: const Text('Close / Reject'),
                   ),
@@ -501,7 +509,7 @@ class _ComplaintDetailScreenState extends ConsumerState<ComplaintDetailScreen> {
           ? StickyActionBar(
               child: FilledButton.icon(
                 key: const Key('convert_to_work_order_button'),
-                onPressed: _converting ? null : _confirmConvert,
+                onPressed: _busy ? null : _confirmConvert,
                 icon: _converting
                     ? const SizedBox(
                         width: 18,

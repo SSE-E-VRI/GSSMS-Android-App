@@ -13,7 +13,7 @@ class PagedFetchResult {
   final bool truncated;
 }
 
-/// Default page cap. Only `AssetViewSet` paginates today
+/// Default page cap. `AssetViewSet` and the inspections endpoints paginate
 /// (StandardResultsSetPagination, `page_size` up to 100), so at
 /// [preferredPageSize] this is 2,000 rows before truncation — comfortably past
 /// any one depot's register, while still bounding a global-scoped fetch that

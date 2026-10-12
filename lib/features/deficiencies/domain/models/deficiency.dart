@@ -28,10 +28,8 @@ enum DeficiencyStatus {
 }
 
 /// One row from `GET /api/v1/deficiencies/pending/` (`DeficiencySerializer`
-/// in `assets/serializers.py`). Read-only on mobile — web's own Pending
-/// Actions tab for this type has no batch-convert action either, only a
-/// deep link into the asset's Deficiencies tab, which mobile mirrors by
-/// opening the asset detail screen.
+/// in `assets/serializers.py`). Rows are selectable for rectification via
+/// createRectification; manual assign/start/resolve are disabled server-side.
 class Deficiency extends Equatable {
   const Deficiency({
     required this.id,

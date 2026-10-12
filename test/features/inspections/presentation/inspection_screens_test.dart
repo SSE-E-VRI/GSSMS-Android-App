@@ -532,5 +532,74 @@ void main() {
         200,
       );
     });
+
+    testWidgets(
+        'convert coerces string work_order_id and refetches full record with ticket',
+        (tester) async {
+      const open = Inspection(
+        id: 8,
+        title: 'EB Bunk Monthly Check',
+        notes: 'Earth resistance and cleaning',
+        status: InspectionStatus.open,
+        stationName: 'Thalanallur',
+      );
+      const converted = Inspection(
+        id: 8,
+        title: 'EB Bunk Monthly Check',
+        notes: 'Earth resistance and cleaning',
+        status: InspectionStatus.converted,
+        stationName: 'Thalanallur',
+        isConverted: true,
+        workOrderId: 42,
+        workOrderStatus: 'IN_PROGRESS',
+        jobWorks: [
+          InspectionJobWorkRef(
+            id: 42,
+            ticketNumber: 'JW-2026-42',
+            status: 'IN_PROGRESS',
+          ),
+        ],
+      );
+      var fetchCount = 0;
+      when(() => mockRepo.fetchInspectionById(8)).thenAnswer((_) async {
+        fetchCount++;
+        return fetchCount == 1 ? open : converted;
+      });
+      when(() => mockRepo.convertToWorkOrder(8))
+          .thenAnswer((_) async => {'work_order_id': '42'});
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            inspectionRepositoryProvider.overrideWithValue(mockRepo),
+            authControllerProvider.overrideWith(
+              () => _FakeAuthenticatedController(_sessionWithInspectionsAdd),
+            ),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.lightTheme,
+            home: const InspectionDetailScreen(inspection: open),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(fetchCount, 1);
+
+      await tester.tap(find.byKey(const Key('convert_to_work_order_button')));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('A Job Work will be created'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('confirm_convert_button')));
+      await tester.pumpAndSettle();
+
+      verify(() => mockRepo.convertToWorkOrder(8)).called(1);
+      expect(find.text('Converted. A Job Work has been created.'),
+          findsOneWidget);
+      expect(fetchCount, 2);
+      await tester.scrollUntilVisible(
+        find.textContaining('JW-2026-42'),
+        200,
+      );
+      expect(find.textContaining('JW-2026-42'), findsWidgets);
+    });
   });
 }

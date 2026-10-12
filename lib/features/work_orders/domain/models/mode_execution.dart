@@ -358,9 +358,9 @@ class InspectionPointExecutionEntry extends Equatable {
             ? Map<String, dynamic>.from(execRaw)
             : <String, dynamic>{};
 
-    T pick<T>(String key, T fallback) {
+    String pickStr(String key) {
       final v = exec.containsKey(key) ? exec[key] : json[key];
-      return (v as T?) ?? fallback;
+      return asJsonString(v) ?? '';
     }
 
     bool corrective(dynamic v, bool fallback) {
@@ -386,9 +386,9 @@ class InspectionPointExecutionEntry extends Equatable {
           asJsonInt(json['sequence'] ?? exec['sequence']) ?? 1,
       hasExecution:
           asJsonBool(json['has_execution']) ?? exec['id'] != null,
-      initialFindings: pick<String>('initial_findings', ''),
-      actionTaken: pick<String>('action_taken', ''),
-      finalRemarks: pick<String>('final_remarks', ''),
+      initialFindings: pickStr('initial_findings'),
+      actionTaken: pickStr('action_taken'),
+      finalRemarks: pickStr('final_remarks'),
       correctiveActionPerformed: corrective(
           exec.containsKey('corrective_action_performed')
               ? exec['corrective_action_performed']

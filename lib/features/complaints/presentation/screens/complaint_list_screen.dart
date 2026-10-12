@@ -96,6 +96,18 @@ class _ComplaintListScreenState extends ConsumerState<ComplaintListScreen> {
     );
   }
 
+  Future<void> _open(Complaint complaint) async {
+    // The detail screen stays open after a successful convert (so its "View
+    // Linked Job Work" link is reachable), so refresh whenever the user comes
+    // back rather than plumbing a result through the back button.
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => ComplaintDetailScreen(complaint: complaint),
+      ),
+    );
+    if (mounted) unawaited(_controller.fetchComplaints(forceRefresh: true));
+  }
+
   @override
   Widget build(BuildContext context) {
     final listState = ref.watch(complaintListControllerProvider);
@@ -271,7 +283,10 @@ class _ComplaintListScreenState extends ConsumerState<ComplaintListScreen> {
         ),
         sliver: SliverList(
           delegate: SliverChildBuilderDelegate(
-            (context, i) => _ComplaintCard(complaint: complaints[i]),
+            (context, i) => _ComplaintCard(
+              complaint: complaints[i],
+              onTap: () => _open(complaints[i]),
+            ),
             childCount: complaints.length,
           ),
         ),
@@ -491,9 +506,10 @@ class _ComplaintFilterSheet extends StatelessWidget {
 }
 
 class _ComplaintCard extends StatelessWidget {
-  const _ComplaintCard({required this.complaint});
+  const _ComplaintCard({required this.complaint, required this.onTap});
 
   final Complaint complaint;
+  final VoidCallback onTap;
 
   static final DateFormat _dateTimeFormat = DateFormat('dd MMM yyyy, hh:mm a');
   static final DateFormat _dateOnlyFormat = DateFormat('dd MMM yyyy');
@@ -517,13 +533,7 @@ class _ComplaintCard extends StatelessWidget {
       key: Key('complaint_card_${complaint.id}'),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => ComplaintDetailScreen(complaint: complaint),
-            ),
-          );
-        },
+        onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(GssmsSpacing.s16),
           child: Column(

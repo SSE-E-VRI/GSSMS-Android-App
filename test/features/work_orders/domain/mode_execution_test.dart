@@ -186,5 +186,20 @@ void main() {
       expect(submitted['point_job_work_id'], 901);
       expect(submitted['technical_parameters'], isNotEmpty);
     });
+
+    test('coerces non-string findings/action/remarks instead of throwing', () {
+      final pt = InspectionPointExecutionEntry.fromJson({
+        'point_job_work_id': 901,
+        'point_number': 1,
+        'observation': 'Flashover damage',
+        'execution': {
+          'initial_findings': 12,
+          'action_taken': null,
+        },
+      });
+      expect(pt.initialFindings, '12');
+      expect(pt.actionTaken, '');
+      expect(pt.finalRemarks, '');
+    });
   });
 }

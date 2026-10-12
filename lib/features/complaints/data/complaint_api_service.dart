@@ -93,7 +93,8 @@ class ComplaintApiService {
   /// Convert complaint to work order — POST
   /// /api/v1/complaints/{id}/convert_to_work_order/. Same ConversionService
   /// backing (and response shape: `{message, work_order_id}`) as the
-  /// inspection conversion endpoint.
+  /// inspection conversion endpoint. A null body still means success, so an
+  /// empty map is returned rather than throwing.
   Future<Map<String, dynamic>> convertToWorkOrder(int complaintId) async {
     final response =
         await _dio.post('/api/v1/complaints/$complaintId/convert_to_work_order/');

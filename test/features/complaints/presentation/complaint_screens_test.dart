@@ -340,5 +340,76 @@ void main() {
             complainantName: 'Test User',
           )).called(1);
     });
+
+    testWidgets(
+        'convert coerces string work_order_id and refetches full record with ticket',
+        (tester) async {
+      const open = Complaint(
+        id: 7,
+        title: 'Pump Noise',
+        description: 'Rattling',
+        status: ComplaintStatus.open,
+        stationName: 'VRI',
+      );
+      const converted = Complaint(
+        id: 7,
+        title: 'Pump Noise',
+        description: 'Rattling',
+        status: ComplaintStatus.converted,
+        stationName: 'VRI',
+        isConverted: true,
+        workOrderId: 42,
+        workOrderTicketNumber: 'JW-2026-42',
+        workOrderStatus: 'IN_PROGRESS',
+      );
+      var fetchCount = 0;
+      when(() => mockRepo.fetchComplaintById(7)).thenAnswer((_) async {
+        fetchCount++;
+        return fetchCount == 1 ? open : converted;
+      });
+      when(() => mockRepo.convertToWorkOrder(7))
+          .thenAnswer((_) async => {'work_order_id': '42'});
+      const convertSession = UserSession(
+        accessToken: 'test_token',
+        username: 'depot_incharge',
+        primaryRole: AuthRole.depotIncharge,
+        roles: [AuthRole.depotIncharge],
+        permissions: ['complaints.view', 'complaints.edit', 'maintenance.view'],
+        scope: OrgScope(level: OrgScopeLevel.depot),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            complaintRepositoryProvider.overrideWithValue(mockRepo),
+            authControllerProvider.overrideWith(
+              () => _FakeAuthenticatedController(convertSession),
+            ),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.lightTheme,
+            home: const ComplaintDetailScreen(complaint: open),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(fetchCount, 1);
+
+      await tester.tap(find.byKey(const Key('convert_to_work_order_button')));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('A Job Work will be created'), findsOneWidget);
+      await tester.tap(find.byKey(const Key('confirm_convert_button')));
+      await tester.pumpAndSettle();
+
+      verify(() => mockRepo.convertToWorkOrder(7)).called(1);
+      expect(find.text('Converted. A Job Work has been created.'),
+          findsOneWidget);
+      expect(fetchCount, 2);
+      await tester.scrollUntilVisible(
+        find.textContaining('JW-2026-42'),
+        200,
+      );
+      expect(find.textContaining('JW-2026-42'), findsWidgets);
+    });
   });
 }

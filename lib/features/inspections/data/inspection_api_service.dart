@@ -137,20 +137,13 @@ class InspectionApiService {
 
   /// Legacy whole-inspection conversion. Backend 400s with
   /// STRUCTURED_CONVERSION_FORBIDDEN for point-ful inspections — callers must
-  /// surface that and route to point-wise create-job-work instead.
+  /// surface that and route to point-wise create-job-work instead. A null
+  /// body still means success, so return an empty map rather than throwing.
   Future<Map<String, dynamic>> convertToWorkOrder(int inspectionId) async {
     final response = await _dio
         .post('/api/v1/inspections/$inspectionId/convert_to_work_order/');
     final data = _asObject(response.data);
-    if (data == null) {
-      throw DioException(
-        requestOptions: response.requestOptions,
-        response: response,
-        type: DioExceptionType.badResponse,
-        message: 'Unexpected convert-to-work-order payload',
-      );
-    }
-    return data;
+    return data ?? const {};
   }
 
   /// Point-wise Job Work creation (Slice I2/I7.6): JW-001 or JW-002.
