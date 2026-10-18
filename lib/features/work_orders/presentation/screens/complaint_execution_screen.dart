@@ -15,6 +15,7 @@ import 'package:gssms_mobile/features/work_orders/data/execution_api_service.dar
 import 'package:gssms_mobile/features/work_orders/domain/models/mode_execution.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/widgets/execution_autosave.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/widgets/execution_widgets.dart';
+import 'package:gssms_mobile/features/work_orders/presentation/widgets/failure_details_section.dart';
 
 /// Technician execution form for COMPLAINT-mode (Breakdown) Job Works.
 ///
@@ -50,6 +51,10 @@ class _ComplaintExecutionScreenState
 
   ComplaintExecution? _execution;
   List<Map<String, String>> _params = [];
+  int? _failureCode;
+  DateTime? _restoredTime;
+  String? _failureCodeError;
+  String? _restoredTimeError;
   bool _loading = true;
   bool _saving = false;
   bool _submitting = false;
@@ -126,6 +131,11 @@ class _ComplaintExecutionScreenState
           _params = exec.parameters
               .map((e) => Map<String, String>.from(e))
               .toList();
+          _failureCode = exec.failureCode;
+          _restoredTime = exec.restoredTime ??
+              (exec.requiresFailureDetails ? DateTime.now() : null);
+          _failureCodeError = null;
+          _restoredTimeError = null;
         });
       } finally {
         _hydrating = false;
@@ -139,6 +149,22 @@ class _ComplaintExecutionScreenState
     }
   }
 
+  void _onFailureCodeChanged(int? code) {
+    setState(() {
+      _failureCode = code;
+      _failureCodeError = null;
+    });
+    _autosave.markEdited();
+  }
+
+  void _onRestoredTimeChanged(DateTime? dt) {
+    setState(() {
+      _restoredTime = dt;
+      _restoredTimeError = null;
+    });
+    _autosave.markEdited();
+  }
+
   Map<String, dynamic> _draftPayload() => {
         'initial_findings': _findingsController.text.trim(),
         'action_taken': _actionController.text.trim(),
@@ -147,6 +173,8 @@ class _ComplaintExecutionScreenState
             .where((r) =>
                 r['parameter']!.isNotEmpty && r['value']!.isNotEmpty)
             .toList(),
+        'failure_code': _failureCode,
+        'restored_time': _restoredTime?.toIso8601String(),
       };
 
   Future<void> _saveDraft() async {
@@ -246,6 +274,29 @@ class _ComplaintExecutionScreenState
       );
       return;
     }
+    if (exec?.requiresFailureDetails == true) {
+      var hasIsoError = false;
+      if (_failureCode == null) {
+        _failureCodeError =
+            'Failure Code is mandatory for Critical Asset maintenance logs (ISO 55000).';
+        hasIsoError = true;
+      }
+      if (_restoredTime == null) {
+        _restoredTimeError =
+            'Restored Time is mandatory for Critical Asset maintenance logs (ISO 55000).';
+        hasIsoError = true;
+      }
+      if (hasIsoError) {
+        setState(() {});
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                'Failure Code and Restored Time are mandatory for Critical/High criticality assets (ISO 55000).'),
+          ),
+        );
+        return;
+      }
+    }
     final confirmed = await showConfirmationDialog(
       context,
       title: 'Sign & Submit?',
@@ -278,6 +329,20 @@ class _ComplaintExecutionScreenState
       Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
+      if (e is DioException && e.response?.data is Map) {
+        final data = e.response!.data as Map;
+        final fields = data['fields'] is Map ? data['fields'] as Map : null;
+        if (fields != null) {
+          setState(() {
+            if (fields['failure_code'] != null) {
+              _failureCodeError = fields['failure_code'].toString();
+            }
+            if (fields['restored_time'] != null) {
+              _restoredTimeError = fields['restored_time'].toString();
+            }
+          });
+        }
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Could not submit: ${userFacingError(e)}')),
       );
@@ -436,6 +501,24 @@ class _ComplaintExecutionScreenState
                               onDelete: _deletePhoto,
                             ),
                           ],
+                        ),
+                        const SizedBox(height: 12),
+                        FailureDetailsSection(
+                          assetCriticality: _execution?.assetCriticality,
+                          requiresFailureDetails:
+                              _execution?.requiresFailureDetails ?? false,
+                          failureCode: _failureCode,
+                          onFailureCodeChanged:
+                              _busy ? null : _onFailureCodeChanged,
+                          restoredTime: _restoredTime,
+                          onRestoredTimeChanged:
+                              _busy ? null : _onRestoredTimeChanged,
+                          breakdownTime: _execution?.breakdownTime,
+                          failureCodeOptions:
+                              _execution?.failureCodeOptions ?? const [],
+                          enabled: !_busy,
+                          failureCodeError: _failureCodeError,
+                          restoredTimeError: _restoredTimeError,
                         ),
                         const SizedBox(height: 16),
                         AutosaveStatusLine(controller: _autosave),

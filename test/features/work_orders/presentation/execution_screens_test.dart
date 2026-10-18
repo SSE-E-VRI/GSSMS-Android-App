@@ -22,6 +22,9 @@ class _FakeExecApi extends ExecutionApiService {
       const PointwiseInspectionExecution();
   RectificationPayload rectification = const RectificationPayload();
   final List<Map<String, dynamic>> complaintDraftSaves = [];
+  final List<Map<String, dynamic>> complaintSubmissions = [];
+  final List<Map<String, dynamic>> rectificationDraftSaves = [];
+  final List<Map<String, dynamic>> rectificationSubmissions = [];
 
   @override
   Future<ComplaintExecution> saveComplaintDraft(
@@ -29,6 +32,15 @@ class _FakeExecApi extends ExecutionApiService {
     Map<String, dynamic> fields,
   ) async {
     complaintDraftSaves.add(fields);
+    return complaint;
+  }
+
+  @override
+  Future<ComplaintExecution> submitComplaintExecution(
+    int workOrderId,
+    Map<String, dynamic> payload,
+  ) async {
+    complaintSubmissions.add(payload);
     return complaint;
   }
 
@@ -44,6 +56,24 @@ class _FakeExecApi extends ExecutionApiService {
   @override
   Future<RectificationPayload> getRectification(int workOrderId) async =>
       rectification;
+
+  @override
+  Future<RectificationPayload> saveRectificationDraft(
+    int workOrderId,
+    Map<String, dynamic> fields,
+  ) async {
+    rectificationDraftSaves.add(fields);
+    return rectification;
+  }
+
+  @override
+  Future<RectificationPayload> submitRectification(
+    int workOrderId,
+    Map<String, dynamic> payload,
+  ) async {
+    rectificationSubmissions.add(payload);
+    return rectification;
+  }
 }
 
 Widget _harness(
@@ -221,6 +251,161 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.byType(PermissionDeniedView), findsOneWidget);
       }
+    });
+
+    testWidgets(
+        'ComplaintExecutionScreen enforces ISO 55000 fields for CRITICAL assets',
+        (tester) async {
+      final api = _FakeExecApi()
+        ..complaint = ComplaintExecution(
+          id: 10,
+          initialFindings: 'Burnt terminal',
+          actionTaken: 'Replaced terminal',
+          finalRemarks: 'Restored service',
+          assetCriticality: 'CRITICAL',
+          requiresFailureDetails: true,
+          failureCode: null,
+          restoredTime: null,
+          failureCodeOptions: const [
+            FailureCodeOption(
+                id: 42, code: 'ELEC-42', description: 'Terminal failure'),
+          ],
+          photos: const [
+            ExecutionPhoto(id: 1, kind: 'BEFORE'),
+            ExecutionPhoto(id: 2, kind: 'AFTER'),
+          ],
+        );
+      _tallSurface(tester);
+      await tester.pumpWidget(
+        _harness(const ComplaintExecutionScreen(workOrderId: 7), api),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('iso55000_mandatory_badge')), findsOneWidget);
+      expect(find.text('CRITICAL'), findsOneWidget);
+
+      // Attempt submit without failure code or restored time
+      final submitBtn = find.byKey(const Key('submit_exec_button'));
+      await tester.ensureVisible(submitBtn);
+      await tester.tap(submitBtn);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining('Failure Code is mandatory for Critical Asset'),
+        findsOneWidget,
+      );
+      expect(api.complaintSubmissions, isEmpty);
+
+      // Now pick failure code
+      final dropdown = find.byKey(const Key('failure_code_dropdown'));
+      await tester.ensureVisible(dropdown);
+      await tester.tap(dropdown);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('ELEC-42: Terminal failure').last,
+          warnIfMissed: false);
+      await tester.pumpAndSettle();
+
+      // Tap Set to Now
+      final setToNow = find.byKey(const Key('set_to_now_button'));
+      await tester.ensureVisible(setToNow);
+      await tester.tap(setToNow);
+      await tester.pumpAndSettle();
+
+      // Submit again
+      await tester.ensureVisible(submitBtn);
+      await tester.tap(submitBtn);
+      await tester.pumpAndSettle();
+
+      final confirmBtn =
+          find.byKey(const Key('confirm_submit_complaint_execution'));
+      expect(confirmBtn, findsOneWidget);
+      await tester.tap(confirmBtn);
+      await tester.pumpAndSettle();
+
+      expect(api.complaintSubmissions, hasLength(1));
+      expect(api.complaintSubmissions.single['failure_code'], 42);
+      expect(api.complaintSubmissions.single['restored_time'], isNotNull);
+    });
+
+    testWidgets(
+        'RectificationExecutionScreen enforces ISO 55000 fields for HIGH criticality assets',
+        (tester) async {
+      final api = _FakeExecApi()
+        ..rectification = RectificationPayload(
+          editable: true,
+          workOrderId: 20,
+          assetCriticality: 'HIGH',
+          requiresFailureDetails: true,
+          failureCode: null,
+          restoredTime: null,
+          failureCodeOptions: const [
+            FailureCodeOption(
+                id: 77, code: 'DEF-77', description: 'Deficiency code'),
+          ],
+          finalRemarks: 'Fixed all points',
+          items: const [
+            RectificationItem(
+              id: 31,
+              asset: 'CB-01',
+              finding: 'Rust',
+              actionTaken: 'Repainted',
+              outcome: 'RECTIFIED',
+              photos: [
+                ExecutionPhoto(id: 1, kind: 'BEFORE'),
+                ExecutionPhoto(id: 2, kind: 'AFTER'),
+              ],
+            ),
+          ],
+        );
+      _tallSurface(tester);
+      await tester.pumpWidget(
+        _harness(const RectificationExecutionScreen(workOrderId: 20), api),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('iso55000_mandatory_badge')), findsOneWidget);
+      expect(find.text('HIGH'), findsOneWidget);
+
+      // Attempt submit without failure code / restored time
+      final submitBtn = find.byKey(const Key('submit_rect_button'));
+      await tester.ensureVisible(submitBtn);
+      await tester.tap(submitBtn);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining('Failure Code is mandatory for Critical Asset'),
+        findsOneWidget,
+      );
+      expect(api.rectificationSubmissions, isEmpty);
+
+      // Pick failure code
+      final dropdown = find.byKey(const Key('failure_code_dropdown'));
+      await tester.ensureVisible(dropdown);
+      await tester.tap(dropdown);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('DEF-77: Deficiency code').last,
+          warnIfMissed: false);
+      await tester.pumpAndSettle();
+
+      // Tap Set to Now
+      final setToNow = find.byKey(const Key('set_to_now_button'));
+      await tester.ensureVisible(setToNow);
+      await tester.tap(setToNow);
+      await tester.pumpAndSettle();
+
+      // Submit again
+      await tester.ensureVisible(submitBtn);
+      await tester.tap(submitBtn);
+      await tester.pumpAndSettle();
+
+      final confirmBtn = find.byKey(const Key('confirm_submit_rectification'));
+      expect(confirmBtn, findsOneWidget);
+      await tester.tap(confirmBtn);
+      await tester.pumpAndSettle();
+
+      expect(api.rectificationSubmissions, hasLength(1));
+      expect(api.rectificationSubmissions.single['failure_code'], 77);
+      expect(api.rectificationSubmissions.single['restored_time'], isNotNull);
     });
   });
 }

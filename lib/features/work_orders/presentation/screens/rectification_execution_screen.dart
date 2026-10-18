@@ -17,6 +17,7 @@ import 'package:gssms_mobile/features/work_orders/data/execution_api_service.dar
 import 'package:gssms_mobile/features/work_orders/domain/models/mode_execution.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/widgets/execution_autosave.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/widgets/execution_widgets.dart';
+import 'package:gssms_mobile/features/work_orders/presentation/widgets/failure_details_section.dart';
 
 /// Technician execution form for RECTIFICATION-mode (deficiency) Job Works.
 ///
@@ -68,6 +69,10 @@ class _RectificationExecutionScreenState
 
   RectificationPayload? _payload;
   final Map<int, _ItemDraft> _drafts = {};
+  int? _failureCode;
+  DateTime? _restoredTime;
+  String? _failureCodeError;
+  String? _restoredTimeError;
   bool _loading = true;
   bool _saving = false;
   bool _submitting = false;
@@ -163,6 +168,11 @@ class _RectificationExecutionScreenState
           _payload = payload;
           _finalRemarksController.text = payload.finalRemarks;
           _otherStaffController.text = payload.otherStaff;
+          _failureCode = payload.failureCode;
+          _restoredTime = payload.restoredTime ??
+              (payload.requiresFailureDetails ? DateTime.now() : null);
+          _failureCodeError = null;
+          _restoredTimeError = null;
           _syncDrafts(payload);
         });
       } finally {
@@ -177,9 +187,27 @@ class _RectificationExecutionScreenState
     }
   }
 
+  void _onFailureCodeChanged(int? code) {
+    setState(() {
+      _failureCode = code;
+      _failureCodeError = null;
+    });
+    _autosave.markEdited();
+  }
+
+  void _onRestoredTimeChanged(DateTime? dt) {
+    setState(() {
+      _restoredTime = dt;
+      _restoredTimeError = null;
+    });
+    _autosave.markEdited();
+  }
+
   Map<String, dynamic> _draftPayload() => {
         'final_remarks': _finalRemarksController.text.trim(),
         'other_staff': _otherStaffController.text.trim(),
+        'failure_code': _failureCode,
+        'restored_time': _restoredTime?.toIso8601String(),
         'items': [
           for (final entry in _drafts.entries)
             {
@@ -307,6 +335,14 @@ class _RectificationExecutionScreenState
     if (_finalRemarksController.text.trim().isEmpty) {
       return 'Final outcome is required before completion.';
     }
+    if (_payload?.requiresFailureDetails == true) {
+      if (_failureCode == null) {
+        return 'Failure Code is mandatory for Critical Asset maintenance logs (ISO 55000).';
+      }
+      if (_restoredTime == null) {
+        return 'Restored Time is mandatory for Critical Asset maintenance logs (ISO 55000).';
+      }
+    }
     return null;
   }
 
@@ -314,8 +350,28 @@ class _RectificationExecutionScreenState
     if (!(_formKey.currentState?.validate() ?? false)) return;
     final blocked = _blockedReason();
     if (blocked != null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(blocked)));
+      if (_payload?.requiresFailureDetails == true) {
+        setState(() {
+          if (_failureCode == null) {
+            _failureCodeError =
+                'Failure Code is mandatory for Critical Asset maintenance logs (ISO 55000).';
+          }
+          if (_restoredTime == null) {
+            _restoredTimeError =
+                'Restored Time is mandatory for Critical Asset maintenance logs (ISO 55000).';
+          }
+        });
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            (_payload?.requiresFailureDetails == true &&
+                    (_failureCode == null || _restoredTime == null))
+                ? 'Failure Code and Restored Time are mandatory for Critical/High criticality assets (ISO 55000).'
+                : blocked,
+          ),
+        ),
+      );
       return;
     }
     final confirmed = await showConfirmationDialog(
@@ -338,6 +394,8 @@ class _RectificationExecutionScreenState
         widget.workOrderId,
         {
           'remarks': _finalRemarksController.text.trim(),
+          'failure_code': _failureCode,
+          'restored_time': _restoredTime?.toIso8601String(),
           if (session?.username.isNotEmpty == true)
             'technician_name': session!.username,
           'technician_signature': 'SIGNED_DIGITALLY',
@@ -351,6 +409,20 @@ class _RectificationExecutionScreenState
       Navigator.of(context).pop(true);
     } catch (e) {
       if (!mounted) return;
+      if (e is DioException && e.response?.data is Map) {
+        final data = e.response!.data as Map;
+        final fields = data['fields'] is Map ? data['fields'] as Map : null;
+        if (fields != null) {
+          setState(() {
+            if (fields['failure_code'] != null) {
+              _failureCodeError = fields['failure_code'].toString();
+            }
+            if (fields['restored_time'] != null) {
+              _restoredTimeError = fields['restored_time'].toString();
+            }
+          });
+        }
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Could not submit: ${userFacingError(e)}')),
       );
@@ -462,6 +534,24 @@ class _RectificationExecutionScreenState
                               ),
                             ),
                           ],
+                        ),
+                        const SizedBox(height: 12),
+                        FailureDetailsSection(
+                          assetCriticality: _payload?.assetCriticality,
+                          requiresFailureDetails:
+                              _payload?.requiresFailureDetails ?? false,
+                          failureCode: _failureCode,
+                          onFailureCodeChanged:
+                              _busy ? null : _onFailureCodeChanged,
+                          restoredTime: _restoredTime,
+                          onRestoredTimeChanged:
+                              _busy ? null : _onRestoredTimeChanged,
+                          breakdownTime: _payload?.breakdownTime,
+                          failureCodeOptions:
+                              _payload?.failureCodeOptions ?? const [],
+                          enabled: !_busy,
+                          failureCodeError: _failureCodeError,
+                          restoredTimeError: _restoredTimeError,
                         ),
                         const SizedBox(height: 16),
                         AutosaveStatusLine(controller: _autosave),

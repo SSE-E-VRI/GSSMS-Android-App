@@ -105,6 +105,44 @@ void main() {
       expect(exec.photos[1].locked, isTrue);
       expect(exec.photos[1].fromComplaint, isTrue);
     });
+
+    test('parses ISO 55000 failure details for critical/high assets', () {
+      final exec = ComplaintExecution.fromJson({
+        'id': 10,
+        'asset_criticality': 'CRITICAL',
+        'requires_failure_details': true,
+        'failure_code': 101,
+        'failure_code_details': {
+          'id': 101,
+          'code': 'MECH-01',
+          'description': 'Bearing seizure',
+        },
+        'restored_time': '2026-10-18T10:30:00Z',
+        'breakdown_time': '2026-10-18T08:00:00Z',
+        'failure_code_options': [
+          {'id': 101, 'code': 'MECH-01', 'description': 'Bearing seizure'},
+          {'id': 102, 'code': 'ELEC-02', 'description': 'Coil burnout'},
+        ],
+      });
+      expect(exec.assetCriticality, 'CRITICAL');
+      expect(exec.requiresFailureDetails, isTrue);
+      expect(exec.failureCode, 101);
+      expect(exec.failureCodeDetails?.code, 'MECH-01');
+      expect(exec.failureCodeDetails?.label, 'MECH-01: Bearing seizure');
+      expect(exec.restoredTime, DateTime.parse('2026-10-18T10:30:00Z').toLocal());
+      expect(exec.breakdownTime, DateTime.parse('2026-10-18T08:00:00Z').toLocal());
+      expect(exec.failureCodeOptions.length, 2);
+    });
+
+    test('defaults requiresFailureDetails to false for LOW criticality', () {
+      final exec = ComplaintExecution.fromJson({'id': 11});
+      expect(exec.assetCriticality, 'LOW');
+      expect(exec.requiresFailureDetails, isFalse);
+      expect(exec.failureCode, isNull);
+      expect(exec.failureCodeDetails, isNull);
+      expect(exec.restoredTime, isNull);
+      expect(exec.failureCodeOptions, isEmpty);
+    });
   });
 
   group('RectificationPayload', () {
@@ -135,6 +173,30 @@ void main() {
       expect(payload.editable, isTrue);
       expect(payload.items.length, 1);
       expect(payload.items.first.isRectified, isFalse);
+    });
+
+    test('parses ISO 55000 failure details for critical/high assets', () {
+      final payload = RectificationPayload.fromJson({
+        'work_order_id': 201,
+        'asset_criticality': 'HIGH',
+        'requires_failure_details': true,
+        'failure_code': 55,
+        'failure_code_details': {
+          'id': 55,
+          'code': 'INS-03',
+          'description': 'Bushing breakdown',
+        },
+        'restored_time': '2026-10-18T11:00:00Z',
+        'failure_code_options': [
+          {'id': 55, 'code': 'INS-03', 'description': 'Bushing breakdown'},
+        ],
+      });
+      expect(payload.assetCriticality, 'HIGH');
+      expect(payload.requiresFailureDetails, isTrue);
+      expect(payload.failureCode, 55);
+      expect(payload.failureCodeDetails?.code, 'INS-03');
+      expect(payload.restoredTime, DateTime.parse('2026-10-18T11:00:00Z').toLocal());
+      expect(payload.failureCodeOptions.single.code, 'INS-03');
     });
   });
 

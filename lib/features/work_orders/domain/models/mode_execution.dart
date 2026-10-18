@@ -101,6 +101,38 @@ class ExecutionPhoto extends Equatable {
       [id, kind, url, locked, fromComplaint, uploadedAt, uploadedByName, caption];
 }
 
+/// Active failure code dropdown option (ISO 55000 failure catalogue).
+class FailureCodeOption extends Equatable {
+  const FailureCodeOption({
+    required this.id,
+    required this.code,
+    required this.description,
+  });
+
+  final int id;
+  final String code;
+  final String description;
+
+  String get label => '$code: $description';
+
+  factory FailureCodeOption.fromJson(Map<String, dynamic> json) {
+    return FailureCodeOption(
+      id: asJsonInt(json['id']) ?? 0,
+      code: asJsonString(json['code']) ?? '',
+      description: asJsonString(json['description']) ?? '',
+    );
+  }
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'code': code,
+        'description': description,
+      };
+
+  @override
+  List<Object?> get props => [id, code, description];
+}
+
 /// Technician's complaint (Breakdown) execution record.
 class ComplaintExecution extends Equatable {
   const ComplaintExecution({
@@ -112,6 +144,13 @@ class ComplaintExecution extends Equatable {
     this.photos = const [],
     this.updatedByName,
     this.updatedAt,
+    this.assetCriticality = 'LOW',
+    this.requiresFailureDetails = false,
+    this.failureCode,
+    this.failureCodeDetails,
+    this.restoredTime,
+    this.breakdownTime,
+    this.failureCodeOptions = const [],
   });
 
   final int id;
@@ -122,6 +161,13 @@ class ComplaintExecution extends Equatable {
   final List<ExecutionPhoto> photos;
   final String? updatedByName;
   final DateTime? updatedAt;
+  final String assetCriticality;
+  final bool requiresFailureDetails;
+  final int? failureCode;
+  final FailureCodeOption? failureCodeDetails;
+  final DateTime? restoredTime;
+  final DateTime? breakdownTime;
+  final List<FailureCodeOption> failureCodeOptions;
 
   bool get hasBefore => photos.any((p) => p.isBefore);
   bool get hasAfter => photos.any((p) => p.isAfter);
@@ -139,6 +185,12 @@ class ComplaintExecution extends Equatable {
   }
 
   factory ComplaintExecution.fromJson(Map<String, dynamic> json) {
+    final rawOptions = json['failure_code_options'];
+    final rawDetails = json['failure_code_details'];
+    final crit = asJsonString(json['asset_criticality']) ?? 'LOW';
+    final req = asJsonBool(json['requires_failure_details']) ??
+        const {'CRITICAL', 'HIGH'}.contains(crit.toUpperCase());
+
     return ComplaintExecution(
       id: asJsonInt(json['id']) ?? 0,
       initialFindings: asJsonString(json['initial_findings']) ?? '',
@@ -148,6 +200,21 @@ class ComplaintExecution extends Equatable {
       photos: ExecutionPhoto.listOf(json['photos']),
       updatedByName: asJsonString(json['updated_by_name']),
       updatedAt: asJsonDateTime(json['updated_at']),
+      assetCriticality: crit,
+      requiresFailureDetails: req,
+      failureCode: asJsonInt(json['failure_code']),
+      failureCodeDetails: rawDetails is Map
+          ? FailureCodeOption.fromJson(Map<String, dynamic>.from(rawDetails))
+          : null,
+      restoredTime: asJsonDateTime(json['restored_time']),
+      breakdownTime: asJsonDateTime(json['breakdown_time']),
+      failureCodeOptions: rawOptions is List
+          ? rawOptions
+              .whereType<Map>()
+              .map((e) =>
+                  FailureCodeOption.fromJson(Map<String, dynamic>.from(e)))
+              .toList()
+          : const [],
     );
   }
 
@@ -161,6 +228,13 @@ class ComplaintExecution extends Equatable {
         photos,
         updatedByName,
         updatedAt,
+        assetCriticality,
+        requiresFailureDetails,
+        failureCode,
+        failureCodeDetails,
+        restoredTime,
+        breakdownTime,
+        failureCodeOptions,
       ];
 }
 
@@ -255,6 +329,13 @@ class RectificationPayload extends Equatable {
     this.items = const [],
     this.technician,
     this.stationName,
+    this.assetCriticality = 'LOW',
+    this.requiresFailureDetails = false,
+    this.failureCode,
+    this.failureCodeDetails,
+    this.restoredTime,
+    this.breakdownTime,
+    this.failureCodeOptions = const [],
   });
 
   final int? workOrderId;
@@ -266,9 +347,22 @@ class RectificationPayload extends Equatable {
   final List<RectificationItem> items;
   final String? technician;
   final String? stationName;
+  final String assetCriticality;
+  final bool requiresFailureDetails;
+  final int? failureCode;
+  final FailureCodeOption? failureCodeDetails;
+  final DateTime? restoredTime;
+  final DateTime? breakdownTime;
+  final List<FailureCodeOption> failureCodeOptions;
 
   factory RectificationPayload.fromJson(Map<String, dynamic> json) {
     final rawItems = json['items'];
+    final rawOptions = json['failure_code_options'];
+    final rawDetails = json['failure_code_details'];
+    final crit = asJsonString(json['asset_criticality']) ?? 'LOW';
+    final req = asJsonBool(json['requires_failure_details']) ??
+        const {'CRITICAL', 'HIGH'}.contains(crit.toUpperCase());
+
     return RectificationPayload(
       workOrderId: asJsonInt(json['work_order_id']),
       ticketNumber: asJsonString(json['ticket_number']),
@@ -285,6 +379,21 @@ class RectificationPayload extends Equatable {
           : const [],
       technician: asJsonString(json['technician']),
       stationName: asJsonString(json['station_name']),
+      assetCriticality: crit,
+      requiresFailureDetails: req,
+      failureCode: asJsonInt(json['failure_code']),
+      failureCodeDetails: rawDetails is Map
+          ? FailureCodeOption.fromJson(Map<String, dynamic>.from(rawDetails))
+          : null,
+      restoredTime: asJsonDateTime(json['restored_time']),
+      breakdownTime: asJsonDateTime(json['breakdown_time']),
+      failureCodeOptions: rawOptions is List
+          ? rawOptions
+              .whereType<Map>()
+              .map((e) =>
+                  FailureCodeOption.fromJson(Map<String, dynamic>.from(e)))
+              .toList()
+          : const [],
     );
   }
 
@@ -299,6 +408,13 @@ class RectificationPayload extends Equatable {
         items,
         technician,
         stationName,
+        assetCriticality,
+        requiresFailureDetails,
+        failureCode,
+        failureCodeDetails,
+        restoredTime,
+        breakdownTime,
+        failureCodeOptions,
       ];
 }
 
