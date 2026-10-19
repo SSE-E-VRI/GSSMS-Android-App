@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gssms_mobile/core/database/local_cache_service.dart';
 import 'package:gssms_mobile/core/network/api_error.dart';
 import 'package:gssms_mobile/core/sync/outbox_command.dart';
+import 'package:gssms_mobile/core/utils/json_parsing.dart';
 import 'package:gssms_mobile/features/work_orders/data/evidence_service.dart';
 import 'package:gssms_mobile/features/work_orders/data/work_order_api_service.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_order_controllers.dart';
@@ -98,8 +99,13 @@ class SyncManager extends Notifier<SyncState> {
 
   @override
   SyncState build() {
-    // Initial sync count check
-    Future.microtask(() => refreshPendingCount());
+    // Initial sync count check — guarded so a startup storage error
+    // never surfaces as an unhandled async exception.
+    Future.microtask(() async {
+      try {
+        await refreshPendingCount();
+      } catch (_) {}
+    });
     return const SyncState();
   }
 
@@ -158,14 +164,21 @@ class SyncManager extends Notifier<SyncState> {
     final completer = Completer<T>();
     _lock = completer.future.then((_) => null, onError: (_) => null);
 
-    previous.whenComplete(() async {
+    unawaited(previous.then((_) async {
       try {
         final result = await action();
         completer.complete(result);
       } catch (e, st) {
         completer.completeError(e, st);
       }
-    });
+    }, onError: (_) async {
+      try {
+        final result = await action();
+        completer.complete(result);
+      } catch (e, st) {
+        completer.completeError(e, st);
+      }
+    }));
 
     return completer.future;
   }
@@ -208,16 +221,21 @@ class SyncManager extends Notifier<SyncState> {
         final scopedCommands = actorUserId == null
             ? commands
             : commands.where((c) => c.ownerUserId == actorUserId).toList();
+        // Never drop another user's queued commands: they stay untouched
+        // while this session drains only its own scope.
+        final unscopedCommands = actorUserId == null
+            ? const <OutboxCommand>[]
+            : commands.where((c) => c.ownerUserId != actorUserId).toList();
+        Future<void> persistScoped(List<OutboxCommand> scoped) =>
+            _cacheService.saveOutboxCommands([...unscopedCommands, ...scoped]);
         final pendingCommands =
             scopedCommands.where((c) => c.status == OutboxCommandStatus.pending).toList();
 
         if (pendingCommands.isEmpty) {
+          // Epoch changed (logout/identity switch): return without writing
+          // so we never persist the previous user's outbox view.
           if (epoch != _sessionEpoch) return;
-          await _cacheService.saveOutboxCommands(scopedCommands);
-          if (epoch != _sessionEpoch) {
-            await _cacheService.saveOutboxCommands(const []);
-            return;
-          }
+          await persistScoped(_evictStale(scopedCommands));
           state = state.copyWith(
             mode: SyncConnectivityMode.online,
             pendingCount: _countQueued(scopedCommands),
@@ -231,10 +249,8 @@ class SyncManager extends Notifier<SyncState> {
         final syncedKeys = <String>{};
 
         for (var i = 0; i < scopedCommands.length; i++) {
-          if (epoch != _sessionEpoch) {
-            remainingCommands.clear();
-            break;
-          }
+          // Epoch changed mid-drain: abort without persisting anything.
+          if (epoch != _sessionEpoch) return;
           final cmd = scopedCommands[i];
           if (cmd.status != OutboxCommandStatus.pending) {
             remainingCommands.add(cmd);
@@ -261,11 +277,22 @@ class SyncManager extends Notifier<SyncState> {
                 errStr.contains('network is unreachable');
 
             if (isNetwork) {
-              // Keep command in pending state and pause outbox draining
-              remainingCommands.add(cmd.copyWith(
-                retryCount: cmd.retryCount + 1,
-                lastError: 'Network offline. Will retry automatically.',
-              ));
+              // Keep command in pending state and pause outbox draining.
+              // Cap retries so an always-offline queue cannot grow its
+              // retryCount unboundedly; after the cap it parks as FAILED
+              // for the user to retry explicitly.
+              const maxAutoRetries = 25;
+              if (cmd.retryCount >= maxAutoRetries) {
+                remainingCommands.add(cmd.copyWith(
+                  status: OutboxCommandStatus.failed,
+                  lastError: 'Network offline. Retry limit reached — tap retry.',
+                ));
+              } else {
+                remainingCommands.add(cmd.copyWith(
+                  retryCount: cmd.retryCount + 1,
+                  lastError: 'Network offline. Will retry automatically.',
+                ));
+              }
               remainingCommands.addAll(scopedCommands.sublist(i + 1));
               state = state.copyWith(
                 mode: SyncConnectivityMode.offline,
@@ -301,22 +328,41 @@ class SyncManager extends Notifier<SyncState> {
         if (epoch != _sessionEpoch) {
           return;
         }
-        await _cacheService.saveOutboxCommands(remainingCommands);
-        if (epoch != _sessionEpoch) {
-          await _cacheService.saveOutboxCommands(const []);
-          return;
+        final prunedRemaining = _evictStale(remainingCommands);
+        // Persist first, discard evidence files only afterwards: a crash
+        // between discard and persist must never leave a replay pointing
+        // at a missing file (permanent FAILED).
+        await persistScoped(prunedRemaining);
+        if (epoch != _sessionEpoch) return;
+        // Discard evidence for commands that just synced successfully.
+        final syncedIds = syncedKeys;
+        if (syncedIds.isNotEmpty) {
+          final syncedFilePaths = <String>{};
+          for (final cmd in scopedCommands) {
+            if (!syncedIds.contains(cmd.idempotencyKey)) continue;
+            final fp = cmd.payload['file_path']?.toString();
+            if (fp != null && fp.isNotEmpty) syncedFilePaths.add(fp);
+            final pp = cmd.payload['proof_path']?.toString();
+            if (pp != null && pp.isNotEmpty) syncedFilePaths.add(pp);
+          }
+          for (final p in syncedFilePaths) {
+            try {
+              await _evidenceService.discard(p);
+            } catch (_) {}
+          }
         }
         // Retention sweep: delete expired local evidence, never files that
-        // are still queued for upload.
+        // are still queued for upload. Compare canonical absolute paths so
+        // a symlink/relative mismatch cannot delete a queued photo.
         final queuedPaths = <String>{};
-        for (final cmd in remainingCommands) {
+        for (final cmd in prunedRemaining) {
           final filePath = cmd.payload['file_path']?.toString();
           if (filePath != null && filePath.isNotEmpty) {
-            queuedPaths.add(filePath);
+            queuedPaths.add(_canonicalPath(filePath));
           }
           final proofPath = cmd.payload['proof_path']?.toString();
           if (proofPath != null && proofPath.isNotEmpty) {
-            queuedPaths.add(proofPath);
+            queuedPaths.add(_canonicalPath(proofPath));
           }
         }
         try {
@@ -324,14 +370,14 @@ class SyncManager extends Notifier<SyncState> {
             excludePaths: queuedPaths,
           );
         } catch (_) {}
-        final queued = _countQueued(remainingCommands);
+        final queued = _countQueued(prunedRemaining);
 
         state = state.copyWith(
           mode: queued == 0
               ? SyncConnectivityMode.online
               : SyncConnectivityMode.offline,
           pendingCount: queued,
-          attentionCount: _countNeedsAttention(remainingCommands),
+          attentionCount: _countNeedsAttention(prunedRemaining),
           lastSyncTime: DateTime.now(),
         );
       } finally {
@@ -410,7 +456,32 @@ class SyncManager extends Notifier<SyncState> {
     });
   }
 
+  /// Drops FAILED/CONFLICT commands older than 7 days so a permanently
+  /// rejected queue cannot grow unboundedly. PENDING commands are never
+  /// evicted here — only the UI (discard) removes those.
+  List<OutboxCommand> _evictStale(List<OutboxCommand> commands) {
+    final cutoff = DateTime.now().subtract(const Duration(days: 7));
+    return commands.where((c) {
+      if (c.status == OutboxCommandStatus.failed ||
+          c.status == OutboxCommandStatus.conflict) {
+        return c.createdAt.isAfter(cutoff);
+      }
+      return true;
+    }).toList();
+  }
+
+  String _canonicalPath(String path) {
+    try {
+      return File(path).absolute.path;
+    } catch (_) {
+      return path;
+    }
+  }
+
   Future<void> _executeCommand(OutboxCommand cmd) async {
+    // NOTE: evidence files are discarded by drainOutbox *after* the outbox
+    // persist, never here — see drainOutbox. Discarding here would leave a
+    // replay pointing at a missing file if the app crashed before saving.
     switch (cmd.type) {
       case OutboxCommandType.submitLine:
         await _apiService.submitLine(
@@ -420,12 +491,27 @@ class SyncManager extends Notifier<SyncState> {
         );
         break;
       case OutboxCommandType.transitionStatus:
+        final status = asJsonString(cmd.payload['status']);
+        if (status == null || status.isEmpty) {
+          throw const FormatException('Missing status in transitionStatus payload');
+        }
+        final rawChecklist = cmd.payload['checklist'];
+        final checklist = rawChecklist is Map
+            ? Map<String, dynamic>.from(rawChecklist)
+            : null;
+        final rawEvidence = cmd.payload['evidence'];
+        final evidence = rawEvidence is List
+            ? rawEvidence
+                .map((e) => asJsonInt(e))
+                .whereType<int>()
+                .toList()
+            : null;
         await _apiService.changeStatus(
           cmd.entityId,
-          status: cmd.payload['status'] as String,
-          remarks: cmd.payload['remarks'] as String?,
-          checklist: cmd.payload['checklist'] as Map<String, dynamic>?,
-          evidence: (cmd.payload['evidence'] as List<dynamic>?)?.map((e) => e as int).toList(),
+          status: status,
+          remarks: asJsonString(cmd.payload['remarks']),
+          checklist: checklist,
+          evidence: evidence,
           idempotencyKey: cmd.idempotencyKey,
         );
         break;
@@ -438,42 +524,46 @@ class SyncManager extends Notifier<SyncState> {
       case OutboxCommandType.completeRecord:
         await _apiService.completeRecord(
           cmd.entityId,
-          technicianName: cmd.payload['technician_name'] as String? ?? '',
-          remarks: cmd.payload['remarks'] as String? ?? '',
-          supervisorName: cmd.payload['supervisor_name'] as String?,
+          technicianName: asJsonString(cmd.payload['technician_name']) ?? '',
+          remarks: asJsonString(cmd.payload['remarks']) ?? '',
+          supervisorName: asJsonString(cmd.payload['supervisor_name']),
           idempotencyKey: cmd.idempotencyKey,
         );
         break;
       case OutboxCommandType.uploadEvidence:
-        final proofPath = cmd.payload['proof_path'] as String?;
+        final proofPath = asJsonString(cmd.payload['proof_path']);
         await _apiService.uploadRecordEvidence(
           cmd.entityId,
           proofJpegPath: proofPath,
-          remarks: cmd.payload['remarks'] as String?,
-          otherStaff: cmd.payload['other_staff'] as String?,
+          remarks: asJsonString(cmd.payload['remarks']),
+          otherStaff: asJsonString(cmd.payload['other_staff']),
           idempotencyKey: cmd.idempotencyKey,
         );
-        if (proofPath != null) {
-          try {
-            await _evidenceService.discard(proofPath);
-          } catch (_) {}
-        }
         break;
       case OutboxCommandType.uploadLineAttachment:
-        final filePath = cmd.payload['file_path'] as String;
-        final capturedAtStr = cmd.payload['captured_at'] as String?;
-        final capturedAt = capturedAtStr != null ? DateTime.tryParse(capturedAtStr) : null;
+        final filePath = asJsonString(cmd.payload['file_path']);
+        if (filePath == null || filePath.isEmpty) {
+          throw const FormatException('Missing file_path in line attachment payload');
+        }
+        final lineId = asJsonInt(cmd.payload['line_id']);
+        if (lineId == null) {
+          throw const FormatException('Missing line_id in line attachment payload');
+        }
+        final kind = asJsonString(cmd.payload['kind']);
+        if (kind == null || kind.isEmpty) {
+          throw const FormatException('Missing kind in line attachment payload');
+        }
+        final capturedAtStr = asJsonString(cmd.payload['captured_at']);
+        final capturedAt =
+            capturedAtStr != null ? DateTime.tryParse(capturedAtStr) : null;
         await _apiService.uploadLineAttachment(
           cmd.entityId,
-          lineId: cmd.payload['line_id'] as int,
-          kind: cmd.payload['kind'] as String,
+          lineId: lineId,
+          kind: kind,
           imagePath: filePath,
           capturedAt: capturedAt,
           idempotencyKey: cmd.idempotencyKey,
         );
-        try {
-          await _evidenceService.discard(filePath);
-        } catch (_) {}
         break;
     }
   }

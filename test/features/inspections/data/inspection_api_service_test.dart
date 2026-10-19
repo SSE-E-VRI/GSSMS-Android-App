@@ -93,6 +93,17 @@ void main() {
       expect(result['work_order_id'], 99);
     });
 
+    test('convertToWorkOrder returns empty map on null body instead of throwing', () async {
+      dio.httpClientAdapter = MockAdapter((options) async {
+        expect(options.path, '/api/v1/inspections/10/convert_to_work_order/');
+        expect(options.method, 'POST');
+        return _json(null, 201);
+      });
+
+      final result = await apiService.convertToWorkOrder(10);
+      expect(result, isEmpty);
+    });
+
     test('list never sends a priority filter (SSOT §11.4 FIX-003)', () async {
       dio.httpClientAdapter = MockAdapter((options) async {
         expect(options.queryParameters.containsKey('priority'), isFalse);

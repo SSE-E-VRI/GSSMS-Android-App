@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
@@ -40,6 +41,8 @@ class ChecklistLineCard extends ConsumerStatefulWidget {
     this.onCapturePhoto,
     this.onDeletePhoto,
     this.onRetryPhoto,
+    this.showAttachments = true,
+    this.isHighlighted = false,
   });
 
   final MaintenanceRecordLine line;
@@ -49,6 +52,13 @@ class ChecklistLineCard extends ConsumerStatefulWidget {
   final Future<void> Function(EvidenceKind kind, ImageSource source)? onCapturePhoto;
   final Future<void> Function(LineAttachment attachment)? onDeletePhoto;
   final Future<void> Function(LineAttachment attachment)? onRetryPhoto;
+
+  /// False when the photos are shown once per asset group instead (the group
+  /// evidence strip), so the per-line photo section is left out.
+  final bool showAttachments;
+
+  /// True when this card was jumped to as the first incomplete required line.
+  final bool isHighlighted;
 
   @override
   ConsumerState<ChecklistLineCard> createState() => _ChecklistLineCardState();
@@ -120,10 +130,26 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
         _remarksController.text = widget.line.observationAction ?? '';
       }
       final components = widget.line.componentValues;
-      for (final key in widget.line.valueType.componentKeys) {
-        final focus = _componentFocusNodes[key];
-        final ctrl = _componentControllers[key];
-        if (ctrl != null && focus != null && !focus.hasFocus) {
+      // RYB <-> VoltAmp switches introduce new keys: create controllers
+      // for them, dispose removed ones, sync text for existing ones.
+      final newKeys = widget.line.valueType.componentKeys.toSet();
+      final oldKeys = _componentControllers.keys.toSet();
+      for (final removed in oldKeys.difference(newKeys)) {
+        _componentFocusNodes[removed]?.removeListener(_onFocusChanged);
+        _componentFocusNodes[removed]?.dispose();
+        _componentFocusNodes.remove(removed);
+        _componentControllers[removed]?.dispose();
+        _componentControllers.remove(removed);
+      }
+      for (final key in newKeys) {
+        var ctrl = _componentControllers[key];
+        var focus = _componentFocusNodes[key];
+        if (ctrl == null || focus == null) {
+          ctrl = TextEditingController(text: components[key] ?? '');
+          focus = FocusNode()..addListener(_onFocusChanged);
+          _componentControllers[key] = ctrl;
+          _componentFocusNodes[key] = focus;
+        } else if (!focus.hasFocus) {
           ctrl.text = components[key] ?? '';
         }
       }
@@ -226,11 +252,25 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
   @override
   Widget build(BuildContext context) {
     final line = _line;
+    final isHighlighted = widget.isHighlighted;
 
     return Card(
-      key: Key('checklist_line_${line.id}'),
+      key: isHighlighted
+          ? Key('checklist_line_${line.id}_highlighted')
+          : Key('checklist_line_${line.id}'),
+      color: isHighlighted ? context.gssms.accent.background : null,
+      shape: isHighlighted
+          ? RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(GssmsRadius.r12),
+              side: BorderSide(
+                color: context.gssms.accent.solid,
+                width: 2,
+              ),
+            )
+          : null,
       margin: EdgeInsets.zero,
       child: Padding(
+        key: isHighlighted ? const Key('checklist_line_highlighted') : null,
         padding: const EdgeInsets.symmetric(
           horizontal: GssmsSpacing.s12,
           vertical: GssmsSpacing.s8,
@@ -242,7 +282,7 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
             const Divider(height: 10),
             ..._buildValueInput(line),
             if (line.statusOptions.isNotEmpty) ..._buildStatusAndAction(line),
-            _buildAttachmentsSection(line),
+            if (widget.showAttachments) _buildAttachmentsSection(line),
           ],
         ),
       ),
@@ -373,12 +413,23 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
       keyboardType: isNumeric
           ? const TextInputType.numberWithOptions(decimal: true, signed: true)
           : TextInputType.text,
+      inputFormatters: isNumeric
+          ? [
+              FilteringTextInputFormatter.allow(
+                  RegExp(r'^-?[0-9]*\.?[0-9]*')),
+            ]
+          : null,
       decoration: InputDecoration(
         labelText: 'Reading',
         hintText: hasReference ? 'Reference: ${line.referenceValue}' : null,
         suffixText: hasUnit ? line.unit : null,
         isDense: true,
         border: const OutlineInputBorder(),
+        errorText: isNumeric &&
+                _valueController.text.trim().isNotEmpty &&
+                double.tryParse(_valueController.text.trim()) == null
+            ? 'Enter a valid number'
+            : null,
       ),
       onChanged: (_) => _triggerSave(),
       onEditingComplete: () => _triggerSave(immediate: true),
@@ -414,6 +465,10 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
               controller: _componentControllers[key],
               focusNode: _componentFocusNodes[key],
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(
+                    RegExp(r'^-?[0-9]*\.?[0-9]*')),
+              ],
               decoration: InputDecoration(
                 labelText: key,
                 labelStyle: TextStyle(
@@ -427,7 +482,7 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderSide: BorderSide(
-                      color: _getComponentColor(key).withOpacity(0.6)),
+                      color: _getComponentColor(key).withValues(alpha: 0.6)),
                 ),
                 border: const OutlineInputBorder(),
               ),
@@ -794,7 +849,7 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
                 maxHeight: MediaQuery.of(ctx).size.height * 0.65,
               ),
               child: InteractiveViewer(
-                child: _AttachmentImage(
+                child: AttachmentImage(
                   attachment: attachment,
                   headers: _authHeaders(),
                   fit: BoxFit.contain,
@@ -1044,7 +1099,7 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
                   width: 76,
                   height: 76,
                   color: tokens.surfaceInset,
-                  child: _AttachmentImage(
+                  child: AttachmentImage(
                     attachment: attachment,
                     headers: _authHeaders(),
                     fit: BoxFit.cover,
@@ -1102,8 +1157,9 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
 /// Local file first (queued photos), then the server copy, then a placeholder
 /// — without a synchronous `File.existsSync()` in `build` (disk I/O on the UI
 /// thread for every thumbnail on every rebuild).
-class _AttachmentImage extends StatelessWidget {
-  const _AttachmentImage({
+class AttachmentImage extends StatelessWidget {
+  const AttachmentImage({
+    super.key,
     required this.attachment,
     required this.headers,
     required this.fit,

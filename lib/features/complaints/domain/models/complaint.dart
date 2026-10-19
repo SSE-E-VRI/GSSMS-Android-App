@@ -27,17 +27,80 @@ enum ComplaintStatus {
   }
 }
 
+/// A registration-time evidence photo (`ComplaintPhotoSerializer`).
+class ComplaintPhoto extends Equatable {
+  const ComplaintPhoto({
+    required this.id,
+    this.url,
+    this.uploadedByName,
+    this.uploadedAt,
+    this.sizeBytes,
+    this.sha256,
+  });
+
+  final int id;
+  final String? url;
+  final String? uploadedByName;
+  final DateTime? uploadedAt;
+  final int? sizeBytes;
+  final String? sha256;
+
+  factory ComplaintPhoto.fromJson(Map<String, dynamic> json) {
+    return ComplaintPhoto(
+      id: asJsonInt(json['id']) ?? 0,
+      url: asJsonString(json['url']),
+      uploadedByName: asJsonString(json['uploaded_by_name']),
+      uploadedAt: asJsonDateTime(json['uploaded_at']),
+      sizeBytes: asJsonInt(json['size_bytes']),
+      sha256: asJsonString(json['sha256']),
+    );
+  }
+
+  @override
+  List<Object?> get props =>
+      [id, url, uploadedByName, uploadedAt, sizeBytes, sha256];
+}
+
+/// Direct close/reject reason categories (`Complaint.CLOSURE_REASON_CHOICES`).
+class ComplaintClosureReasons {
+  static const values = [
+    'RESOLVED',
+    'DUPLICATE',
+    'FALSE',
+    'INVALID',
+    'NOT_REQUIRED',
+  ];
+
+  static String displayName(String code) {
+    switch (code.toUpperCase().trim()) {
+      case 'RESOLVED':
+        return 'Resolved';
+      case 'DUPLICATE':
+        return 'Duplicate';
+      case 'FALSE':
+        return 'False';
+      case 'INVALID':
+        return 'Invalid';
+      case 'NOT_REQUIRED':
+        return 'Not Required';
+      default:
+        return code;
+    }
+  }
+}
+
 /// A complaint as `ComplaintSerializer` returns it (SSOT §10.1).
 ///
-/// There is no severity/priority on complaints (SSOT §10.6, FIX-002) and no
-/// server-issued complaint number: the reference shown to users is `#<id>`,
-/// exactly as the Web "Complaint Details" view shows it.
+/// Dual-status: [status] is the persisted `record_status`; [effectiveStatus]
+/// is the live aggregate (linked Job Work status once converted, else the
+/// record status) — mirrors web's `record_status` + `effective_status`.
 class Complaint extends Equatable {
   const Complaint({
     required this.id,
     required this.title,
     this.description,
     this.status = ComplaintStatus.open,
+    this.effectiveStatus,
     this.department,
     this.stationId,
     this.stationName,
@@ -50,17 +113,30 @@ class Complaint extends Equatable {
     this.staffQuarterName,
     this.assetId,
     this.assetUniqueId,
+    this.generalAssetDescription,
+    this.failureDate,
+    this.failureTime,
+    this.complainantName,
+    this.closureReason,
+    this.closureRemarks,
+    this.closedByName,
+    this.closedAt,
     this.createdAt,
     this.isConverted = false,
     this.workOrderId,
     this.workOrderStatus,
     this.workOrderTicketNumber,
+    this.woAssignedToName,
+    this.photos = const [],
   });
 
   final int id;
   final String title;
   final String? description;
   final ComplaintStatus status;
+
+  /// Live aggregate status string (`effective_status`); null on old payloads.
+  final String? effectiveStatus;
 
   /// `complaint_department` lookup key (SSOT §10.4) — display via the lookup.
   final String? department;
@@ -78,6 +154,20 @@ class Complaint extends Equatable {
   /// The linked asset's server-generated `unique_id` (serializer
   /// `asset_unique_id`) — what the Web register shows as "Asset".
   final String? assetUniqueId;
+
+  /// Non-registered/general item (mutually exclusive with [assetId]).
+  final String? generalAssetDescription;
+
+  /// When the failure happened / who reported it (required on create).
+  final String? failureDate;
+  final String? failureTime;
+  final String? complainantName;
+
+  /// Direct close/reject audit (close action only, never PATCH).
+  final String? closureReason;
+  final String? closureRemarks;
+  final String? closedByName;
+  final DateTime? closedAt;
   final DateTime? createdAt;
 
   /// From ComplaintSerializer's `is_converted` — whether a Work Order has
@@ -93,6 +183,17 @@ class Complaint extends Equatable {
 
   /// From `wo_ticket_number` — the linked Job Work's human reference.
   final String? workOrderTicketNumber;
+
+  /// From `wo_assigned_to_name` — who holds the linked Job Work, if anyone.
+  /// The server sends `''` for "nobody" and old payloads omit the key; both
+  /// read as null.
+  final String? woAssignedToName;
+
+  /// Registration-time evidence photos (max 5, JPEG, OPEN only server-side).
+  final List<ComplaintPhoto> photos;
+
+  /// Whether the record is closed by record status.
+  bool get isClosed => status == ComplaintStatus.closed;
 
   /// User-facing reference (Web "Reference ID").
   String get reference => '#$id';
@@ -114,11 +215,26 @@ class Complaint extends Equatable {
 
     int? fkId(dynamic v) => v is Map ? asJsonInt(v['id']) : asJsonInt(v);
 
+    List<ComplaintPhoto> parsePhotos(dynamic v) {
+      if (v is! List) return const [];
+      return v
+          .whereType<Map>()
+          .map((e) => ComplaintPhoto.fromJson(Map<String, dynamic>.from(e)))
+          .toList();
+    }
+
+    // record_status is the persisted column; `status` is overridden with the
+    // linked Work Order status once converted (serializer
+    // `to_representation`), so the chip reads the record value.
+    final recordRaw =
+        asJsonString(json['record_status']) ?? asJsonString(json['status']);
+
     return Complaint(
       id: asJsonInt(json['id']) ?? 0,
-      title: asJsonString(json['title']) ?? 'Untitled Complaint',
+      title: asJsonString(json['title']) ?? 'Untitled Breakdown',
       description: asJsonString(json['description']),
-      status: ComplaintStatus.fromString(asJsonString(json['status'])),
+      status: ComplaintStatus.fromString(recordRaw),
+      effectiveStatus: asJsonString(json['effective_status']),
       department: asJsonString(json['department']),
       stationId: fkId(json['station']),
       stationName: asJsonString(json['station_name']),
@@ -131,11 +247,22 @@ class Complaint extends Equatable {
       staffQuarterName: asJsonString(json['staff_quarter_name']),
       assetId: fkId(json['asset']),
       assetUniqueId: asJsonString(json['asset_unique_id']),
+      generalAssetDescription:
+          asJsonString(json['general_asset_description']),
+      failureDate: asJsonString(json['failure_date']),
+      failureTime: asJsonString(json['failure_time']),
+      complainantName: asJsonString(json['complainant_name']),
+      closureReason: asJsonString(json['closure_reason']),
+      closureRemarks: asJsonString(json['closure_remarks']),
+      closedByName: asJsonString(json['closed_by_name']),
+      closedAt: parseDate(json['closed_at']),
       createdAt: parseDate(json['created_at']),
       isConverted: asJsonBool(json['is_converted']) ?? false,
       workOrderId: asJsonInt(json['wo_id']),
       workOrderStatus: asJsonString(json['wo_status']),
       workOrderTicketNumber: asJsonString(json['wo_ticket_number']),
+      woAssignedToName: asJsonNonBlankString(json['wo_assigned_to_name']),
+      photos: parsePhotos(json['photos']),
     );
   }
 
@@ -147,6 +274,7 @@ class Complaint extends Equatable {
       title: title,
       description: description,
       status: ComplaintStatus.converted,
+      effectiveStatus: effectiveStatus,
       department: department,
       stationId: stationId,
       stationName: stationName,
@@ -159,11 +287,21 @@ class Complaint extends Equatable {
       staffQuarterName: staffQuarterName,
       assetId: assetId,
       assetUniqueId: assetUniqueId,
+      generalAssetDescription: generalAssetDescription,
+      failureDate: failureDate,
+      failureTime: failureTime,
+      complainantName: complainantName,
+      closureReason: closureReason,
+      closureRemarks: closureRemarks,
+      closedByName: closedByName,
+      closedAt: closedAt,
       createdAt: createdAt,
       isConverted: true,
       workOrderId: workOrderId ?? this.workOrderId,
       workOrderStatus: workOrderStatus,
       workOrderTicketNumber: workOrderTicketNumber,
+      woAssignedToName: woAssignedToName,
+      photos: photos,
     );
   }
 
@@ -173,6 +311,7 @@ class Complaint extends Equatable {
         title,
         description,
         status,
+        effectiveStatus,
         department,
         stationId,
         stationName,
@@ -185,10 +324,20 @@ class Complaint extends Equatable {
         staffQuarterName,
         assetId,
         assetUniqueId,
+        generalAssetDescription,
+        failureDate,
+        failureTime,
+        complainantName,
+        closureReason,
+        closureRemarks,
+        closedByName,
+        closedAt,
         createdAt,
         isConverted,
         workOrderId,
         workOrderStatus,
         workOrderTicketNumber,
+        woAssignedToName,
+        photos,
       ];
 }

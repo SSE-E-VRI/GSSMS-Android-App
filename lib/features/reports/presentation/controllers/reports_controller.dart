@@ -7,6 +7,8 @@ import 'package:gssms_mobile/features/reports/data/infrastructure_options_servic
 import 'package:gssms_mobile/features/reports/data/reports_api_service.dart';
 import 'package:gssms_mobile/features/reports/data/reports_repository.dart';
 import 'package:gssms_mobile/features/reports/domain/models/infrastructure_option.dart';
+import 'package:gssms_mobile/features/work_orders/data/work_order_repository.dart';
+import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_order_controllers.dart';
 import 'package:gssms_mobile/features/reports/presentation/controllers/reports_state.dart';
 
 final reportsApiServiceProvider = Provider<ReportsApiService>((ref) {
@@ -35,7 +37,7 @@ class ReportsController extends Notifier<ReportsState> {
     return const ReportsLoading();
   }
 
-  IReportsRepository get _repository => ref.read(reportsRepositoryProvider);
+  IWorkOrderRepository get _workOrders => ref.read(workOrderRepositoryProvider);
   InfrastructureOptionsService get _options =>
       ref.read(infrastructureOptionsServiceProvider);
 
@@ -84,14 +86,20 @@ class ReportsController extends Notifier<ReportsState> {
         }
       }
 
-      final entries = await _repository.fetchMaintenanceRegister(
-        startDate: df.format(start),
-        endDate: df.format(end),
-        zoneId: scope.zoneId,
-        divisionId: scope.divisionId,
+      final entries = await _workOrders.fetchWorkOrders(
+        // Web Register query (ReportsView.generateReport): completed Job
+        // Works in the completion-date range. Statuses are comma-separated
+        // server-side; depot scoping beyond the explicit depot comes from
+        // the server-side org scope, exactly like the web call.
+        status: 'TECH_COMPLETED,VERIFIED,CLOSED',
+        completionFrom: df.format(start),
+        completionTo: df.format(end),
         depotId: scope.depotId,
-        infraType: type,
-        infraId: id,
+        stationId: type == InfraFilterType.station ? id : null,
+        lcGateId: type == InfraFilterType.lcGate ? id : null,
+        serviceBuildingId: type == InfraFilterType.serviceBuilding ? id : null,
+        staffQuarterId: type == InfraFilterType.staffQuarter ? id : null,
+        infraType: type.registerTypeParam,
       );
 
       state = ReportsLoaded(

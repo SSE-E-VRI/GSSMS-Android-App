@@ -44,7 +44,7 @@ class _WorkOrderCreateScreenState
   bool _loadingDepots = false;
   int? _selectedDepotId;
 
-  WorkOrderType _type = WorkOrderType.preventive;
+  final WorkOrderType _type = WorkOrderType.preventive;
   WorkOrderPriority _priority = WorkOrderPriority.medium;
   DateTime? _dueDate;
 
@@ -67,6 +67,7 @@ class _WorkOrderCreateScreenState
   MaintenanceScheduleType? _templateScheduleFilter;
   MaintenanceTemplateKind _templateKindFilter = MaintenanceTemplateKind.assetTemplate;
   int? _selectedMaintenanceMasterId;
+  int _loadSeq = 0;
 
   List<MaintenanceMaster> get _filteredTemplates {
     return _templates.where((t) {
@@ -143,6 +144,7 @@ class _WorkOrderCreateScreenState
   }
 
   Future<void> _loadTemplates() async {
+    if (!mounted) return;
     setState(() => _loadingTemplates = true);
     try {
       final templates =
@@ -158,6 +160,7 @@ class _WorkOrderCreateScreenState
   }
 
   Future<void> _loadDepots({int? zoneId, int? divisionId}) async {
+    if (!mounted) return;
     setState(() => _loadingDepots = true);
     try {
       final d = await ref
@@ -172,6 +175,8 @@ class _WorkOrderCreateScreenState
   }
 
   Future<void> _loadLocations() async {
+    if (!mounted) return;
+    final seq = ++_loadSeq;
     setState(() {
       _loadingLocations = true;
       _selectedLocationId = null;
@@ -185,15 +190,19 @@ class _WorkOrderCreateScreenState
       final opts = await ref
           .read(infrastructureOptionsServiceProvider)
           .fetchOptions(_infraType, depotId: _selectedDepotId);
-      if (mounted) setState(() => _locations = opts);
+      if (!mounted || seq != _loadSeq) return;
+      setState(() => _locations = opts);
     } catch (_) {
-      if (mounted) setState(() => _locations = const []);
+      if (!mounted || seq != _loadSeq) return;
+      setState(() => _locations = const []);
     } finally {
-      if (mounted) setState(() => _loadingLocations = false);
+      if (mounted && seq == _loadSeq) setState(() => _loadingLocations = false);
     }
   }
 
   Future<void> _loadAssets() async {
+    if (!mounted) return;
+    final seq = ++_loadSeq;
     final stationId = _resolvedStationId;
     setState(() {
       _assets = const [];
@@ -207,7 +216,7 @@ class _WorkOrderCreateScreenState
       final page = await ref
           .read(assetApiServiceProvider)
           .getAssets(stationId: stationId);
-      if (!mounted) return;
+      if (!mounted || seq != _loadSeq) return;
       final cats = <String>{
         for (final a in page.assets)
           if ((a.assetCategoryName ?? '').trim().isNotEmpty)
@@ -219,9 +228,10 @@ class _WorkOrderCreateScreenState
         _categories = cats;
       });
     } catch (_) {
-      if (mounted) setState(() => _assets = const []);
+      if (!mounted || seq != _loadSeq) return;
+      setState(() => _assets = const []);
     } finally {
-      if (mounted) setState(() => _loadingAssets = false);
+      if (mounted && seq == _loadSeq) setState(() => _loadingAssets = false);
     }
   }
 
@@ -245,7 +255,7 @@ class _WorkOrderCreateScreenState
   }
 
   Future<void> _submit() async {
-    if (!canCreateWorkOrder(sessionOf(ref))) {
+    if (!canCreateWorkOrder(sessionFromAuth(ref.read(authControllerProvider)))) {
       if (mounted) {
         showPermissionDeniedSnackBar(context);
       }
@@ -255,6 +265,12 @@ class _WorkOrderCreateScreenState
     if (_canSelectDepot && _selectedDepotId == null) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
           content: const Text('Please select a Depot'),
+          backgroundColor: context.gssms.danger.solid));
+      return;
+    }
+    if (_selectedMaintenanceMasterId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: const Text('A Preventive Job Work needs a checklist.'),
           backgroundColor: context.gssms.danger.solid));
       return;
     }
@@ -313,10 +329,9 @@ class _WorkOrderCreateScreenState
     }
 
     return Scaffold(
-      // No title here — the colored header below already carries it (as an
-      // accessible `Semantics(header: true)` region), so the AppBar isn't
-      // duplicating it back-to-back. Only the back button lives up top.
-      appBar: AppBar(),
+      appBar: AppBar(
+        title: const Text('New Job Work'),
+      ),
       backgroundColor: _webLightBg,
       body: !_bootstrapped
           ? const Center(child: CircularProgressIndicator())
@@ -407,7 +422,7 @@ class _WorkOrderCreateScreenState
                                     children: [
                                       _label('Type',
                                           tooltip:
-                                              'The nature of the work — preventive, corrective, breakdown, etc.'),
+                                              'New Job Work is Preventive only.'),
                                       const SizedBox(height: 6),
                                       DropdownButtonFormField<WorkOrderType>(
                                         key: const Key('wo_type_dropdown'),
@@ -416,11 +431,6 @@ class _WorkOrderCreateScreenState
                                         decoration: _input(),
                                         items: const [
                                           WorkOrderType.preventive,
-                                          WorkOrderType.corrective,
-                                          WorkOrderType.breakdown,
-                                          WorkOrderType.calibration,
-                                          WorkOrderType.installation,
-                                          WorkOrderType.other,
                                         ]
                                             .map((t) => DropdownMenuItem(
                                                 value: t,
@@ -430,11 +440,15 @@ class _WorkOrderCreateScreenState
                                                     style: const TextStyle(
                                                         fontSize: 13))))
                                             .toList(),
-                                        onChanged: (t) {
-                                          if (t != null) {
-                                            setState(() => _type = t);
-                                          }
-                                        },
+                                        onChanged: null,
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'Report breakdowns in the Breakdowns module.',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: context.gssms.textSecondary,
+                                        ),
                                       ),
                                     ],
                                   ),
@@ -646,11 +660,13 @@ class _WorkOrderCreateScreenState
               Icon(Icons.location_on,
                   color: context.gssms.link, size: 16),
               const SizedBox(width: 6),
-              Text('Location & Asset (Optional)',
-                  style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: context.gssms.link,
-                      fontSize: 13)),
+              Flexible(
+                child: Text('Location & Asset (Optional)',
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: context.gssms.link,
+                        fontSize: 13)),
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -799,48 +815,74 @@ class _WorkOrderCreateScreenState
             children: [
               Icon(Icons.checklist, color: context.gssms.link, size: 16),
               const SizedBox(width: 6),
-              Text('Template / Checklist (Optional)',
+              Flexible(
+                child: Text(
+                  'Checklist *',
                   style: TextStyle(
                       fontWeight: FontWeight.bold,
                       color: context.gssms.link,
-                      fontSize: 13)),
+                      fontSize: 13),
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 12),
           _label('Category',
               tooltip:
-                  'Asset Template applies to one specific asset; Station / Batch Template applies broadly across a station.'),
+                  'Asset applies to one specific asset; Station applies across a station; AMC lists the division AMC checklists.'),
           const SizedBox(height: 6),
           // Web splits templates into Asset Templates / Station Templates
           // tables (MaintenanceMasterList.jsx `template_kind`); here that's a
           // segmented toggle instead of two lists. "Station / Batch" is the
-          // scoped-across-a-station template kind ("batch job work").
-          SegmentedButton<MaintenanceTemplateKind>(
-            key: const Key('wo_template_kind_segment'),
-            segments: const [
-              ButtonSegment(
-                value: MaintenanceTemplateKind.assetTemplate,
-                label: Text('Asset', style: TextStyle(fontSize: 12)),
-              ),
-              ButtonSegment(
-                value: MaintenanceTemplateKind.stationTemplate,
-                label: Text('Station / Batch', style: TextStyle(fontSize: 12)),
-              ),
-            ],
-            selected: {_templateKindFilter},
-            onSelectionChanged: (s) {
-              setState(() {
-                _templateKindFilter = s.first;
-                if (_selectedMaintenanceMasterId != null &&
-                    !_filteredTemplates
-                        .any((t) => t.id == _selectedMaintenanceMasterId)) {
-                  _selectedMaintenanceMasterId = null;
-                }
-              });
-            },
+          // scoped-across-a-station template kind ("batch job work"). S-V4:
+          // Segmented toggle showing all checklist kinds the web offers for manual creation:
+          // Asset, Station, AMC, Handing Over, Taking Over, Special Drive.
+          // Wrapped in a horizontal scroll view so all segments fit at 360dp without clipping or overflow.
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: SegmentedButton<MaintenanceTemplateKind>(
+              key: const Key('wo_template_kind_segment'),
+              segments: const [
+                ButtonSegment(
+                  value: MaintenanceTemplateKind.assetTemplate,
+                  label: Text('Asset', style: TextStyle(fontSize: 12)),
+                ),
+                ButtonSegment(
+                  value: MaintenanceTemplateKind.stationTemplate,
+                  label: Text('Station', style: TextStyle(fontSize: 12)),
+                ),
+                ButtonSegment(
+                  value: MaintenanceTemplateKind.amc,
+                  label: Text('AMC', style: TextStyle(fontSize: 12)),
+                ),
+                ButtonSegment(
+                  value: MaintenanceTemplateKind.handover,
+                  label: Text('Handing Over', style: TextStyle(fontSize: 12)),
+                ),
+                ButtonSegment(
+                  value: MaintenanceTemplateKind.takeover,
+                  label: Text('Taking Over', style: TextStyle(fontSize: 12)),
+                ),
+                ButtonSegment(
+                  value: MaintenanceTemplateKind.specialDrive,
+                  label: Text('Special Drive', style: TextStyle(fontSize: 12)),
+                ),
+              ],
+              selected: {_templateKindFilter},
+              onSelectionChanged: (s) {
+                setState(() {
+                  _templateKindFilter = s.first;
+                  if (_selectedMaintenanceMasterId != null &&
+                      !_filteredTemplates
+                          .any((t) => t.id == _selectedMaintenanceMasterId)) {
+                    _selectedMaintenanceMasterId = null;
+                  }
+                });
+              },
+            ),
           ),
           const SizedBox(height: 12),
-          _label('Schedule Type', tooltip: 'How often this checklist template is meant to run.'),
+          _label('Filter by schedule type', tooltip: 'How often this checklist is meant to run.'),
           const SizedBox(height: 6),
           DropdownButtonFormField<MaintenanceScheduleType?>(
             key: const Key('wo_template_schedule_dropdown'),
@@ -869,9 +911,9 @@ class _WorkOrderCreateScreenState
             },
           ),
           const SizedBox(height: 12),
-          _label('Template',
+          _label('Checklist',
               tooltip:
-                  'Attach a checklist template so the technician has a structured checklist during execution.'),
+                  'Maintenance checklist to attach — determines what the technician is asked to fill in when closing the job work. Required; use the Checklist Type / Schedule filters to narrow the list down.'),
           const SizedBox(height: 6),
           DropdownButtonFormField<int>(
             key: const Key('wo_template_dropdown'),
@@ -879,7 +921,7 @@ class _WorkOrderCreateScreenState
             value: filtered.any((t) => t.id == _selectedMaintenanceMasterId)
                 ? _selectedMaintenanceMasterId
                 : null,
-            decoration: _input('-- No Template --').copyWith(
+            decoration: _input('-- Select Checklist --').copyWith(
               suffixIcon: _loadingTemplates
                   ? const Padding(
                       padding: EdgeInsets.all(10),
@@ -891,15 +933,23 @@ class _WorkOrderCreateScreenState
             ),
             items: [
               const DropdownMenuItem<int>(
-                  value: null, child: Text('-- No Template --')),
+                  value: null, child: Text('-- Select Checklist --')),
               ...filtered.map((t) => DropdownMenuItem(
                   value: t.id,
-                  child: Text('${t.name} (${t.scheduleType.displayName})',
+                  child: Text(t.displayLabel,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(fontSize: 13)))),
             ],
             onChanged: (id) =>
                 setState(() => _selectedMaintenanceMasterId = id),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Maintenance checklist to attach — determines what the technician is asked to fill in when closing the job work. Scheduled PM is created from Schedules → Convert.',
+            style: TextStyle(
+              fontSize: 11,
+              color: context.gssms.textSecondary,
+            ),
           ),
         ],
       ),
@@ -910,50 +960,61 @@ class _WorkOrderCreateScreenState
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
-        OutlinedButton.icon(
-          key: const Key('cancel_wo_button'),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: context.gssms.textSecondary,
-            side: BorderSide(color: context.gssms.border),
-            padding:
-                const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8)),
-            minimumSize: const Size(0, 48),
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        Expanded(
+          child: OutlinedButton.icon(
+            key: const Key('cancel_wo_button'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: context.gssms.textSecondary,
+              side: BorderSide(color: context.gssms.border),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
+              minimumSize: const Size(0, 48),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            onPressed:
+                _isSubmitting ? null : () => Navigator.of(context).pop(false),
+            icon: const Icon(Icons.close, size: 16),
+            label: const FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text('Cancel',
+                  style: TextStyle(fontWeight: FontWeight.w600)),
+            ),
           ),
-          onPressed:
-              _isSubmitting ? null : () => Navigator.of(context).pop(false),
-          icon: const Icon(Icons.close, size: 16),
-          label: const Text('Cancel',
-              style: TextStyle(fontWeight: FontWeight.w600)),
         ),
         const SizedBox(width: 10),
-        ElevatedButton.icon(
-          key: const Key('submit_wo_button'),
-          style: ElevatedButton.styleFrom(
-            backgroundColor: _band,
-            foregroundColor: _onBand,
-            padding:
-                const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8)),
-            elevation: 2,
-            minimumSize: const Size(0, GssmsSize.touchTarget),
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        Expanded(
+          flex: 2,
+          child: ElevatedButton.icon(
+            key: const Key('submit_wo_button'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _band,
+              foregroundColor: _onBand,
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8)),
+              elevation: 2,
+              minimumSize: const Size(0, GssmsSize.touchTarget),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            onPressed: _isSubmitting ? null : _submit,
+            icon: _isSubmitting
+                ? SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                        color: _onBand, strokeWidth: 2))
+                : const Icon(Icons.add_task_outlined,
+                    size: 16),
+            label: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(_isSubmitting ? 'Creating...' : 'Create Job Work',
+                  style:
+                      const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            ),
           ),
-          onPressed: _isSubmitting ? null : _submit,
-          icon: _isSubmitting
-              ? SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                      color: _onBand, strokeWidth: 2))
-              : const Icon(Icons.add_task_outlined,
-                  size: 16),
-          label: Text(_isSubmitting ? 'Creating...' : 'Create Job Work',
-              style:
-                  const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
         ),
       ],
     );

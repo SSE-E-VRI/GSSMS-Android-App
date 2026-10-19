@@ -11,6 +11,7 @@ import '../../../auth/presentation/controllers/auth_controller.dart';
 import '../../../auth/presentation/screens/user_profile_screen.dart';
 import '../../../auth/presentation/widgets/sign_out_confirmation.dart';
 import '../../../dashboard/presentation/screens/dashboard_screen.dart';
+import '../../../deficiencies/presentation/screens/deficiency_list_screen.dart';
 import '../../../energy/presentation/screens/energy_placeholder_screen.dart';
 import '../../../maintenance/presentation/screens/maintenance_screen.dart';
 import '../../../notifications/presentation/screens/notifications_screen.dart';
@@ -152,6 +153,15 @@ class MoreScreen extends ConsumerWidget {
               title: 'Maintenance Management',
               subtitle: 'Compliance & job work distribution',
               screen: const MaintenanceScreen(),
+            ),
+          if (canViewDeficiencyModule(currentSession))
+            moduleTile(
+              key: const Key('more_menu_deficiencies'),
+              icon: Icons.rule_outlined,
+              color: AppTheme.moduleDeficiencies,
+              title: 'Deficiencies',
+              subtitle: 'Open findings & rectification status',
+              screen: const DeficiencyListScreen(),
             ),
           if (sessionAllows(currentSession, 'reports.view'))
             moduleTile(

@@ -29,8 +29,8 @@ class OrgScopeOptionsService {
   Future<List<OrgOption>> _fetch(String path, Map<String, dynamic> query) async {
     final response = await _dio.get<dynamic>(path, queryParameters: query);
     return _asList(response.data)
-        .whereType<Map<String, dynamic>>()
-        .map(OrgOption.fromJson)
+        .whereType<Map>()
+        .map((m) => OrgOption.fromJson(Map<String, dynamic>.from(m)))
         .where((o) => o.id > 0)
         .toList();
   }

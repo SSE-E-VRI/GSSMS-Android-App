@@ -1,13 +1,14 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gssms_mobile/features/reports/data/infrastructure_options_service.dart';
-import 'package:gssms_mobile/features/reports/data/reports_repository.dart';
 import 'package:gssms_mobile/features/reports/domain/models/infrastructure_option.dart';
 import 'package:gssms_mobile/features/reports/presentation/controllers/reports_controller.dart';
 import 'package:gssms_mobile/features/reports/presentation/controllers/reports_state.dart';
+import 'package:gssms_mobile/features/work_orders/data/work_order_repository.dart';
+import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_order_controllers.dart';
 import 'package:mocktail/mocktail.dart';
 
-class MockReportsRepository extends Mock implements IReportsRepository {}
+class MockWorkOrderRepository extends Mock implements IWorkOrderRepository {}
 
 class MockInfrastructureOptionsService extends Mock
     implements InfrastructureOptionsService {}
@@ -17,24 +18,26 @@ void main() {
     registerFallbackValue(InfraFilterType.all);
   });
 
-  late MockReportsRepository mockRepo;
+  late MockWorkOrderRepository mockRepo;
   late MockInfrastructureOptionsService mockOptions;
   late ProviderContainer container;
 
   setUp(() {
-    mockRepo = MockReportsRepository();
+    mockRepo = MockWorkOrderRepository();
     mockOptions = MockInfrastructureOptionsService();
     when(
-      () => mockRepo.fetchMaintenanceRegister(
-        startDate: any(named: 'startDate'),
-        endDate: any(named: 'endDate'),
+      () => mockRepo.fetchWorkOrders(
+        status: any(named: 'status'),
+        completionFrom: any(named: 'completionFrom'),
+        completionTo: any(named: 'completionTo'),
+        depotId: any(named: 'depotId'),
+        stationId: any(named: 'stationId'),
         infraType: any(named: 'infraType'),
-        infraId: any(named: 'infraId'),
       ),
     ).thenAnswer((_) async => const []);
     container = ProviderContainer(
       overrides: [
-        reportsRepositoryProvider.overrideWithValue(mockRepo),
+        workOrderRepositoryProvider.overrideWithValue(mockRepo),
         infrastructureOptionsServiceProvider.overrideWithValue(mockOptions),
       ],
     );
@@ -56,12 +59,14 @@ void main() {
     await controller.setInfraId(12);
 
     verify(() => mockOptions.fetchOptions(InfraFilterType.station)).called(1);
+    // Web Register query: completed Job Works in the completion-date range.
     verify(
-      () => mockRepo.fetchMaintenanceRegister(
-        startDate: '2026-09-01',
-        endDate: '2026-09-07',
-        infraType: InfraFilterType.station,
-        infraId: 12,
+      () => mockRepo.fetchWorkOrders(
+        status: 'TECH_COMPLETED,VERIFIED,CLOSED',
+        completionFrom: '2026-09-01',
+        completionTo: '2026-09-07',
+        stationId: 12,
+        infraType: 'STATION',
       ),
     ).called(1);
 

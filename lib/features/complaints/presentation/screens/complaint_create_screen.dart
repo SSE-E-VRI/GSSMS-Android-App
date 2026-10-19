@@ -1,7 +1,11 @@
 import 'dart:async';
+import 'dart:io';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:intl/intl.dart';
 import 'package:gssms_mobile/core/data/lookup_options_service.dart';
 import 'package:gssms_mobile/core/data/org_scope_options_service.dart';
 import 'package:gssms_mobile/core/domain/lookup_option.dart';
@@ -25,11 +29,11 @@ const _infraTypes = [
   InfraFilterType.staffQuarter,
 ];
 
-/// Log New Complaint — mirrors web `Log New Complaint`
+/// Report New Breakdown — mirrors web `Report New Breakdown`
 /// (gssms.share.zrok.io/complaints/new) field-for-field: Depot, Department
 /// Reporting, Title/Subject, a Location & Asset Details group (Infrastructure
 /// Type, Location Name, Asset Category, Specific Asset), then Description,
-/// with Cancel / Submit Complaint footer.
+/// with Cancel / Submit Breakdown footer.
 class ComplaintCreateScreen extends ConsumerStatefulWidget {
   const ComplaintCreateScreen(
       {super.key, this.initialAssetId, this.initialAssetName});
@@ -43,9 +47,21 @@ class ComplaintCreateScreen extends ConsumerStatefulWidget {
 }
 
 class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
+  static const int _maxPhotos = 5;
+  static const int _maxPhotoBytes = 15 * 1024 * 1024;
+
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
+  final _complainantController = TextEditingController();
+  final _generalAssetController = TextEditingController();
+
+  DateTime? _failureDate;
+  TimeOfDay? _failureTime;
+  String? _failureDateError;
+  String? _failureTimeError;
+
+  final List<XFile> _stagedPhotos = [];
 
   bool _isSubmitting = false;
   bool _bootstrapped = false;
@@ -67,6 +83,7 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
 
   List<Asset> _assets = const [];
   bool _loadingAssets = false;
+  int _loadSeq = 0;
   List<String> _categories = const [];
   String? _selectedCategory;
   int? _selectedAssetId;
@@ -88,6 +105,8 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
+    _complainantController.dispose();
+    _generalAssetController.dispose();
     super.dispose();
   }
 
@@ -137,6 +156,7 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
   }
 
   Future<void> _loadDepartments() async {
+    if (!mounted) return;
     setState(() => _loadingDepartments = true);
     try {
       final options = await ref
@@ -153,6 +173,7 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
   }
 
   Future<void> _loadDepots({int? zoneId, int? divisionId}) async {
+    if (!mounted) return;
     setState(() => _loadingDepots = true);
     try {
       final depots = await ref
@@ -167,6 +188,8 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
   }
 
   Future<void> _loadLocations() async {
+    if (!mounted) return;
+    final seq = ++_loadSeq;
     setState(() {
       _loadingLocations = true;
       _selectedLocationId = null;
@@ -180,15 +203,19 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
       final options = await ref
           .read(infrastructureOptionsServiceProvider)
           .fetchOptions(_infraType, depotId: _selectedDepotId);
-      if (mounted) setState(() => _locations = options);
+      if (!mounted || seq != _loadSeq) return;
+      setState(() => _locations = options);
     } catch (_) {
-      if (mounted) setState(() => _locations = const []);
+      if (!mounted || seq != _loadSeq) return;
+      setState(() => _locations = const []);
     } finally {
-      if (mounted) setState(() => _loadingLocations = false);
+      if (mounted && seq == _loadSeq) setState(() => _loadingLocations = false);
     }
   }
 
   Future<void> _loadAssetsForLocation() async {
+    if (!mounted) return;
+    final seq = ++_loadSeq;
     final stationId = _resolvedStationId;
     setState(() {
       _assets = const [];
@@ -203,7 +230,7 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
       final page = await ref
           .read(assetApiServiceProvider)
           .getAssets(stationId: stationId);
-      if (!mounted) return;
+      if (!mounted || seq != _loadSeq) return;
       final categories = <String>{
         for (final a in page.assets)
           if ((a.assetCategoryName ?? '').trim().isNotEmpty)
@@ -215,9 +242,10 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
         _categories = categories;
       });
     } catch (_) {
-      if (mounted) setState(() => _assets = const []);
+      if (!mounted || seq != _loadSeq) return;
+      setState(() => _assets = const []);
     } finally {
-      if (mounted) setState(() => _loadingAssets = false);
+      if (mounted && seq == _loadSeq) setState(() => _loadingAssets = false);
     }
   }
 
@@ -229,12 +257,29 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
   }
 
   Future<void> _submitComplaint() async {
-    if (!sessionAllows(sessionOf(ref), 'complaints.create')) return;
-    if (!_formKey.currentState!.validate()) return;
+    if (!sessionAllows(
+        sessionFromAuth(ref.read(authControllerProvider)), 'complaints.create')) {
+      return;
+    }
+    if (!(_formKey.currentState?.validate() ?? false)) return;
     if (_selectedDepartment == null) {
       setState(() => _departmentError = 'Please select a department');
       return;
     }
+    var valid = true;
+    if (_failureDate == null) {
+      setState(() => _failureDateError = 'Please select the failure date');
+      valid = false;
+    } else {
+      setState(() => _failureDateError = null);
+    }
+    if (_failureTime == null) {
+      setState(() => _failureTimeError = 'Please select the failure time');
+      valid = false;
+    } else {
+      setState(() => _failureTimeError = null);
+    }
+    if (!valid) return;
     if (_canSelectDepot && _selectedDepotId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -246,24 +291,54 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
 
     setState(() => _isSubmitting = true);
     try {
-      await ref.read(complaintRepositoryProvider).createComplaint(
-            title: _titleController.text.trim(),
-            description: _descriptionController.text.trim(),
-            department: _selectedDepartment!,
-            depotId: _selectedDepotId,
-            stationId: _infraType == InfraFilterType.station
-                ? _selectedLocationId
-                : null,
-            infrastructureId: _infraType == InfraFilterType.station
-                ? null
-                : _selectedLocationId,
-            assetId: _selectedAssetId ?? widget.initialAssetId,
-          );
+      final failureDate =
+          DateFormat('yyyy-MM-dd').format(_failureDate ?? DateTime.now());
+      final failureTime =
+          '${_failureTime!.hour.toString().padLeft(2, '0')}:${_failureTime!.minute.toString().padLeft(2, '0')}';
+      final generalAsset = _generalAssetController.text.trim();
+      final created =
+          await ref.read(complaintRepositoryProvider).createComplaint(
+                title: _titleController.text.trim(),
+                description: _descriptionController.text.trim(),
+                department: _selectedDepartment!,
+                depotId: _selectedDepotId,
+                stationId: _infraType == InfraFilterType.station
+                    ? _selectedLocationId
+                    : null,
+                infrastructureId: _infraType == InfraFilterType.station
+                    ? null
+                    : _selectedLocationId,
+                assetId: generalAsset.isNotEmpty
+                    ? null
+                    : (_selectedAssetId ?? widget.initialAssetId),
+                generalAssetDescription:
+                    generalAsset.isNotEmpty ? generalAsset : null,
+                failureDate: failureDate,
+                failureTime: failureTime,
+                complainantName: _complainantController.text.trim(),
+              );
+
+      // Staged evidence uploads after the breakdown exists (it needs the id
+      // first) — a failure here warns but keeps the created breakdown, same
+      // as web's photoWarning path.
+      var photoErrors = 0;
+      for (final photo in _stagedPhotos) {
+        try {
+          await ref.read(complaintRepositoryProvider).uploadPhoto(
+                complaintId: created.id,
+                file: await _photoFile(photo),
+              );
+        } catch (_) {
+          photoErrors++;
+        }
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('Complaint logged successfully!'),
+            content: Text(photoErrors > 0
+                ? 'Breakdown reported successfully! ($photoErrors photo(s) could not be uploaded.)'
+                : 'Breakdown reported successfully!'),
             backgroundColor: context.gssms.success.solid,
           ),
         );
@@ -274,7 +349,7 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content:
-                Text('Failed to log complaint: ${workOrderReadableError(e)}'),
+                Text('Failed to report breakdown: ${workOrderReadableError(e)}'),
             backgroundColor: context.gssms.danger.solid,
           ),
         );
@@ -284,12 +359,84 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
     }
   }
 
+  /// JPEG-only, ≤15MB multipart file for a staged photo (mirrors web's
+  /// client-side gate; the server re-validates and normalizes).
+  Future<MultipartFile> _photoFile(XFile photo) async {
+    final file = File(photo.path);
+    if (!await file.exists()) {
+      throw ArgumentError('Photo not found');
+    }
+    final lower = photo.path.toLowerCase();
+    if (!lower.endsWith('.jpg') && !lower.endsWith('.jpeg')) {
+      throw ArgumentError('Only JPEG photos are allowed');
+    }
+    if (await file.length() > _maxPhotoBytes) {
+      throw ArgumentError('Photo exceeds the 15 MB limit');
+    }
+    final filename = photo.path.split(Platform.pathSeparator).last;
+    return MultipartFile.fromFile(
+      photo.path,
+      filename: filename.isNotEmpty ? filename : 'evidence.jpg',
+      contentType: DioMediaType('image', 'jpeg'),
+    );
+  }
+
+  Future<void> _pickPhotos() async {
+    try {
+      final picked = await ImagePicker().pickMultiImage(imageQuality: 85);
+      if (!mounted) return;
+      setState(() {
+        for (final p in picked) {
+          if (_stagedPhotos.length >= _maxPhotos) break;
+          final lower = p.path.toLowerCase();
+          if (!lower.endsWith('.jpg') && !lower.endsWith('.jpeg')) {
+            continue;
+          }
+          _stagedPhotos.add(p);
+        }
+      });
+    } catch (_) {
+      // Picker dismissal / denial — stay on the form.
+    }
+  }
+
+  Future<void> _pickFailureDate() async {
+    final now = DateTime.now();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _failureDate ?? now,
+      firstDate: DateTime(2020),
+      lastDate: now,
+      helpText: 'Select failure date',
+    );
+    if (picked != null && mounted) {
+      setState(() {
+        _failureDate = picked;
+        _failureDateError = null;
+      });
+    }
+  }
+
+  Future<void> _pickFailureTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: _failureTime ?? TimeOfDay.now(),
+      helpText: 'Select failure time',
+    );
+    if (picked != null && mounted) {
+      setState(() {
+        _failureTime = picked;
+        _failureTimeError = null;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!sessionAllows(sessionOf(ref), 'complaints.create')) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text('Log New Complaint'),
+          title: const Text('Report New Breakdown'),
         ),
         body: const PermissionDeniedView(),
       );
@@ -322,7 +469,7 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Red header — mirrors web's "Log New Complaint" bar.
+                      // Red header — mirrors web's "Report New Breakdown" bar.
                       // This is the screen's only title (the AppBar carries
                       // no text of its own — see build() above), so it's
                       // marked as an accessible header region rather than
@@ -330,7 +477,7 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
                       // skip.
                       Semantics(
                         header: true,
-                        label: 'Log New Complaint',
+                        label: 'Report New Breakdown',
                         // The Row's own Icon/Text would otherwise each add
                         // their own semantics on top of this label.
                         excludeSemantics: true,
@@ -348,7 +495,7 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
                                   color: _onBand, size: 20),
                               const SizedBox(width: 8),
                               Text(
-                                'Log New Complaint',
+                                'Report New Breakdown',
                                 style: TextStyle(
                                     color: _onBand,
                                     fontSize: 16,
@@ -372,10 +519,16 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
                             _departmentField(),
                             const SizedBox(height: 14),
                             _titleField(),
+                            const SizedBox(height: 14),
+                            _failureFields(),
+                            const SizedBox(height: 14),
+                            _complainantField(),
                             const SizedBox(height: 16),
                             _locationAndAssetSection(),
                             const SizedBox(height: 14),
                             _descriptionField(),
+                            const SizedBox(height: 16),
+                            _photosSection(),
                             const SizedBox(height: 16),
                             Divider(height: 1, color: _border),
                             const SizedBox(height: 16),
@@ -490,7 +643,7 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
       children: [
         _labelWithInfo('Depot',
             tooltip:
-                'The depot this complaint is scoped to. Locked to your own depot unless you have multi-depot access.'),
+                'The depot this breakdown is scoped to. Locked to your own depot unless you have multi-depot access.'),
         const SizedBox(height: 6),
         DropdownButtonFormField<int>(
           key: const Key('complaint_depot_dropdown'),
@@ -540,7 +693,7 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
       children: [
         _labelWithInfo('Department Reporting',
             required: true,
-            tooltip: 'The department responsible for handling this complaint.'),
+            tooltip: 'The department responsible for handling this breakdown.'),
         const SizedBox(height: 6),
         DropdownButtonFormField<String>(
           key: const Key('complaint_department_dropdown'),
@@ -592,10 +745,173 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
           decoration: _webInput(hint: 'e.g. Fan not working in Waiting Hall'),
           validator: (val) {
             if (val == null || val.trim().isEmpty) {
-              return 'Please enter a complaint title';
+              return 'Please enter a breakdown title';
             }
             return null;
           },
+        ),
+      ],
+    );
+  }
+
+  Widget _failureFields() {
+    final dateText = _failureDate == null
+        ? '-- Select date --'
+        : DateFormat('dd-MM-yyyy').format(_failureDate!);
+    final timeText = _failureTime == null
+        ? '-- Select time --'
+        : _failureTime!.format(context);
+    InputDecoration box(String? error) => _webInput().copyWith(
+          errorText: error,
+          suffixIcon: Icon(Icons.calendar_today_outlined,
+              size: 18, color: context.gssms.textSecondary),
+        );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final narrow = constraints.maxWidth < 420;
+        final dateField = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _labelWithInfo('Failure Date',
+                required: true,
+                tooltip: 'When the failure happened. Cannot be in the future.'),
+            const SizedBox(height: 6),
+            InkWell(
+              key: const Key('complaint_failure_date_field'),
+              onTap: _pickFailureDate,
+              borderRadius: BorderRadius.circular(8),
+              child: InputDecorator(
+                decoration: box(_failureDateError),
+                child: Text(dateText,
+                    style: TextStyle(
+                        fontSize: 14, color: context.gssms.textPrimary)),
+              ),
+            ),
+          ],
+        );
+        final timeField = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _labelWithInfo('Failure Time',
+                required: true,
+                tooltip: 'The time the failure was observed.'),
+            const SizedBox(height: 6),
+            InkWell(
+              key: const Key('complaint_failure_time_field'),
+              onTap: _pickFailureTime,
+              borderRadius: BorderRadius.circular(8),
+              child: InputDecorator(
+                decoration:
+                    box(_failureTimeError).copyWith(suffixIcon: null),
+                child: Text(timeText,
+                    style: TextStyle(
+                        fontSize: 14, color: context.gssms.textPrimary)),
+              ),
+            ),
+          ],
+        );
+        if (narrow) {
+          return Column(
+            children: [
+              dateField,
+              const SizedBox(height: 12),
+              timeField,
+            ],
+          );
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: dateField),
+            const SizedBox(width: 12),
+            Expanded(child: timeField),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _complainantField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _labelWithInfo('Complainant Name',
+            required: true,
+            tooltip: 'Name of the person who reported this breakdown.'),
+        const SizedBox(height: 6),
+        TextFormField(
+          key: const Key('complaint_complainant_field'),
+          controller: _complainantController,
+          decoration: _webInput(hint: 'Who reported this?'),
+          validator: (val) {
+            if (val == null || val.trim().isEmpty) {
+              return 'Please enter the complainant name';
+            }
+            return null;
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _generalAssetField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _labelWithInfo('General / Non-Registered Asset (Optional)',
+            tooltip:
+                'Describe the affected item when there is no registered asset for it. Clears the Specific Asset selection above.'),
+        const SizedBox(height: 6),
+        TextFormField(
+          key: const Key('complaint_general_asset_field'),
+          controller: _generalAssetController,
+          decoration: _webInput(hint: 'e.g. Platform bench near Gate 2'),
+          onChanged: (v) {
+            if (v.trim().isNotEmpty && _selectedAssetId != null) {
+              setState(() => _selectedAssetId = null);
+            }
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _photosSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _labelWithInfo('Evidence Photos (Optional)',
+            tooltip:
+                'JPEG only, up to 5. Uploaded after the breakdown is reported; a failure warns but keeps the breakdown.'),
+        const SizedBox(height: 6),
+        if (_stagedPhotos.isNotEmpty)
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (var i = 0; i < _stagedPhotos.length; i++)
+                Chip(
+                  key: Key('complaint_staged_photo_$i'),
+                  label: Text(
+                    _stagedPhotos[i].path.split(Platform.pathSeparator).last,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  deleteIcon: const Icon(Icons.close, size: 16),
+                  onDeleted: () => setState(() => _stagedPhotos.removeAt(i)),
+                ),
+            ],
+          ),
+        if (_stagedPhotos.isNotEmpty) const SizedBox(height: 8),
+        OutlinedButton.icon(
+          key: const Key('complaint_add_photos_button'),
+          onPressed:
+              _stagedPhotos.length >= _maxPhotos ? null : _pickPhotos,
+          icon: const Icon(Icons.photo_camera_outlined, size: 16),
+          label: Text(
+              'Add Photos (${_stagedPhotos.length}/$_maxPhotos)',
+              style:
+                  const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
         ),
       ],
     );
@@ -719,10 +1035,12 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
             Padding(
               padding: const EdgeInsets.only(top: 8),
               child: Text(
-                'No registered assets found for this location. You can still log a generic complaint.',
+                'No registered assets found for this location. You can still report a generic breakdown.',
                 style: TextStyle(fontSize: 12, color: context.gssms.textSecondary),
               ),
             ),
+          const SizedBox(height: 12),
+          _generalAssetField(),
         ],
       ),
     );
@@ -770,7 +1088,7 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _labelWithInfo('Location Name',
-            tooltip: 'The specific site this complaint applies to.'),
+            tooltip: 'The specific site this breakdown applies to.'),
         const SizedBox(height: 6),
         DropdownButtonFormField<int>(
           key: const Key('complaint_location_dropdown'),
@@ -862,7 +1180,7 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
       children: [
         _labelWithInfo('Specific Asset (Optional)',
             tooltip:
-                'Link this complaint to one exact asset, or leave blank for a general/location-level issue.'),
+                'Link this breakdown to one exact asset, or leave blank for a general/location-level issue.'),
         const SizedBox(height: 6),
         DropdownButtonFormField<int>(
           key: const Key('complaint_asset_dropdown'),
@@ -904,7 +1222,14 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
           ],
           onChanged: _selectedLocationId == null
               ? null
-              : (id) => setState(() => _selectedAssetId = id),
+              : (id) => setState(() {
+                    _selectedAssetId = id;
+                    // Registered asset and general item are mutually
+                    // exclusive server-side — picking one clears the other.
+                    if (id != null && _generalAssetController.text.isNotEmpty) {
+                      _generalAssetController.clear();
+                    }
+                  }),
         ),
       ],
     );
@@ -960,7 +1285,7 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
                       color: _onBand, strokeWidth: 2))
               : const Icon(Icons.send_outlined,
                   size: 16),
-          label: Text(_isSubmitting ? 'Submitting...' : 'Submit Complaint',
+          label: Text(_isSubmitting ? 'Submitting...' : 'Submit Breakdown',
               style:
                   const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
         ),

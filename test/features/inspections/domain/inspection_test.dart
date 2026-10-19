@@ -35,7 +35,7 @@ void main() {
       expect(i.title, 'EB Bunk Monthly Check');
       expect(i.status, InspectionStatus.open);
       expect(i.stationName, 'Thalanallur');
-      expect(i.locationLabel, 'Thalanallur (Station)');
+      expect(i.locationLabel, 'Thalanallur - EB-01');
       expect(i.createdByName, 'Ravi Kumar');
       expect(i.createdByDesignation, 'SSE');
       expect(i.isConverted, isFalse);
@@ -73,6 +73,23 @@ void main() {
       expect(InspectionStatus.fromString('IN_PROGRESS'), InspectionStatus.unknown);
       expect(InspectionStatus.fromString('COMPLETED'), InspectionStatus.unknown);
       expect(InspectionStatus.fromString('CANCELLED'), InspectionStatus.unknown);
+    });
+
+    test('wo_assigned_to_name parses when present; absent or blank is null',
+        () {
+      Map<String, dynamic> payload(String? name) => {
+            ...json,
+            'is_converted': true,
+            'wo_id': 7,
+            'wo_status': 'ASSIGNED',
+            'wo_assigned_to_name': name,
+          };
+      expect(
+          Inspection.fromJson(payload('krishna')).woAssignedToName, 'krishna');
+      expect(Inspection.fromJson(json).woAssignedToName, isNull);
+      expect(Inspection.fromJson(payload(null)).woAssignedToName, isNull);
+      expect(Inspection.fromJson(payload('')).woAssignedToName, isNull);
+      expect(Inspection.fromJson(payload('  ')).woAssignedToName, isNull);
     });
 
     test('markConverted sets status and Job Work id', () {

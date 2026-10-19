@@ -1,0 +1,125 @@
+{
+  "id": "breakdown_deficiency",
+  "kind": "complaint",
+  "generatedAt": "2026-10-03T04:00:00Z",
+  "ticket": "JW-2026-000104",
+  "workOrder": {
+    "id": 104,
+    "ticket_number": "JW-2026-000104",
+    "station_name": "Chengalpattu",
+    "depot_name": "CGL Depot",
+    "assigned_to_name": "V. Murugan",
+    "title": "Deficiency Rectification - Circuit Breaker",
+    "description": "Fix air pressure leakage in pneumatic drive",
+    "asset_name": "CB-CGL-01",
+    "execution_mode": "COMPLAINT",
+    "status": "COMPLETED",
+    "original_deficiency_details": {
+      "asset_unique_id": "CB-CGL-01",
+      "asset_category": "Circuit Breakers",
+      "inspection_point": "Pneumatic pressure check",
+      "severity": "High",
+      "status_label": "Pressure Low",
+      "action_label": "Replace seal gasket",
+      "finding": "Air leaking from manifold connector during charging cycle."
+    }
+  },
+  "payload": {
+    "id": 604,
+    "work_order": 104,
+    "organization": {
+      "railway_name": "Southern Railway",
+      "division_name": "Chennai Division",
+      "depot_name": "CGL Depot"
+    },
+    "initial_findings": "Found cracked nitrile O-ring on air manifold inlet pipe.",
+    "action_taken": "Depressurized cylinder, removed worn gasket, installed new seal kit and leak-tested at 15 bar.",
+    "final_remarks": "Operating smoothly without pressure drop over 2 hours.",
+    "parameters": [
+      {
+        "parameter_name": "Initial Pressure",
+        "recorded_value": "8.5",
+        "unit": "bar"
+      },
+      {
+        "parameter_name": "Holding Pressure",
+        "recorded_value": "15.0",
+        "unit": "bar"
+      },
+      {
+        "parameter_name": "Charging Time",
+        "recorded_value": "42",
+        "unit": "sec"
+      }
+    ],
+    "submission_history": [
+      {
+        "submission_no": 1,
+        "timestamp": "2026-09-29T11:00:00Z",
+        "updated_by_name": "V. Murugan",
+        "initial_findings": "Initial draft findings.",
+        "action_taken": "Work in progress.",
+        "final_remarks": "",
+        "photos": []
+      },
+      {
+        "submission_no": 2,
+        "timestamp": "2026-09-29T16:45:00Z",
+        "updated_by_name": "V. Murugan",
+        "initial_findings": "Found cracked nitrile O-ring on air manifold inlet pipe.",
+        "action_taken": "Depressurized cylinder, removed worn gasket, installed new seal kit and leak-tested at 15 bar.",
+        "final_remarks": "Operating smoothly without pressure drop over 2 hours.",
+        "parameters": [
+          {
+            "parameter_name": "Initial Pressure",
+            "recorded_value": "8.5",
+            "unit": "bar"
+          },
+          {
+            "parameter_name": "Holding Pressure",
+            "recorded_value": "15.0",
+            "unit": "bar"
+          },
+          {
+            "parameter_name": "Charging Time",
+            "recorded_value": "42",
+            "unit": "sec"
+          }
+        ],
+        "photos": [
+          {
+            "image": "/parity-images/before_1.jpg",
+            "kind": "BEFORE",
+            "photo_type": "BEFORE",
+            "caption": "Leaking manifold connector"
+          },
+          {
+            "image": "/parity-images/portrait_1.jpg",
+            "kind": "BEFORE",
+            "photo_type": "BEFORE",
+            "caption": "Cracked O-ring"
+          },
+          {
+            "image": "/parity-images/after_1.jpg",
+            "kind": "AFTER",
+            "photo_type": "AFTER",
+            "caption": "New gasket assembly installed"
+          },
+          {
+            "image": "/parity-images/evidence_1.jpg",
+            "kind": "AFTER",
+            "photo_type": "AFTER",
+            "caption": "Pressure gauge at 15 bar"
+          },
+          {
+            "image": "/parity-images/wide_1.jpg",
+            "kind": "AFTER",
+            "photo_type": "AFTER",
+            "caption": "Overall completed cabinet"
+          }
+        ]
+      }
+    ],
+    "verification": null
+  }
+}

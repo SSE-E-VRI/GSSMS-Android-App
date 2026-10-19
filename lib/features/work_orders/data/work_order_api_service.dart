@@ -4,8 +4,12 @@ import 'package:dio/dio.dart';
 import 'package:gssms_mobile/core/network/paginated_fetch.dart';
 import 'package:gssms_mobile/core/utils/json_parsing.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/batch_convert_result.dart';
+import 'package:gssms_mobile/features/work_orders/domain/models/deficiency_severity_option.dart';
+import 'package:gssms_mobile/features/work_orders/domain/models/group_inclusion_result.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/maintenance_master.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/maintenance_record.dart';
+import 'package:gssms_mobile/features/work_orders/domain/models/pm_approval_request.dart';
+import 'package:gssms_mobile/features/work_orders/domain/models/supervisor_mandate.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/technician.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/verification_workspace.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/work_order.dart';
@@ -28,6 +32,7 @@ class WorkOrderApiService {
   static const String _records = '/api/v1/maintenance/records';
   static const String _staffWorkOrders = '/api/v1/staff-workorders';
   static const String _masters = '/api/v1/maintenance/masters';
+  static const String _schedules = '/api/v1/maintenance/schedules';
 
   Map<String, dynamic>? _asObject(dynamic data) {
     if (data is Map<String, dynamic>) return data;
@@ -47,15 +52,30 @@ class WorkOrderApiService {
   ///
   /// [assignedToMe] uses the staff-scoped endpoint, which returns only the
   /// technician's own work — the mobile equivalent of the web "My Work Orders".
+  /// [status] accepts a single value or a comma-separated list (backend
+  /// `status__in`). [completionFrom]/[completionTo] filter the
+  /// `report_completed_at` range (web Register query); [updatedFrom]/
+  /// [updatedTo] filter `updated_at`. Infra id params mirror
+  /// `filter_legacy_infrastructure_params` (`station_id`, `lc_gate_id`,
+  /// `service_building_id`, `staff_quarter_id`) plus the `infra_type`
+  /// fallback web sends.
   Future<List<WorkOrder>> getWorkOrders({
     String? status,
     String? type,
     String? dateFrom,
     String? dateTo,
+    String? updatedFrom,
+    String? updatedTo,
+    String? completionFrom,
+    String? completionTo,
     int? zoneId,
     int? divisionId,
     int? depotId,
     int? stationId,
+    int? lcGateId,
+    int? serviceBuildingId,
+    int? staffQuarterId,
+    String? infraType,
     bool assignedToMe = false,
   }) async {
     final queryParams = <String, dynamic>{};
@@ -73,6 +93,18 @@ class WorkOrderApiService {
       if (dateFrom != null && dateFrom.isNotEmpty) queryParams['date_from'] = dateFrom;
       if (dateTo != null && dateTo.isNotEmpty) queryParams['date_to'] = dateTo;
     }
+    if (updatedFrom != null && updatedFrom.isNotEmpty) {
+      queryParams['updated_from'] = updatedFrom;
+    }
+    if (updatedTo != null && updatedTo.isNotEmpty) {
+      queryParams['updated_to'] = updatedTo;
+    }
+    if (completionFrom != null && completionFrom.isNotEmpty) {
+      queryParams['completion_from'] = completionFrom;
+    }
+    if (completionTo != null && completionTo.isNotEmpty) {
+      queryParams['completion_to'] = completionTo;
+    }
     // depot_id/division_id/zone_id are mutually exclusive server-side (most
     // specific wins — WorkOrderViewSet.get_queryset), so sending all three
     // that are set is harmless; the server picks the narrowest.
@@ -80,6 +112,16 @@ class WorkOrderApiService {
     if (divisionId != null) queryParams['division_id'] = divisionId;
     if (depotId != null) queryParams['depot_id'] = depotId;
     if (stationId != null) queryParams['station_id'] = stationId;
+    if (lcGateId != null) queryParams['lc_gate_id'] = lcGateId;
+    if (serviceBuildingId != null) {
+      queryParams['service_building_id'] = serviceBuildingId;
+    }
+    if (staffQuarterId != null) {
+      queryParams['staff_quarter_id'] = staffQuarterId;
+    }
+    if (infraType != null && infraType.isNotEmpty) {
+      queryParams['infra_type'] = infraType;
+    }
 
     // Walk `next` links like the other CMMS lists so a paginated register is
     // not silently truncated to page 1. Single-shot envelopes still work:
@@ -132,6 +174,28 @@ class WorkOrderApiService {
     final response = await _dio.post(
       '$_workOrders/create_from_inspections/',
       data: {'ids': ids},
+    );
+    return BatchConvertResult.fromJson(_asObject(response.data) ?? const {});
+  }
+
+  /// Creates deficiency rectification Job Work(s) — POST
+  /// Creates deficiency rectification Job Work(s) — POST
+  /// /work-orders/create_rectification/ {deficiency_ids, one_per_deficiency}.
+  /// Grouped one Job Work per location by default; one per deficiency when
+  /// [onePerDeficiency] is true. All-or-nothing, Depot Incharge/User only.
+  /// Response shape matches the other batch endpoints
+  /// (`{work_order_ids, work_order_id, count, results, message}`), so
+  /// [BatchConvertResult] fits.
+  Future<BatchConvertResult> createRectification(
+    List<int> deficiencyIds, {
+    bool onePerDeficiency = false,
+  }) async {
+    final response = await _dio.post(
+      '$_workOrders/create_rectification/',
+      data: {
+        'deficiency_ids': deficiencyIds,
+        'one_per_deficiency': onePerDeficiency,
+      },
     );
     return BatchConvertResult.fromJson(_asObject(response.data) ?? const {});
   }
@@ -331,6 +395,29 @@ class WorkOrderApiService {
     return MaintenanceRecord.fromJson(data);
   }
 
+  /// Raw maintenance-record rows for report resolution — `GET
+  /// /api/v1/maintenance/records/` with `?work_order=<id>` and/or
+  /// `?schedule=<id>` (same filters web's ReportsView uses to resolve a Job
+  /// Work's record, including the verification context on work_order
+  /// queries). Returns decoded maps (not [MaintenanceRecord]) because
+  /// report shaping consumes the raw nested lines/options.
+  Future<List<Map<String, dynamic>>> fetchMaintenanceRecords({
+    int? workOrderId,
+    int? scheduleId,
+  }) async {
+    final query = <String, dynamic>{};
+    if (workOrderId != null) query['work_order'] = workOrderId;
+    if (scheduleId != null) query['schedule'] = scheduleId;
+    final response = await _dio.get(
+      '$_records/',
+      queryParameters: query.isEmpty ? null : query,
+    );
+    return _asList(response.data)
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+  }
+
   Future<void> submitLine(int recordId, Map<String, dynamic> lineData, {String? idempotencyKey}) async {
     await _dio.post(
       '$_records/$recordId/submit_line/',
@@ -471,5 +558,211 @@ class WorkOrderApiService {
     await _dio.delete(
       '$_records/$recordId/lines/$lineId/attachments/$attachmentId/',
     );
+  }
+
+  Never _badPayload(Response<dynamic> response, String what) {
+    throw DioException(
+      requestOptions: response.requestOptions,
+      response: response,
+      type: DioExceptionType.badResponse,
+      message: 'Unexpected $what payload',
+    );
+  }
+
+  /// Reassigns the technician of an ASSIGNED Job Work (`reassign/`).
+  Future<WorkOrder> reassignWorkOrder(
+    int workOrderId, {
+    required int technicianId,
+    required String reason,
+  }) async {
+    final response = await _dio.post(
+      '$_workOrders/$workOrderId/reassign/',
+      data: {'assigned_to': technicianId, 'reason': reason},
+    );
+    final data = _asObject(response.data);
+    if (data == null || data['id'] == null) {
+      _badPayload(response, 'reassign');
+    }
+    return WorkOrder.fromJson(data);
+  }
+
+  /// Pre-START checklist preparation / preview (`prepare-checklist/`).
+  Future<PrepareChecklistResult> prepareChecklist(int workOrderId) async {
+    final response = await _dio.post(
+      '$_workOrders/$workOrderId/prepare-checklist/',
+      data: const {},
+    );
+    final data = _asObject(response.data);
+    if (data == null) _badPayload(response, 'prepare-checklist');
+    return PrepareChecklistResult.fromJson(data);
+  }
+
+  Future<List<SupervisorMandate>> getSupervisorMandates(int workOrderId) async {
+    final response =
+        await _dio.get('$_workOrders/$workOrderId/supervisor-mandate/');
+    return SupervisorMandate.listFromJson(response.data);
+  }
+
+  /// Upserts the mandate for (category, name). [action] is `INCLUDE` or
+  /// `EXCLUDE`.
+  Future<SupervisorMandate> setSupervisorMandate(
+    int workOrderId, {
+    int? assetCategoryId,
+    required String assetName,
+    required String action,
+    String reason = '',
+  }) async {
+    final response = await _dio.post(
+      '$_workOrders/$workOrderId/supervisor-mandate/',
+      data: {
+        'asset_category': assetCategoryId,
+        'asset_name': assetName,
+        'action': action,
+        'reason': reason,
+      },
+    );
+    final data = _asObject(response.data);
+    if (data == null) _badPayload(response, 'supervisor-mandate');
+    return SupervisorMandate.fromJson(data);
+  }
+
+  /// Asset groups of a checklist master for the pre-START preview.
+  Future<List<ChecklistGroupPreview>> getMasterChecklistGroups(
+    int masterId,
+  ) async {
+    final response = await _dio.get('$_masters/$masterId/workspace/');
+    final data = _asObject(response.data);
+    if (data == null) _badPayload(response, 'master workspace');
+    final groups = data['groups'];
+    if (groups is! List) return const [];
+    return groups
+        .whereType<Map>()
+        .map((e) =>
+            ChecklistGroupPreview.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+
+  /// Checks an asset group out / un-checks it (`group-inclusion/`). [reason]
+  /// is omitted when null or empty.
+  Future<GroupInclusionResult> setGroupInclusion(
+    int recordId, {
+    int? assetCategoryId,
+    required String assetName,
+    required bool included,
+    String? reason,
+  }) async {
+    final response = await _dio.post(
+      '$_records/$recordId/group-inclusion/',
+      data: {
+        'asset_category': assetCategoryId,
+        'asset_name': assetName,
+        'included': included,
+        if (reason != null && reason.trim().isNotEmpty) 'reason': reason.trim(),
+      },
+    );
+    final data = _asObject(response.data);
+    if (data == null) _badPayload(response, 'group-inclusion');
+    return GroupInclusionResult.fromJson(data);
+  }
+
+  Future<List<DeficiencySeverityOption>> getDeficiencySeverities() async {
+    final response = await _dio.get(
+      '/api/v1/deficiency-severities/',
+      queryParameters: const {'is_active': 'true'},
+    );
+    return DeficiencySeverityOption.listFromJson(response.data);
+  }
+
+  /// Changes a deficiency's severity. [expectedVersion] is the row's
+  /// `deficiency_version`; a stale version yields 409.
+  Future<DeficiencySeverityUpdate> updateDeficiencySeverity(
+    int deficiencyId, {
+    required int severityId,
+    required int expectedVersion,
+  }) async {
+    final response = await _dio.patch(
+      '/api/v1/deficiencies/$deficiencyId/',
+      data: {'severity': severityId, 'expected_version': expectedVersion},
+    );
+    final data = _asObject(response.data);
+    if (data == null) _badPayload(response, 'deficiency');
+    return DeficiencySeverityUpdate.fromJson(data);
+  }
+
+  Future<RemarkFlagResult> flagRemarkDeficiency(
+    int recordId, {
+    required int remarkIndex,
+    String? assetUniqueId,
+    int? severityId,
+  }) async {
+    final response = await _dio.post(
+      '$_records/$recordId/flag-remark-deficiency/',
+      data: {
+        'remark_index': remarkIndex,
+        if (assetUniqueId != null) 'asset_unique_id': assetUniqueId,
+        if (severityId != null) 'severity_id': severityId,
+      },
+    );
+    final data = _asObject(response.data);
+    if (data == null) _badPayload(response, 'flag-remark-deficiency');
+    return RemarkFlagResult.fromJson(data);
+  }
+
+  Future<void> unflagRemarkDeficiency(
+    int recordId, {
+    required int remarkIndex,
+  }) async {
+    await _dio.post(
+      '$_records/$recordId/unflag-remark-deficiency/',
+      data: {'remark_index': remarkIndex},
+    );
+  }
+
+  /// Alternative checklist templates for a schedule
+  /// (`conversion-context` -> `template.alternatives`).
+  Future<List<ScheduleAlternative>> getScheduleAlternatives(
+    int scheduleId,
+  ) async {
+    final response =
+        await _dio.get('$_schedules/$scheduleId/conversion-context/');
+    final data = _asObject(response.data);
+    final template = data?['template'];
+    final alternatives = template is Map ? template['alternatives'] : null;
+    if (alternatives is! List) return const [];
+    return alternatives
+        .whereType<Map>()
+        .map((e) => ScheduleAlternative.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+
+  /// Raises a PM skip approval request. [reasonCode] is a key of
+  /// [kSkipReasonChoices].
+  Future<ApprovalRequestSummary> requestPmSkip(
+    int scheduleId, {
+    required String reasonCode,
+    required String remarks,
+  }) async {
+    final response = await _dio.post(
+      '$_schedules/$scheduleId/skip-request/',
+      data: {'reason_code': reasonCode, 'remarks': remarks},
+    );
+    final data = _asObject(response.data);
+    if (data == null) _badPayload(response, 'skip-request');
+    return ApprovalRequestSummary.fromJson(data);
+  }
+
+  /// Raises a checklist-change approval request for a schedule occurrence.
+  Future<ApprovalRequestSummary> requestChecklistChange(
+    int scheduleId, {
+    required int maintenanceMasterId,
+    required String remarks,
+  }) async {
+    final response = await _dio.post(
+      '$_schedules/$scheduleId/template-change-request/',
+      data: {'maintenance_master_id': maintenanceMasterId, 'remarks': remarks},
+    );
+    final data = _asObject(response.data);
+    if (data == null) _badPayload(response, 'template-change-request');
+    return ApprovalRequestSummary.fromJson(data);
   }
 }

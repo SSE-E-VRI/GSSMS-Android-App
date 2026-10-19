@@ -1,0 +1,40 @@
+{
+  "id": "breakdown_jobwork",
+  "kind": "complaint",
+  "generatedAt": "2026-10-03T04:00:00Z",
+  "ticket": "JW-2026-000106",
+  "workOrder": {
+    "id": 106,
+    "ticket_number": "JW-2026-000106",
+    "station_name": "Tambaram",
+    "depot_name": "TBM Depot",
+    "assigned_to_name": "M. Das",
+    "title": "General Yard Cable Trench Inspection & Repair",
+    "description": "Concrete slab cover displaced by vehicle movement",
+    "asset_name": null,
+    "execution_mode": "COMPLAINT",
+    "status": "COMPLETED"
+  },
+  "payload": {
+    "id": 606,
+    "work_order": 106,
+    "organization": null,
+    "initial_findings": "Two trench slabs damaged; signal cable exposed but unhurt.",
+    "action_taken": "Fabricated and laid two heavy-duty RCC cover slabs.",
+    "final_remarks": "Trench sealed securely.",
+    "parameters": [],
+    "photos": [],
+    "submission_history": [
+      {
+        "submission_no": 1,
+        "timestamp": "2026-09-27T12:00:00Z",
+        "updated_by_name": "M. Das",
+        "initial_findings": "Two trench slabs damaged; signal cable exposed but unhurt.",
+        "action_taken": "Fabricated and laid two heavy-duty RCC cover slabs.",
+        "final_remarks": "Trench sealed securely.",
+        "photos": []
+      }
+    ],
+    "verification": null
+  }
+}

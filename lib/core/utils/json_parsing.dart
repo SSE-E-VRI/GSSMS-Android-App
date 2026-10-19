@@ -24,6 +24,22 @@ int? asJsonInt(dynamic value) {
   return int.tryParse(value.toString());
 }
 
+/// Defensively coerces a decoded JSON value to a double.
+///
+/// Handles `int`, `double`, and numeric strings (`"12.5"`) without throwing.
+/// Returns null for empty/invalid input.
+double? asJsonDouble(dynamic value) {
+  if (value == null) return null;
+  if (value is double) return value;
+  if (value is num) return value.toDouble();
+  if (value is String) {
+    final text = value.trim();
+    if (text.isEmpty) return null;
+    return double.tryParse(text);
+  }
+  return null;
+}
+
 /// Parses an API date/datetime into **device-local** time.
 ///
 /// The backend runs with `USE_TZ = True` and serializes datetimes with an
@@ -54,4 +70,15 @@ bool? asJsonBool(dynamic value) {
     if (lower == 'false' || lower == '0') return false;
   }
   return null;
+}
+
+/// Trimmed string, or null when the value is absent **or blank**.
+///
+/// Several serializer `*_name` fields (e.g. `wo_assigned_to_name`,
+/// `active_remedial_work_order.assigned_to_name`) send `''` for "nobody"
+/// instead of omitting the key — callers treat null as "no assignee", so a
+/// blank must not surface as an empty name.
+String? asJsonNonBlankString(dynamic value) {
+  final text = asJsonString(value)?.trim() ?? '';
+  return text.isEmpty ? null : text;
 }

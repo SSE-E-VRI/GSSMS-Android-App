@@ -72,6 +72,7 @@ class AppTheme {
   static const Color moduleComplaints = accentOrange;
   static const Color moduleInspections = Color(0xFF0F766E);
   static const Color moduleAssets = Color(0xFF1D4ED8);
+  static const Color moduleDeficiencies = Color(0xFFBE123C);
   static const Color moduleReports = Color(0xFFB45309);
   static const Color moduleEnergy = Color(0xFF3730A3);
 
@@ -212,7 +213,7 @@ class AppTheme {
         centerTitle: false,
         titleTextStyle: themedText.titleLarge?.copyWith(color: Colors.white),
       ),
-      tabBarTheme: TabBarTheme(
+      tabBarTheme: TabBarThemeData(
         labelColor: Colors.white,
         unselectedLabelColor: Colors.white70,
         indicatorColor: Colors.white,
@@ -221,7 +222,7 @@ class AppTheme {
         unselectedLabelStyle:
             themedText.labelMedium?.copyWith(fontWeight: FontWeight.w500),
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: cardColor,
         surfaceTintColor: Colors.transparent,
         elevation: brightness == Brightness.light ? 1 : 0,
@@ -305,7 +306,7 @@ class AppTheme {
           borderRadius: BorderRadius.circular(GssmsRadius.r8),
         ),
       ),
-      dialogTheme: DialogTheme(
+      dialogTheme: DialogThemeData(
         backgroundColor: cardColor,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(

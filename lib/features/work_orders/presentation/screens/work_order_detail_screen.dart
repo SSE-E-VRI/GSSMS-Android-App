@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:gssms_mobile/core/network/api_error.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
 import 'package:gssms_mobile/core/widgets/empty_state_view.dart';
+import 'package:gssms_mobile/core/widgets/feedback.dart';
 import 'package:gssms_mobile/core/widgets/section_card.dart';
 import 'package:gssms_mobile/core/widgets/skeleton_list.dart';
 import 'package:gssms_mobile/core/widgets/status_chip.dart';
@@ -14,16 +14,22 @@ import 'package:gssms_mobile/features/auth/presentation/controllers/auth_control
 import 'package:gssms_mobile/features/auth/presentation/widgets/permission_denied_view.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/technician.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/work_order.dart';
+import 'package:gssms_mobile/features/work_orders/domain/models/mode_execution.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/work_order_action.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/work_order_audit.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_order_controllers.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_order_state.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/screens/checklist_screen.dart';
+import 'package:gssms_mobile/features/work_orders/presentation/screens/complaint_execution_screen.dart';
+import 'package:gssms_mobile/features/work_orders/presentation/screens/inspection_execution_screen.dart';
+import 'package:gssms_mobile/features/work_orders/presentation/screens/job_work_report_screen.dart';
+import 'package:gssms_mobile/features/work_orders/presentation/screens/rectification_execution_screen.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/screens/verification_workspace_screen.dart';
+import 'package:gssms_mobile/features/work_orders/presentation/widgets/pm_approval_request_sheet.dart';
+import 'package:gssms_mobile/features/work_orders/presentation/widgets/pre_start_mandate_panel.dart';
+import 'package:gssms_mobile/features/work_orders/presentation/widgets/reassign_technician_sheet.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/work_order_status_style.dart';
-import 'package:gssms_mobile/features/work_orders/services/work_order_pdf_service.dart';
 import 'package:intl/intl.dart';
-import 'package:printing/printing.dart';
 
 class WorkOrderDetailScreen extends ConsumerStatefulWidget {
   const WorkOrderDetailScreen({super.key, required this.workOrderId});
@@ -68,6 +74,7 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
     }
 
     ref.listen(workOrderDetailControllerProvider(widget.workOrderId), (prev, next) {
+      if (!context.mounted) return;
       if (next is WorkOrderDetailLoaded && next.errorMessage != null) {
         final tokens = context.gssms;
         ScaffoldMessenger.of(context).showSnackBar(
@@ -86,49 +93,77 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
       appBar: AppBar(
         title: const Text('Job Work'),
         actions: [
-          // Web per-row PDF action — share/print the Job Work sheet.
-          if (canExportPdf(userSession))
-            IconButton(
-              key: const Key('work_order_pdf_button'),
-              icon: const Icon(Icons.picture_as_pdf_outlined),
-              tooltip: 'Export PDF',
-              onPressed: detailState is WorkOrderDetailLoaded
-                  ? () => _exportPdf(detailState)
-                  : null,
-            ),
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Refresh job work details',
             onPressed: _controller.loadDetail,
           ),
+          if (detailState is WorkOrderDetailLoaded)
+            ..._overflowMenu(detailState.workOrder, userSession),
         ],
       ),
-      body: _buildBody(detailState),
+      body: _buildBody(detailState, userSession),
       bottomNavigationBar: _buildBottomActions(detailState, userSession),
     );
   }
 
-  Future<void> _exportPdf(WorkOrderDetailLoaded loaded) async {
-    try {
-      final doc = await WorkOrderPdfService.build(
-        loaded.workOrder,
-        audit: loaded.audit,
-      );
-      await Printing.layoutPdf(
-        onLayout: (_) async => doc.save(),
-        name:
-            'JobWork_${loaded.workOrder.displayReference.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_')}.pdf',
-      );
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not export the PDF. ${userFacingError(e)}')),
-        );
-      }
+  /// Overflow menu for the online-only management actions. Empty (no button)
+  /// when the viewer can do none of them on this Job Work.
+  List<Widget> _overflowMenu(WorkOrder wo, UserSession? session) {
+    final canReassign = ReassignTechnicianSheet.canShow(wo, session);
+    final canRequest = PmApprovalRequestSheet.canShow(wo, session);
+    if (!canReassign && !canRequest) return const [];
+    return [
+      PopupMenuButton<String>(
+        key: const Key('work_order_overflow_menu'),
+        tooltip: 'More actions',
+        onSelected: (value) => _onMenuSelected(value, wo),
+        itemBuilder: (_) => [
+          if (canReassign)
+            const PopupMenuItem<String>(
+              value: 'reassign',
+              child: Text('Reassign technician'),
+            ),
+          if (canRequest) ...const [
+            PopupMenuItem<String>(
+              value: 'skip',
+              child: Text('Request PM skip'),
+            ),
+            PopupMenuItem<String>(
+              value: 'change_checklist',
+              child: Text('Request checklist change'),
+            ),
+          ],
+        ],
+      ),
+    ];
+  }
+
+  Future<void> _onMenuSelected(String value, WorkOrder wo) async {
+    final bool? done;
+    final String message;
+    switch (value) {
+      case 'reassign':
+        done = await showReassignTechnicianSheet(context, ref, wo);
+        message = 'Job Work reassigned.';
+      case 'skip':
+        done = await showPmApprovalRequestSheet(
+            context, ref, wo, PmApprovalRequestMode.skip);
+        message = 'Request submitted for Division Admin approval.';
+      case 'change_checklist':
+        done = await showPmApprovalRequestSheet(
+            context, ref, wo, PmApprovalRequestMode.checklistChange);
+        message = 'Request submitted for Division Admin approval.';
+      default:
+        return;
+    }
+    if (done == true && mounted) {
+      showGssmsSnackBar(context, message, tone: GssmsTone.success);
+      unawaited(_controller.loadDetail());
     }
   }
 
-  Widget _buildBody(WorkOrderDetailState state) {
+  Widget _buildBody(WorkOrderDetailState state, UserSession? session) {
     if (state is WorkOrderDetailLoading) {
       return const SingleChildScrollView(
         padding: EdgeInsets.only(top: GssmsSpacing.s8),
@@ -161,6 +196,10 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
             _buildAssetSection(wo),
             const SizedBox(height: GssmsSpacing.s12),
             _buildScheduleSection(wo),
+            if (PreStartMandatePanel.isVisibleFor(wo, session)) ...[
+              const SizedBox(height: GssmsSpacing.s12),
+              PreStartMandatePanel(workOrder: wo),
+            ],
             if (wo.description != null && wo.description!.isNotEmpty) ...[
               const SizedBox(height: GssmsSpacing.s12),
               SectionCard(
@@ -209,13 +248,25 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
         ),
         const SizedBox(height: GssmsSpacing.s8),
         Text(wo.displayTitle, style: textTheme.titleLarge),
+        // S-V4: the checklist version actually executed (frozen server-side
+        // at creation), not the template's current version. Shown only when
+        // the server sent one — legacy rows render exactly as before.
+        if (wo.maintenanceMasterVersionSnapshot != null &&
+            wo.maintenanceMasterVersionSnapshot!.trim().isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: GssmsSpacing.s4),
+            child: Text(
+              'Checklist v${wo.maintenanceMasterVersionSnapshot!.trim()} · as executed',
+              style: textTheme.bodySmall,
+            ),
+          ),
         const SizedBox(height: GssmsSpacing.s12),
         Wrap(
           spacing: GssmsSpacing.s8,
           runSpacing: GssmsSpacing.s8,
           children: [
             WorkOrderPriorityChip(priority: wo.priority),
-            StatusChip(label: wo.type.displayName, icon: Icons.category_outlined),
+            StatusChip(label: wo.displayTypeLabel, icon: Icons.category_outlined),
             if (wo.isSlaAtRisk)
               StatusChip(
                 label: 'SLA ${wo.slaStatus!.replaceAll('_', ' ').toLowerCase()}',
@@ -318,12 +369,17 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
   }
 
   /// Bottom action bar: server `allowed` transitions, plus Start Execution /
-  /// Open Checklist only when `maintenance.edit` and the matching allowed
-  /// action is present. Status alone never shows a mutating control.
+  /// mode execution entry only when `maintenance.edit` and the matching
+  /// allowed action is present. Status alone never shows a mutating control.
+  /// The execution form is routed by [executionRouteFor]: checklist rows
+  /// open the checklist record screen, while COMPLAINT / INSPECTION /
+  /// RECTIFICATION modes open their dedicated execution forms.
   Widget? _buildBottomActions(WorkOrderDetailState state, UserSession? session) {
     if (state is! WorkOrderDetailLoaded) return null;
     final wo = state.workOrder;
-    final canEdit = sessionAllows(session, 'maintenance.edit');
+    // Admin/HQ-only sessions are read-only on mobile (SSOT §5.1) even though
+    // the server's allowed-actions payload lists ADMIN-tier transitions.
+    final canEdit = canOperateJobWorksOnMobile(session);
     final canChecklist = canWriteChecklist(session);
     final allowed = state.actions;
     final busy = state.isTransitioning;
@@ -334,6 +390,19 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
     final canStart = canEdit &&
         needsExecutionStart &&
         (allowed?.allowsTarget('IN_PROGRESS') ?? false);
+
+    final route = executionRouteFor(wo);
+    final executionLabel = switch (route) {
+      ExecutionRoute.complaint => 'Open Breakdown Execution',
+      ExecutionRoute.inspection => 'Open Inspection Execution',
+      ExecutionRoute.rectification => 'Open Rectification',
+      ExecutionRoute.checklist => 'Open Checklist',
+    };
+    // Checklist resume keeps its writer-role gate; mode forms are gated by
+    // the server (assigned technician / depot roles) with maintenance.edit
+    // as the client-side floor.
+    final canResume =
+        route == ExecutionRoute.checklist ? canChecklist : canEdit;
 
     Widget? primary;
     if (canStart) {
@@ -349,28 +418,15 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
         label: Text(busy ? (state.actionMessage ?? 'Working…') : 'Start Execution'),
         onPressed: busy ? null : _startExecution,
       );
-    } else if (canChecklist &&
+    } else if (canResume &&
         wo.status == WorkOrderStatus.inProgress &&
         ((allowed?.allowsTarget('TECH_COMPLETED') ?? false) ||
             (allowed?.allowsTarget('IN_PROGRESS') ?? false))) {
       primary = FilledButton.icon(
         key: const Key('action_open_checklist'),
         icon: const Icon(Icons.checklist),
-        label: const Text('Open Checklist'),
-        onPressed: () {
-          final recordId = wo.linkedRecordId;
-          if (recordId == null) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('No maintenance record is linked to this job work yet.'),
-              ),
-            );
-            return;
-          }
-          unawaited(Navigator.of(context).push(
-            MaterialPageRoute(builder: (_) => ChecklistScreen(recordId: recordId)),
-          ));
-        },
+        label: Text(executionLabel),
+        onPressed: () => _openExecution(wo),
       );
     }
 
@@ -383,10 +439,16 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
             // maintenance record); a second raw "Start" button would offer a
             // path that skips the record.
             .where((a) => !(canStart && a.targetStatus.toUpperCase() == 'IN_PROGRESS'))
+            // Completion must only happen through the Sign & Submit of the
+            // checklist screen / execution forms (web parity): a raw "Tech
+            // Completed" button here would let a technician complete the Job
+            // Work with only remarks, bypassing the checklist, photo and
+            // signature validation the submit endpoints enforce.
+            .where((a) => a.targetStatus.toUpperCase() != 'TECH_COMPLETED')
             .toList()
         : const <WorkOrderAction>[];
 
-    final secondary = [
+    final secondary = <Widget>[
       for (final action in serverActions)
         _ServerActionButton(
           action: action,
@@ -395,6 +457,30 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
           onPressed: busy ? null : () => _onAllowedAction(action),
         ),
     ];
+
+    // Technician report view (online-only). Independent of Export PDF.
+    final canReport = JobWorkReportScreen.canShow(wo, session);
+    if (canReport) {
+      final reportOnly = primary == null && secondary.isEmpty;
+      const reportLabel = Text('View Report');
+      void openReport() => Navigator.of(context).push(MaterialPageRoute<void>(
+          builder: (_) => JobWorkReportScreen(workOrder: wo)));
+      final reportButton = reportOnly
+          ? FilledButton.icon(
+              key: const Key('action_view_report'),
+              icon: const Icon(Icons.description_outlined),
+              label: reportLabel,
+              onPressed: openReport,
+            )
+          : OutlinedButton.icon(
+              key: const Key('action_view_report'),
+              icon: const Icon(Icons.description_outlined),
+              label: reportLabel,
+              onPressed: openReport,
+            );
+      if (reportOnly) return StickyActionBar(child: reportButton);
+      secondary.add(reportButton);
+    }
 
     if (primary == null && secondary.isEmpty) return null;
     return StickyActionBar(child: primary, children: secondary);
@@ -411,20 +497,71 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
   Future<void> _startExecution() async {
     final recordId = await _controller.startExecution();
     if (!mounted) return;
+    final current = ref.read(workOrderDetailControllerProvider(widget.workOrderId));
+    final wo = current is WorkOrderDetailLoaded ? current.workOrder : null;
     if (recordId != null) {
-      unawaited(Navigator.of(context).push(
-        MaterialPageRoute(builder: (_) => ChecklistScreen(recordId: recordId)),
-      ));
+      _openExecution(wo, recordId: recordId);
       return;
     }
     // Offline-queued (not a hard failure) leaves an informational message on
     // the reloaded WorkOrderDetailLoaded state instead of a WorkOrderDetailError.
-    final current = ref.read(workOrderDetailControllerProvider(widget.workOrderId));
     if (current is WorkOrderDetailLoaded && current.actionMessage != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(current.actionMessage!)),
       );
     }
+  }
+
+  /// Opens the execution UI matching the Job Work's server-owned mode.
+  /// Checklist rows need their record id; mode forms load by work order id
+  /// (and require connectivity — an offline-queued start can't open them).
+  void _openExecution(WorkOrder? wo, {int? recordId}) {
+    final route = wo == null ? ExecutionRoute.checklist : executionRouteFor(wo);
+    if (route == ExecutionRoute.checklist) {
+      final id = recordId ?? wo?.linkedRecordId;
+      if (id == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('No maintenance record is linked to this job work yet.'),
+          ),
+        );
+        return;
+      }
+      unawaited(Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => ChecklistScreen(recordId: id)),
+      ).then((_) => _reloadDetail()));
+      return;
+    }
+    if (wo == null) return;
+    final screen = switch (route) {
+      ExecutionRoute.complaint => ComplaintExecutionScreen(
+          workOrderId: wo.id,
+          ticketNumber: wo.displayReference,
+          title: wo.displayTitle,
+        ),
+      ExecutionRoute.inspection => InspectionExecutionScreen(
+          workOrderId: wo.id,
+          ticketNumber: wo.displayReference,
+          title: wo.displayTitle,
+        ),
+      ExecutionRoute.rectification => RectificationExecutionScreen(
+          workOrderId: wo.id,
+          ticketNumber: wo.displayReference,
+          title: wo.displayTitle,
+        ),
+      ExecutionRoute.checklist => null,
+    };
+    if (screen == null) return;
+    unawaited(Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => screen),
+    ).then((_) => _reloadDetail()));
+  }
+
+  void _reloadDetail() {
+    if (!mounted) return;
+    unawaited(ref
+        .read(workOrderDetailControllerProvider(widget.workOrderId).notifier)
+        .loadDetail());
   }
 
   void _onAllowedAction(WorkOrderAction action) {
@@ -750,12 +887,31 @@ class _AuditRow extends StatelessWidget {
     final tokens = context.gssms;
     final textTheme = Theme.of(context).textTheme;
     final color = event.isReturn ? tokens.danger.foreground : tokens.link;
-    final transition = (event.fromState != null && event.toState != null)
-        ? '${WorkOrderStatus.fromString(event.fromState).displayName} → '
-            '${WorkOrderStatus.fromString(event.toState).displayName}'
-        : (event.toState != null
-            ? WorkOrderStatus.fromString(event.toState).displayName
-            : event.eventType);
+    final isReassign = event.eventType == 'REASSIGNED';
+    final transition = isReassign
+        ? 'Reassigned'
+        : (event.fromState != null && event.toState != null)
+            ? '${WorkOrderStatus.fromString(event.fromState).displayName} → '
+                '${WorkOrderStatus.fromString(event.toState).displayName}'
+            : (event.toState != null
+                ? WorkOrderStatus.fromString(event.toState).displayName
+                : _humanizeEventType(event.eventType));
+    final String? people;
+    if (isReassign) {
+      if (event.fromUser != null && event.toUser != null) {
+        people = '${event.fromUser} → ${event.toUser}';
+      } else if (event.toUser != null) {
+        people = 'Reassigned to ${event.toUser}';
+      } else if (event.fromUser != null) {
+        people = 'Reassigned from ${event.fromUser}';
+      } else {
+        people = null;
+      }
+    } else if (event.toState == 'ASSIGNED' && event.toUser != null) {
+      people = 'Assigned to ${event.toUser}';
+    } else {
+      people = null;
+    }
 
     // Dot + divider layout: no IntrinsicHeight per row.
     return Row(
@@ -788,9 +944,16 @@ class _AuditRow extends StatelessWidget {
                   ].whereType<String>().join(' · '),
                   style: textTheme.bodySmall?.copyWith(color: tokens.textSecondary),
                 ),
+                if (people != null) ...[
+                  const SizedBox(height: GssmsSpacing.s4),
+                  Text(people, style: textTheme.bodyMedium),
+                ],
                 if (event.reason != null && event.reason!.trim().isNotEmpty) ...[
                   const SizedBox(height: GssmsSpacing.s4),
-                  Text(event.reason!, style: textTheme.bodyMedium),
+                  Text(
+                    isReassign ? 'Reason: ${event.reason!}' : event.reason!,
+                    style: textTheme.bodyMedium,
+                  ),
                 ],
               ],
             ),
@@ -799,6 +962,18 @@ class _AuditRow extends StatelessWidget {
       ],
     );
   }
+}
+
+/// `SOME_EVENT` -> `Some Event`.
+String _humanizeEventType(String raw) {
+  if (raw.isEmpty || raw != raw.toUpperCase() || !raw.contains(RegExp(r'[A-Z]'))) {
+    return raw;
+  }
+  return raw
+      .split('_')
+      .where((w) => w.isNotEmpty)
+      .map((w) => w[0] + w.substring(1).toLowerCase())
+      .join(' ');
 }
 
 /// Tinted notice box used inside dialogs.

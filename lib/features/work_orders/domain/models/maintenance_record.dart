@@ -294,6 +294,14 @@ class MaintenanceRecordLine extends Equatable {
     this.exclusionReason,
     this.isSaved = true,
     this.attachments = const [],
+    this.checkedOut,
+    this.checkoutSource = '',
+    this.assetCategoryId,
+    this.assetUniqueId,
+    this.assetIsActive,
+    this.applicability,
+    this.assetGroupLabelOverride,
+    this.inclusionChangedAt,
   });
 
   final int id;
@@ -338,6 +346,22 @@ class MaintenanceRecordLine extends Equatable {
 
   /// Line-scoped attachments (before/after photos).
   final List<LineAttachment> attachments;
+
+  /// Whether this line's asset group has been checked out (`checked_out`).
+  /// Null on legacy payloads that predate group check-out.
+  final bool? checkedOut;
+
+  /// `SUPERVISOR`, `TECHNICIAN` or empty (`checkout_source`).
+  final String checkoutSource;
+  final int? assetCategoryId;
+  final String? assetUniqueId;
+  final bool? assetIsActive;
+  final String? applicability;
+  final String? assetGroupLabelOverride;
+  final DateTime? inclusionChangedAt;
+
+  /// Legacy payloads without `checked_out` count as checked out.
+  bool get isCheckedOut => checkedOut ?? true;
 
   /// Label shown as the line's heading.
   String get displayTitle {
@@ -418,6 +442,11 @@ class MaintenanceRecordLine extends Equatable {
     bool? deficiencyAttended,
     bool? isSaved,
     List<LineAttachment>? attachments,
+    bool? excluded,
+    Object? exclusionReason = _unset,
+    Object? checkedOut = _unset,
+    String? checkoutSource,
+    Object? applicability = _unset,
   }) {
     return MaintenanceRecordLine(
       id: id,
@@ -446,10 +475,24 @@ class MaintenanceRecordLine extends Equatable {
       deficiency:
           identical(deficiency, _unset) ? this.deficiency : deficiency as String?,
       deficiencyAttended: deficiencyAttended ?? this.deficiencyAttended,
-      excluded: excluded,
-      exclusionReason: exclusionReason,
+      excluded: excluded ?? this.excluded,
+      exclusionReason: identical(exclusionReason, _unset)
+          ? this.exclusionReason
+          : exclusionReason as String?,
       isSaved: isSaved ?? this.isSaved,
       attachments: attachments ?? this.attachments,
+      checkedOut: identical(checkedOut, _unset)
+          ? this.checkedOut
+          : checkedOut as bool?,
+      checkoutSource: checkoutSource ?? this.checkoutSource,
+      assetCategoryId: assetCategoryId,
+      assetUniqueId: assetUniqueId,
+      assetIsActive: assetIsActive,
+      applicability: identical(applicability, _unset)
+          ? this.applicability
+          : applicability as String?,
+      assetGroupLabelOverride: assetGroupLabelOverride,
+      inclusionChangedAt: inclusionChangedAt,
     );
   }
 
@@ -492,6 +535,14 @@ class MaintenanceRecordLine extends Equatable {
           .whereType<Map>()
           .map((e) => LineAttachment.fromJson(Map<String, dynamic>.from(e)))
           .toList(),
+      checkedOut: asJsonBool(json['checked_out']),
+      checkoutSource: asJsonString(json['checkout_source']) ?? '',
+      assetCategoryId: _asInt(json['asset_category_id']),
+      assetUniqueId: asJsonString(json['asset_unique_id']),
+      assetIsActive: asJsonBool(json['asset_is_active']),
+      applicability: asJsonString(json['applicability']),
+      assetGroupLabelOverride: asJsonString(json['asset_group_label_override']),
+      inclusionChangedAt: _asDate(json['inclusion_changed_at']),
     );
   }
 
@@ -519,6 +570,14 @@ class MaintenanceRecordLine extends Equatable {
         'excluded': excluded,
         'exclusion_reason': exclusionReason,
         'attachments': attachments.map((a) => a.toJson()).toList(),
+        'checked_out': checkedOut,
+        'checkout_source': checkoutSource,
+        'asset_category_id': assetCategoryId,
+        'asset_unique_id': assetUniqueId,
+        'asset_is_active': assetIsActive,
+        'applicability': applicability,
+        'asset_group_label_override': assetGroupLabelOverride,
+        'inclusion_changed_at': inclusionChangedAt?.toIso8601String(),
       };
 
   @override
@@ -545,6 +604,14 @@ class MaintenanceRecordLine extends Equatable {
         exclusionReason,
         isSaved,
         attachments,
+        checkedOut,
+        checkoutSource,
+        assetCategoryId,
+        assetUniqueId,
+        assetIsActive,
+        applicability,
+        assetGroupLabelOverride,
+        inclusionChangedAt,
       ];
 }
 
@@ -567,6 +634,12 @@ class MaintenanceRecord extends Equatable {
     this.lines = const [],
     this.remarks,
     this.status,
+    this.stationId,
+    this.infrastructureId,
+    this.jobWorkAssetId,
+    this.jobWorkAssetUniqueId,
+    this.jobWorkAssetName,
+    this.workOrderStatus,
   });
 
   final int id;
@@ -583,6 +656,33 @@ class MaintenanceRecord extends Equatable {
   final String? remarks;
   final String? status;
 
+  /// `schedule_details.station` / `.infrastructure` (ids, for station-scoped
+  /// asset lookups when recording replacements).
+  final int? stationId;
+  final int? infrastructureId;
+
+  /// The asset the Job Work was raised for (`work_order_context`).
+  final int? jobWorkAssetId;
+  final String? jobWorkAssetUniqueId;
+  final String? jobWorkAssetName;
+
+  /// Job Work status (`work_order_context.status`).
+  final String? workOrderStatus;
+
+  /// Mirrors web MaintenanceRecordForm isTerminal: replacements are hidden once
+  /// the Job Work or record is past technician completion.
+  bool get isReplacementLocked {
+    const terminal = {
+      'COMPLETED',
+      'TECH_COMPLETED',
+      'VERIFIED',
+      'CLOSED',
+      'CANCELLED',
+    };
+    final s = (workOrderStatus ?? status)?.toUpperCase();
+    return isPastTechCompleted || (s != null && terminal.contains(s));
+  }
+
   /// Returns true if the record is at or past technician completion.
   bool get isPastTechCompleted {
     final s = status?.toUpperCase();
@@ -592,10 +692,61 @@ class MaintenanceRecord extends Equatable {
         s == 'CANCELLED';
   }
 
-  /// Excluded lines are not part of this record's work, so they are left out of
-  /// both the checklist and its progress.
+  /// Excluded and not-yet-checked-out lines are not part of this record's
+  /// work, so they are left out of both the checklist and its progress
+  /// (web `MaintenanceRecordForm.jsx:36`).
   List<MaintenanceRecordLine> get activeLines =>
-      lines.where((l) => !l.excluded).toList();
+      lines.where((l) => !l.excluded && l.isCheckedOut).toList();
+
+  /// Lines grouped by asset, mirroring web `MaintenanceRecordForm.jsx:363-424`.
+  /// Lines of inactive assets are skipped unless the record is past
+  /// technician completion.
+  List<ChecklistAssetGroup> get assetGroups {
+    final byKey = <String, List<MaintenanceRecordLine>>{};
+    for (final line in lines) {
+      if (line.assetIsActive == false && !isPastTechCompleted) continue;
+      final key = line.assetUniqueId ??
+          '${line.assetCategoryId ?? 'none'}::${line.itemName.trim().toLowerCase()}';
+      byKey.putIfAbsent(key, () => []).add(line);
+    }
+
+    String labelOf(MaintenanceRecordLine l) {
+      final c = l.assetCategory?.trim();
+      return (c == null || c.isEmpty) ? 'General' : c;
+    }
+
+    // Distinct asset names per category label decide the heading.
+    final namesByCategory = <String, Set<String>>{};
+    for (final lines in byKey.values) {
+      final first = lines.first;
+      namesByCategory
+          .putIfAbsent(labelOf(first), () => <String>{})
+          .add(first.itemName.trim().toLowerCase());
+    }
+
+    return [
+      for (final entry in byKey.entries)
+        () {
+          final first = entry.value.first;
+          final categoryLabel = labelOf(first);
+          final multiple = (namesByCategory[categoryLabel]?.length ?? 0) > 1;
+          return ChecklistAssetGroup(
+            key: entry.key,
+            assetCategoryId: first.assetCategoryId,
+            assetName: first.itemName,
+            assetUniqueId: first.assetUniqueId,
+            categoryLabel: categoryLabel,
+            lines: entry.value,
+            displayTitle: multiple ? first.itemName : categoryLabel,
+            checkedOut: entry.value.every((l) => l.isCheckedOut && !l.excluded),
+            checkoutSource: first.checkoutSource,
+            applicability: first.applicability,
+            supervisorExcluded: entry.value
+                .any((l) => l.excluded && l.checkoutSource == 'SUPERVISOR'),
+          );
+        }(),
+    ];
+  }
 
   int get totalLines => activeLines.length;
   int get completedLines => activeLines.where((l) => l.isCompleted).length;
@@ -606,10 +757,13 @@ class MaintenanceRecord extends Equatable {
     final lineList = rawLines is List ? rawLines : const [];
     final sched = json['schedule_details'];
     final schedule = sched is Map ? Map<String, dynamic>.from(sched) : null;
+    final ctxRaw = json['work_order_context'];
+    final ctx = ctxRaw is Map ? Map<String, dynamic>.from(ctxRaw) : null;
 
     return MaintenanceRecord(
       id: asJsonInt(json['id']) ?? 0,
       workOrderId: _asInt(json['work_order']) ??
+          _asInt(ctx?['work_order_id']) ??
           _asInt(json['work_order_id']) ??
           _asInt(schedule?['work_order_id']),
       workOrderTicket: asJsonString(schedule?['work_order_ticket']),
@@ -627,6 +781,13 @@ class MaintenanceRecord extends Equatable {
           .toList(),
       remarks: asJsonString(json['remarks']),
       status: asJsonString(json['status']),
+      stationId: _asInt(schedule?['station']),
+      infrastructureId: _asInt(schedule?['infrastructure']),
+      jobWorkAssetId: _asInt(ctx?['asset_id']),
+      jobWorkAssetUniqueId: asJsonString(ctx?['asset_unique_id']),
+      jobWorkAssetName: asJsonString(ctx?['asset_name']),
+      workOrderStatus: asJsonString(ctx?['status']) ??
+          asJsonString(schedule?['work_order_status']),
     );
   }
 
@@ -645,6 +806,15 @@ class MaintenanceRecord extends Equatable {
           'station_name': stationName,
           'depot_name': depotName,
           'division_name': divisionName,
+          'station': stationId,
+          'infrastructure': infrastructureId,
+        },
+        'work_order_context': {
+          'work_order_id': workOrderId,
+          'asset_id': jobWorkAssetId,
+          'asset_unique_id': jobWorkAssetUniqueId,
+          'asset_name': jobWorkAssetName,
+          'status': workOrderStatus,
         },
         'lines': lines.map((l) => l.toCacheJson()).toList(),
       };
@@ -664,6 +834,12 @@ class MaintenanceRecord extends Equatable {
       lines: lines ?? this.lines,
       remarks: remarks,
       status: status,
+      stationId: stationId,
+      infrastructureId: infrastructureId,
+      jobWorkAssetId: jobWorkAssetId,
+      jobWorkAssetUniqueId: jobWorkAssetUniqueId,
+      jobWorkAssetName: jobWorkAssetName,
+      workOrderStatus: workOrderStatus,
     );
   }
 
@@ -682,6 +858,60 @@ class MaintenanceRecord extends Equatable {
         lines,
         remarks,
         status,
+        stationId,
+        infrastructureId,
+        jobWorkAssetId,
+        jobWorkAssetUniqueId,
+        jobWorkAssetName,
+        workOrderStatus,
+      ];
+}
+
+/// One asset's lines within a checklist record, as shown by the group
+/// check-out UI. Photos for the group live on [photoHolder].
+class ChecklistAssetGroup extends Equatable {
+  const ChecklistAssetGroup({
+    required this.key,
+    required this.assetName,
+    required this.categoryLabel,
+    required this.lines,
+    required this.displayTitle,
+    this.assetCategoryId,
+    this.assetUniqueId,
+    this.checkedOut = false,
+    this.checkoutSource = '',
+    this.applicability,
+    this.supervisorExcluded = false,
+  });
+
+  final String key;
+  final int? assetCategoryId;
+  final String assetName;
+  final String? assetUniqueId;
+  final String categoryLabel;
+  final List<MaintenanceRecordLine> lines;
+  final String displayTitle;
+  final bool checkedOut;
+  final String checkoutSource;
+  final String? applicability;
+  final bool supervisorExcluded;
+
+  /// The first line carries the group's photo evidence.
+  MaintenanceRecordLine get photoHolder => lines.first;
+
+  @override
+  List<Object?> get props => [
+        key,
+        assetCategoryId,
+        assetName,
+        assetUniqueId,
+        categoryLabel,
+        lines,
+        displayTitle,
+        checkedOut,
+        checkoutSource,
+        applicability,
+        supervisorExcluded,
       ];
 }
 

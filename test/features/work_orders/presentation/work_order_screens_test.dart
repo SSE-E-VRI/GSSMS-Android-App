@@ -51,7 +51,7 @@ void main() {
       mockRepo = MockWorkOrderRepository();
     });
 
-    testWidgets('WorkOrderListScreen renders work order card and filter chips', (tester) async {
+    testWidgets('WorkOrderListScreen renders work order card and filter sheet', (tester) async {
       when(() => mockRepo.fetchWorkOrders()).thenAnswer((_) async => testOrders);
 
       await tester.pumpWidget(
@@ -72,20 +72,26 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Job Works'), findsOneWidget);
+      expect(find.byKey(const Key('filters_button')), findsOneWidget);
+      expect(find.text('Search ticket, title, asset'), findsOneWidget);
+      expect(find.text('1 Job Work'), findsOneWidget);
+      expect(find.text('WO #101'), findsOneWidget);
+      expect(find.text('Monthly Transformer Inspection'), findsOneWidget);
+      expect(find.text('tech_ramesh'), findsOneWidget);
+
+      // Open filter bottom sheet
+      await tester.tap(find.byKey(const Key('filters_button')));
+      await tester.pumpAndSettle();
+
       expect(find.byKey(const Key('date_range_from')), findsOneWidget);
       expect(find.byKey(const Key('date_range_to')), findsOneWidget);
-      // Status/Type are a dropdown pair, not FilterChip rows (avoids the
-      // chip row wrapping/clipping on narrow phones).
       expect(find.byKey(const Key('wo_status_filter_dropdown')), findsOneWidget);
       expect(find.byKey(const Key('wo_type_filter_dropdown')), findsOneWidget);
       expect(find.byKey(const Key('wo_infra_type_dropdown')), findsOneWidget);
       expect(find.byKey(const Key('wo_infra_name_dropdown')), findsOneWidget);
-      expect(find.text('WO #101'), findsOneWidget);
-      expect(find.text('Monthly Transformer Inspection'), findsOneWidget);
-      expect(find.text('tech_ramesh'), findsOneWidget);
     });
 
-    testWidgets('WorkOrderListScreen type + infra filters narrow the list', (tester) async {
+    testWidgets('WorkOrderListScreen type + infra filters narrow the list via sheet', (tester) async {
       const orders = [
         WorkOrder(
           id: 1,
@@ -124,21 +130,79 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      // Type dropdown filters client-side.
+      expect(find.text('2 Job Works'), findsOneWidget);
+
+      // Open filter sheet and select Corrective
+      await tester.tap(find.byKey(const Key('filters_button')));
+      await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('wo_type_filter_dropdown')));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Corrective').last);
       await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('apply_filters_button')));
+      await tester.pumpAndSettle();
+
       expect(find.text('WO #2'), findsOneWidget);
       expect(find.text('WO #1'), findsNothing);
+      expect(find.text('1 of 2 Job Works'), findsOneWidget);
+      expect(find.byKey(const Key('chip_type_filter')), findsOneWidget);
 
-      // Back to all types, then infra name narrows to one row.
-      await tester.tap(find.byKey(const Key('wo_type_filter_dropdown')));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('All Types').last);
+      // Remove type filter chip via its delete icon
+      await tester.tap(
+        find.descendant(
+          of: find.byKey(const Key('chip_type_filter')),
+          matching: find.byType(Icon),
+        ),
+      );
       await tester.pumpAndSettle();
       expect(find.text('WO #1'), findsOneWidget);
       expect(find.text('WO #2'), findsOneWidget);
+    });
+
+    testWidgets('WorkOrderListScreen displays overdue styling for past due PM and Unassigned for unassigned', (tester) async {
+      final pastDue = DateTime.now().subtract(const Duration(days: 3));
+      final orders = [
+        WorkOrder(
+          id: 10,
+          status: WorkOrderStatus.inProgress,
+          type: WorkOrderType.preventive,
+          title: 'Overdue PM Transformer',
+          stationName: 'VRI',
+          dueDate: pastDue,
+        ),
+        WorkOrder(
+          id: 20,
+          status: WorkOrderStatus.inProgress,
+          type: WorkOrderType.corrective,
+          title: 'Breakdown Job Work Past Due',
+          stationName: 'VRI',
+          originalComplaintId: 99,
+          dueDate: pastDue,
+        ),
+      ];
+      when(() => mockRepo.fetchWorkOrders()).thenAnswer((_) async => orders);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            workOrderRepositoryProvider.overrideWithValue(mockRepo),
+            authControllerProvider.overrideWith(
+              () => FakeAuthenticatedController(fakeSession()),
+            ),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.lightTheme,
+            home: const WorkOrderListScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      // Card 10 is overdue PM: shows Overdue text and Unassigned
+      expect(find.textContaining('Overdue · due'), findsOneWidget);
+      expect(find.text('Unassigned'), findsWidgets);
+      // Card 20 is Breakdown: never overdue even if dueDate in past
+      expect(find.textContaining('Due '), findsOneWidget);
     });
 
     testWidgets('WorkOrderDetailScreen renders details and action button', (tester) async {
@@ -208,6 +272,51 @@ void main() {
       expect(find.byKey(const Key('action_on_hold')), findsOneWidget);
       expect(find.byKey(const Key('work_order_audit_timeline')), findsOneWidget);
       expect(find.text('New → Assigned'), findsOneWidget);
+    });
+
+    testWidgets('audit timeline names reassigned technicians and reason',
+        (tester) async {
+      when(() => mockRepo.fetchWorkOrderById(101)).thenAnswer((_) async => testOrders[0]);
+      when(() => mockRepo.fetchAllowedActions(101)).thenAnswer(
+        (_) async => const WorkOrderActionSet(
+          workOrderId: 101,
+          currentStatus: 'ASSIGNED',
+          allowed: [],
+        ),
+      );
+      when(() => mockRepo.fetchAudit(101)).thenAnswer(
+        (_) async => WorkOrderAudit(
+          workOrderId: 101,
+          events: [
+            WorkOrderAuditEvent.fromJson(const {
+              'event_id': 'e2',
+              'event_type': 'REASSIGNED',
+              'actor': 'incharge_kumar',
+              'reason': 'Wrongly assigned',
+              'details': {'from_user': 'Alice', 'to_user': 'Bob'},
+            }),
+          ],
+        ),
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            workOrderRepositoryProvider.overrideWithValue(mockRepo),
+            authControllerProvider.overrideWith(
+              () => FakeAuthenticatedController(fakeSession()),
+            ),
+          ],
+          child: const MaterialApp(
+            home: WorkOrderDetailScreen(workOrderId: 101),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('Reassigned'), findsOneWidget);
+      expect(find.text('Alice → Bob'), findsOneWidget);
+      expect(find.text('Reason: Wrongly assigned'), findsOneWidget);
     });
 
     testWidgets('WorkOrderDetailScreen offers no transition the server withheld',

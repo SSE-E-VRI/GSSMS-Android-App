@@ -45,6 +45,7 @@ class AssetApiService {
     int? divisionId,
     int? depotId,
     int? stationId,
+    int? infrastructureId,
   }) async {
     final query = <String, dynamic>{};
     if (search != null && search.isNotEmpty) query['search'] = search;
@@ -55,6 +56,7 @@ class AssetApiService {
     if (divisionId != null) query['division'] = divisionId;
     if (depotId != null) query['depot'] = depotId;
     if (stationId != null) query['station'] = stationId;
+    if (infrastructureId != null) query['infrastructure'] = infrastructureId;
 
     final page = await fetchAllPages(_dio, '/api/v1/assets/', queryParameters: query);
     return AssetPage(

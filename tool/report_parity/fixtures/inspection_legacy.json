@@ -1,0 +1,72 @@
+{
+  "id": "inspection_legacy",
+  "kind": "inspection",
+  "generatedAt": "2026-10-03T04:00:00Z",
+  "ticket": "JW-2026-000108",
+  "workOrder": {
+    "id": 108,
+    "ticket_number": "JW-2026-000108",
+    "station_name": "Jolarpettai",
+    "depot_name": "JTJ Depot",
+    "assigned_to_name": "B. Natarajan",
+    "title": "Legacy Form Station Inspection",
+    "description": "Legacy format inspection record",
+    "execution_mode": "INSPECTION",
+    "status": "COMPLETED"
+  },
+  "payload": {
+    "id": 708,
+    "ticket_number": "JW-2026-000108",
+    "is_pointwise": false,
+    "inspection_details": {
+      "title": "Station Illumination & Cabling Walkthrough",
+      "inspection_no": "INSP-LEG-09",
+      "inspector_name": "B. Natarajan",
+      "inspection_date": "2026-09-20",
+      "inspection_time": "16:00:00",
+      "station_name": "Jolarpettai",
+      "remarks": "General platform lighting and emergency backup check.",
+      "points": [
+        {
+          "point_number": 1,
+          "description": "Platform 1 lighting distribution box inspection",
+          "priority": "HIGH"
+        },
+        {
+          "point_number": 2,
+          "description": "DG set auto-start changeover test",
+          "priority": "MEDIUM"
+        },
+        {
+          "point_number": 3,
+          "description": "Signaling cable duct cover integrity",
+          "priority": "LOW"
+        }
+      ]
+    },
+    "findings_summary": "Distribution box MCB tripped on line 2; DG changeover delayed by 8s.",
+    "action_taken": "Reset line 2, replaced timer relay on AMF panel.",
+    "technician_remarks": "All systems operating normally after component replacement.",
+    "corrective_action_performed": true,
+    "technical_parameters": [
+      {
+        "parameter_name": "DG Changeover Time",
+        "recorded_value": "3.5",
+        "unit": "sec"
+      }
+    ],
+    "photos": [
+      {
+        "image": "/parity-images/before_1.jpg",
+        "photo_type": "BEFORE",
+        "caption": "Faulty timer relay in AMF panel"
+      },
+      {
+        "image": "/parity-images/after_1.jpg",
+        "photo_type": "AFTER",
+        "caption": "New electronic timer installed"
+      }
+    ],
+    "verification": null
+  }
+}

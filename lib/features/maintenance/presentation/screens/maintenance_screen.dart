@@ -13,6 +13,8 @@ import 'package:gssms_mobile/features/dashboard/domain/models/dashboard_models.d
 import 'package:gssms_mobile/features/dashboard/presentation/controllers/dashboard_controller.dart';
 import 'package:gssms_mobile/features/dashboard/presentation/controllers/dashboard_state.dart';
 import 'package:gssms_mobile/features/dashboard/presentation/widgets/status_donut_chart.dart';
+import 'package:gssms_mobile/features/deficiencies/presentation/controllers/deficiency_controllers.dart';
+import 'package:gssms_mobile/features/deficiencies/presentation/screens/deficiency_list_screen.dart';
 import 'package:gssms_mobile/features/inspections/presentation/screens/inspection_list_screen.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/screens/work_order_list_screen.dart';
 
@@ -35,6 +37,13 @@ class _MaintenanceScreenState extends ConsumerState<MaintenanceScreen> {
       }
       ref.read(dashboardControllerProvider.notifier).loadDashboard();
     });
+  }
+
+  Future<void> _handleRefresh(UserSession? session) async {
+    if (canViewDeficiencyModule(session)) {
+      ref.invalidate(deficiencyNeedsActionCountProvider);
+    }
+    await ref.read(dashboardControllerProvider.notifier).loadDashboard();
   }
 
   @override
@@ -96,8 +105,7 @@ class _MaintenanceScreenState extends ConsumerState<MaintenanceScreen> {
       final fallback = state.previousLoaded;
       if (fallback != null) {
         return RefreshIndicator(
-          onRefresh: () =>
-              ref.read(dashboardControllerProvider.notifier).loadDashboard(),
+          onRefresh: () => _handleRefresh(session),
           child: ListView(
             padding: const EdgeInsets.all(16),
             children: [
@@ -152,7 +160,7 @@ class _MaintenanceScreenState extends ConsumerState<MaintenanceScreen> {
               ),
               const SizedBox(height: 16),
               ElevatedButton(
-                onPressed: () => ref.read(dashboardControllerProvider.notifier).loadDashboard(),
+                onPressed: () => _handleRefresh(session),
                 child: const Text('Retry'),
               ),
             ],
@@ -165,7 +173,7 @@ class _MaintenanceScreenState extends ConsumerState<MaintenanceScreen> {
       final stats = state.summary.stats;
 
       return RefreshIndicator(
-        onRefresh: () => ref.read(dashboardControllerProvider.notifier).loadDashboard(),
+        onRefresh: () => _handleRefresh(session),
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
@@ -240,13 +248,14 @@ class _MaintenanceScreenState extends ConsumerState<MaintenanceScreen> {
   }
 
   /// Reaching this screen already required `maintenance.view` (the Home tile
-  /// gate), which covers the Work Orders shortcut. Complaints and Inspections
-  /// are independently-permissioned resources on the server
-  /// (ComplaintViewSet/InspectionViewSet each gate reads on their own
-  /// `complaints.view`/`inspections.view` code, not `maintenance.view`) — a
-  /// role that holds only `maintenance.view` would 403 on those lists, so
-  /// each shortcut here is gated on the permission its destination actually
-  /// requires rather than assumed from this screen's own entry gate.
+  /// gate), which covers the Work Orders shortcut. Complaints, Inspections,
+  /// and Deficiencies are independently-permissioned resources on the server
+  /// (ComplaintViewSet/InspectionViewSet/DeficiencyViewSet each gate reads on
+  /// their own `complaints.view`/`inspections.view`/`assets.view` code, not
+  /// `maintenance.view`) — a role that holds only `maintenance.view` would 403
+  /// on those lists, so each shortcut here is gated on the permission its
+  /// destination actually requires rather than assumed from this screen's
+  /// own entry gate.
   Widget _buildQuickActions(
     BuildContext context,
     DashboardStats stats,
@@ -254,38 +263,67 @@ class _MaintenanceScreenState extends ConsumerState<MaintenanceScreen> {
   ) {
     final tiles = <Widget>[];
     if (sessionAllows(session, 'maintenance.view')) {
+      final count = stats.scheduledTasksDisplay;
+      final noun = count == 1 ? 'Job Work' : 'Job Works';
       tiles.add(ListTile(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         tileColor: Theme.of(context).cardTheme.color,
         leading: CircleAvatar(backgroundColor: context.gssms.info.background, child: Icon(Icons.assignment, color: context.gssms.link)),
         title: const Text('Job Works', style: TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text('${stats.pendingTaskCount} pending tasks'),
+        subtitle: Text('$count pending $noun'),
         trailing: const Icon(Icons.arrow_forward_ios, size: 16),
         onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const WorkOrderListScreen())),
       ));
     }
 
     if (sessionAllows(session, 'complaints.view')) {
+      final count = stats.openComplaintCount;
+      final noun = count == 1 ? 'breakdown' : 'breakdowns';
       tiles.add(ListTile(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         tileColor: Theme.of(context).cardTheme.color,
         leading: CircleAvatar(backgroundColor: context.gssms.danger.background, child: Icon(Icons.report_problem, color: context.gssms.danger.foreground)),
-        title: const Text('Complaints & Failures', style: TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text('${stats.openComplaintCount} open complaints'),
-        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+        title: const Text('Breakdowns', style: TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Text('$count open $noun'),        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
         onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const ComplaintListScreen())),
       ));
     }
 
     if (sessionAllows(session, 'inspections.view')) {
+      final count = stats.inspectionCount;
+      final noun = count == 1 ? 'inspection' : 'inspections';
       tiles.add(ListTile(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         tileColor: Theme.of(context).cardTheme.color,
         leading: CircleAvatar(backgroundColor: context.gssms.success.background, child: Icon(Icons.fact_check, color: context.gssms.success.foreground)),
-        title: const Text('Inspections & Notes', style: TextStyle(fontWeight: FontWeight.bold)),
-        subtitle: Text('${stats.inspectionCount} recorded notes'),
+        title: const Text('Inspections', style: TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Text('$count $noun'),
         trailing: const Icon(Icons.arrow_forward_ios, size: 16),
         onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => const InspectionListScreen())),
+      ));
+    }
+
+    if (canViewDeficiencyModule(session)) {
+      final deficiencyCountAsync = ref.watch(deficiencyNeedsActionCountProvider);
+      final subtitleText = deficiencyCountAsync.when(
+        data: (count) => count > 0 ? '$count need action' : 'All clear',
+        loading: () => 'Loading…',
+        error: (_, __) => 'View deficiencies',
+      );
+      final deficiencyColor = context.moduleColor(AppTheme.moduleDeficiencies);
+      tiles.add(ListTile(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        tileColor: Theme.of(context).cardTheme.color,
+        leading: CircleAvatar(
+          backgroundColor: deficiencyColor.withValues(alpha: 0.15),
+          child: Icon(Icons.rule_outlined, color: deficiencyColor),
+        ),
+        title: const Text('Deficiencies', style: TextStyle(fontWeight: FontWeight.bold)),
+        subtitle: Text(subtitleText),
+        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+        onTap: () => Navigator.of(context).push(
+          MaterialPageRoute<void>(builder: (_) => const DeficiencyListScreen()),
+        ),
       ));
     }
 

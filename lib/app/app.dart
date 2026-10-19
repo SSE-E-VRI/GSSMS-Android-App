@@ -18,10 +18,20 @@ class GssmsApp extends ConsumerStatefulWidget {
 
 class _GssmsAppState extends ConsumerState<GssmsApp>
     with WidgetsBindingObserver {
+  ProviderSubscription<AuthState>? _authSub;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // Subscribe once (not in build) — replay queued work when a session
+    // becomes available instead of waiting for a new mutation.
+    _authSub = ref.listenManual<AuthState>(authControllerProvider,
+        (previous, next) {
+      if (next is Authenticated && previous is! Authenticated) {
+        unawaited(ref.read(syncManagerProvider.notifier).resumePendingSync());
+      }
+    });
     // Attempt automatic session restoration on app launch
     Future.microtask(() {
       unawaited(ref.read(authControllerProvider.notifier).restoreSession());
@@ -30,6 +40,7 @@ class _GssmsAppState extends ConsumerState<GssmsApp>
 
   @override
   void dispose() {
+    _authSub?.close();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -46,14 +57,6 @@ class _GssmsAppState extends ConsumerState<GssmsApp>
 
   @override
   Widget build(BuildContext context) {
-    // Replay work queued before a restart as soon as a session is available
-    // (restored or freshly signed in) instead of waiting for a new mutation.
-    ref.listen<AuthState>(authControllerProvider, (previous, next) {
-      if (next is Authenticated && previous is! Authenticated) {
-        unawaited(ref.read(syncManagerProvider.notifier).resumePendingSync());
-      }
-    });
-
     final authState = ref.watch(authControllerProvider);
     final themeMode = ref.watch(themeModeProvider);
 

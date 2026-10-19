@@ -41,7 +41,7 @@ class AvoidHardcodedColor extends DartLintRule {
       if (node.argumentList.arguments.isEmpty) return;
       final source = node.argumentList.arguments.first.toSource().toUpperCase();
       if (source.contains('0XFF')) {
-        reporter.atNode(node, code);
+        reporter.reportErrorForNode(code, node);
       }
     });
   }
@@ -72,7 +72,7 @@ class AvoidBareFontSize extends DartLintRule {
 
     context.registry.addNamedExpression((node) {
       if (node.name.label.name == 'fontSize') {
-        reporter.atNode(node, code);
+        reporter.reportErrorForNode(code, node);
       }
     });
   }

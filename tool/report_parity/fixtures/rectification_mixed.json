@@ -1,0 +1,86 @@
+{
+  "id": "rectification_mixed",
+  "kind": "rectification",
+  "generatedAt": "2026-10-03T04:00:00Z",
+  "ticket": "JW-2026-000109",
+  "workOrder": {
+    "id": 109,
+    "ticket_number": "JW-2026-000109",
+    "station_name": null,
+    "depot_name": "MAS Depot",
+    "assigned_to_name": "R. Vignesh",
+    "title": "Grouped Deficiency Rectification Batch #4",
+    "description": "Batch rectification of 3 logged deficiencies",
+    "execution_mode": "RECTIFICATION",
+    "status": "COMPLETED"
+  },
+  "payload": {
+    "id": 809,
+    "ticket_number": "JW-2026-000109",
+    "report_date": "2026-09-24",
+    "station_name": "Chennai Central",
+    "technician_name": "R. Vignesh",
+    "other_staff": "M. Kumar",
+    "organization": {
+      "railway_name": "Southern Railway",
+      "division_name": "Chennai Division",
+      "depot_name": "MAS Central Depot"
+    },
+    "verified_by": "Senior Divisional Electrical Engineer",
+    "verified_at": "2026-09-24T17:30:00Z",
+    "verification_remarks": "Item 1 approved. Item 2 material requisition noted.",
+    "final_outcome": "2 items addressed (1 rectified on site, 1 spare pending). Overall yard safe.",
+    "items": [
+      {
+        "id": 901,
+        "asset_unique_id": "BAY-4-ISO",
+        "checkpoint": "Auxiliary contact alignment",
+        "source_ticket": "JW-2026-000088",
+        "source_date": "2026-09-15",
+        "finding": "Auxiliary switch not making contact during manual open.",
+        "action_taken": "Cleaned contacts with electro-cleaner and readjusted driving linkage.",
+        "outcome": "RECTIFIED",
+        "reason_not_rectified": null,
+        "photos": [
+          {
+            "image": "/parity-images/before_1.jpg",
+            "kind": "BEFORE"
+          },
+          {
+            "image": "/parity-images/after_1.jpg",
+            "kind": "AFTER"
+          }
+        ]
+      },
+      {
+        "id": 902,
+        "asset_unique_id": "CT-SEC-02",
+        "checkpoint": "Terminal block hairline crack",
+        "source_ticket": "JW-2026-000089",
+        "source_date": "2026-09-16",
+        "finding": "Cracked secondary terminal block on CT phase Y.",
+        "action_taken": "Inspected insulation resistance (measured > 100M ohm).",
+        "outcome": "NOT_RECTIFIED",
+        "reason_not_rectified": "Spare terminal block out of stock in depot store. Indent #842 placed.",
+        "photos": [
+          {
+            "image": "/parity-images/before_1.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "id": 903,
+        "asset_unique_id": "LIGHT-MAST-1",
+        "checkpoint": "Aviation warning lamp bulb",
+        "source_ticket": "JW-2026-000092",
+        "source_date": "2026-09-18",
+        "finding": "Aviation bulb fused on top of mast.",
+        "action_taken": "",
+        "outcome": "PENDING",
+        "reason_not_rectified": null,
+        "photos": []
+      }
+    ]
+  }
+}

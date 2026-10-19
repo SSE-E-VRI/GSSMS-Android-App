@@ -32,6 +32,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       final session = sessionFromAuth(ref.read(authControllerProvider));
       if (!sessionAllows(session, 'dashboard.view')) return;
       ref.read(dashboardControllerProvider.notifier).loadDashboard();
@@ -137,7 +138,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               _buildTypeStatsRow(stats),
             ],
             const SizedBox(height: 16),
-            _buildPendingActions(stats, state.summary.pendingTasks, session),
+            _buildPendingActions(
+              stats,
+              state.summary.pendingTasks.where((t) => !t.isBreakdown).toList(),
+              session,
+            ),
             const SizedBox(height: 16),
             _buildKpiGrid(stats),
           ],
@@ -160,15 +165,24 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
+            // Wrap (not Row): title + two badges overflow a phone-width card,
+            // so the badges drop to the next line instead of clipping.
+            Wrap(
+              spacing: 8,
+              runSpacing: 6,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
-                Icon(Icons.warning_amber_rounded, color: context.gssms.danger.foreground),
-                const SizedBox(width: 8),
-                Text(
-                  'Attention Required',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: context.gssms.link),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.warning_amber_rounded, color: context.gssms.danger.foreground),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Attention Required',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: context.gssms.link),
+                    ),
+                  ],
                 ),
-                const Spacer(),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
@@ -181,7 +195,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   ),
                 ),
                 if (attention.dueSoon.isNotEmpty) ...[
-                  const SizedBox(width: 6),
                   Container(
                     key: const Key('attention_due_soon_badge'),
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -384,11 +397,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           onTap: () => openList(const WorkOrderListScreen()),
         ));
       }
-      if (stats.pendingTaskCount > 0 && canWorkOrders) {
+      if (stats.scheduledTasksDisplay > 0 && canWorkOrders) {
         rows.add(_pendingRow(
           icon: Icons.hourglass_empty_outlined,
           color: context.gssms.warning.foreground,
-          title: '${stats.pendingTaskCount} pending tasks',
+          title: '${stats.scheduledTasksDisplay} pending job works',
           subtitle: 'Open assignments needing execution',
           onTap: () => openList(const WorkOrderListScreen()),
         ));
@@ -397,8 +410,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         rows.add(_pendingRow(
           icon: Icons.report_problem_outlined,
           color: context.gssms.danger.foreground,
-          title: '${stats.openComplaintCount} open complaints',
-          subtitle: 'Triage the complaint queue',
+          title: '${stats.openComplaintCount} open breakdowns',
+          subtitle: 'Triage the breakdown queue',
           onTap: () => openList(const ComplaintListScreen()),
         ));
       }
@@ -566,12 +579,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Expanded(
-                child: _buildKpiCard('Pending Tasks', '${stats.pendingTaskCount}',
+                child: _buildKpiCard('Pending Tasks', '${stats.scheduledTasksDisplay}',
                     Icons.hourglass_empty_outlined, context.gssms.warning.foreground),
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: _buildKpiCard('Open Complaints', '${stats.openComplaintCount}',
+                child: _buildKpiCard('Open Breakdowns', '${stats.openComplaintCount}',
                     Icons.report_problem_outlined, context.gssms.danger.foreground),
               ),
             ],

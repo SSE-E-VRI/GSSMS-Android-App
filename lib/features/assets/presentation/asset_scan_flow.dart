@@ -41,9 +41,10 @@ Future<void> scanAndOpenAsset(BuildContext context, WidgetRef ref) async {
     failure = e;
   } finally {
     // Close the progress dialog (the route on top of the caller).
-    navigator.pop();
+    if (context.mounted) navigator.pop();
   }
 
+  if (!context.mounted) return;
   if (match != null) {
     unawaited(navigator.push(
       MaterialPageRoute(builder: (_) => AssetDetailScreen(assetId: match!.id)),

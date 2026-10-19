@@ -63,6 +63,24 @@ void main() {
       expect(page.assets[0].criticality, AssetCriticality.critical);
     });
 
+    test('getAssets sends station and infrastructure filters', () async {
+      dio.httpClientAdapter = MockAdapter((options) async {
+        expect(options.queryParameters['station'], 9);
+        expect(options.queryParameters['infrastructure'], 4);
+        return _json([], 200);
+      });
+      final page = await apiService.getAssets(stationId: 9, infrastructureId: 4);
+      expect(page.assets, isEmpty);
+    });
+
+    test('getAssets omits infrastructure when not given', () async {
+      dio.httpClientAdapter = MockAdapter((options) async {
+        expect(options.queryParameters.containsKey('infrastructure'), isFalse);
+        return _json([], 200);
+      });
+      await apiService.getAssets(stationId: 9);
+    });
+
     test('findAssetByCode resolves a scan through the search endpoint', () async {
       // There is no by_code endpoint on the backend, so a lookup searches the
       // register and then requires an exact identifier match.

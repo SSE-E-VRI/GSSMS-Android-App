@@ -6,8 +6,7 @@ import 'package:gssms_mobile/features/work_orders/domain/models/work_order_audit
 
 /// Printable Job Work sheet for one work order — mirrors web's per-row PDF
 /// action on Job Works (Manage/Audit/PDF): header meta + asset/location +
-/// assignment + remarks + status history. Same letterhead/footer language as
-/// [RegisterEntryPdfService] so all mobile PDFs read as one set.
+/// assignment + remarks + status history.
 class WorkOrderPdfService {
   const WorkOrderPdfService._();
 
@@ -88,7 +87,7 @@ class WorkOrderPdfService {
               style: const pw.TextStyle(fontSize: 11)),
           pw.SizedBox(height: 4),
           pw.Text(
-              'Status: ${wo.status.displayName}  |  Type: ${wo.type.displayName}  |  Priority: ${wo.priority.displayName}',
+              'Status: ${wo.status.displayName}  |  Type: ${wo.displayTypeLabel}  |  Priority: ${wo.priority.displayName}',
               textAlign: pw.TextAlign.center,
               style: const pw.TextStyle(
                   fontSize: 9, color: PdfColors.grey700)),

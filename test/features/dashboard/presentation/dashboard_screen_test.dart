@@ -131,6 +131,73 @@ void main() {
       expect(find.text('Verify TR-01 job'), findsOneWidget);
     });
 
+    Future<void> pumpSummary(WidgetTester tester, DashboardSummary summary) async {
+      when(() => mockRepo.fetchAttention())
+          .thenAnswer((_) async => const AttentionSummary());
+      when(() => mockRepo.fetchSummary()).thenAnswer((_) async => summary);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            dashboardRepositoryProvider.overrideWithValue(mockRepo),
+            authControllerProvider.overrideWith(
+              () => FakeAuthenticatedController(fakeSession(
+                permissions: const ['dashboard.view', 'maintenance.view'],
+              )),
+            ),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.lightTheme,
+            home: const DashboardScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('Pending Tasks KPI shows scheduled_task_count when the payload has it',
+        (tester) async {
+      await pumpSummary(
+        tester,
+        const DashboardSummary(
+          stats: DashboardStats(pendingTaskCount: 9, scheduledTaskCount: 3),
+        ),
+      );
+      expect(find.text('Pending Tasks', skipOffstage: false), findsOneWidget);
+      expect(find.text('3', skipOffstage: false), findsOneWidget);
+      expect(find.text('9', skipOffstage: false), findsNothing);
+    });
+
+    testWidgets('Pending Tasks KPI falls back to pending_task_count for an old payload',
+        (tester) async {
+      await pumpSummary(
+        tester,
+        const DashboardSummary(stats: DashboardStats(pendingTaskCount: 9)),
+      );
+      expect(find.text('9', skipOffstage: false), findsOneWidget);
+    });
+
+    testWidgets('itemised pending list hides breakdown rows', (tester) async {
+      await pumpSummary(
+        tester,
+        const DashboardSummary(
+          stats: DashboardStats(pendingTaskCount: 2, scheduledTaskCount: 1),
+          pendingTasks: [
+            PendingAction(id: 1, kind: PendingActionKind.task, title: 'Scheduled PM row'),
+            PendingAction(
+                id: 2,
+                kind: PendingActionKind.task,
+                title: 'Breakdown backing row',
+                isBreakdown: true),
+          ],
+        ),
+      );
+      await tester.scrollUntilVisible(find.text('Scheduled PM row'), 300,
+          scrollable: find.byType(Scrollable).first);
+      await tester.pumpAndSettle();
+      expect(find.text('Scheduled PM row'), findsOneWidget);
+      expect(find.text('Breakdown backing row', skipOffstage: false), findsNothing);
+    });
+
     testWidgets('session=null shows permission denied and no pending work-order rows',
         (tester) async {
       when(() => mockRepo.fetchAttention())

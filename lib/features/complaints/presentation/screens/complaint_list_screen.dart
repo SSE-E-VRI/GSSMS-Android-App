@@ -18,6 +18,7 @@ import 'package:gssms_mobile/features/complaints/presentation/complaint_status_s
 import 'package:gssms_mobile/features/complaints/presentation/controllers/complaint_controllers.dart';
 import 'package:gssms_mobile/features/complaints/presentation/screens/complaint_create_screen.dart';
 import 'package:gssms_mobile/features/complaints/presentation/screens/complaint_detail_screen.dart';
+import 'package:gssms_mobile/features/work_orders/presentation/widgets/linked_job_work_line.dart';
 import 'package:intl/intl.dart';
 
 class ComplaintListScreen extends ConsumerStatefulWidget {
@@ -70,9 +71,41 @@ class _ComplaintListScreenState extends ConsumerState<ComplaintListScreen> {
           s.dateFrom != null ||
           s.dateTo != null);
 
+  static int _activeFilterCount(ComplaintListLoaded? s) {
+    if (s == null) return 0;
+    var count = 0;
+    if (s.dateFrom != null || s.dateTo != null) count++;
+    if (s.selectedStatus != null) count++;
+    return count;
+  }
+
   Future<void> _clearFilters() async {
     _searchController.clear();
     await _controller.clearFilters();
+  }
+
+  void _openFilterSheet(BuildContext context, ComplaintListLoaded? loaded) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => _ComplaintFilterSheet(
+        state: loaded,
+        controller: _controller,
+        onClearAll: _clearFilters,
+      ),
+    );
+  }
+
+  Future<void> _open(Complaint complaint) async {
+    // The detail screen stays open after a successful convert (so its "View
+    // Linked Job Work" link is reachable), so refresh whenever the user comes
+    // back rather than plumbing a result through the back button.
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute(
+        builder: (_) => ComplaintDetailScreen(complaint: complaint),
+      ),
+    );
+    if (mounted) unawaited(_controller.fetchComplaints(forceRefresh: true));
   }
 
   @override
@@ -82,7 +115,7 @@ class _ComplaintListScreenState extends ConsumerState<ComplaintListScreen> {
 
     if (!sessionAllows(session, 'complaints.view')) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Complaints & Issues')),
+        appBar: AppBar(title: const Text('Breakdowns')),
         body: const PermissionDeniedView(),
       );
     }
@@ -90,12 +123,13 @@ class _ComplaintListScreenState extends ConsumerState<ComplaintListScreen> {
     final loaded = listState is ComplaintListLoaded
         ? listState
         : (listState is ComplaintListError ? listState.previousLoaded : null);
+    final filterCount = _activeFilterCount(loaded);
 
     return Scaffold(
       appBar: widget.isEmbedded
           ? null
           : AppBar(
-              title: const Text('Complaints & Issues'),
+              title: const Text('Breakdowns'),
               actions: [
                 if (session != null)
                   OrgScopeAppBarFilter(
@@ -117,21 +151,32 @@ class _ComplaintListScreenState extends ConsumerState<ComplaintListScreen> {
             SliverToBoxAdapter(
               child: FilterStrip(
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    GssmsSearchField(
-                      controller: _searchController,
-                      hintText: 'Search by #, title, location, asset…',
-                      onChanged: _controller.setSearchQuery,
+                    Row(
+                      children: [
+                        Expanded(
+                          child: GssmsSearchField(
+                            controller: _searchController,
+                            hintText: 'Search number, title, place',
+                            onChanged: _controller.setSearchQuery,
+                          ),
+                        ),
+                        const SizedBox(width: GssmsSpacing.s8),
+                        _ComplaintFiltersButton(
+                          activeCount: filterCount,
+                          onPressed: () => _openFilterSheet(context, loaded),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: GssmsSpacing.s8),
-                    DateRangeFilterBar(
-                      from: loaded?.dateFrom,
-                      to: loaded?.dateTo,
-                      padding: EdgeInsets.zero,
-                      onChanged: _controller.setDateRange,
-                    ),
-                    const SizedBox(height: GssmsSpacing.s8),
-                    _StatusFilter(state: loaded, onChanged: _controller.setStatusFilter),
+                    if (loaded != null && filterCount > 0) ...[
+                      const SizedBox(height: GssmsSpacing.s8),
+                      _ComplaintActiveFilterChips(
+                        state: loaded,
+                        controller: _controller,
+                        onClearAll: _clearFilters,
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -141,7 +186,8 @@ class _ComplaintListScreenState extends ConsumerState<ComplaintListScreen> {
                 child: ListResultHeader(
                   shown: loaded.filteredComplaints.length,
                   total: loaded.complaints.length,
-                  noun: 'complaints',
+                  noun: 'Breakdowns',
+                  nounSingular: 'Breakdown',
                   onClearFilters: _hasActiveFilters(loaded) ? _clearFilters : null,
                 ),
               ),
@@ -155,7 +201,7 @@ class _ComplaintListScreenState extends ConsumerState<ComplaintListScreen> {
           ? FloatingActionButton.extended(
               key: const Key('fab_create_complaint'),
               icon: const Icon(Icons.add_comment_outlined),
-              label: const Text('Log Complaint'),
+              label: const Text('Report Breakdown'),
               onPressed: () async {
                 final created = await Navigator.of(context).push<bool>(
                   MaterialPageRoute(
@@ -193,7 +239,7 @@ class _ComplaintListScreenState extends ConsumerState<ComplaintListScreen> {
         SliverFillRemaining(
           hasScrollBody: false,
           child: EmptyStateView.error(
-            title: 'Could not load complaints',
+            title: 'Could not load breakdowns',
             message: state.message,
             onRetry: () => _controller.fetchComplaints(forceRefresh: true),
           ),
@@ -218,8 +264,8 @@ class _ComplaintListScreenState extends ConsumerState<ComplaintListScreen> {
           hasScrollBody: false,
           child: EmptyStateView.noResults(
             title: filtered
-                ? 'No complaints match these filters'
-                : 'No complaints logged yet',
+                ? 'No breakdowns match these filters'
+                : 'No breakdowns reported yet',
             icon: Icons.report_problem_outlined,
             onClearFilters: filtered ? _clearFilters : null,
           ),
@@ -237,7 +283,10 @@ class _ComplaintListScreenState extends ConsumerState<ComplaintListScreen> {
         ),
         sliver: SliverList(
           delegate: SliverChildBuilderDelegate(
-            (context, i) => _ComplaintCard(complaint: complaints[i]),
+            (context, i) => _ComplaintCard(
+              complaint: complaints[i],
+              onTap: () => _open(complaints[i]),
+            ),
             childCount: complaints.length,
           ),
         ),
@@ -246,62 +295,232 @@ class _ComplaintListScreenState extends ConsumerState<ComplaintListScreen> {
   }
 }
 
-/// Single-choice status filter as a dropdown (one row instead of a chip band).
-class _StatusFilter extends StatelessWidget {
-  const _StatusFilter({required this.state, required this.onChanged});
+class _ComplaintFiltersButton extends StatelessWidget {
+  const _ComplaintFiltersButton({
+    required this.activeCount,
+    required this.onPressed,
+  });
 
-  final ComplaintListLoaded? state;
-  final ValueChanged<ComplaintStatus?> onChanged;
+  final int activeCount;
+  final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
-    final s = state;
-    int countFor(ComplaintStatus? status) {
-      if (s == null) return 0;
-      if (status == null) return s.complaints.length;
-      return s.complaints.where((c) => c.status == status).length;
-    }
-
-    final options = <(String, ComplaintStatus?)>[
-      ('All (${countFor(null)})', null),
-      for (final status in const [
-        ComplaintStatus.open,
-        ComplaintStatus.converted,
-        ComplaintStatus.closed,
-      ])
-        ('${status.displayName} (${countFor(status)})', status),
-    ];
-
-    return DropdownButtonFormField<ComplaintStatus?>(
-      key: const Key('complaint_status_filter_dropdown'),
-      isExpanded: true,
-      value: s?.selectedStatus,
-      decoration: const InputDecoration(
-        labelText: 'Status',
-        isDense: true,
-        contentPadding: EdgeInsets.symmetric(
+    final tokens = context.gssms;
+    final button = OutlinedButton.icon(
+      key: const Key('complaint_filters_button'),
+      onPressed: onPressed,
+      icon: const Icon(Icons.filter_list, size: 20),
+      label: const Text('Filters'),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: activeCount > 0 ? tokens.link : tokens.textPrimary,
+        side: BorderSide(
+          color: activeCount > 0 ? tokens.link : tokens.borderStrong,
+        ),
+        padding: const EdgeInsets.symmetric(
           horizontal: GssmsSpacing.s12,
           vertical: GssmsSpacing.s12,
         ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(GssmsRadius.r12),
+        ),
       ),
-      items: [
-        for (final (label, status) in options)
-          DropdownMenuItem(
-            value: status,
-            child: Text(label, overflow: TextOverflow.ellipsis),
+    );
+
+    if (activeCount == 0) return button;
+
+    return Badge(
+      key: const Key('complaint_filters_badge'),
+      label: Text('$activeCount'),
+      backgroundColor: tokens.link,
+      child: button,
+    );
+  }
+}
+
+class _ComplaintActiveFilterChips extends StatelessWidget {
+  const _ComplaintActiveFilterChips({
+    required this.state,
+    required this.controller,
+    required this.onClearAll,
+  });
+
+  final ComplaintListLoaded state;
+  final ComplaintListController controller;
+  final VoidCallback onClearAll;
+
+  static final DateFormat _dateFormat = DateFormat('dd MMM');
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.gssms;
+    final chips = <Widget>[];
+
+    if (state.dateFrom != null || state.dateTo != null) {
+      final String dateLabel;
+      if (state.dateFrom != null && state.dateTo != null) {
+        dateLabel =
+            '${_dateFormat.format(state.dateFrom!)} - ${_dateFormat.format(state.dateTo!)}';
+      } else if (state.dateFrom != null) {
+        dateLabel = 'From ${_dateFormat.format(state.dateFrom!)}';
+      } else {
+        dateLabel = 'To ${_dateFormat.format(state.dateTo!)}';
+      }
+      chips.add(
+        InputChip(
+          key: const Key('chip_complaint_date_range'),
+          label: Text(dateLabel),
+          onDeleted: () => controller.setDateRange(null, null),
+        ),
+      );
+    }
+
+    if (state.selectedStatus != null) {
+      chips.add(
+        InputChip(
+          key: const Key('chip_complaint_status'),
+          label: Text('Status: ${state.selectedStatus!.displayName}'),
+          onDeleted: () => controller.setStatusFilter(null),
+        ),
+      );
+    }
+
+    return Wrap(
+      spacing: GssmsSpacing.s8,
+      runSpacing: GssmsSpacing.s4,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        ...chips,
+        TextButton(
+          key: const Key('clear_all_complaint_filters_button'),
+          style: TextButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: GssmsSpacing.s8),
+            visualDensity: VisualDensity.compact,
+            foregroundColor: tokens.link,
           ),
+          onPressed: onClearAll,
+          child: const Text('Clear all'),
+        ),
       ],
-      onChanged: onChanged,
+    );
+  }
+}
+
+class _ComplaintFilterSheet extends StatelessWidget {
+  const _ComplaintFilterSheet({
+    required this.state,
+    required this.controller,
+    required this.onClearAll,
+  });
+
+  final ComplaintListLoaded? state;
+  final ComplaintListController controller;
+  final VoidCallback onClearAll;
+
+  static const _statuses = [
+    ComplaintStatus.open,
+    ComplaintStatus.converted,
+    ComplaintStatus.closed,
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.gssms;
+    final textTheme = Theme.of(context).textTheme;
+
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: GssmsSpacing.s16,
+          right: GssmsSpacing.s16,
+          top: GssmsSpacing.s16,
+          bottom: MediaQuery.of(context).viewInsets.bottom + GssmsSpacing.s16,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Filters', style: textTheme.titleMedium),
+                  TextButton(
+                    onPressed: () {
+                      onClearAll();
+                      Navigator.of(context).pop();
+                    },
+                    child: const Text('Reset'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: GssmsSpacing.s12),
+              DateRangeFilterBar(
+                from: state?.dateFrom,
+                to: state?.dateTo,
+                padding: EdgeInsets.zero,
+                onChanged: controller.setDateRange,
+              ),
+              const SizedBox(height: GssmsSpacing.s12),
+              DropdownButtonFormField<ComplaintStatus?>(
+                key: const Key('complaint_status_filter_dropdown'),
+                isExpanded: true,
+                value: state?.selectedStatus,
+                decoration: const InputDecoration(
+                  labelText: 'Status',
+                  isDense: true,
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: GssmsSpacing.s12,
+                    vertical: GssmsSpacing.s12,
+                  ),
+                ),
+                items: [
+                  const DropdownMenuItem(value: null, child: Text('All')),
+                  for (final status in _statuses)
+                    DropdownMenuItem(
+                      value: status,
+                      child: Text(
+                        status.displayName,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                ],
+                onChanged: controller.setStatusFilter,
+              ),
+              const SizedBox(height: GssmsSpacing.s16),
+              FilledButton(
+                key: const Key('apply_complaint_filters_button'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: tokens.link,
+                  padding: const EdgeInsets.symmetric(vertical: GssmsSpacing.s12),
+                ),
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Done'),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
 
 class _ComplaintCard extends StatelessWidget {
-  const _ComplaintCard({required this.complaint});
+  const _ComplaintCard({required this.complaint, required this.onTap});
 
   final Complaint complaint;
+  final VoidCallback onTap;
 
-  static final DateFormat _dateFormat = DateFormat('dd MMM yyyy, hh:mm a');
+  static final DateFormat _dateTimeFormat = DateFormat('dd MMM yyyy, hh:mm a');
+  static final DateFormat _dateOnlyFormat = DateFormat('dd MMM yyyy');
+
+  static String _formatWhen(DateTime when) {
+    final local = when.toLocal();
+    if (local.hour == 0 && local.minute == 0 && local.second == 0) {
+      return _dateOnlyFormat.format(local);
+    }
+    return _dateTimeFormat.format(local);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -314,13 +533,7 @@ class _ComplaintCard extends StatelessWidget {
       key: Key('complaint_card_${complaint.id}'),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        onTap: () {
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => ComplaintDetailScreen(complaint: complaint),
-            ),
-          );
-        },
+        onTap: onTap,
         child: Padding(
           padding: const EdgeInsets.all(GssmsSpacing.s16),
           child: Column(
@@ -380,17 +593,28 @@ class _ComplaintCard extends StatelessWidget {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
+                  if (complaint.complainantName != null &&
+                      complaint.complainantName!.trim().isNotEmpty)
+                    _Meta(
+                      icon: Icons.person_outline,
+                      text: complaint.complainantName!.trim(),
+                      style: metaStyle,
+                    ),
                   if (complaint.createdAt != null)
                     _Meta(
                       icon: Icons.schedule,
-                      text: _dateFormat.format(complaint.createdAt!.toLocal()),
+                      text: _formatWhen(complaint.createdAt!),
                       style: metaStyle,
                     ),
                 ],
               ),
-              if (complaint.isConverted) ...[
+              if (complaint.isConverted && complaint.workOrderId != null) ...[
                 const SizedBox(height: GssmsSpacing.s8),
-                ComplaintJobWorkChip(complaint: complaint),
+                LinkedJobWorkLine(
+                  workOrderId: complaint.workOrderId!,
+                  ticketNumber: complaint.workOrderTicketNumber,
+                  workOrderStatus: complaint.workOrderStatus,
+                ),
               ],
             ],
           ),

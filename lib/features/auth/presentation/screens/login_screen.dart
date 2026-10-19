@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../core/config/app_version.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../controllers/auth_controller.dart';
 import '../controllers/auth_state.dart';
@@ -20,9 +21,25 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _passwordController = TextEditingController();
   final _otpController = TextEditingController();
   bool _obscurePassword = true;
+  ProviderSubscription<AuthState>? _authSub;
+
+  @override
+  void initState() {
+    super.initState();
+    // Clear the password from memory as soon as authentication succeeds —
+    // the controller must not retain it in its TextEditingController.
+    _authSub = ref.listenManual<AuthState>(authControllerProvider,
+        (prev, next) {
+      if (next is Authenticated) {
+        _passwordController.clear();
+        _otpController.clear();
+      }
+    });
+  }
 
   @override
   void dispose() {
+    _authSub?.close();
     _usernameController.dispose();
     _passwordController.dispose();
     _otpController.dispose();
@@ -69,6 +86,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     _buildOtpChallengeView(authState)
                   else
                     _buildStandardLoginForm(authState, isGeneralLoading),
+                  const SizedBox(height: 24),
+                  Text(
+                    'Version $appVersion',
+                    key: const Key('login_version_footer'),
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
                 ],
               ),
             ),

@@ -86,6 +86,13 @@ bool canConvertComplaint(UserSession? session) {
 /// Actions screen, not a separate check.
 bool canBatchConvertToWorkOrder(UserSession? session) => canCreateWorkOrder(session);
 
+/// Deficiency → rectification Job Work creation (`create_rectification`)
+/// maps to `maintenance.create` server-side with the same in-body
+/// DEPOT_INCHARGE/DEPOT_USER converter-role gate as the complaint/inspection
+/// batch conversions above — deliberately the same check under a distinct
+/// name so the Deficiencies tab reads on its own terms.
+bool canCreateRectification(UserSession? session) => canCreateWorkOrder(session);
+
 /// Roles `MaintenanceScheduleViewSet.create_batch_work_orders` accepts —
 /// gated server-side on `maintenance.edit` (not `.create`, unlike the other
 /// two batch-convert actions above) plus the same in-body DEPOT_INCHARGE/
@@ -112,4 +119,103 @@ bool canWriteChecklist(UserSession? session) {
   if (session == null) return false;
   if (!sessionAllows(session, 'maintenance.edit')) return false;
   return session.roles.any(_checklistWriterRoles.contains);
+}
+
+bool _editWithRoles(UserSession? session, Set<AuthRole> roles) {
+  if (session == null) return false;
+  if (!sessionAllows(session, 'maintenance.edit')) return false;
+  return session.roles.any(roles.contains);
+}
+
+/// Roles that operate Job Works on mobile. MOBILE_APP_SSOT §5.1: DIV_ADMIN,
+/// ZR_ADMIN and SUPER_ADMIN are "awareness only" on mobile ("power tools stay
+/// on web permanently") and HQ users are read + export. The server still
+/// lists lifecycle transitions (assign, cancel, hold, verify, close) for the
+/// ADMIN tier because the web may perform them, so the mobile client must
+/// not render them. Multi-role users keep the controls of any field role
+/// they also hold (role union).
+const _jobWorkFieldRoles = {
+  AuthRole.depotIncharge,
+  AuthRole.depotUser,
+  AuthRole.maintenanceStaff,
+};
+
+/// Whether this session may perform Job Work mutations on mobile at all:
+/// `maintenance.edit` plus at least one field role. Admin/HQ-only sessions
+/// are read-only here.
+bool canOperateJobWorksOnMobile(UserSession? session) =>
+    _editWithRoles(session, _jobWorkFieldRoles);
+
+/// Reassign technician (`POST .../work-orders/{id}/reassign/`, `views.py:3705`,
+/// `workorder_lifecycle_service.py:1061`): the server also accepts the ADMIN
+/// tier, but on mobile only DEPOT_INCHARGE / DEPOT_USER (SSOT §5.1).
+bool canReassignWorkOrder(UserSession? session) => _editWithRoles(session, {
+      AuthRole.depotIncharge,
+      AuthRole.depotUser,
+    });
+
+/// Pre-START checklist preparation and supervisor mandates
+/// (`prepare-checklist/` `views.py:3049`, `supervisor-mandate/` `views.py:3065`):
+/// the server also accepts the ADMIN tier, but on mobile only DEPOT_INCHARGE
+/// (SSOT §5.1).
+bool canManagePreStartMandates(UserSession? session) =>
+    _editWithRoles(session, {AuthRole.depotIncharge});
+
+/// Un-checking a checked-out asset group (`group-inclusion/`, `views.py:2151`)
+/// needs `maintenance.group_uncheckout` (DEPOT_INCHARGE; SUPER_ADMIN holds all).
+bool canUncheckoutGroup(UserSession? session) =>
+    sessionAllows(session, 'maintenance.group_uncheckout');
+
+/// Changing a deficiency's severity (`PATCH /deficiencies/{id}/`,
+/// `assets/services/deficiencies.py:20,139`): `maintenance.edit` plus
+/// DEPOT_INCHARGE or DEPOT_USER.
+bool canTriageDeficiencySeverity(UserSession? session) =>
+    _editWithRoles(session, {AuthRole.depotIncharge, AuthRole.depotUser});
+
+/// Flag / un-flag a technician remark as a deficiency
+/// (`flag-remark-deficiency/`, `views.py:1797`): `maintenance.edit` plus
+/// DEPOT_INCHARGE, DEPOT_USER, DIV_ADMIN or ZR_ADMIN (SUPER_ADMIN included).
+bool canFlagRemarkDeficiency(UserSession? session) => _editWithRoles(session, {
+      AuthRole.superAdmin,
+      AuthRole.zrAdmin,
+      AuthRole.divAdmin,
+      AuthRole.depotIncharge,
+      AuthRole.depotUser,
+    });
+
+/// PM skip / checklist-change requests (`schedules/{id}/skip-request/`,
+/// `template-change-request/`): `maintenance.edit` plus DEPOT_INCHARGE or
+/// DEPOT_USER (superuser is refused server-side).
+bool canRequestPmApproval(UserSession? session) =>
+    _editWithRoles(session, {AuthRole.depotIncharge, AuthRole.depotUser});
+
+/// Web MaintenanceRecordForm `auth.can('assets.replace')` - gates both buttons.
+/// Held by SUPER_ADMIN and MAINTENANCE_STAFF only (rbac/registry.py).
+bool canReplaceAssets(UserSession? s) => sessionAllows(s, 'assets.replace');
+
+/// replace_asset additionally requires the MAINTENANCE_STAFF role (assets/views.py:2277).
+bool canReplaceWholeAsset(UserSession? s) =>
+    canReplaceAssets(s) && (s?.roles.contains(AuthRole.maintenanceStaff) ?? false);
+
+const _deficiencyModuleRoles = {AuthRole.depotIncharge, AuthRole.depotUser};
+
+/// Whether this session may access the Deficiencies operational module.
+///
+/// Web parity with `MaintenanceView.jsx:91-96,128-135`: on web, operational
+/// tabs ('schedules', 'complaints', 'inspections', 'deficiencies') are hidden
+/// from MAINTENANCE_STAFF and restricted away from users whose scope level is
+/// not DEPOT (`restrictedForAdmin = ['schedules', 'complaints', 'inspections', 'deficiencies']`).
+/// In the GSSMS domain model, holding a depot role ([AuthRole.depotIncharge]
+/// or [AuthRole.depotUser]) inherently implies DEPOT scope level
+/// ([OrgScopeLevel.depot]). Therefore, checking that the session holds at least
+/// one of these depot roles maintains web parity without redundant scope checks.
+/// Multi-role sessions holding a depot role alongside an admin role retain
+/// access (role union).
+///
+/// Fails closed for null sessions or sessions lacking `assets.view`.
+bool canViewDeficiencyModule(UserSession? s) {
+  if (s == null) return false;
+  if (!sessionAllows(s, 'assets.view')) return false;
+  return s.roles.any(_deficiencyModuleRoles.contains) ||
+      _deficiencyModuleRoles.contains(s.primaryRole);
 }

@@ -3,6 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
+import 'package:gssms_mobile/features/auth/domain/models/auth_role.dart';
+import 'package:gssms_mobile/features/work_orders/domain/models/deficiency_severity_option.dart';
+import 'package:gssms_mobile/features/work_orders/domain/models/group_inclusion_result.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:gssms_mobile/features/work_orders/data/work_order_repository.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/maintenance_record.dart';
@@ -46,12 +49,18 @@ void main() {
     when(() => mockRepo.fetchWorkOrders()).thenAnswer((_) async => [newOrder]);
   });
 
-  Widget wrap(Widget home) {
+  Widget wrap(
+    Widget home, {
+    AuthRole role = AuthRole.depotIncharge,
+    List<String> permissions = const ['maintenance.view', 'maintenance.edit'],
+  }) {
     return ProviderScope(
       overrides: [
         workOrderRepositoryProvider.overrideWithValue(mockRepo),
         authControllerProvider.overrideWith(
-          () => FakeAuthenticatedController(fakeSession()),
+          () => FakeAuthenticatedController(
+            fakeSession(role: role, permissions: permissions),
+          ),
         ),
       ],
       child: MaterialApp(
@@ -237,6 +246,257 @@ void main() {
         ),
       ).called(1);
       verifyNever(() => mockRepo.verifyWorkOrder(any(), remarks: any(named: 'remarks')));
+    });
+
+    group('severity, groups and modes', () {
+      const severities = [
+        DeficiencySeverityOption(id: 1, code: 'MINOR', label: 'Minor'),
+        DeficiencySeverityOption(id: 2, code: 'MAJOR', label: 'Major'),
+      ];
+
+      VerificationWorkspace workspaceWith({
+        String mode = 'CHECKLIST',
+        String status = 'TECH_COMPLETED',
+        Map<String, dynamic>? complaint,
+      }) {
+        return VerificationWorkspace.fromJson({
+          'can_verify': true,
+          'work_order': {'status': status, 'execution_mode': mode},
+          'record': {'id': 55, 'work_order': 101, 'lines': []},
+          'deficiency_rows': [
+            {
+              'id': 7,
+              'asset': 'TR-01',
+              'checkpoint': 'Oil level',
+              'finding': 'Low oil',
+              'severity': 'Minor',
+              'deficiency_id': 12,
+              'deficiency_version': 3,
+              'severity_id': 1,
+            },
+          ],
+          'remark_deficiency_rows': [],
+          'asset_groups': [
+            {
+              'key': 'g1',
+              'asset_category_id': 4,
+              'asset_name': 'TR-01',
+              'display_name': 'Transformer TR-01',
+              'checked_out': true,
+              'checkout_source': 'SUPERVISOR',
+            },
+          ],
+          'complaint_execution': complaint,
+        });
+      }
+
+      void arrange(WidgetTester tester, VerificationWorkspace ws) {
+        tester.view.physicalSize = const Size(800, 3000);
+        tester.view.devicePixelRatio = 1;
+        addTearDown(tester.view.reset);
+        stubDetail();
+        when(() => mockRepo.fetchVerificationWorkspace(101))
+            .thenAnswer((_) async => ws);
+        when(() => mockRepo.getDeficiencySeverities())
+            .thenAnswer((_) async => severities);
+      }
+
+      testWidgets('shows severity dropdown for DEPOT_INCHARGE', (tester) async {
+        arrange(tester, workspaceWith());
+        await tester.pumpWidget(
+          wrap(const VerificationWorkspaceScreen(workOrderId: 101)),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(const Key('severity_dropdown_7')), findsOneWidget);
+      });
+
+      testWidgets('shows severity text for DIV_ADMIN', (tester) async {
+        arrange(tester, workspaceWith());
+        await tester.pumpWidget(
+          wrap(
+            const VerificationWorkspaceScreen(workOrderId: 101),
+            role: AuthRole.divAdmin,
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.byKey(const Key('severity_dropdown_7')), findsNothing);
+        expect(find.byKey(const Key('severity_text_7')), findsOneWidget);
+      });
+
+      Future<void> pickMajor(WidgetTester tester) async {
+        await tester.tap(find.byKey(const Key('severity_dropdown_7')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Major').last);
+        await tester.pumpAndSettle();
+      }
+
+      testWidgets('changing severity sends expectedVersion', (tester) async {
+        arrange(tester, workspaceWith());
+        when(
+          () => mockRepo.updateDeficiencySeverity(
+            12,
+            severityId: 2,
+            expectedVersion: 3,
+          ),
+        ).thenAnswer(
+          (_) async => const DeficiencySeverityUpdate(id: 12, severityId: 2),
+        );
+        await tester.pumpWidget(
+          wrap(const VerificationWorkspaceScreen(workOrderId: 101)),
+        );
+        await tester.pumpAndSettle();
+
+        await pickMajor(tester);
+
+        verify(
+          () => mockRepo.updateDeficiencySeverity(
+            12,
+            severityId: 2,
+            expectedVersion: 3,
+          ),
+        ).called(1);
+      });
+
+      testWidgets('a 409 on severity shows the conflict message', (tester) async {
+        arrange(tester, workspaceWith());
+        when(
+          () => mockRepo.updateDeficiencySeverity(
+            12,
+            severityId: 2,
+            expectedVersion: 3,
+          ),
+        ).thenThrow(
+          DioException(
+            requestOptions: RequestOptions(path: '/api/v1/deficiencies/12/'),
+            type: DioExceptionType.badResponse,
+            response: Response(
+              requestOptions: RequestOptions(path: '/api/v1/deficiencies/12/'),
+              statusCode: 409,
+              data: const {'detail': 'stale'},
+            ),
+          ),
+        );
+        await tester.pumpWidget(
+          wrap(const VerificationWorkspaceScreen(workOrderId: 101)),
+        );
+        await tester.pumpAndSettle();
+
+        await pickMajor(tester);
+
+        expect(
+          find.text(
+            'This deficiency was updated by someone else. The latest state has been reloaded.',
+          ),
+          findsOneWidget,
+        );
+      });
+
+      testWidgets('Un-check needs group_uncheckout and TECH_COMPLETED', (tester) async {
+        arrange(tester, workspaceWith());
+        await tester.pumpWidget(
+          wrap(const VerificationWorkspaceScreen(workOrderId: 101)),
+        );
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('uncheck_group_g1')), findsNothing);
+
+        arrange(tester, workspaceWith(status: 'VERIFIED'));
+        await tester.pumpWidget(
+          wrap(
+            const VerificationWorkspaceScreen(workOrderId: 101),
+            permissions: const [
+              'maintenance.view',
+              'maintenance.edit',
+              'maintenance.group_uncheckout',
+            ],
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('uncheck_group_g1')), findsNothing);
+      });
+
+      testWidgets('Un-check asks for a reason then calls setGroupInclusion', (tester) async {
+        arrange(tester, workspaceWith());
+        when(
+          () => mockRepo.setGroupInclusion(
+            55,
+            assetCategoryId: 4,
+            assetName: 'TR-01',
+            included: false,
+            reason: 'Wrong asset',
+          ),
+        ).thenAnswer(
+          (_) async => const GroupInclusionResult(returnedToTechnician: true),
+        );
+        await tester.pumpWidget(
+          wrap(
+            const VerificationWorkspaceScreen(workOrderId: 101),
+            permissions: const [
+              'maintenance.view',
+              'maintenance.edit',
+              'maintenance.group_uncheckout',
+            ],
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(find.byKey(const Key('uncheck_group_g1')));
+        await tester.pumpAndSettle();
+        expect(find.text('Reason for un-checking "Transformer TR-01"'),
+            findsOneWidget);
+
+        // Reason is required.
+        await tester.tap(find.byKey(const Key('uncheck_confirm_button')));
+        await tester.pumpAndSettle();
+        verifyNever(
+          () => mockRepo.setGroupInclusion(
+            any(),
+            assetCategoryId: any(named: 'assetCategoryId'),
+            assetName: any(named: 'assetName'),
+            included: any(named: 'included'),
+            reason: any(named: 'reason'),
+          ),
+        );
+
+        await tester.enterText(
+            find.byKey(const Key('uncheck_reason_field')), 'Wrong asset');
+        await tester.tap(find.byKey(const Key('uncheck_confirm_button')));
+        await tester.pumpAndSettle();
+
+        verify(
+          () => mockRepo.setGroupInclusion(
+            55,
+            assetCategoryId: 4,
+            assetName: 'TR-01',
+            included: false,
+            reason: 'Wrong asset',
+          ),
+        ).called(1);
+      });
+
+      testWidgets('COMPLAINT mode shows findings and hides Checklist', (tester) async {
+        arrange(
+          tester,
+          workspaceWith(
+            mode: 'COMPLAINT',
+            complaint: const {
+              'id': 9,
+              'initial_findings': 'Loud humming noise',
+              'action_taken': 'Tightened bolts',
+              'final_remarks': 'Resolved',
+            },
+          ),
+        );
+        await tester.pumpWidget(
+          wrap(const VerificationWorkspaceScreen(workOrderId: 101)),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Loud humming noise'), findsOneWidget);
+        expect(find.text('Tightened bolts'), findsOneWidget);
+        expect(find.text('Checklist'), findsNothing);
+      });
     });
   });
 }

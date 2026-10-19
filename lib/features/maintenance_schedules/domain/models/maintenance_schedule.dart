@@ -9,6 +9,7 @@ enum ScheduleStatus {
   inProgress('IN_PROGRESS', 'In Progress'),
   completed('COMPLETED', 'Completed'),
   overdue('OVERDUE', 'Overdue'),
+  skipped('SKIPPED', 'Skipped'),
   unknown('UNKNOWN', 'Unknown');
 
   const ScheduleStatus(this.code, this.displayName);
@@ -40,6 +41,7 @@ class MaintenanceSchedule extends Equatable {
     this.workOrderId,
     this.workOrderTicket,
     this.workOrderStatus,
+    this.isBreakdown = false,
   });
 
   final int id;
@@ -58,7 +60,15 @@ class MaintenanceSchedule extends Equatable {
   final String? workOrderTicket;
   final String? workOrderStatus;
 
+  /// Backing row of a breakdown (corrective) job, not a scheduled task.
+  final bool isBreakdown;
+
   bool get isConverted => workOrderId != null;
+
+  /// A skipped occurrence (owner/DIV_ADMIN-approved) must never be offered
+  /// for batch conversion - the backend refuses it with 400 regardless, so
+  /// this is what stops the UI from offering an action it knows will fail.
+  bool get isSkipped => status == ScheduleStatus.skipped;
 
   factory MaintenanceSchedule.fromJson(Map<String, dynamic> json) {
     return MaintenanceSchedule(
@@ -76,6 +86,7 @@ class MaintenanceSchedule extends Equatable {
       workOrderId: asJsonInt(json['work_order_id']),
       workOrderTicket: asJsonString(json['work_order_ticket']),
       workOrderStatus: asJsonString(json['work_order_status']),
+      isBreakdown: asJsonBool(json['is_breakdown']) ?? false,
     );
   }
 
@@ -91,5 +102,6 @@ class MaintenanceSchedule extends Equatable {
         workOrderId,
         workOrderTicket,
         workOrderStatus,
+        isBreakdown,
       ];
 }

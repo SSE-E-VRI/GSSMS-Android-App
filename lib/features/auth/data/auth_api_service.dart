@@ -32,13 +32,21 @@ class AuthApiService {
       if (data == null || data['access'] == null) {
         throw const AuthException('Invalid response structure from login endpoint');
       }
+      final access = data['access'];
+      if (access is! String || access.isEmpty) {
+        throw const AuthException('Invalid access token in login response');
+      }
+      final refresh = data['refresh'];
 
       return AuthTokens(
-        accessToken: data['access'] as String,
-        refreshToken: data['refresh'] as String?,
+        accessToken: access,
+        refreshToken: refresh is String ? refresh : null,
       );
     } on DioException catch (e) {
       throw _parseDioError(e);
+    } catch (e) {
+      if (e is AuthException) rethrow;
+      throw AuthException('Invalid login response: $e');
     }
   }
 
@@ -78,12 +86,20 @@ class AuthApiService {
       if (data == null || data['access'] == null) {
         throw const AuthException('Invalid OTP login response structure');
       }
+      final access = data['access'];
+      if (access is! String || access.isEmpty) {
+        throw const AuthException('Invalid access token in OTP login response');
+      }
+      final refresh = data['refresh'];
       return AuthTokens(
-        accessToken: data['access'] as String,
-        refreshToken: data['refresh'] as String?,
+        accessToken: access,
+        refreshToken: refresh is String ? refresh : null,
       );
     } on DioException catch (e) {
       throw _parseDioError(e);
+    } catch (e) {
+      if (e is AuthException) rethrow;
+      throw AuthException('Invalid OTP login response: $e');
     }
   }
 
@@ -133,9 +149,17 @@ class AuthApiService {
       );
       final data = response.data;
       if (data == null || data['access'] == null) throw const AuthException('Invalid TOTP validate response');
-      return AuthTokens(accessToken: data['access'] as String, refreshToken: data['refresh'] as String?);
+      final access = data['access'];
+      if (access is! String || access.isEmpty) {
+        throw const AuthException('Invalid access token in TOTP response');
+      }
+      final refresh = data['refresh'];
+      return AuthTokens(accessToken: access, refreshToken: refresh is String ? refresh : null);
     } on DioException catch (e) {
       throw _parseDioError(e);
+    } catch (e) {
+      if (e is AuthException) rethrow;
+      throw AuthException('Invalid TOTP response: $e');
     }
   }
 
@@ -174,12 +198,16 @@ class AuthApiService {
       final dynamic data;
       if (filePath != null) {
         final filename = filePath.split(RegExp(r'[/\\]')).last;
-        data = FormData.fromMap({
-          'profile_picture': await MultipartFile.fromFile(
-            filePath,
-            filename: filename,
-          ),
-        });
+        try {
+          data = FormData.fromMap({
+            'profile_picture': await MultipartFile.fromFile(
+              filePath,
+              filename: filename,
+            ),
+          });
+        } catch (e) {
+          throw AuthException('Unable to read photo file: $e');
+        }
       } else {
         data = {'profile_picture': null};
       }
@@ -192,6 +220,9 @@ class AuthApiService {
       return {};
     } on DioException catch (e) {
       throw _parseDioError(e);
+    } catch (e) {
+      if (e is AuthException) rethrow;
+      throw AuthException('Unable to update photo: $e');
     }
   }
 
@@ -207,13 +238,21 @@ class AuthApiService {
       if (data == null || data['access'] == null) {
         throw const AuthException('Invalid response structure from refresh endpoint');
       }
+      final access = data['access'];
+      if (access is! String || access.isEmpty) {
+        throw const AuthException('Invalid access token in refresh response');
+      }
+      final refresh = data['refresh'];
 
       return AuthTokens(
-        accessToken: data['access'] as String,
-        refreshToken: data['refresh'] as String? ?? refreshToken,
+        accessToken: access,
+        refreshToken: refresh is String && refresh.isNotEmpty ? refresh : refreshToken,
       );
     } on DioException catch (e) {
       throw _parseDioError(e);
+    } catch (e) {
+      if (e is AuthException) rethrow;
+      throw AuthException('Invalid refresh response: $e');
     }
   }
 

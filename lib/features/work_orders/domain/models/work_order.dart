@@ -118,6 +118,11 @@ class WorkOrder extends Equatable {
     required this.type,
     this.ticketNumber,
     this.maintenanceMasterName,
+    // S-V1 checklist version frozen when this Job Work was created
+    // (`maintenance_master_version_snapshot`), surfaced in S-V4. This is the
+    // version actually executed — not the master's current version — and is
+    // null for legacy/unversioned rows.
+    this.maintenanceMasterVersionSnapshot,
     this.slaStatus,
     this.escalationLevel,
     this.stationId,
@@ -144,6 +149,10 @@ class WorkOrder extends Equatable {
     this.originalScheduleId,
     this.originalComplaintId,
     this.originalInspectionId,
+    this.originalDeficiencyId,
+    this.executionMode,
+    this.maintenanceMasterId,
+    this.source,
   });
 
   final int id;
@@ -155,6 +164,9 @@ class WorkOrder extends Equatable {
 
   /// Checklist template this work order executes.
   final String? maintenanceMasterName;
+
+  /// Checklist version frozen at execution time (see above).
+  final String? maintenanceMasterVersionSnapshot;
 
   /// Server-computed SLA state, e.g. "OK", "AT_RISK", "BREACHED".
   final String? slaStatus;
@@ -184,6 +196,28 @@ class WorkOrder extends Equatable {
   final int? originalScheduleId;
   final int? originalComplaintId;
   final int? originalInspectionId;
+  final int? originalDeficiencyId;
+
+  /// Server-owned execution UI bucket (`COMPLAINT` / `CHECKLIST` /
+  /// `INSPECTION` / `RECTIFICATION`) — read-only, mirrors web's
+  /// `jobWorkType` helper which also keys labels off it.
+  final String? executionMode;
+
+  /// Checklist master (`maintenance_master` FK) this Job Work executes.
+  final int? maintenanceMasterId;
+
+  /// Origin of the Job Work, e.g. `SCHEDULED_PM`.
+  final String? source;
+
+  /// Preventive Job Work (type PREVENTIVE or created from a scheduled PM).
+  bool get isPmWorkOrder =>
+      type == WorkOrderType.preventive ||
+      source?.toUpperCase() == 'SCHEDULED_PM';
+
+  /// Server-owned mode execution (Breakdown / Inspection / Rectification
+  /// forms rather than the checklist).
+  bool get isModeExecution => const {'COMPLAINT', 'INSPECTION', 'RECTIFICATION'}
+      .contains(executionMode?.toUpperCase());
 
   String get displayTitle {
     if (title != null && title!.trim().isNotEmpty) return title!;
@@ -191,7 +225,47 @@ class WorkOrder extends Equatable {
       return maintenanceMasterName!;
     }
     final asset = assetName ?? infrastructureName ?? stationName ?? 'Asset';
-    return '${type.displayName} - $asset';
+    return '$displayTypeLabel - $asset';
+  }
+
+  /// Display-only type label. Stored [type] stays untouched (still CORRECTIVE
+  /// for complaint/deficiency/inspection job works, so report counts don't
+  /// change). Order mirrors web's `jobWorkTypeLabel`: complaint-origin →
+  /// "Breakdown Maintenance", deficiency-origin → "Deficiency Rectification",
+  /// inspection-origin → "Inspection Notes Attention", else the stored
+  /// type's display name. Label only — no extra panel.
+  String get displayTypeLabel {
+    if (originalComplaintId != null) return 'Breakdown Maintenance';
+    if (originalDeficiencyId != null ||
+        executionMode?.toUpperCase() == 'RECTIFICATION') {
+      return 'Deficiency Rectification';
+    }
+    if (originalInspectionId != null ||
+        executionMode?.toUpperCase() == 'INSPECTION') {
+      return 'Inspection Notes Attention';
+    }
+    return type.displayName;
+  }
+
+  /// Report register "Schedule" column, mirroring web's
+  /// `jobWorkScheduleCategory`: PM / Breakdown / Inspection / Deficiency
+  /// Rectification, else the stored type label. Display only — the stored
+  /// [type] is untouched.
+  String get scheduleCategory {
+    if (originalDeficiencyId != null ||
+        executionMode?.toUpperCase() == 'RECTIFICATION') {
+      return 'Deficiency Rectification';
+    }
+    if (originalComplaintId != null) return 'Breakdown';
+    if (originalInspectionId != null ||
+        executionMode?.toUpperCase() == 'INSPECTION') {
+      return 'Inspection';
+    }
+    if (originalScheduleId != null || type == WorkOrderType.preventive) {
+      return 'PM';
+    }
+    if (type == WorkOrderType.breakdown) return 'Breakdown';
+    return type == WorkOrderType.unknown ? '-' : type.displayName;
   }
 
   /// Ticket number when the server issued one, otherwise the numeric id.
@@ -224,6 +298,7 @@ class WorkOrder extends Equatable {
       type: type,
       ticketNumber: ticketNumber,
       maintenanceMasterName: maintenanceMasterName,
+      maintenanceMasterVersionSnapshot: maintenanceMasterVersionSnapshot,
       slaStatus: slaStatus,
       escalationLevel: escalationLevel,
       stationId: stationId,
@@ -252,6 +327,10 @@ class WorkOrder extends Equatable {
       originalScheduleId: originalScheduleId,
       originalComplaintId: originalComplaintId,
       originalInspectionId: originalInspectionId,
+      originalDeficiencyId: originalDeficiencyId,
+      executionMode: executionMode,
+      maintenanceMasterId: maintenanceMasterId,
+      source: source,
     );
   }
 
@@ -279,6 +358,8 @@ class WorkOrder extends Equatable {
       type: WorkOrderType.fromString(asJsonString(json['type'])),
       ticketNumber: asJsonString(json['ticket_number']),
       maintenanceMasterName: asJsonString(json['maintenance_master_name']),
+      maintenanceMasterVersionSnapshot:
+          asJsonString(json['maintenance_master_version_snapshot']),
       slaStatus: asJsonString(json['sla_status']),
       escalationLevel: asJsonString(json['escalation_level']),
       stationId: fkId(json['station']),
@@ -303,8 +384,15 @@ class WorkOrder extends Equatable {
       latestEventSummary: eventSummary,
       linkedRecordId: asJsonInt(json['linked_record_id']),
       originalScheduleId: asJsonInt(json['original_schedule_id']),
-      originalComplaintId: asJsonInt(json['original_complaint_id']),
-      originalInspectionId: asJsonInt(json['original_inspection_id']),
+      originalComplaintId: fkId(json['original_complaint_id']) ??
+          fkId(json['original_complaint']),
+      originalInspectionId: fkId(json['original_inspection_id']) ??
+          fkId(json['original_inspection']),
+      originalDeficiencyId: fkId(json['original_deficiency_id']) ??
+          fkId(json['original_deficiency']),
+      executionMode: asJsonString(json['execution_mode']),
+      maintenanceMasterId: fkId(json['maintenance_master']),
+      source: asJsonString(json['source']),
     );
   }
 
@@ -315,6 +403,7 @@ class WorkOrder extends Equatable {
         type,
         ticketNumber,
         maintenanceMasterName,
+        maintenanceMasterVersionSnapshot,
         slaStatus,
         escalationLevel,
         stationId,
@@ -341,6 +430,10 @@ class WorkOrder extends Equatable {
         originalScheduleId,
         originalComplaintId,
         originalInspectionId,
+        originalDeficiencyId,
+        executionMode,
+        maintenanceMasterId,
+        source,
       ];
 }
 

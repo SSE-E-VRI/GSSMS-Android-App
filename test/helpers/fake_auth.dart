@@ -17,6 +17,7 @@ UserSession fakeSession({
   AuthRole role = AuthRole.depotIncharge,
   List<String> permissions = const ['maintenance.view', 'maintenance.edit'],
   OrgScope scope = const OrgScope(level: OrgScopeLevel.depot),
+  int? userId,
 }) {
   return UserSession(
     accessToken: 'test_token',
@@ -27,5 +28,6 @@ UserSession fakeSession({
     roles: [role],
     permissions: permissions,
     scope: scope,
+    userId: userId,
   );
 }

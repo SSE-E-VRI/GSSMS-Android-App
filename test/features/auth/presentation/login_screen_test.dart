@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gssms_mobile/core/config/app_version.dart';
 import 'package:gssms_mobile/features/auth/data/auth_repository.dart';
 import 'package:gssms_mobile/features/auth/domain/models/auth_exceptions.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
@@ -35,6 +36,13 @@ void main() {
       expect(find.byKey(const Key('login_password_field')), findsOneWidget);
       expect(find.byKey(const Key('login_submit_button')), findsOneWidget);
       expect(find.text('GSSMS Mobile'), findsOneWidget);
+    });
+
+    testWidgets('shows the app version footer', (tester) async {
+      await tester.pumpWidget(createTestWidget());
+
+      expect(find.byKey(const Key('login_version_footer')), findsOneWidget);
+      expect(find.text('Version $appVersion'), findsOneWidget);
     });
 
     testWidgets('shows validation errors when submitting empty form', (tester) async {

@@ -101,14 +101,18 @@ class ListResultHeader extends StatelessWidget {
     required this.shown,
     required this.total,
     required this.noun,
+    this.nounSingular,
     this.onClearFilters,
   });
 
   final int shown;
   final int total;
 
-  /// Plural noun, e.g. `complaints`.
+  /// Plural noun, e.g. `complaints`, `Job Works`.
   final String noun;
+
+  /// Singular noun, e.g. `Job Work`. If omitted, [noun] is used for all counts.
+  final String? nounSingular;
 
   /// Non-null when any filter/search is active.
   final VoidCallback? onClearFilters;
@@ -117,9 +121,10 @@ class ListResultHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final tokens = context.gssms;
     final filtered = onClearFilters != null;
+    final effectiveNoun = (total == 1 && nounSingular != null) ? nounSingular! : noun;
     final text = filtered && shown != total
-        ? '$shown of $total $noun'
-        : '$total $noun';
+        ? '$shown of $total $effectiveNoun'
+        : '$total $effectiveNoun';
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         GssmsSpacing.s16,

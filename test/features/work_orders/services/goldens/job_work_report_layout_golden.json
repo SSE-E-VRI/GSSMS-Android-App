@@ -1,0 +1,194 @@
+{
+  "checklist_pm_full": {
+    "pageCount": 2,
+    "pageSizes": [
+      {
+        "width": 595.92,
+        "height": 842.88
+      },
+      {
+        "width": 595.92,
+        "height": 842.88
+      }
+    ],
+    "objectCount": 21
+  },
+  "checklist_pm_minimal": {
+    "pageCount": 1,
+    "pageSizes": [
+      {
+        "width": 595.92,
+        "height": 842.88
+      }
+    ],
+    "objectCount": 19
+  },
+  "checklist_pm_long": {
+    "pageCount": 5,
+    "pageSizes": [
+      {
+        "width": 595.92,
+        "height": 842.88
+      },
+      {
+        "width": 595.92,
+        "height": 842.88
+      },
+      {
+        "width": 595.92,
+        "height": 842.88
+      },
+      {
+        "width": 595.92,
+        "height": 842.88
+      },
+      {
+        "width": 595.92,
+        "height": 842.88
+      }
+    ],
+    "objectCount": 27
+  },
+  "breakdown_deficiency": {
+    "pageCount": 2,
+    "pageSizes": [
+      {
+        "width": 595.92,
+        "height": 842.88
+      },
+      {
+        "width": 595.92,
+        "height": 842.88
+      }
+    ],
+    "objectCount": 21
+  },
+  "breakdown_complaint": {
+    "pageCount": 1,
+    "pageSizes": [
+      {
+        "width": 595.92,
+        "height": 842.88
+      }
+    ],
+    "objectCount": 19
+  },
+  "breakdown_jobwork": {
+    "pageCount": 1,
+    "pageSizes": [
+      {
+        "width": 595.92,
+        "height": 842.88
+      }
+    ],
+    "objectCount": 19
+  },
+  "inspection_pointwise": {
+    "pageCount": 2,
+    "pageSizes": [
+      {
+        "width": 595.92,
+        "height": 842.88
+      },
+      {
+        "width": 595.92,
+        "height": 842.88
+      }
+    ],
+    "objectCount": 21
+  },
+  "inspection_legacy": {
+    "pageCount": 1,
+    "pageSizes": [
+      {
+        "width": 595.92,
+        "height": 842.88
+      }
+    ],
+    "objectCount": 19
+  },
+  "rectification_mixed": {
+    "pageCount": 2,
+    "pageSizes": [
+      {
+        "width": 595.92,
+        "height": 842.88
+      },
+      {
+        "width": 595.92,
+        "height": 842.88
+      }
+    ],
+    "objectCount": 21
+  },
+  "rectification_single": {
+    "pageCount": 1,
+    "pageSizes": [
+      {
+        "width": 595.92,
+        "height": 842.88
+      }
+    ],
+    "objectCount": 19
+  },
+  "checklist_pm_stress": {
+    "pageCount": 2,
+    "pageSizes": [
+      {
+        "width": 595.92,
+        "height": 842.88
+      },
+      {
+        "width": 595.92,
+        "height": 842.88
+      }
+    ],
+    "objectCount": 21
+  },
+  "breakdown_long": {
+    "pageCount": 2,
+    "pageSizes": [
+      {
+        "width": 595.92,
+        "height": 842.88
+      },
+      {
+        "width": 595.92,
+        "height": 842.88
+      }
+    ],
+    "objectCount": 21
+  },
+  "rectification_long": {
+    "pageCount": 3,
+    "pageSizes": [
+      {
+        "width": 595.92,
+        "height": 842.88
+      },
+      {
+        "width": 595.92,
+        "height": 842.88
+      },
+      {
+        "width": 595.92,
+        "height": 842.88
+      }
+    ],
+    "objectCount": 23
+  },
+  "register_checklist": {
+    "pageCount": 2,
+    "pageSizes": [
+      {
+        "width": 595.92,
+        "height": 842.88
+      },
+      {
+        "width": 595.92,
+        "height": 842.88
+      }
+    ],
+    "objectCount": 21
+  }
+}

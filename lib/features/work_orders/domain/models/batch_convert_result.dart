@@ -1,30 +1,65 @@
 import 'package:equatable/equatable.dart';
 import 'package:gssms_mobile/core/utils/json_parsing.dart';
 
-/// Response shape shared by the three batch-conversion endpoints
-/// (`create_from_complaints`, `create_from_inspections`,
-/// `create_batch_work_orders`) — all all-or-nothing per SSOT §12's
-/// conversion contract, so a 2xx response always means every requested id
-/// converted.
+/// One entry in [BatchConvertResult.results] — the ticket number (and
+/// eventually other fields) for a single created Job Work.
+class BatchConvertResultItem extends Equatable {
+  const BatchConvertResultItem({this.ticketNumber});
+  final String? ticketNumber;
+
+  factory BatchConvertResultItem.fromJson(Map<String, dynamic> json) {
+    return BatchConvertResultItem(
+      ticketNumber: asJsonString(json['ticket_number']),
+    );
+  }
+
+  @override
+  List<Object?> get props => [ticketNumber];
+}
+
+/// Response shape shared by the batch-conversion endpoints
+/// (create_from_complaints, create_from_inspections,
+/// create_batch_work_orders, create_rectification).
 class BatchConvertResult extends Equatable {
-  const BatchConvertResult({this.workOrderIds = const [], this.message});
+  const BatchConvertResult({
+    this.workOrderIds = const [],
+    this.results = const [],
+    this.message,
+  });
 
   final List<int> workOrderIds;
+
+  /// Per-Job-Work detail objects from the server (contains ticket_number).
+  final List<BatchConvertResultItem> results;
+
   final String? message;
 
   int get count => workOrderIds.length;
+
+  /// Ticket numbers extracted from results, filtered to non-empty strings.
+  List<String> get tickets =>
+      results.map((r) => r.ticketNumber).whereType<String>().toList();
 
   factory BatchConvertResult.fromJson(Map<String, dynamic> json) {
     final rawIds = json['work_order_ids'];
     final ids = rawIds is List
         ? rawIds.map((e) => asJsonInt(e)).whereType<int>().toList()
         : <int>[];
+    final rawResults = json['results'];
+    final resultItems = rawResults is List
+        ? rawResults
+            .whereType<Map>()
+            .map((e) =>
+                BatchConvertResultItem.fromJson(Map<String, dynamic>.from(e)))
+            .toList()
+        : <BatchConvertResultItem>[];
     return BatchConvertResult(
       workOrderIds: ids,
+      results: resultItems,
       message: asJsonString(json['message']),
     );
   }
 
   @override
-  List<Object?> get props => [workOrderIds, message];
+  List<Object?> get props => [workOrderIds, results, message];
 }

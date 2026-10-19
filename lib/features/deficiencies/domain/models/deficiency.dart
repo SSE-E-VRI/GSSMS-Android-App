@@ -28,10 +28,8 @@ enum DeficiencyStatus {
 }
 
 /// One row from `GET /api/v1/deficiencies/pending/` (`DeficiencySerializer`
-/// in `assets/serializers.py`). Read-only on mobile — web's own Pending
-/// Actions tab for this type has no batch-convert action either, only a
-/// deep link into the asset's Deficiencies tab, which mobile mirrors by
-/// opening the asset detail screen.
+/// in `assets/serializers.py`). Rows are selectable for rectification via
+/// createRectification; manual assign/start/resolve are disabled server-side.
 class Deficiency extends Equatable {
   const Deficiency({
     required this.id,
@@ -50,6 +48,9 @@ class Deficiency extends Equatable {
     this.workOrderId,
     this.workOrderTicket,
     this.detectedAt,
+    this.activeRemedialWorkOrderId,
+    this.activeRemedialWorkOrderStatus,
+    this.activeRemedialWorkOrderAssignedToName,
   });
 
   final int id;
@@ -75,10 +76,16 @@ class Deficiency extends Equatable {
   final int? workOrderId;
   final String? workOrderTicket;
   final DateTime? detectedAt;
+  /// `active_remedial_work_order.id` — an open remedial Job Work, if any.
+  final int? activeRemedialWorkOrderId;
+  final String? activeRemedialWorkOrderStatus;
 
-  /// The line to show as the card's main text — the human-readable finding
-  /// when present, falling back to the raw description (mirrors web's
-  /// `item.deficiency_finding || item.description`).
+  /// `active_remedial_work_order.assigned_to_name` — who holds that Job Work.
+  /// The server sends `''` for "nobody"; absent and blank both read as null.
+  final String? activeRemedialWorkOrderAssignedToName;
+
+  bool get hasActiveRemedial => activeRemedialWorkOrderId != null;
+
   String get displayFinding =>
       (deficiencyFinding != null && deficiencyFinding!.isNotEmpty)
           ? deficiencyFinding!
@@ -94,6 +101,7 @@ class Deficiency extends Equatable {
   }
 
   factory Deficiency.fromJson(Map<String, dynamic> json) {
+    final remedial = json['active_remedial_work_order'];
     return Deficiency(
       id: asJsonInt(json['id']) ?? 0,
       code: asJsonString(json['code']),
@@ -112,6 +120,13 @@ class Deficiency extends Equatable {
       workOrderTicket: asJsonString(json['work_order_ticket']),
       detectedAt: asJsonString(json['detected_at']) != null
           ? asJsonDateTime(json['detected_at'])
+          : null,
+      activeRemedialWorkOrderId:
+          remedial is Map ? asJsonInt(remedial['id']) : null,
+      activeRemedialWorkOrderStatus:
+          remedial is Map ? asJsonString(remedial['status']) : null,
+      activeRemedialWorkOrderAssignedToName: remedial is Map
+          ? asJsonNonBlankString(remedial['assigned_to_name'])
           : null,
     );
   }
@@ -134,5 +149,8 @@ class Deficiency extends Equatable {
         workOrderId,
         workOrderTicket,
         detectedAt,
+        activeRemedialWorkOrderId,
+        activeRemedialWorkOrderStatus,
+        activeRemedialWorkOrderAssignedToName,
       ];
 }

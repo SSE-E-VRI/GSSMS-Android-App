@@ -1,7 +1,7 @@
 import 'package:equatable/equatable.dart';
 import 'package:gssms_mobile/core/widgets/org_scope_filter_bar.dart';
 import 'package:gssms_mobile/features/reports/domain/models/infrastructure_option.dart';
-import 'package:gssms_mobile/features/reports/domain/models/maintenance_register_entry.dart';
+import 'package:gssms_mobile/features/work_orders/domain/models/work_order.dart';
 
 sealed class ReportsState extends Equatable {
   const ReportsState();
@@ -25,7 +25,10 @@ class ReportsLoaded extends ReportsState {
     this.orgScope = OrgScopeSelection.empty,
   });
 
-  final List<MaintenanceRegisterEntry> entries;
+  /// Completed Job Works in range (TECH_COMPLETED / VERIFIED / CLOSED),
+  /// mirroring web's Register tab work-order list. Tapping one resolves its
+  /// checklist record for the Register export.
+  final List<WorkOrder> entries;
   final DateTime startDate;
   final DateTime endDate;
   final InfraFilterType infraType;
@@ -39,7 +42,7 @@ class ReportsLoaded extends ReportsState {
   final OrgScopeSelection orgScope;
 
   ReportsLoaded copyWith({
-    List<MaintenanceRegisterEntry>? entries,
+    List<WorkOrder>? entries,
     DateTime? startDate,
     DateTime? endDate,
     InfraFilterType? infraType,

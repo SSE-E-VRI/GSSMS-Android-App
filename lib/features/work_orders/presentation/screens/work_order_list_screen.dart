@@ -11,14 +11,18 @@ import 'package:gssms_mobile/core/widgets/org_scope_app_bar_filter.dart';
 import 'package:gssms_mobile/core/widgets/org_scope_filter_bar.dart';
 import 'package:gssms_mobile/core/widgets/skeleton_list.dart';
 import 'package:gssms_mobile/core/widgets/status_chip.dart';
+import 'package:gssms_mobile/features/auth/domain/models/org_scope.dart';
+import 'package:gssms_mobile/features/auth/domain/models/user_session.dart';
 import 'package:gssms_mobile/features/auth/domain/rbac.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:gssms_mobile/features/auth/presentation/widgets/permission_denied_view.dart';
 import 'package:gssms_mobile/features/reports/domain/models/infrastructure_option.dart';
+import 'package:gssms_mobile/features/work_orders/domain/models/mode_execution.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/work_order.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_order_controllers.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_order_state.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/screens/work_order_create_screen.dart';
+import 'package:gssms_mobile/features/work_orders/presentation/screens/job_work_report_screen.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/screens/work_order_detail_screen.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/work_order_status_style.dart';
 import 'package:intl/intl.dart';
@@ -74,6 +78,17 @@ class _WorkOrderListScreenState extends ConsumerState<WorkOrderListScreen> {
           s.infraType != InfraFilterType.all ||
           (s.infraName?.isNotEmpty ?? false));
 
+  static int _activeFilterCount(WorkOrderListLoaded? s) {
+    if (s == null) return 0;
+    var count = 0;
+    if (s.dateFrom != null || s.dateTo != null) count++;
+    if (s.selectedStatusFilter != null) count++;
+    if (s.selectedTypeFilter != null) count++;
+    if (s.infraType != InfraFilterType.all) count++;
+    if (s.infraName != null && s.infraName!.isNotEmpty) count++;
+    return count;
+  }
+
   Future<void> _clearFilters() async {
     _searchController.clear();
     _controller
@@ -82,6 +97,18 @@ class _WorkOrderListScreenState extends ConsumerState<WorkOrderListScreen> {
       ..clearInfraFilters()
       ..setSearchQuery('');
     await _controller.setDateRange(null, null);
+  }
+
+  void _openFilterSheet(BuildContext context, WorkOrderListLoaded? loaded) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => _WorkOrderFilterSheet(
+        state: loaded,
+        controller: _controller,
+        onClearAll: _clearFilters,
+      ),
+    );
   }
 
   @override
@@ -99,6 +126,7 @@ class _WorkOrderListScreenState extends ConsumerState<WorkOrderListScreen> {
     final loaded = listState is WorkOrderListLoaded
         ? listState
         : (listState is WorkOrderListError ? listState.previousLoaded : null);
+    final filterCount = _activeFilterCount(loaded);
 
     return Scaffold(
       appBar: widget.isEmbedded
@@ -129,23 +157,32 @@ class _WorkOrderListScreenState extends ConsumerState<WorkOrderListScreen> {
             SliverToBoxAdapter(
               child: FilterStrip(
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    GssmsSearchField(
-                      controller: _searchController,
-                      hintText: 'Search by ticket, title, asset, station…',
-                      onChanged: _controller.setSearchQuery,
+                    Row(
+                      children: [
+                        Expanded(
+                          child: GssmsSearchField(
+                            controller: _searchController,
+                            hintText: 'Search ticket, title, asset',
+                            onChanged: _controller.setSearchQuery,
+                          ),
+                        ),
+                        const SizedBox(width: GssmsSpacing.s8),
+                        _FiltersButton(
+                          activeCount: filterCount,
+                          onPressed: () => _openFilterSheet(context, loaded),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: GssmsSpacing.s8),
-                    DateRangeFilterBar(
-                      from: loaded?.dateFrom,
-                      to: loaded?.dateTo,
-                      padding: EdgeInsets.zero,
-                      onChanged: _controller.setDateRange,
-                    ),
-                    const SizedBox(height: GssmsSpacing.s8),
-                    _StatusTypeFilters(state: loaded, controller: _controller),
-                    const SizedBox(height: GssmsSpacing.s8),
-                    _InfraFilters(state: loaded, controller: _controller),
+                    if (loaded != null && filterCount > 0) ...[
+                      const SizedBox(height: GssmsSpacing.s8),
+                      _WorkOrderActiveFilterChips(
+                        state: loaded,
+                        controller: _controller,
+                        onClearAll: _clearFilters,
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -155,7 +192,8 @@ class _WorkOrderListScreenState extends ConsumerState<WorkOrderListScreen> {
                 child: ListResultHeader(
                   shown: loaded.filteredOrders.length,
                   total: loaded.workOrders.length,
-                  noun: 'job works',
+                  noun: 'Job Works',
+                  nounSingular: 'Job Work',
                   onClearFilters: _hasActiveFilters(loaded) ? _clearFilters : null,
                 ),
               ),
@@ -224,6 +262,7 @@ class _WorkOrderListScreenState extends ConsumerState<WorkOrderListScreen> {
   }
 
   List<Widget> _buildLoadedSlivers(WorkOrderListLoaded state) {
+    final session = sessionFromAuth(ref.watch(authControllerProvider));
     final orders = state.filteredOrders;
     if (orders.isEmpty) {
       final filtered = _hasActiveFilters(state);
@@ -253,6 +292,15 @@ class _WorkOrderListScreenState extends ConsumerState<WorkOrderListScreen> {
               final order = orders[i];
               return _WorkOrderCard(
                 workOrder: order,
+                session: session,
+                onViewReport: JobWorkReportScreen.canShow(order, session)
+                    ? () => Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) =>
+                                JobWorkReportScreen(workOrder: order),
+                          ),
+                        )
+                    : null,
                 onTap: () {
                   Navigator.of(context).push(
                     MaterialPageRoute(
@@ -270,15 +318,160 @@ class _WorkOrderListScreenState extends ConsumerState<WorkOrderListScreen> {
   }
 }
 
-/// Status + Type as a dropdown pair: chip rows clipped mid-label at 360dp
-/// and cost two extra rows of vertical space.
-class _StatusTypeFilters extends StatelessWidget {
-  const _StatusTypeFilters({required this.state, required this.controller});
+class _FiltersButton extends StatelessWidget {
+  const _FiltersButton({
+    required this.activeCount,
+    required this.onPressed,
+  });
+
+  final int activeCount;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.gssms;
+    final button = OutlinedButton.icon(
+      key: const Key('filters_button'),
+      onPressed: onPressed,
+      icon: const Icon(Icons.filter_list, size: 20),
+      label: const Text('Filters'),
+      style: OutlinedButton.styleFrom(
+        foregroundColor: activeCount > 0 ? tokens.link : tokens.textPrimary,
+        side: BorderSide(
+          color: activeCount > 0 ? tokens.link : tokens.borderStrong,
+        ),
+        padding: const EdgeInsets.symmetric(
+          horizontal: GssmsSpacing.s12,
+          vertical: GssmsSpacing.s12,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(GssmsRadius.r12),
+        ),
+      ),
+    );
+
+    if (activeCount == 0) return button;
+
+    return Badge(
+      key: const Key('filters_badge'),
+      label: Text('$activeCount'),
+      backgroundColor: tokens.link,
+      child: button,
+    );
+  }
+}
+
+class _WorkOrderActiveFilterChips extends StatelessWidget {
+  const _WorkOrderActiveFilterChips({
+    required this.state,
+    required this.controller,
+    required this.onClearAll,
+  });
+
+  final WorkOrderListLoaded state;
+  final WorkOrderListController controller;
+  final VoidCallback onClearAll;
+
+  static final DateFormat _dateFormat = DateFormat('dd MMM');
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.gssms;
+    final chips = <Widget>[];
+
+    if (state.dateFrom != null || state.dateTo != null) {
+      final String dateLabel;
+      if (state.dateFrom != null && state.dateTo != null) {
+        dateLabel =
+            '${_dateFormat.format(state.dateFrom!)} - ${_dateFormat.format(state.dateTo!)}';
+      } else if (state.dateFrom != null) {
+        dateLabel = 'From ${_dateFormat.format(state.dateFrom!)}';
+      } else {
+        dateLabel = 'To ${_dateFormat.format(state.dateTo!)}';
+      }
+      chips.add(
+        InputChip(
+          key: const Key('chip_date_range'),
+          label: Text(dateLabel),
+          onDeleted: () => controller.setDateRange(null, null),
+        ),
+      );
+    }
+
+    if (state.selectedStatusFilter != null) {
+      chips.add(
+        InputChip(
+          key: const Key('chip_status_filter'),
+          label: Text('Status: ${state.selectedStatusFilter!.displayName}'),
+          onDeleted: () => controller.setStatusFilter(null),
+        ),
+      );
+    }
+
+    if (state.selectedTypeFilter != null) {
+      chips.add(
+        InputChip(
+          key: const Key('chip_type_filter'),
+          label: Text(
+            'Type: ${state.selectedTypeFilter == WorkOrderType.corrective ? 'Corrective' : 'Preventive'}',
+          ),
+          onDeleted: () => controller.setTypeFilter(null),
+        ),
+      );
+    }
+
+    if (state.infraType != InfraFilterType.all) {
+      chips.add(
+        InputChip(
+          key: const Key('chip_infra_type'),
+          label: Text('Infra Type: ${state.infraType.label}'),
+          onDeleted: () => controller.setInfraFilter(InfraFilterType.all, null),
+        ),
+      );
+    }
+
+    if (state.infraName != null && state.infraName!.isNotEmpty) {
+      chips.add(
+        InputChip(
+          key: const Key('chip_infra_name'),
+          label: Text('Infra: ${state.infraName}'),
+          onDeleted: () => controller.setInfraName(null),
+        ),
+      );
+    }
+
+    return Wrap(
+      spacing: GssmsSpacing.s8,
+      runSpacing: GssmsSpacing.s4,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        ...chips,
+        TextButton(
+          key: const Key('clear_all_filters_button'),
+          style: TextButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: GssmsSpacing.s8),
+            visualDensity: VisualDensity.compact,
+            foregroundColor: tokens.link,
+          ),
+          onPressed: onClearAll,
+          child: const Text('Clear all'),
+        ),
+      ],
+    );
+  }
+}
+
+class _WorkOrderFilterSheet extends StatelessWidget {
+  const _WorkOrderFilterSheet({
+    required this.state,
+    required this.controller,
+    required this.onClearAll,
+  });
 
   final WorkOrderListLoaded? state;
   final WorkOrderListController controller;
+  final VoidCallback onClearAll;
 
-  // Every server status a user can filter by, in lifecycle order.
   static const _statuses = [
     WorkOrderStatus.newOrder,
     WorkOrderStatus.assigned,
@@ -291,14 +484,22 @@ class _StatusTypeFilters extends StatelessWidget {
     WorkOrderStatus.cancelled,
   ];
 
+  static const _infraOptions = [
+    InfraFilterType.all,
+    InfraFilterType.station,
+    InfraFilterType.lcGate,
+    InfraFilterType.serviceBuilding,
+    InfraFilterType.staffQuarter,
+  ];
+
   @override
   Widget build(BuildContext context) {
+    final tokens = context.gssms;
+    final textTheme = Theme.of(context).textTheme;
     final s = state;
-    int countFor(WorkOrderStatus? status) {
-      if (s == null) return 0;
-      if (status == null) return s.workOrders.length;
-      return s.workOrders.where((w) => w.status == status).length;
-    }
+    final infraType = s?.infraType ?? InfraFilterType.all;
+    final infraName = s?.infraName;
+    final names = s?.availableInfraNames ?? const <String>[];
 
     const dense = InputDecoration(
       isDense: true,
@@ -308,130 +509,125 @@ class _StatusTypeFilters extends StatelessWidget {
       ),
     );
 
-    return Row(
-      children: [
-        Expanded(
-          child: DropdownButtonFormField<WorkOrderStatus?>(
-            key: const Key('wo_status_filter_dropdown'),
-            isExpanded: true,
-            value: s?.selectedStatusFilter,
-            decoration: dense.copyWith(labelText: 'Status'),
-            items: [
-              DropdownMenuItem(value: null, child: Text('All (${countFor(null)})')),
-              for (final status in _statuses)
-                DropdownMenuItem(
-                  value: status,
-                  child: Text(
-                    '${status.displayName} (${countFor(status)})',
-                    overflow: TextOverflow.ellipsis,
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.only(
+          left: GssmsSpacing.s16,
+          right: GssmsSpacing.s16,
+          top: GssmsSpacing.s16,
+          bottom: MediaQuery.of(context).viewInsets.bottom + GssmsSpacing.s16,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text('Filters', style: textTheme.titleMedium),
+                  TextButton(
+                    onPressed: () {
+                      onClearAll();
+                      Navigator.of(context).pop();
+                    },
+                    child: const Text('Reset'),
                   ),
+                ],
+              ),
+              const SizedBox(height: GssmsSpacing.s12),
+              DateRangeFilterBar(
+                from: s?.dateFrom,
+                to: s?.dateTo,
+                padding: EdgeInsets.zero,
+                onChanged: controller.setDateRange,
+              ),
+              const SizedBox(height: GssmsSpacing.s12),
+              DropdownButtonFormField<WorkOrderStatus?>(
+                key: const Key('wo_status_filter_dropdown'),
+                isExpanded: true,
+                value: s?.selectedStatusFilter,
+                decoration: dense.copyWith(labelText: 'Status'),
+                items: [
+                  const DropdownMenuItem(value: null, child: Text('All')),
+                  for (final status in _statuses)
+                    DropdownMenuItem(
+                      value: status,
+                      child: Text(
+                        status.displayName,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                ],
+                onChanged: controller.setStatusFilter,
+              ),
+              const SizedBox(height: GssmsSpacing.s12),
+              DropdownButtonFormField<WorkOrderType?>(
+                key: const Key('wo_type_filter_dropdown'),
+                isExpanded: true,
+                value: s?.selectedTypeFilter,
+                decoration: dense.copyWith(labelText: 'Job Work type'),
+                items: const [
+                  DropdownMenuItem(value: null, child: Text('All Types')),
+                  DropdownMenuItem(value: WorkOrderType.corrective, child: Text('Corrective')),
+                  DropdownMenuItem(value: WorkOrderType.preventive, child: Text('Preventive')),
+                ],
+                onChanged: controller.setTypeFilter,
+              ),
+              const SizedBox(height: GssmsSpacing.s12),
+              DropdownButtonFormField<InfraFilterType>(
+                key: const Key('wo_infra_type_dropdown'),
+                isExpanded: true,
+                value: infraType,
+                decoration: dense.copyWith(labelText: 'Infrastructure type'),
+                items: [
+                  for (final t in _infraOptions)
+                    DropdownMenuItem(
+                      value: t,
+                      child: Text(
+                        t == InfraFilterType.all ? 'All Types' : t.label,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                ],
+                onChanged: (t) {
+                  if (t == null) return;
+                  controller.setInfraFilter(t, null);
+                },
+              ),
+              const SizedBox(height: GssmsSpacing.s12),
+              DropdownButtonFormField<String>(
+                key: const Key('wo_infra_name_dropdown'),
+                isExpanded: true,
+                value: names.contains(infraName) ? infraName : null,
+                decoration: dense.copyWith(labelText: 'Infrastructure'),
+                hint: const Text('All'),
+                items: [
+                  const DropdownMenuItem<String>(value: null, child: Text('All')),
+                  for (final n in names)
+                    DropdownMenuItem(
+                      value: n,
+                      child: Text(n, overflow: TextOverflow.ellipsis),
+                    ),
+                ],
+                onChanged: infraType == InfraFilterType.all
+                    ? null
+                    : controller.setInfraName,
+              ),
+              const SizedBox(height: GssmsSpacing.s16),
+              FilledButton(
+                key: const Key('apply_filters_button'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: tokens.link,
+                  padding: const EdgeInsets.symmetric(vertical: GssmsSpacing.s12),
                 ),
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Done'),
+              ),
             ],
-            onChanged: controller.setStatusFilter,
           ),
         ),
-        const SizedBox(width: GssmsSpacing.s8),
-        Expanded(
-          child: DropdownButtonFormField<WorkOrderType?>(
-            key: const Key('wo_type_filter_dropdown'),
-            isExpanded: true,
-            value: s?.selectedTypeFilter,
-            decoration: dense.copyWith(labelText: 'Type'),
-            // Web Job Works chips: All / Corrective / Preventive.
-            items: const [
-              DropdownMenuItem(value: null, child: Text('All Types')),
-              DropdownMenuItem(value: WorkOrderType.corrective, child: Text('Corrective')),
-              DropdownMenuItem(value: WorkOrderType.preventive, child: Text('Preventive')),
-            ],
-            onChanged: controller.setTypeFilter,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// Web filter row: Infra Type + Infra Name. Client-side over the loaded page
-/// ([WorkOrderListLoaded.filteredOrders]), so it works offline.
-class _InfraFilters extends StatelessWidget {
-  const _InfraFilters({required this.state, required this.controller});
-
-  final WorkOrderListLoaded? state;
-  final WorkOrderListController controller;
-
-  @override
-  Widget build(BuildContext context) {
-    final infraType = state?.infraType ?? InfraFilterType.all;
-    final infraName = state?.infraName;
-    final names = state?.availableInfraNames ?? const <String>[];
-    const infraOptions = [
-      InfraFilterType.all,
-      InfraFilterType.station,
-      InfraFilterType.lcGate,
-      InfraFilterType.serviceBuilding,
-      InfraFilterType.staffQuarter,
-    ];
-    String infraLabel(InfraFilterType t) =>
-        t == InfraFilterType.all ? 'All Types' : t.label;
-    final hasInfraFilter =
-        infraType != InfraFilterType.all || (infraName?.isNotEmpty ?? false);
-
-    const dense = InputDecoration(
-      isDense: true,
-      contentPadding: EdgeInsets.symmetric(
-        horizontal: GssmsSpacing.s12,
-        vertical: GssmsSpacing.s12,
       ),
-    );
-
-    return Row(
-      children: [
-        Expanded(
-          child: DropdownButtonFormField<InfraFilterType>(
-            key: const Key('wo_infra_type_dropdown'),
-            isExpanded: true,
-            value: infraType,
-            decoration: dense.copyWith(labelText: 'Infra Type'),
-            items: [
-              for (final t in infraOptions)
-                DropdownMenuItem(
-                  value: t,
-                  child: Text(infraLabel(t), overflow: TextOverflow.ellipsis),
-                ),
-            ],
-            onChanged: (t) {
-              if (t == null) return;
-              controller.setInfraFilter(t, null);
-            },
-          ),
-        ),
-        const SizedBox(width: GssmsSpacing.s8),
-        Expanded(
-          child: DropdownButtonFormField<String>(
-            key: const Key('wo_infra_name_dropdown'),
-            isExpanded: true,
-            value: names.contains(infraName) ? infraName : null,
-            decoration: dense.copyWith(labelText: 'Infra Name'),
-            hint: const Text('All'),
-            items: [
-              const DropdownMenuItem<String>(value: null, child: Text('All')),
-              for (final n in names)
-                DropdownMenuItem(
-                  value: n,
-                  child: Text(n, overflow: TextOverflow.ellipsis),
-                ),
-            ],
-            onChanged: controller.setInfraName,
-          ),
-        ),
-        if (hasInfraFilter)
-          IconButton(
-            key: const Key('wo_infra_clear_button'),
-            tooltip: 'Clear infra filters',
-            icon: const Icon(Icons.clear, size: 18),
-            onPressed: controller.clearInfraFilters,
-          ),
-      ],
     );
   }
 }
@@ -440,34 +636,80 @@ class _WorkOrderCard extends StatelessWidget {
   const _WorkOrderCard({
     required this.workOrder,
     required this.onTap,
+    this.session,
+    this.onViewReport,
   });
 
   final WorkOrder workOrder;
   final VoidCallback onTap;
+  final UserSession? session;
+
+  /// Non-null only for an assigned technician on a reportable Job Work.
+  final VoidCallback? onViewReport;
 
   static final DateFormat _dateFormat = DateFormat('dd MMM yyyy');
+
+  String _formatTypeChip(WorkOrder wo) {
+    switch (executionRouteFor(wo)) {
+      case ExecutionRoute.complaint:
+        return 'Breakdown';
+      case ExecutionRoute.rectification:
+        return 'Rectification';
+      case ExecutionRoute.inspection:
+        return 'Inspection';
+      case ExecutionRoute.checklist:
+        return wo.type == WorkOrderType.corrective ? 'Corrective' : 'Preventive';
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final tokens = context.gssms;
     final textTheme = Theme.of(context).textTheme;
-    final priorityTone = tokens.tone(workOrder.priority.severity.tone);
     final metaStyle = textTheme.bodySmall?.copyWith(color: tokens.textSecondary);
-    final location = [workOrder.stationName ?? workOrder.infrastructureName, workOrder.depotName]
-        .where((s) => s != null && s.isNotEmpty)
-        .join(' • ');
+
+    final isBreakdown = executionRouteFor(workOrder) == ExecutionRoute.complaint;
+    const terminalStatuses = {
+      WorkOrderStatus.techCompleted,
+      WorkOrderStatus.verified,
+      WorkOrderStatus.closed,
+      WorkOrderStatus.cancelled,
+    };
+    final isTerminal = terminalStatuses.contains(workOrder.status);
+
+    // Overdue evaluated against today in IST (UTC+5:30)
+    final nowIst = DateTime.now().toUtc().add(const Duration(hours: 5, minutes: 30));
+    final todayIst = DateTime(nowIst.year, nowIst.month, nowIst.day);
+    final isDueDatePast = workOrder.dueDate != null && workOrder.dueDate!.isBefore(todayIst);
+    final isOverdue = !isBreakdown && !isTerminal && (workOrder.isSlaAtRisk || isDueDatePast);
+
+    // Location formatting: omit depot if single depot scope
+    final isSingleDepot = session?.scope.level == OrgScopeLevel.depot ||
+        (session?.depotId != null &&
+            session?.scope.level != OrgScopeLevel.global &&
+            session?.scope.level != OrgScopeLevel.zone &&
+            session?.scope.level != OrgScopeLevel.division);
+
+    final locationPrimary = workOrder.stationName ?? workOrder.infrastructureName;
+    final location = isSingleDepot
+        ? (locationPrimary ?? '')
+        : [locationPrimary, workOrder.depotName]
+            .where((s) => s != null && s.isNotEmpty)
+            .join(' • ');
 
     return Card(
       key: Key('work_order_card_${workOrder.id}'),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
-        // Priority edge: a left border instead of an IntrinsicHeight row —
-        // same look without a second layout pass per card while scrolling.
+        // Left accent bar: Indicates overdue (danger) state only; neutral cards
+        // have no accent border so the indicator has a single, unambiguous meaning.
         child: DecoratedBox(
           decoration: BoxDecoration(
             border: Border(
-              left: BorderSide(color: priorityTone.solid, width: 5),
+              left: isOverdue
+                  ? BorderSide(color: tokens.danger.solid, width: 5)
+                  : BorderSide.none,
             ),
           ),
           child: Padding(
@@ -509,7 +751,7 @@ class _WorkOrderCard extends StatelessWidget {
                   runSpacing: GssmsSpacing.s4,
                   children: [
                     WorkOrderPriorityChip(priority: workOrder.priority),
-                    StatusChip(label: workOrder.type.displayName),
+                    StatusChip(label: _formatTypeChip(workOrder)),
                     if (workOrder.isSlaAtRisk)
                       StatusChip(
                         label: 'SLA ${workOrder.slaStatus!.replaceAll('_', ' ').toLowerCase()}',
@@ -524,21 +766,50 @@ class _WorkOrderCard extends StatelessWidget {
                   runSpacing: GssmsSpacing.s4,
                   children: [
                     if (location.isNotEmpty)
-                      _Meta(icon: Icons.location_on_outlined, text: location, style: metaStyle),
+                      _Meta(
+                        icon: Icons.location_on_outlined,
+                        text: location,
+                        style: metaStyle,
+                        maxLines: 2,
+                      ),
                     if (workOrder.dueDate != null)
                       _Meta(
                         icon: Icons.event_outlined,
-                        text: 'Due ${_dateFormat.format(workOrder.dueDate!)}',
-                        style: metaStyle,
+                        text: isOverdue
+                            ? 'Overdue · due ${_dateFormat.format(workOrder.dueDate!)}'
+                            : 'Due ${_dateFormat.format(workOrder.dueDate!)}',
+                        style: isOverdue
+                            ? metaStyle?.copyWith(
+                                color: tokens.danger.foreground,
+                                fontWeight: FontWeight.w600,
+                              )
+                            : metaStyle,
                       ),
-                    if (workOrder.assignedToName != null)
+                    if (workOrder.assignedToName != null &&
+                        workOrder.assignedToName!.trim().isNotEmpty)
                       _Meta(
                         icon: Icons.person_outline,
-                        text: workOrder.assignedToName!,
+                        text: workOrder.assignedToName!.trim(),
                         style: metaStyle?.copyWith(color: tokens.link),
+                      )
+                    else
+                      _Meta(
+                        icon: Icons.person_outline,
+                        text: 'Unassigned',
+                        style: metaStyle,
                       ),
                   ],
                 ),
+                if (onViewReport != null)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      key: Key('work_order_card_report_${workOrder.id}'),
+                      onPressed: onViewReport,
+                      icon: const Icon(Icons.description_outlined),
+                      label: const Text('View Report'),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -549,21 +820,40 @@ class _WorkOrderCard extends StatelessWidget {
 }
 
 class _Meta extends StatelessWidget {
-  const _Meta({required this.icon, required this.text, this.style});
+  const _Meta({
+    required this.icon,
+    required this.text,
+    this.style,
+    this.maxLines = 1,
+  });
 
   final IconData icon;
   final String text;
   final TextStyle? style;
+  final int maxLines;
 
   @override
   Widget build(BuildContext context) {
     return Row(
       mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment:
+          maxLines > 1 ? CrossAxisAlignment.start : CrossAxisAlignment.center,
       children: [
-        Icon(icon, size: 14, color: style?.color),
+        Padding(
+          padding: EdgeInsets.only(top: maxLines > 1 ? 2.0 : 0.0),
+          child: Icon(icon, size: 14, color: style?.color),
+        ),
         const SizedBox(width: GssmsSpacing.s4),
-        Flexible(child: Text(text, style: style, overflow: TextOverflow.ellipsis)),
+        Flexible(
+          child: Text(
+            text,
+            style: style,
+            maxLines: maxLines,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
       ],
     );
   }
 }
+

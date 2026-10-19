@@ -1,0 +1,55 @@
+{
+  "id": "breakdown_complaint",
+  "kind": "complaint",
+  "generatedAt": "2026-10-03T04:00:00Z",
+  "ticket": "JW-2026-000105",
+  "workOrder": {
+    "id": 105,
+    "ticket_number": "JW-2026-000105",
+    "station_name": "Arakkonam",
+    "depot_name": "AJJ Depot",
+    "assigned_to_name": "K. Raman",
+    "title": "Emergency Breakdown - Battery Charger Fail",
+    "description": "DC control supply failure alarm in control room",
+    "asset_name": "CHG-AJJ-01",
+    "execution_mode": "COMPLAINT",
+    "status": "COMPLETED",
+    "original_complaint_details": {
+      "failure_date": "2026-09-28",
+      "failure_time": "14:05:00",
+      "department": "ELECTRICAL",
+      "complainant_name": "Station Master AJJ",
+      "description": "Alarm buzzed at 14:00. Output DC voltage dropped to 95V."
+    }
+  },
+  "payload": {
+    "id": 605,
+    "work_order": 105,
+    "organization": {
+      "railway_name": "Southern Railway",
+      "division_name": "Chennai Division",
+      "depot_name": "AJJ Depot"
+    },
+    "initial_findings": "Thyristor bridge fuse blown on phase B.",
+    "action_taken": "Replaced high-speed semiconductor fuse 100A. Checked filter capacitors and recalibrated float voltage.",
+    "final_remarks": "Float voltage restored to 110V DC steady.",
+    "parameters": [],
+    "photos": [],
+    "submission_history": [
+      {
+        "submission_no": 1,
+        "timestamp": "2026-09-28T18:20:00Z",
+        "updated_by_name": "K. Raman",
+        "initial_findings": "Thyristor bridge fuse blown on phase B.",
+        "action_taken": "Replaced high-speed semiconductor fuse 100A. Checked filter capacitors and recalibrated float voltage.",
+        "final_remarks": "Float voltage restored to 110V DC steady.",
+        "photos": []
+      }
+    ],
+    "verification": {
+      "verified_by_name": "E. Engineer",
+      "verified_at": "2026-09-28T19:00:00Z",
+      "remarks": "Verified DC voltage output and alarm clearance."
+    }
+  }
+}

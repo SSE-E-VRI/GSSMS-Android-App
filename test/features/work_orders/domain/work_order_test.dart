@@ -322,4 +322,55 @@ void main() {
       expect(restored, original);
     });
   });
+
+  group('WorkOrder executed checklist version (S-V1 field, surfaced in S-V4)', () {
+    test('maintenanceMasterVersionSnapshot parses when present', () {
+      final wo = WorkOrder.fromJson(const {
+        'id': 143,
+        'status': 'IN_PROGRESS',
+        'type': 'PREVENTIVE',
+        'maintenance_master_name': 'DG Set AMC',
+        'maintenance_master_version_snapshot': '1.2.0',
+      });
+
+      expect(wo.maintenanceMasterName, 'DG Set AMC');
+      expect(wo.maintenanceMasterVersionSnapshot, '1.2.0');
+    });
+
+    test('maintenanceMasterVersionSnapshot stays null when absent (back-compat)', () {
+      final wo = WorkOrder.fromJson(const {
+        'id': 144,
+        'status': 'NEW',
+        'type': 'PREVENTIVE',
+        'maintenance_master_name': 'Panel Monthly',
+      });
+
+      expect(wo.maintenanceMasterVersionSnapshot, isNull);
+    });
+    test('parses executionMode, maintenanceMasterId and source', () {
+      final wo = WorkOrder.fromJson(const {
+        'id': 1,
+        'execution_mode': 'COMPLAINT',
+        'maintenance_master': 5,
+        'source': 'SCHEDULED_PM',
+      });
+      expect(wo.executionMode, 'COMPLAINT');
+      expect(wo.isModeExecution, isTrue);
+      expect(wo.maintenanceMasterId, 5);
+      expect(wo.source, 'SCHEDULED_PM');
+      expect(wo.isPmWorkOrder, isTrue);
+    });
+
+    test('isModeExecution identifies server-owned modes', () {
+      for (final mode in ['COMPLAINT', 'INSPECTION', 'RECTIFICATION']) {
+        final wo = WorkOrder.fromJson({'id': 1, 'execution_mode': mode});
+        expect(wo.isModeExecution, isTrue, reason: mode);
+      }
+      expect(
+        WorkOrder.fromJson(const {'id': 1, 'execution_mode': 'CHECKLIST'}).isModeExecution,
+        isFalse,
+      );
+      expect(WorkOrder.fromJson(const {'id': 1}).isModeExecution, isFalse);
+    });
+  });
 }

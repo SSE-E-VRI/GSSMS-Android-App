@@ -5,8 +5,11 @@ import 'package:image_picker/image_picker.dart';
 import 'package:gssms_mobile/core/network/api_error.dart';
 import 'package:gssms_mobile/core/sync/sync_manager.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
+import 'package:gssms_mobile/core/utils/numbered_list.dart';
+import 'package:gssms_mobile/core/widgets/confirmation_dialog.dart';
 import 'package:gssms_mobile/core/widgets/empty_state_view.dart';
 import 'package:gssms_mobile/core/widgets/feedback.dart';
+import 'package:gssms_mobile/core/widgets/repeatable_text_list.dart';
 import 'package:gssms_mobile/core/widgets/skeleton_list.dart';
 import 'package:gssms_mobile/features/auth/domain/rbac.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
@@ -14,11 +17,16 @@ import 'package:gssms_mobile/features/auth/presentation/controllers/auth_state.d
 import 'package:gssms_mobile/features/auth/presentation/widgets/permission_denied_view.dart';
 import 'package:gssms_mobile/features/work_orders/data/evidence_service.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/maintenance_record.dart';
+import 'package:gssms_mobile/features/work_orders/domain/models/replacement_requests.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_order_controllers.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_order_state.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/widgets/checklist_action_bar.dart';
+import 'package:gssms_mobile/features/work_orders/presentation/widgets/checklist_group_header.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/widgets/checklist_header.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/widgets/checklist_line_card.dart';
+import 'package:gssms_mobile/features/work_orders/presentation/widgets/group_evidence_strip.dart';
+import 'package:gssms_mobile/features/work_orders/presentation/widgets/replace_asset_sheet.dart';
+import 'package:gssms_mobile/features/work_orders/presentation/widgets/replace_component_sheet.dart';
 
 class ChecklistScreen extends ConsumerStatefulWidget {
   const ChecklistScreen({super.key, required this.recordId});
@@ -30,10 +38,70 @@ class ChecklistScreen extends ConsumerStatefulWidget {
 }
 
 class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
-  /// Replaced asset/component details captured from the overflow menu. There
-  /// is no API field for them, so they are carried into the closing remarks
-  /// (an existing `complete` field) instead of being discarded.
-  final List<String> _replacementNotes = [];
+  /// Scroll targets for line cards, by line id.
+  final Map<int, GlobalKey> _lineScrollKeys = {};
+
+  /// Currently highlighted (jumped-to) line id, cleared after a few seconds.
+  int? _highlightedLineId;
+  int _highlightSeq = 0;
+  Timer? _highlightTimer;
+
+  @override
+  void dispose() {
+    _highlightTimer?.cancel();
+    super.dispose();
+  }
+
+  void _highlightLine(int lineId) {
+    _highlightTimer?.cancel();
+    final seq = ++_highlightSeq;
+    setState(() {
+      _highlightedLineId = lineId;
+    });
+    _highlightTimer = Timer(const Duration(seconds: 3), () {
+      if (!mounted || _highlightSeq != seq) return;
+      setState(() {
+        _highlightedLineId = null;
+      });
+    });
+  }
+
+  void _jumpToIncompleteLine(ChecklistLoaded state) {
+    final targetLine = state.firstIncompleteRequiredLine;
+    if (targetLine == null) return;
+
+    final remaining = state.remainingRequired;
+    showGssmsSnackBar(
+      context,
+      'Complete the highlighted item first ($remaining left).',
+      tone: GssmsTone.warning,
+    );
+
+    final isHidden = state.activeSubCategory != null &&
+        !state.displayedGroups
+            .any((g) => g.lines.any((l) => l.id == targetLine.id));
+
+    if (isHidden) {
+      ref
+          .read(checklistControllerProvider(widget.recordId).notifier)
+          .setActiveSubCategory(null);
+    }
+
+    _highlightLine(targetLine.id);
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final keyContext = _lineScrollKeys[targetLine.id]?.currentContext;
+      if (keyContext != null) {
+        Scrollable.ensureVisible(
+          keyContext,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+          alignment: 0.1,
+        );
+      }
+    });
+  }
 
   @override
   void initState() {
@@ -74,6 +142,7 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
     final state = ref.watch(checklistControllerProvider(widget.recordId));
 
     ref.listen(checklistControllerProvider(widget.recordId), (prev, next) {
+      if (!context.mounted) return;
       if (next is ChecklistCompleted) {
         // Never claim completion that has only reached this device (SSOT §41).
         showGssmsSnackBar(
@@ -129,6 +198,7 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
           ? ChecklistActionBar(
               state: state,
               onSignAndSubmit: _showCompletionDialog,
+              onIncompleteTap: () => _jumpToIncompleteLine(state),
             )
           : null,
     );
@@ -151,87 +221,67 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
 
     if (state is ChecklistLoaded) {
       final record = state.record;
-      final lines = state.displayedLines;
+      final groups = state.displayedGroups;
+      final allGroups = record.assetGroups;
       final categories = state.subCategories;
+      final session = sessionOf(ref);
+      final canCheckOut = canWriteChecklist(session);
+      final canUncheck = canUncheckoutGroup(session);
 
       return CustomScrollView(
         slivers: [
           SliverAppBar(
             pinned: true,
-            expandedHeight: 180,
+            title: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${record.stationName ?? 'Station'} · ${record.templateName ?? 'Schedule'} · ${(record.progress * 100).toInt()}%',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  '${record.completedLines} of ${record.totalLines}',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: Colors.white70,
+                      ),
+                ),
+              ],
+            ),
             actions: [
               _buildOverflowMenu(state),
             ],
             bottom: PreferredSize(
-              preferredSize: const Size.fromHeight(4),
+              preferredSize: const Size.fromHeight(6),
               child: SizedBox(
-                height: 4,
+                height: 6,
                 child: LinearProgressIndicator(
                   value: record.progress,
-                  backgroundColor: Colors.white24,
+                  backgroundColor: Colors.white30,
                   color: record.progress == 1.0
                       ? context.gssms.success.solid
                       : context.gssms.accent.solid,
                 ),
               ),
             ),
-            flexibleSpace: LayoutBuilder(
-              builder: (context, constraints) {
-                final top = constraints.biggest.height;
-                final isCollapsed = top <=
-                    (kToolbarHeight + MediaQuery.of(context).padding.top + 24);
-                return FlexibleSpaceBar(
-                  collapseMode: CollapseMode.parallax,
-                  background: ChecklistHeader(record: record),
-                  titlePadding: const EdgeInsetsDirectional.only(
-                    start: 56,
-                    bottom: 10,
-                    end: 48,
-                  ),
-                  title: isCollapsed
-                      ? Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '${record.stationName ?? 'Station'} · ${record.templateName ?? 'Schedule'} · ${(record.progress * 100).toInt()}%',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleMedium
-                                  ?.copyWith(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            Text(
-                              '${record.completedLines} of ${record.totalLines}',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .labelSmall
-                                  ?.copyWith(
-                                    color: Colors.white70,
-                                  ),
-                            ),
-                          ],
-                        )
-                      : null,
-                );
-              },
-            ),
           ),
+          SliverToBoxAdapter(child: ChecklistHeader(record: record)),
           if (categories.isNotEmpty)
             SliverPersistentHeader(
               pinned: true,
               delegate: _SubsystemChipsDelegate(
                 categories: categories,
                 activeCategory: state.activeSubCategory,
-                totalLines: record.activeLines.length,
+                totalLines: allGroups.length,
                 lineCounts: {
                   for (final cat in categories)
-                    cat: record.activeLines
-                        .where((l) => l.assetCategory == cat)
+                    cat: allGroups
+                        .where((g) => g.categoryLabel == cat)
                         .length,
                 },
                 onSelected: (cat) => ref
@@ -239,7 +289,7 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
                     .setActiveSubCategory(cat),
               ),
             ),
-          if (lines.isEmpty)
+          if (groups.isEmpty)
             SliverFillRemaining(
               hasScrollBody: false,
               child: EmptyStateView.noResults(
@@ -256,29 +306,55 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
               sliver: SliverList(
                 delegate: SliverChildBuilderDelegate(
                   (context, index) {
+                    final group = groups[index];
+                    final activeLines =
+                        group.lines.where((l) => !l.excluded).toList();
+                    // Records from before group check-out existed carry no
+                    // `checked_out`: show their lines flat, as they always were.
+                    final legacy =
+                        group.lines.every((l) => l.checkedOut == null);
                     return Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: ChecklistLineCard(
-                        key: ValueKey(lines[index].id),
-                        line: lines[index],
-                        recordId: widget.recordId,
-                        isPastTechCompleted: state.record.isPastTechCompleted,
-                        onSave: (edit) {
-                          unawaited(ref
-                              .read(checklistControllerProvider(widget.recordId).notifier)
-                              .submitLineObservation(
-                                lineId: lines[index].id,
-                                value: edit.value,
-                                status: edit.status,
-                                statusOptionId: edit.statusOptionId,
-                                actionOptionId: edit.actionOptionId,
-                                remarks: edit.remarks,
-                              ));
-                        },
+                      padding: EdgeInsets.only(bottom: legacy ? 12 : 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          if (legacy)
+                            for (final line in activeLines)
+                              Padding(
+                                padding: EdgeInsets.only(
+                                    top: line == activeLines.first ? 0 : 12),
+                                child: _lineCard(line, record, showAttachments: true),
+                              )
+                          else ...[
+                          ChecklistGroupHeader(
+                            group: group,
+                            canCheckOut: canCheckOut,
+                            canUncheck: canUncheck,
+                            saving: state.savingGroupKeys.contains(group.key),
+                            isPastTechCompleted: record.isPastTechCompleted,
+                            onToggle: (included) =>
+                                _toggleGroup(group, included),
+                          ),
+                          if (group.checkedOut) ...[
+                            const SizedBox(height: GssmsSpacing.s8),
+                            GroupEvidenceStrip(
+                              recordId: widget.recordId,
+                              holder: group.photoHolder,
+                              isPastTechCompleted: record.isPastTechCompleted,
+                            ),
+                            for (final line in activeLines)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 12),
+                                child: _lineCard(line, record,
+                                    showAttachments: false),
+                              ),
+                          ],
+                          ],
+                        ],
                       ),
                     );
                   },
-                  childCount: lines.length,
+                  childCount: groups.length,
                 ),
               ),
             ),
@@ -289,17 +365,86 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
     return const SingleChildScrollView(child: SkeletonList(itemCount: 4));
   }
 
+  Widget _lineCard(MaintenanceRecordLine line, MaintenanceRecord record,
+      {required bool showAttachments}) {
+    final scrollKey = _lineScrollKeys.putIfAbsent(line.id, () => GlobalKey());
+    return KeyedSubtree(
+      key: scrollKey,
+      child: ChecklistLineCard(
+        key: ValueKey(line.id),
+        line: line,
+        isHighlighted: _highlightedLineId == line.id,
+        recordId: widget.recordId,
+        showAttachments: showAttachments,
+        isPastTechCompleted: record.isPastTechCompleted,
+        onSave: (edit) {
+          unawaited(ref
+              .read(checklistControllerProvider(widget.recordId).notifier)
+              .submitLineObservation(
+                lineId: line.id,
+                value: edit.value,
+                status: edit.status,
+                statusOptionId: edit.statusOptionId,
+                actionOptionId: edit.actionOptionId,
+                remarks: edit.remarks,
+              ));
+        },
+      ),
+    );
+  }
+
+  /// Checks a group out or un-checks it. Un-check is confirmed first, and the
+  /// server may ask for a reason (retry with it).
+  Future<void> _toggleGroup(ChecklistAssetGroup group, bool included) async {
+    final controller =
+        ref.read(checklistControllerProvider(widget.recordId).notifier);
+    if (!included) {
+      final confirmed = await showConfirmationDialog(
+        context,
+        title: 'Un-check this asset group?',
+        message: 'Its checklist lines are removed from this record.',
+        confirmLabel: 'Un-check',
+        destructive: true,
+      );
+      if (!confirmed || !mounted) return;
+    }
+
+    var ok = await controller.setGroupIncluded(group, included);
+    if (!ok && !included && controller.groupReasonRequired && mounted) {
+      final reason = await _askReason();
+      if (reason == null || !mounted) return;
+      ok = await controller.setGroupIncluded(group, included, reason: reason);
+    }
+    if (!mounted || !ok) return;
+    final latest =
+        ref.read(checklistControllerProvider(widget.recordId));
+    if (latest is ChecklistLoaded && latest.successMessage != null) {
+      showGssmsSnackBar(context, latest.successMessage!,
+          tone: GssmsTone.success);
+    }
+  }
+
+  Future<String?> _askReason() {
+    return showDialog<String>(
+      context: context,
+      builder: (ctx) => const _ReasonDialog(),
+    );
+  }
+
   Widget _buildOverflowMenu(ChecklistLoaded state) {
+    final session = sessionOf(ref);
+    final allowReplace = ReplacementJobWork.fromRecord(state.record) != null &&
+        !state.record.isReplacementLocked;
     return PopupMenuButton<String>(
       key: const Key('checklist_overflow_menu'),
       icon: const Icon(Icons.more_vert),
       onSelected: (value) {
         switch (value) {
           case 'asset':
-            _showReplacedAssetSheet();
+            _openReplaceAsset(state);
             break;
           case 'component':
-            _showReplacedComponentSheet();
+            _openReplaceComponent(state);
             break;
           case 'preview':
             _showPreviewSheet(state);
@@ -316,49 +461,43 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
               children: [
                 Icon(icon, color: color, size: GssmsSize.iconMd),
                 const SizedBox(width: GssmsSpacing.s12),
-                Text(label),
+                Flexible(child: Text(label)),
               ],
             ),
           );
         }
 
         return [
-          item('asset', Icons.autorenew, tokens.danger.foreground,
-              'Enter Replaced Asset'),
-          item('component', Icons.build_circle_outlined,
-              tokens.accent.foreground, 'Enter Replaced Component'),
+          if (allowReplace && canReplaceWholeAsset(session))
+            item('asset', Icons.autorenew, tokens.danger.foreground,
+                'Enter Replaced Asset'),
+          if (allowReplace && canReplaceAssets(session))
+            item('component', Icons.build_circle_outlined,
+                tokens.accent.foreground, 'Enter Replaced Component'),
           item('preview', Icons.remove_red_eye_outlined, tokens.link, 'Preview'),
         ];
       },
     );
   }
 
-  Future<void> _showReplacedAssetSheet() async {
-    final note = await showModalBottomSheet<String>(
-      context: context,
-      isScrollControlled: true,
-      builder: (ctx) => const _ReplacedAssetSheet(),
-    );
-    _addReplacementNote(note);
+  Future<void> _openReplaceAsset(ChecklistLoaded state) async {
+    final jobWork = ReplacementJobWork.fromRecord(state.record);
+    if (jobWork == null) return;
+    final ok = await showReplaceAssetSheet(context, ref, jobWork);
+    if (ok == true && mounted) {
+      showGssmsSnackBar(context, 'Asset replaced successfully!',
+          tone: GssmsTone.success);
+    }
   }
 
-  Future<void> _showReplacedComponentSheet() async {
-    final note = await showModalBottomSheet<String>(
-      context: context,
-      isScrollControlled: true,
-      builder: (ctx) => const _ReplacedComponentSheet(),
-    );
-    _addReplacementNote(note);
-  }
-
-  void _addReplacementNote(String? note) {
-    if (note == null || note.trim().isEmpty || !mounted) return;
-    setState(() => _replacementNotes.add(note.trim()));
-    showGssmsSnackBar(
-      context,
-      'Added to your closing remarks. Review them when you sign and submit.',
-      tone: GssmsTone.success,
-    );
+  Future<void> _openReplaceComponent(ChecklistLoaded state) async {
+    final jobWork = ReplacementJobWork.fromRecord(state.record);
+    if (jobWork == null) return;
+    final ok = await showReplaceComponentSheet(context, ref, jobWork);
+    if (ok == true && mounted) {
+      showGssmsSnackBar(context, 'Component replacement recorded!',
+          tone: GssmsTone.success);
+    }
   }
 
   void _showPreviewSheet(ChecklistLoaded state) {
@@ -374,10 +513,7 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
     unawaited(showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      builder: (ctx) => _CompletionSheet(
-        recordId: widget.recordId,
-        replacementNotes: List.unmodifiable(_replacementNotes),
-      ),
+      builder: (ctx) => _CompletionSheet(recordId: widget.recordId),
     ));
   }
 }
@@ -453,15 +589,9 @@ class _SubsystemChipsDelegate extends SliverPersistentHeaderDelegate {
 }
 
 class _CompletionSheet extends ConsumerStatefulWidget {
-  const _CompletionSheet({
-    required this.recordId,
-    this.replacementNotes = const [],
-  });
+  const _CompletionSheet({required this.recordId});
 
   final int recordId;
-
-  /// Replaced asset/component notes, pre-filled into the closing remarks.
-  final List<String> replacementNotes;
 
   @override
   ConsumerState<_CompletionSheet> createState() => _CompletionSheetState();
@@ -469,7 +599,9 @@ class _CompletionSheet extends ConsumerStatefulWidget {
 
 class _CompletionSheetState extends ConsumerState<_CompletionSheet> {
   final _formKey = GlobalKey<FormState>();
-  final _remarksController = TextEditingController();
+  final _remarksKey = GlobalKey<RepeatableTextListState>();
+  late final List<String> _initialRemarks;
+  String? _remarksError;
   final _technicianController = TextEditingController();
   final _otherStaffController = TextEditingController();
 
@@ -484,14 +616,14 @@ class _CompletionSheetState extends ConsumerState<_CompletionSheet> {
     if (authState is Authenticated) {
       _technicianController.text = authState.session.displayName;
     }
-    if (widget.replacementNotes.isNotEmpty) {
-      _remarksController.text = widget.replacementNotes.join('\n');
-    }
+    final current = ref.read(checklistControllerProvider(widget.recordId));
+    _initialRemarks = [
+      if (current is ChecklistLoaded) ...splitNumberedList(current.record.remarks),
+    ];
   }
 
   @override
   void dispose() {
-    _remarksController.dispose();
     _technicianController.dispose();
     _otherStaffController.dispose();
     super.dispose();
@@ -594,23 +726,17 @@ class _CompletionSheetState extends ConsumerState<_CompletionSheet> {
                 ),
               ),
               const SizedBox(height: GssmsSpacing.s12),
-              TextFormField(
-                key: const Key('completion_remarks_field'),
-                controller: _remarksController,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: const InputDecoration(
-                  labelText: 'Technician Closing Remarks *',
-                  helperText: 'At least 10 characters',
-                ),
-                minLines: 3,
-                maxLines: 6,
-                validator: (val) {
-                  final text = val?.trim() ?? '';
-                  if (text.length < ChecklistController.minCompletionRemarksLength) {
-                    return 'Remarks must be at least '
-                        '${ChecklistController.minCompletionRemarksLength} characters';
+              RepeatableTextList(
+                key: _remarksKey,
+                keyPrefix: 'completion_remarks',
+                label: 'Technician Remarks *',
+                hint: 'Add a remark',
+                initial: _initialRemarks,
+                errorText: _remarksError,
+                onChanged: (_) {
+                  if (_remarksError != null) {
+                    setState(() => _remarksError = null);
                   }
-                  return null;
                 },
               ),
               const SizedBox(height: GssmsSpacing.s8),
@@ -742,20 +868,30 @@ class _CompletionSheetState extends ConsumerState<_CompletionSheet> {
   }
 
   Future<void> _submit() async {
-    if (!canWriteChecklist(sessionOf(ref))) {
+    if (!canWriteChecklist(sessionFromAuth(ref.read(authControllerProvider)))) {
       if (mounted) {
         showPermissionDeniedSnackBar(context);
       }
       return;
     }
-    if (!(_formKey.currentState?.validate() ?? false)) return;
+    final formOk = _formKey.currentState?.validate() ?? false;
+    // Commit typed-but-not-added text before validating the remarks.
+    final entries = _remarksKey.currentState?.commitPending() ?? const [];
+    final remarks = joinNumberedList(entries);
+    if (entries.isEmpty ||
+        remarks.trim().length < ChecklistController.minCompletionRemarksLength) {
+      setState(() =>
+          _remarksError = 'Add at least one remark (10+ characters).');
+      return;
+    }
+    if (!formOk) return;
 
     final otherStaff = _otherStaffController.text.trim();
     final ok = await ref
         .read(checklistControllerProvider(widget.recordId).notifier)
         .completeExecution(
           technicianName: _technicianController.text.trim(),
-          remarks: _remarksController.text.trim(),
+          remarks: remarks,
           proofJpegPath: _proof?.path,
           otherStaff: otherStaff.isEmpty ? null : otherStaff,
         );
@@ -764,55 +900,53 @@ class _CompletionSheetState extends ConsumerState<_CompletionSheet> {
   }
 }
 
-/// Shared chrome for the checklist's bottom sheets: icon + title + close,
-/// keyboard-safe padding, scrollable body.
-class _SheetScaffold extends StatelessWidget {
-  const _SheetScaffold({
-    required this.icon,
-    required this.iconColor,
-    required this.title,
-    required this.children,
-  });
+/// Asks for the reason the server requires to un-check a group after
+/// technician completion.
+class _ReasonDialog extends StatefulWidget {
+  const _ReasonDialog();
 
-  final IconData icon;
-  final Color iconColor;
-  final String title;
-  final List<Widget> children;
+  @override
+  State<_ReasonDialog> createState() => _ReasonDialogState();
+}
+
+class _ReasonDialogState extends State<_ReasonDialog> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(
-        left: GssmsSpacing.s16,
-        right: GssmsSpacing.s16,
-        top: GssmsSpacing.s8,
-        bottom: MediaQuery.of(context).viewInsets.bottom + GssmsSpacing.s16,
-      ),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Row(
-              children: [
-                Icon(icon, color: iconColor),
-                const SizedBox(width: GssmsSpacing.s8),
-                Expanded(
-                  child: Text(title, style: Theme.of(context).textTheme.titleMedium),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  tooltip: 'Close',
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-              ],
-            ),
-            const Divider(),
-            const SizedBox(height: GssmsSpacing.s8),
-            ...children,
-          ],
+    final empty = _controller.text.trim().isEmpty;
+    return AlertDialog(
+      title: const Text('Reason required'),
+      content: TextField(
+        key: const Key('group_uncheck_reason_field'),
+        controller: _controller,
+        autofocus: true,
+        minLines: 2,
+        maxLines: 4,
+        onChanged: (_) => setState(() {}),
+        decoration: const InputDecoration(
+          labelText: 'Reason *',
+          helperText: 'The Job Work is returned to the technician for rework.',
         ),
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          key: const Key('group_uncheck_reason_confirm'),
+          onPressed:
+              empty ? null : () => Navigator.of(context).pop(_controller.text.trim()),
+          child: const Text('Un-check'),
+        ),
+      ],
     );
   }
 }
@@ -846,203 +980,6 @@ class _SheetNotice extends StatelessWidget {
                   .textTheme
                   .bodySmall
                   ?.copyWith(color: palette.foreground),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Collects replaced-asset details and pops with a remarks line. There is no
-/// replaced-asset API field, so the text travels in the closing remarks
-/// rather than being thrown away.
-class _ReplacedAssetSheet extends StatefulWidget {
-  const _ReplacedAssetSheet();
-
-  @override
-  State<_ReplacedAssetSheet> createState() => _ReplacedAssetSheetState();
-}
-
-class _ReplacedAssetSheetState extends State<_ReplacedAssetSheet> {
-  final _formKey = GlobalKey<FormState>();
-  final _assetNameController = TextEditingController();
-  final _oldSerialController = TextEditingController();
-  final _newSerialController = TextEditingController();
-  final _reasonController = TextEditingController();
-
-  @override
-  void dispose() {
-    _assetNameController.dispose();
-    _oldSerialController.dispose();
-    _newSerialController.dispose();
-    _reasonController.dispose();
-    super.dispose();
-  }
-
-  void _save() {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
-    final oldSerial = _oldSerialController.text.trim();
-    final reason = _reasonController.text.trim();
-    final note = [
-      'Replaced asset: ${_assetNameController.text.trim()}',
-      if (oldSerial.isNotEmpty) 'old $oldSerial',
-      'new ${_newSerialController.text.trim()}',
-      if (reason.isNotEmpty) 'reason: $reason',
-    ].join(', ');
-    Navigator.of(context).pop('$note.');
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    String? required(String? v) =>
-        (v == null || v.trim().isEmpty) ? 'Required' : null;
-    return Form(
-      key: _formKey,
-      child: _SheetScaffold(
-        icon: Icons.autorenew,
-        iconColor: context.gssms.danger.foreground,
-        title: 'Enter Replaced Asset',
-        children: [
-          const _SheetNotice(
-            tone: GssmsTone.info,
-            icon: Icons.info_outline,
-            text: 'These details are added to your closing remarks so the '
-                'supervisor sees them when verifying.',
-          ),
-          const SizedBox(height: GssmsSpacing.s12),
-          TextFormField(
-            controller: _assetNameController,
-            textInputAction: TextInputAction.next,
-            decoration: const InputDecoration(labelText: 'Asset Name / Tag *', isDense: true),
-            validator: required,
-          ),
-          const SizedBox(height: GssmsSpacing.s12),
-          TextFormField(
-            controller: _oldSerialController,
-            textInputAction: TextInputAction.next,
-            decoration:
-                const InputDecoration(labelText: 'Old Serial / Asset Code', isDense: true),
-          ),
-          const SizedBox(height: GssmsSpacing.s12),
-          TextFormField(
-            controller: _newSerialController,
-            textInputAction: TextInputAction.next,
-            decoration:
-                const InputDecoration(labelText: 'New Serial / Asset Code *', isDense: true),
-            validator: required,
-          ),
-          const SizedBox(height: GssmsSpacing.s12),
-          TextFormField(
-            controller: _reasonController,
-            textCapitalization: TextCapitalization.sentences,
-            decoration:
-                const InputDecoration(labelText: 'Reason for Replacement', isDense: true),
-            maxLines: 2,
-          ),
-          const SizedBox(height: GssmsSpacing.s16),
-          SizedBox(
-            height: GssmsSize.touchTarget,
-            child: FilledButton(
-              onPressed: _save,
-              child: const Text('Add to Closing Remarks'),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ReplacedComponentSheet extends StatefulWidget {
-  const _ReplacedComponentSheet();
-
-  @override
-  State<_ReplacedComponentSheet> createState() => _ReplacedComponentSheetState();
-}
-
-class _ReplacedComponentSheetState extends State<_ReplacedComponentSheet> {
-  final _formKey = GlobalKey<FormState>();
-  final _componentNameController = TextEditingController();
-  final _partNumberController = TextEditingController();
-  final _quantityController = TextEditingController(text: '1');
-  final _remarksController = TextEditingController();
-
-  @override
-  void dispose() {
-    _componentNameController.dispose();
-    _partNumberController.dispose();
-    _quantityController.dispose();
-    _remarksController.dispose();
-    super.dispose();
-  }
-
-  void _save() {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
-    final part = _partNumberController.text.trim();
-    final details = _remarksController.text.trim();
-    final note = [
-      'Replaced component: ${_componentNameController.text.trim()}',
-      if (part.isNotEmpty) 'part $part',
-      'qty ${int.parse(_quantityController.text.trim())}',
-      if (details.isNotEmpty) details,
-    ].join(', ');
-    Navigator.of(context).pop('$note.');
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Form(
-      key: _formKey,
-      child: _SheetScaffold(
-        icon: Icons.build_circle_outlined,
-        iconColor: context.gssms.accent.foreground,
-        title: 'Enter Replaced Component',
-        children: [
-          const _SheetNotice(
-            tone: GssmsTone.info,
-            icon: Icons.info_outline,
-            text: 'These details are added to your closing remarks so the '
-                'supervisor sees them when verifying.',
-          ),
-          const SizedBox(height: GssmsSpacing.s12),
-          TextFormField(
-            controller: _componentNameController,
-            textInputAction: TextInputAction.next,
-            decoration: const InputDecoration(labelText: 'Component Name *', isDense: true),
-            validator: (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
-          ),
-          const SizedBox(height: GssmsSpacing.s12),
-          TextFormField(
-            controller: _partNumberController,
-            textInputAction: TextInputAction.next,
-            decoration: const InputDecoration(labelText: 'Part / Spec Number', isDense: true),
-          ),
-          const SizedBox(height: GssmsSpacing.s12),
-          TextFormField(
-            controller: _quantityController,
-            keyboardType: TextInputType.number,
-            textInputAction: TextInputAction.next,
-            decoration: const InputDecoration(labelText: 'Quantity Replaced *', isDense: true),
-            validator: (v) {
-              final qty = int.tryParse(v?.trim() ?? '');
-              return (qty == null || qty <= 0) ? 'Enter 1 or more' : null;
-            },
-          ),
-          const SizedBox(height: GssmsSpacing.s12),
-          TextFormField(
-            controller: _remarksController,
-            textCapitalization: TextCapitalization.sentences,
-            decoration:
-                const InputDecoration(labelText: 'Remarks / Action Details', isDense: true),
-            maxLines: 2,
-          ),
-          const SizedBox(height: GssmsSpacing.s16),
-          SizedBox(
-            height: GssmsSize.touchTarget,
-            child: FilledButton(
-              onPressed: _save,
-              child: const Text('Add to Closing Remarks'),
             ),
           ),
         ],

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:gssms_mobile/core/sync/outbox_command.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/maintenance_record.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/work_order.dart';
@@ -37,7 +38,13 @@ class LocalCacheService implements ILocalCacheService {
   static const String _kWorkOrderDetailPrefix = 'gssms_cache_wo_detail_';
   static const String _kRecordPrefix = 'gssms_cache_record_';
   static const String _kOutboxCommandsKey = 'gssms_cache_outbox_commands';
+  static const String _kOutboxBackupKey = 'gssms_cache_outbox_commands_bak';
   static const String _kCacheOwnerUserIdKey = 'gssms_cache_owner_user_id';
+
+  /// Last-good outbox decoded in this process. If the persisted JSON is
+  /// corrupt at the top level, we return this instead of `[]` so a single
+  /// bad write can never discard the entire queued-mutation backlog.
+  static List<OutboxCommand> _lastGoodOutbox = const [];
 
   @override
   Future<void> cacheWorkOrders(List<WorkOrder> workOrders) async {
@@ -83,8 +90,23 @@ class LocalCacheService implements ILocalCacheService {
 
     try {
       final decoded = jsonDecode(raw) as List<dynamic>;
-      return decoded.map((e) => WorkOrder.fromJson(e as Map<String, dynamic>)).toList();
-    } catch (_) {
+      final result = <WorkOrder>[];
+      var corrupt = 0;
+      for (final e in decoded) {
+        if (e is! Map) {
+          corrupt++;
+          continue;
+        }
+        try {
+          result.add(WorkOrder.fromJson(Map<String, dynamic>.from(e)));
+        } catch (_) {
+          corrupt++;
+        }
+      }
+      if (corrupt > 0) debugPrint('getCachedWorkOrders: quarantined $corrupt corrupt entries');
+      return result;
+    } catch (e) {
+      debugPrint('getCachedWorkOrders: top-level corrupt, returning empty: $e');
       return [];
     }
   }
@@ -117,6 +139,8 @@ class LocalCacheService implements ILocalCacheService {
       'linked_record_id': workOrder.linkedRecordId,
       'ticket_number': workOrder.ticketNumber,
       'maintenance_master_name': workOrder.maintenanceMasterName,
+      'maintenance_master': workOrder.maintenanceMasterId,
+      'source': workOrder.source,
       'sla_status': workOrder.slaStatus,
       'escalation_level': workOrder.escalationLevel,
       'station': workOrder.stationId,
@@ -138,9 +162,11 @@ class LocalCacheService implements ILocalCacheService {
     if (raw == null || raw.isEmpty) return null;
 
     try {
-      final decoded = jsonDecode(raw) as Map<String, dynamic>;
-      return WorkOrder.fromJson(decoded);
-    } catch (_) {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return null;
+      return WorkOrder.fromJson(Map<String, dynamic>.from(decoded));
+    } catch (e) {
+      debugPrint('getCachedWorkOrderDetail($id): corrupt entry quarantined: $e');
       return null;
     }
   }
@@ -164,9 +190,11 @@ class LocalCacheService implements ILocalCacheService {
     if (raw == null || raw.isEmpty) return null;
 
     try {
-      final decoded = jsonDecode(raw) as Map<String, dynamic>;
-      return MaintenanceRecord.fromJson(decoded);
-    } catch (_) {
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map) return null;
+      return MaintenanceRecord.fromJson(Map<String, dynamic>.from(decoded));
+    } catch (e) {
+      debugPrint('getCachedMaintenanceRecord($id): corrupt entry quarantined: $e');
       return null;
     }
   }
@@ -175,33 +203,63 @@ class LocalCacheService implements ILocalCacheService {
   Future<void> saveOutboxCommands(List<OutboxCommand> commands) async {
     final prefs = await _getPrefs();
     final rawList = commands.map((c) => c.toJson()).toList();
-    await prefs.setString(_kOutboxCommandsKey, jsonEncode(rawList));
+    final encoded = jsonEncode(rawList);
+    final ok = await prefs.setString(_kOutboxCommandsKey, encoded);
+    if (!ok) debugPrint('saveOutboxCommands: setString failed for ${commands.length} commands');
+    // Keep a backup copy so a torn write can be recovered on next read.
+    try {
+      await prefs.setString(_kOutboxBackupKey, encoded);
+    } catch (_) {}
+    _lastGoodOutbox = List<OutboxCommand>.from(commands);
   }
 
   @override
   Future<List<OutboxCommand>> getOutboxCommands() async {
     final prefs = await _getPrefs();
     final raw = prefs.getString(_kOutboxCommandsKey);
-    if (raw == null || raw.isEmpty) return [];
+    if (raw == null || raw.isEmpty) return List<OutboxCommand>.from(_lastGoodOutbox);
 
+    List<dynamic>? decoded;
     try {
-      final decoded = jsonDecode(raw);
-      if (decoded is! List) return [];
-
-      final validCommands = <OutboxCommand>[];
-      for (final item in decoded) {
-        if (item is Map) {
-          try {
-            validCommands.add(OutboxCommand.fromJson(Map<String, dynamic>.from(item)));
-          } catch (_) {
-            // Skip corrupted command entry without dropping remaining valid outbox items
-          }
-        }
+      final parsed = jsonDecode(raw);
+      if (parsed is List) {
+        decoded = parsed;
+      } else {
+        throw const FormatException('outbox top-level is not a List');
       }
-      return validCommands;
-    } catch (_) {
-      return [];
+    } catch (e) {
+      // Try the backup copy before falling back to last-good memory.
+      debugPrint('getOutboxCommands: top-level corrupt, trying backup: $e');
+      try {
+        final bak = prefs.getString(_kOutboxBackupKey);
+        if (bak != null && bak.isNotEmpty) {
+          final parsedBak = jsonDecode(bak);
+          if (parsedBak is List) decoded = parsedBak;
+        }
+      } catch (_) {}
+      if (decoded == null) {
+        return List<OutboxCommand>.from(_lastGoodOutbox);
+      }
     }
+
+    final validCommands = <OutboxCommand>[];
+    var corrupt = 0;
+    final items = decoded;
+    for (final item in items) {
+      if (item is Map) {
+        try {
+          validCommands.add(OutboxCommand.fromJson(Map<String, dynamic>.from(item)));
+        } catch (_) {
+          corrupt++;
+          // Skip corrupted command entry without dropping remaining valid outbox items
+        }
+      } else {
+        corrupt++;
+      }
+    }
+    if (corrupt > 0) debugPrint('getOutboxCommands: quarantined $corrupt corrupt entries');
+    _lastGoodOutbox = List<OutboxCommand>.from(validCommands);
+    return validCommands;
   }
 
   @override
@@ -268,7 +326,11 @@ class InMemoryLocalCacheService implements ILocalCacheService {
 
   @override
   Future<List<OutboxCommand>> getOutboxCommands() async {
-    return (_storage['outbox'] as List<OutboxCommand>?) ?? [];
+    final stored = _storage['outbox'] as List<OutboxCommand>?;
+    // Return a copy: callers mutate (add/removeWhere) before save, and must
+    // never mutate the store's live list pre-save.
+    if (stored == null) return [];
+    return List<OutboxCommand>.from(stored);
   }
 
   @override

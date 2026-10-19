@@ -204,6 +204,9 @@ class _QrScannerDialogState extends State<QrScannerDialog>
                                 setState(() {
                                   _isManualMode = true;
                                 });
+                                // Camera keeps running behind the manual UI
+                                // unless explicitly stopped.
+                                unawaited(_scannerController.stop());
                               },
                               icon: const Icon(Icons.edit_outlined, size: 18),
                               label: const Text(
@@ -217,6 +220,7 @@ class _QrScannerDialogState extends State<QrScannerDialog>
                                     setState(() {
                                       _isManualMode = false;
                                     });
+                                    unawaited(_scannerController.start());
                                   },
                               icon: const Icon(Icons.camera_alt_outlined, size: 18),
                               label: const Text(
@@ -266,7 +270,7 @@ class _QrScannerDialogState extends State<QrScannerDialog>
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.65),
+                color: Colors.black.withValues(alpha: 0.65),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Row(
@@ -274,12 +278,15 @@ class _QrScannerDialogState extends State<QrScannerDialog>
                 children: [
                   const Icon(Icons.info_outline, color: Colors.white, size: 16),
                   const SizedBox(width: 8),
-                  Text(
-                    'Align QR code or Code128 barcode in box',
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w500,
-                        ),
+                  Flexible(
+                    child: Text(
+                      'Align QR code or Code128 barcode in box',
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w500,
+                          ),
+                    ),
                   ),
                 ],
               ),

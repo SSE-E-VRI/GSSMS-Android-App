@@ -74,12 +74,47 @@ void main() {
       expect(find.text('Super Admin'), findsOneWidget);
       expect(find.byKey(const Key('module_maintenance')), findsOneWidget);
       expect(find.byKey(const Key('module_complaints')), findsOneWidget);
+      expect(find.byKey(const Key('module_deficiencies')), findsNothing);
       expect(find.byKey(const Key('module_assets')), findsOneWidget);
       expect(find.byKey(const Key('module_dashboard')), findsOneWidget);
       expect(find.byKey(const Key('module_reports')), findsOneWidget);
       expect(find.byKey(const Key('module_work_orders')), findsNothing);
       expect(find.byKey(const Key('module_energy')), findsNothing);
       expect(find.byKey(const Key('home_notifications_button')), findsOneWidget);
+    });
+
+    testWidgets('Deficiencies tile hidden for technician with assets.view and shown for Depot Incharge', (tester) async {
+      const technicianSession = UserSession(
+        accessToken: 'tech_token',
+        username: 'tech_vri',
+        primaryRole: AuthRole.maintenanceStaff,
+        roles: [AuthRole.maintenanceStaff],
+        permissions: [
+          'maintenance.view',
+          'maintenance.edit',
+          'assets.view',
+          'assets.replace',
+        ],
+      );
+
+      await tester.pumpWidget(createTestWidget(technicianSession));
+      expect(find.byKey(const Key('module_deficiencies')), findsNothing);
+      expect(find.byKey(const Key('module_assets')), findsOneWidget);
+
+      const depotInchargeSession = UserSession(
+        accessToken: 'depot_token',
+        username: 'incharge_vri',
+        primaryRole: AuthRole.depotIncharge,
+        roles: [AuthRole.depotIncharge],
+        permissions: [
+          'maintenance.view',
+          'maintenance.edit',
+          'assets.view',
+        ],
+      );
+
+      await tester.pumpWidget(createTestWidget(depotInchargeSession));
+      expect(find.byKey(const Key('module_deficiencies')), findsOneWidget);
     });
 
     testWidgets('SUPER_ADMIN role without wildcard in permissions does NOT display module tiles (strict server gating)', (tester) async {

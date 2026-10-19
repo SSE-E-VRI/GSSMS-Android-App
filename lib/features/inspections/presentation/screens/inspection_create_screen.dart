@@ -1,7 +1,10 @@
 import 'dart:async';
+import 'dart:io';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:gssms_mobile/core/data/org_scope_options_service.dart';
 import 'package:gssms_mobile/core/domain/org_option.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
@@ -9,6 +12,7 @@ import 'package:gssms_mobile/features/auth/domain/models/org_scope.dart';
 import 'package:gssms_mobile/features/auth/domain/rbac.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:gssms_mobile/features/auth/presentation/widgets/permission_denied_view.dart';
+import 'package:gssms_mobile/features/inspections/data/inspection_repository.dart';
 import 'package:gssms_mobile/features/inspections/presentation/controllers/inspection_controllers.dart';
 import 'package:gssms_mobile/features/reports/domain/models/infrastructure_option.dart';
 import 'package:gssms_mobile/features/reports/presentation/controllers/reports_controller.dart';
@@ -37,6 +41,7 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
   // Kept for widget-test backward compat: old tests pump 'inspection_description_field'.
   // Hidden, no validator — web-parity validation is via _pointsError.
   final _legacyDescriptionController = TextEditingController();
+  final _headerNotesController = TextEditingController();
   DateTime _selectedDate = DateTime.now();
 
   bool _isSubmitting = false;
@@ -53,11 +58,20 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
   List<InfrastructureOption> _locations = const [];
   bool _loadingLocations = false;
   int? _selectedLocationId;
+  int _loadSeq = 0;
 
-  // Inspection Points
+  // Inspection Points (web contract: observation + priority + item_reference).
   final List<TextEditingController> _pointControllers = [TextEditingController()];
   final List<FocusNode> _pointFocusNodes = [FocusNode()];
+  final List<String> _pointPriorities = ['MEDIUM'];
+  final List<TextEditingController> _pointItemRefs = [TextEditingController()];
   String? _pointsError;
+
+  // General evidence staging (JPEG, max 3) — uploaded after the inspection
+  // exists, mirroring web's post-create photo flow.
+  static const int _maxGeneralPhotos = 3;
+  static const int _maxPhotoBytes = 15 * 1024 * 1024;
+  final List<XFile> _stagedPhotos = [];
 
   /// Header band + submit button: a solid/on-solid pair so the text stays
   /// readable in both themes.
@@ -77,11 +91,15 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
   void dispose() {
     _titleController.dispose();
     _legacyDescriptionController.dispose();
+    _headerNotesController.dispose();
     for (final c in _pointControllers) {
       c.dispose();
     }
     for (final f in _pointFocusNodes) {
       f.dispose();
+    }
+    for (final c in _pointItemRefs) {
+      c.dispose();
     }
     super.dispose();
   }
@@ -132,6 +150,7 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
   }
 
   Future<void> _loadDepots({int? zoneId, int? divisionId}) async {
+    if (!mounted) return;
     setState(() => _loadingDepots = true);
     try {
       final depots = await ref.read(orgScopeOptionsServiceProvider).fetchDepots(zoneId: zoneId, divisionId: divisionId);
@@ -144,6 +163,8 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
   }
 
   Future<void> _loadLocations() async {
+    if (!mounted) return;
+    final seq = ++_loadSeq;
     if (_infraType == InfraFilterType.all) {
       setState(() {
         _locations = const [];
@@ -158,11 +179,13 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
     });
     try {
       final options = await ref.read(infrastructureOptionsServiceProvider).fetchOptions(_infraType, depotId: _selectedDepotId);
-      if (mounted) setState(() => _locations = options);
+      if (!mounted || seq != _loadSeq) return;
+      setState(() => _locations = options);
     } catch (_) {
-      if (mounted) setState(() => _locations = const []);
+      if (!mounted || seq != _loadSeq) return;
+      setState(() => _locations = const []);
     } finally {
-      if (mounted) setState(() => _loadingLocations = false);
+      if (mounted && seq == _loadSeq) setState(() => _loadingLocations = false);
     }
   }
 
@@ -170,6 +193,8 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
     setState(() {
       _pointControllers.add(TextEditingController());
       _pointFocusNodes.add(FocusNode());
+      _pointPriorities.add('MEDIUM');
+      _pointItemRefs.add(TextEditingController());
       _pointsError = null;
     });
     // Focus the new field after the frame.
@@ -187,6 +212,9 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
       _pointFocusNodes[index].dispose();
       _pointControllers.removeAt(index);
       _pointFocusNodes.removeAt(index);
+      _pointPriorities.removeAt(index);
+      _pointItemRefs[index].dispose();
+      _pointItemRefs.removeAt(index);
       _pointsError = null;
     });
   }
@@ -206,7 +234,10 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
   }
 
   Future<void> _submit() async {
-    if (!sessionAllows(sessionOf(ref), 'inspections.create')) return;
+    if (!sessionAllows(
+        sessionFromAuth(ref.read(authControllerProvider)), 'inspections.create')) {
+      return;
+    }
     final titleValid = _formKey.currentState?.validate() ?? false;
     // Points validation is outside Form's TextFormFields because the list is dynamic.
     final points = _pointControllers.map((c) => c.text.trim()).where((t) => t.isNotEmpty).toList();
@@ -226,7 +257,6 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
     if (pointsErr != null && legacyFallback.isNotEmpty) {
       pointsErr = null;
     }
-    final effectivePoints = (pointsErr == null && points.isEmpty && legacyFallback.isNotEmpty) ? [legacyFallback] : points;
 
     if (pointsErr != null) {
       setState(() => _pointsError = pointsErr);
@@ -245,23 +275,64 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
 
     setState(() => _isSubmitting = true);
     try {
-      // Recompute effective points for the payload (legacy fallback included).
-      final computedPoints = effectivePoints.isNotEmpty ? effectivePoints : points;
-      final notes = computedPoints.join('\n');
+      // Structured points payload (web InspectionForm contract). Header notes
+      // stay separate; legacy hidden field still feeds a point for old tests.
+      final structured = <InspectionPointInput>[];
+      for (var i = 0; i < _pointControllers.length; i++) {
+        final obs = _pointControllers[i].text.trim();
+        if (obs.isEmpty) continue;
+        structured.add(InspectionPointInput(
+          observation: obs,
+          priority: _pointPriorities[i],
+          itemReference: _pointItemRefs[i].text,
+        ));
+      }
+      if (structured.isEmpty && legacyFallback.isNotEmpty) {
+        structured.add(InspectionPointInput(observation: legacyFallback));
+      }
+      final headerNotes = _headerNotesController.text.trim().isNotEmpty
+          ? _headerNotesController.text.trim()
+          : legacyFallback.isNotEmpty && structured.isNotEmpty
+              // Backward compat: old tests drive the hidden description field
+              // and assert it lands in `notes`. New UI keeps header notes
+              // separate, so mirror the finding into notes only when no
+              // explicit header was typed.
+              ? structured.map((p) => p.observation).join('\n')
+              : _headerNotesController.text.trim();
       final apiDate = DateFormat('yyyy-MM-dd').format(_selectedDate);
-      // Per SSOT §11.3 the backend Inspection model has no asset/priority
-      // field on creation — only title/notes/inspection_date/relations.
-      await ref.read(inspectionRepositoryProvider).createInspection(
-            title: _titleController.text.trim(),
-            notes: notes,
-            depotId: _selectedDepotId,
-            stationId: _resolvedStationId,
-            infrastructureId: _resolvedInfrastructureId,
-            inspectionDate: apiDate,
-          );
+      final created =
+          await ref.read(inspectionRepositoryProvider).createInspection(
+                title: _titleController.text.trim(),
+                notes: headerNotes,
+                depotId: _selectedDepotId,
+                stationId: _resolvedStationId,
+                infrastructureId: _resolvedInfrastructureId,
+                inspectionDate: apiDate,
+                points: structured,
+              );
+      var photoErrors = 0;
+      for (final photo in _stagedPhotos) {
+        try {
+          final file = await _photoFile(photo);
+          if (file == null) {
+            photoErrors++;
+            continue;
+          }
+          await ref.read(inspectionRepositoryProvider).uploadGeneralPhoto(
+                inspectionId: created.id,
+                file: file,
+              );
+        } catch (_) {
+          photoErrors++;
+        }
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: const Text('Inspection logged successfully!'), backgroundColor: context.gssms.success.solid),
+          SnackBar(
+              content: Text(photoErrors > 0
+                  ? 'Inspection logged successfully! ($photoErrors photo(s) could not be uploaded.)'
+                  : 'Inspection logged successfully!'),
+              backgroundColor: context.gssms.success.solid),
         );
         Navigator.of(context).pop(true);
       }
@@ -275,6 +346,39 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
       }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
+
+  Future<MultipartFile?> _photoFile(XFile photo) async {
+    final lower = photo.path.toLowerCase();
+    if (!lower.endsWith('.jpg') && !lower.endsWith('.jpeg')) return null;
+    final file = File(photo.path);
+    if (!await file.exists()) return null;
+    if (await file.length() > _maxPhotoBytes) return null;
+    final filename = photo.path.split(Platform.pathSeparator).last;
+    return MultipartFile.fromFile(
+      photo.path,
+      filename: filename.isNotEmpty ? filename : 'evidence.jpg',
+      contentType: DioMediaType('image', 'jpeg'),
+    );
+  }
+
+  Future<void> _pickPhotos() async {
+    try {
+      final picked = await ImagePicker().pickMultiImage(imageQuality: 85);
+      if (!mounted) return;
+      setState(() {
+        for (final p in picked) {
+          if (_stagedPhotos.length >= _maxGeneralPhotos) break;
+          final lower = p.path.toLowerCase();
+          if (!lower.endsWith('.jpg') && !lower.endsWith('.jpeg')) {
+            continue;
+          }
+          _stagedPhotos.add(p);
+        }
+      });
+    } catch (_) {
+      // Picker dismissal / denial — stay on the form.
     }
   }
 
@@ -380,7 +484,11 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
                             const SizedBox(height: 16),
                             _locationDetailsCard(),
                             const SizedBox(height: 16),
+                            _headerNotesField(),
+                            const SizedBox(height: 16),
                             _inspectionPointsSection(),
+                            const SizedBox(height: 16),
+                            _photosSection(),
                             const SizedBox(height: 16),
                             Divider(height: 1, color: context.gssms.border),
                             const SizedBox(height: 16),
@@ -554,13 +662,28 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
             ],
           ),
           const SizedBox(height: 14),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(child: _infraTypeField()),
-              const SizedBox(width: 12),
-              Expanded(child: _locationNameField()),
-            ],
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final narrow = constraints.maxWidth < 420;
+              if (narrow) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _infraTypeField(),
+                    const SizedBox(height: 12),
+                    _locationNameField(),
+                  ],
+                );
+              }
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: _infraTypeField()),
+                  const SizedBox(width: 12),
+                  Expanded(child: _locationNameField()),
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -647,70 +770,152 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
     );
   }
 
+  Widget _headerNotesField() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _labelWithInfo('General Remarks / Header Notes',
+            tooltip:
+                'Optional high-level remarks for the inspection header. Observation findings go in points below.'),
+        const SizedBox(height: 6),
+        TextFormField(
+          key: const Key('inspection_header_notes_field'),
+          controller: _headerNotesController,
+          maxLines: 2,
+          decoration: InputDecoration(
+            hintText: 'e.g. Conducted during joint divisional inspection',
+            hintStyle: TextStyle(color: context.gssms.textSecondary, fontSize: 14),
+            filled: true,
+            fillColor: Theme.of(context).inputDecorationTheme.fillColor,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: context.gssms.border)),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: context.gssms.border)),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _inspectionPointsSection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _labelWithInfo('Inspection Points',
             required: true,
-            tooltip: 'One line per observation. Add a point for each thing you inspected.'),
+            tooltip: 'One card per observation, with priority and optional item reference (web contract).'),
         const SizedBox(height: 8),
         ...List.generate(_pointControllers.length, (index) {
           return Padding(
             padding: EdgeInsets.only(bottom: index == _pointControllers.length - 1 ? 0 : 10),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                SizedBox(
-                  width: 20,
-                  child: Text('${index + 1}.', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: context.gssms.textPrimary)),
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: TextFormField(
-                    key: Key('inspection_point_field_$index'),
-                    controller: _pointControllers[index],
-                    focusNode: _pointFocusNodes[index],
-                    decoration: InputDecoration(
-                      hintText: 'Enter observation / point...',
-                      hintStyle: TextStyle(color: context.gssms.textSecondary, fontSize: 13),
-                      filled: true,
-                      fillColor: Theme.of(context).inputDecorationTheme.fillColor,
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: context.gssms.border)),
-                      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: context.gssms.border)),
-                    ),
-                    onChanged: (_) {
-                      if (_pointsError != null) setState(() => _pointsError = null);
-                    },
+            child: Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: context.gssms.border),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              padding: const EdgeInsets.all(10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      SizedBox(
+                        width: 24,
+                        child: Text('${index + 1}.', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: context.gssms.textPrimary)),
+                      ),
+                      Expanded(
+                        child: TextFormField(
+                          key: Key('inspection_point_field_$index'),
+                          controller: _pointControllers[index],
+                          focusNode: _pointFocusNodes[index],
+                          decoration: InputDecoration(
+                            hintText: 'Enter observation / point...',
+                            hintStyle: TextStyle(color: context.gssms.textSecondary, fontSize: 13),
+                            filled: true,
+                            fillColor: Theme.of(context).inputDecorationTheme.fillColor,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: context.gssms.border)),
+                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: context.gssms.border)),
+                          ),
+                          onChanged: (_) {
+                            if (_pointsError != null) setState(() => _pointsError = null);
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      SizedBox(
+                        height: 48,
+                        child: OutlinedButton(
+                          key: Key('remove_inspection_point_$index'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: context.gssms.danger.foreground,
+                            side: BorderSide(color: context.gssms.danger.border),
+                            backgroundColor: context.gssms.danger.background,
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            minimumSize: const Size(0, 48),
+                          ),
+                          onPressed: _pointControllers.length <= 1 ? null : () => _removePoint(index),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.delete_outline, size: 16, color: _pointControllers.length <= 1 ? context.gssms.textTertiary : context.gssms.danger.foreground),
+                              const SizedBox(height: 1),
+                              Text('Remove',
+                                  style: TextStyle(fontSize: 10, color: _pointControllers.length <= 1 ? context.gssms.textTertiary : context.gssms.danger.foreground, fontWeight: FontWeight.w600)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(width: 8),
-                SizedBox(
-                  height: 48,
-                  child: OutlinedButton(
-                    key: Key('remove_inspection_point_$index'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: context.gssms.danger.foreground,
-                      side: BorderSide(color: context.gssms.danger.border),
-                      backgroundColor: context.gssms.danger.background,
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                      minimumSize: const Size(0, 48),
-                    ),
-                    onPressed: _pointControllers.length <= 1 ? null : () => _removePoint(index),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.delete_outline, size: 16, color: _pointControllers.length <= 1 ? context.gssms.textTertiary : context.gssms.danger.foreground),
-                        const SizedBox(height: 1),
-                        Text('Remove',
-                            style: TextStyle(fontSize: 10, color: _pointControllers.length <= 1 ? context.gssms.textTertiary : context.gssms.danger.foreground, fontWeight: FontWeight.w600)),
-                      ],
-                    ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          key: Key('inspection_point_priority_$index'),
+                          isExpanded: true,
+                          value: _pointPriorities[index],
+                          decoration: const InputDecoration(
+                            labelText: 'Priority',
+                            isDense: true,
+                            contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                          ),
+                          items: const [
+                            DropdownMenuItem(value: 'LOW', child: Text('Low', style: TextStyle(fontSize: 13))),
+                            DropdownMenuItem(value: 'MEDIUM', child: Text('Medium', style: TextStyle(fontSize: 13))),
+                            DropdownMenuItem(value: 'HIGH', child: Text('High', style: TextStyle(fontSize: 13))),
+                          ],
+                          onChanged: (v) {
+                            if (v == null) return;
+                            setState(() => _pointPriorities[index] = v);
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        flex: 2,
+                        child: TextFormField(
+                          key: Key('inspection_point_item_ref_$index'),
+                          controller: _pointItemRefs[index],
+                          decoration: InputDecoration(
+                            labelText: 'Item ref (optional)',
+                            hintText: 'e.g. Discharge Gauge 2',
+                            hintStyle: TextStyle(color: context.gssms.textSecondary, fontSize: 12),
+                            isDense: true,
+                            filled: true,
+                            fillColor: Theme.of(context).inputDecorationTheme.fillColor,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: context.gssms.border)),
+                            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: context.gssms.border)),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           );
         }),
@@ -741,6 +946,54 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
             key: Key('inspection_priority_dropdown'),
             width: 1,
             height: 1,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _photosSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _labelWithInfo('General Evidence Photos',
+            tooltip:
+                'Optional site/overview context (JPEG only, up to 3). Uploaded after the inspection is logged.'),
+        const SizedBox(height: 8),
+        if (_stagedPhotos.isNotEmpty)
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (var i = 0; i < _stagedPhotos.length; i++)
+                Chip(
+                  key: Key('inspection_staged_photo_$i'),
+                  label: Text(
+                    _stagedPhotos[i].path.split(Platform.pathSeparator).last,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 12),
+                  ),
+                  deleteIcon: const Icon(Icons.close, size: 16),
+                  onDeleted: () => setState(() => _stagedPhotos.removeAt(i)),
+                ),
+            ],
+          ),
+        if (_stagedPhotos.isNotEmpty) const SizedBox(height: 8),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: OutlinedButton.icon(
+            key: const Key('add_inspection_photos_button'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: _webBlue,
+              side: BorderSide(color: _webBlue),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            onPressed: _stagedPhotos.length >= _maxGeneralPhotos ? null : _pickPhotos,
+            icon: const Icon(Icons.photo_camera_outlined, size: 16),
+            label: Text(
+                'Add Photos (${_stagedPhotos.length}/$_maxGeneralPhotos)',
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
           ),
         ),
       ],

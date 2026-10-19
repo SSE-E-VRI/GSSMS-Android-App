@@ -41,7 +41,8 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
   @override
   void initState() {
     super.initState();
-    _startResendTimer();
+    _secondsRemaining = 60;
+    _startResendTimer(notify: false);
   }
 
   @override
@@ -53,11 +54,14 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
     super.dispose();
   }
 
-  void _startResendTimer() {
+  void _startResendTimer({bool notify = true}) {
     _timer?.cancel();
-    setState(() {
-      _secondsRemaining = 60;
-    });
+    // Called from initState with notify:false: do not call setState
+    // before first build.
+    _secondsRemaining = 60;
+    if (notify && mounted) {
+      setState(() {});
+    }
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (!mounted) return;
       if (_secondsRemaining > 1) {

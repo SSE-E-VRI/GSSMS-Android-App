@@ -6,17 +6,25 @@ import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_
 
 /// Single primary action bar for the checklist screen.
 ///
-/// Replaces the horizontal multi-button toolbar with one full-width CTA
-/// and a passive sync status indicator.
+/// The CTA is always "Sign & Submit" so technicians can find it; while
+/// required items remain, the remaining count shows as a helper line above
+/// the button instead of replacing its label, and tapping jumps to the
+/// first incomplete required line (see `onIncompleteTap`) rather than
+/// opening the completion sheet.
 class ChecklistActionBar extends ConsumerWidget {
   const ChecklistActionBar({
     super.key,
     required this.state,
     required this.onSignAndSubmit,
+    required this.onIncompleteTap,
   });
 
   final ChecklistLoaded state;
   final VoidCallback onSignAndSubmit;
+
+  /// Tapped while [ChecklistLoaded.remainingRequired] > 0: the screen
+  /// scrolls to and highlights the first incomplete required line.
+  final VoidCallback onIncompleteTap;
 
   String? _formatLastSyncTime(DateTime? lastSync) {
     if (lastSync == null) return null;
@@ -67,6 +75,17 @@ class ChecklistActionBar extends ConsumerWidget {
                 ),
                 const SizedBox(height: GssmsSpacing.s6),
               ],
+              if (remaining > 0)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: GssmsSpacing.s6),
+                  child: Text(
+                    '$remaining required ${remaining == 1 ? 'item' : 'items'} left',
+                    key: const Key('checklist_remaining_hint'),
+                    style: textTheme.labelSmall
+                        ?.copyWith(color: tokens.textSecondary),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
               Semantics(
                 liveRegion: true,
                 child: FilledButton.icon(
@@ -81,9 +100,9 @@ class ChecklistActionBar extends ConsumerWidget {
                       borderRadius: BorderRadius.circular(GssmsRadius.r8),
                     ),
                   ),
-                  onPressed: (state.canSubmit && !state.isSubmitting)
-                      ? onSignAndSubmit
-                      : null,
+                  onPressed: state.isSubmitting
+                      ? null
+                      : (state.canSubmit ? onSignAndSubmit : onIncompleteTap),
                   icon: state.isSubmitting
                       ? SizedBox(
                           width: 18,
@@ -95,9 +114,7 @@ class ChecklistActionBar extends ConsumerWidget {
                         )
                       : const Icon(Icons.check_circle_outline, size: GssmsSize.iconMd),
                   label: Text(
-                    state.canSubmit
-                        ? 'Sign & Submit'
-                        : '$remaining required ${remaining == 1 ? 'item' : 'items'} left',
+                    'Sign & Submit',
                     style: textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold),
                   ),
                 ),

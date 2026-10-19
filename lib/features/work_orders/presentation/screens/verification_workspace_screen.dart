@@ -4,7 +4,13 @@ import 'package:gssms_mobile/core/theme/app_theme.dart';
 import 'package:gssms_mobile/features/auth/domain/rbac.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:gssms_mobile/features/auth/presentation/widgets/permission_denied_view.dart';
+import 'package:gssms_mobile/core/widgets/feedback.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/maintenance_record.dart';
+import 'package:gssms_mobile/features/work_orders/domain/models/verification_workspace.dart';
+import 'package:gssms_mobile/features/work_orders/presentation/widgets/verify_asset_groups_section.dart';
+import 'package:gssms_mobile/features/work_orders/presentation/widgets/verify_deficiency_section.dart';
+import 'package:gssms_mobile/features/work_orders/presentation/widgets/verify_kind_summary.dart';
+import 'package:gssms_mobile/features/work_orders/presentation/widgets/verify_remarks_section.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/work_order_action.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/controllers/verification_workspace_controller.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/controllers/verification_workspace_state.dart';
@@ -116,6 +122,13 @@ class _VerificationWorkspaceScreenState
 
     final workspace = state.workspace;
     final lines = workspace.record?.activeLines ?? const [];
+    final session = sessionOf(ref);
+    final controller = ref
+        .read(verificationWorkspaceControllerProvider(widget.workOrderId).notifier);
+    final assessmentRows = [
+      ...workspace.deficiencyRows,
+      ...workspace.remarkDeficiencyRows.where((r) => r.isFlagged),
+    ];
 
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -140,28 +153,75 @@ class _VerificationWorkspaceScreenState
           ),
           const SizedBox(height: 12),
         ],
-        Text(
-          'Checklist',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 16,
-            color: context.gssms.link,
-          ),
-        ),
-        const SizedBox(height: 10),
-        if (lines.isEmpty)
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text(
-                'No checklist lines on this record.',
-                style: TextStyle(color: context.gssms.textSecondary),
-              ),
+        if (workspace.mode != 'CHECKLIST') ...[
+          VerifyKindSummary(workspace: workspace),
+          const SizedBox(height: 16),
+        ],
+        if (workspace.mode == 'CHECKLIST') ...[
+          Text(
+            'Checklist',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+              color: context.gssms.link,
             ),
-          )
-        else
-          ...lines.map(_buildLineCard),
-        const SizedBox(height: 16),
+          ),
+          const SizedBox(height: 10),
+          if (lines.isEmpty)
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(
+                  'No checklist lines on this record.',
+                  style: TextStyle(color: context.gssms.textSecondary),
+                ),
+              ),
+            )
+          else
+            ...lines.map(_buildLineCard),
+          const SizedBox(height: 16),
+        ],
+        if (workspace.mode != 'INSPECTION') ...[
+          if (workspace.remarkDeficiencyRows.isNotEmpty) ...[
+            VerifyRemarksSection(
+              rows: workspace.remarkDeficiencyRows,
+              assetOptions: workspace.remarkAssetOptions,
+              severities: state.severities,
+              canFlag: canFlagRemarkDeficiency(session) &&
+                  workspace.workOrderStatus == 'TECH_COMPLETED' &&
+                  workspace.recordId != null,
+              busy: state.isMutating,
+              onFlag: (row, {assetUniqueId, severityId}) => controller.flagRemark(
+                row,
+                assetUniqueId: assetUniqueId,
+                severityId: severityId,
+              ),
+              onUnflag: controller.unflagRemark,
+            ),
+            const SizedBox(height: 16),
+          ],
+          if (assessmentRows.isNotEmpty) ...[
+            VerifyDeficiencySection(
+              rows: assessmentRows,
+              severities: state.severities,
+              canTriage: canTriageDeficiencySeverity(session),
+              busy: state.isMutating,
+              onSeverityChanged: controller.updateSeverity,
+            ),
+            const SizedBox(height: 16),
+          ],
+          if (workspace.assetGroups.isNotEmpty) ...[
+            VerifyAssetGroupsSection(
+              groups: workspace.assetGroups,
+              canUncheck: canUncheckoutGroup(session) &&
+                  workspace.workOrderStatus == 'TECH_COMPLETED' &&
+                  workspace.recordId != null,
+              busy: state.isMutating,
+              onUncheck: _confirmUncheck,
+            ),
+            const SizedBox(height: 16),
+          ],
+        ],
         TextFormField(
           key: const Key('verify_remarks_field'),
           controller: _remarksController,
@@ -472,6 +532,56 @@ class _VerificationWorkspaceScreenState
 
     if (remarks == null || remarks.isEmpty || !mounted) return;
     await _returnToTechnician(remarks);
+  }
+
+  Future<void> _confirmUncheck(VerificationAssetGroup group) async {
+    final textController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    final reason = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Reason for un-checking "${group.displayName}"'),
+        content: Form(
+          key: formKey,
+          child: TextFormField(
+            key: const Key('uncheck_reason_field'),
+            controller: textController,
+            decoration: const InputDecoration(labelText: 'Reason *'),
+            maxLines: 3,
+            validator: (val) => (val == null || val.trim().isEmpty)
+                ? 'A reason is required'
+                : null,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            key: const Key('uncheck_confirm_button'),
+            onPressed: () {
+              if (!(formKey.currentState?.validate() ?? false)) return;
+              Navigator.of(ctx).pop(textController.text.trim());
+            },
+            child: const Text('Confirm Un-check & Return'),
+          ),
+        ],
+      ),
+    );
+    if (reason == null || reason.isEmpty || !mounted) return;
+    final error = await ref
+        .read(verificationWorkspaceControllerProvider(widget.workOrderId).notifier)
+        .uncheckGroup(group, reason);
+    if (!mounted) return;
+    if (error != null) {
+      showGssmsSnackBar(context, error, tone: GssmsTone.danger);
+      return;
+    }
+    showGssmsSnackBar(context, 'Job Work returned to the technician for rework.');
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) Navigator.of(context).pop();
+    });
   }
 
   Future<void> _returnToTechnician(String remarks) async {

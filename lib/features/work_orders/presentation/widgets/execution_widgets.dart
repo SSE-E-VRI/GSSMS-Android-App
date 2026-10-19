@@ -1,0 +1,261 @@
+import 'package:flutter/material.dart';
+import 'package:gssms_mobile/core/theme/app_theme.dart';
+import 'package:gssms_mobile/features/work_orders/domain/models/mode_execution.dart';
+
+/// Editable {parameter, value, unit} rows (max 50 server-side). Used by the
+/// complaint and inspection execution forms — the server validates
+/// non-blank parameter/value in one place regardless of caller.
+class ParamRowsEditor extends StatefulWidget {
+  const ParamRowsEditor({
+    super.key,
+    required this.initial,
+    required this.onChanged,
+    this.enabled = true,
+  });
+
+  final List<Map<String, String>> initial;
+  final ValueChanged<List<Map<String, String>>> onChanged;
+  final bool enabled;
+
+  @override
+  State<ParamRowsEditor> createState() => _ParamRowsEditorState();
+}
+
+class _ParamRowsEditorState extends State<ParamRowsEditor> {
+  late List<TextEditingController> _params;
+  late List<TextEditingController> _values;
+  late List<TextEditingController> _units;
+
+  @override
+  void initState() {
+    super.initState();
+    _params = [];
+    _values = [];
+    _units = [];
+    for (final row in widget.initial) {
+      _params.add(TextEditingController(text: row['parameter'] ?? ''));
+      _values.add(TextEditingController(text: row['value'] ?? ''));
+      _units.add(TextEditingController(text: row['unit'] ?? ''));
+    }
+  }
+
+  @override
+  void dispose() {
+    for (final c in [..._params, ..._values, ..._units]) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  void _emit() {
+    widget.onChanged(List.generate(
+      _params.length,
+      (i) => {
+        'parameter': _params[i].text.trim(),
+        'value': _values[i].text.trim(),
+        'unit': _units[i].text.trim(),
+      },
+    ));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        for (var i = 0; i < _params.length; i++)
+          Padding(
+            padding: EdgeInsets.only(bottom: i == _params.length - 1 ? 0 : 8),
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: TextFormField(
+                    controller: _params[i],
+                    enabled: widget.enabled,
+                    decoration: const InputDecoration(
+                      labelText: 'Parameter',
+                      isDense: true,
+                    ),
+                    onChanged: (_) => _emit(),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 3,
+                  child: TextFormField(
+                    controller: _values[i],
+                    enabled: widget.enabled,
+                    decoration: const InputDecoration(
+                      labelText: 'Value',
+                      isDense: true,
+                    ),
+                    onChanged: (_) => _emit(),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 2,
+                  child: TextFormField(
+                    controller: _units[i],
+                    enabled: widget.enabled,
+                    decoration: const InputDecoration(
+                      labelText: 'Unit',
+                      isDense: true,
+                    ),
+                    onChanged: (_) => _emit(),
+                  ),
+                ),
+                IconButton(
+                  key: Key('remove_param_row_$i'),
+                  icon: const Icon(Icons.delete_outline, size: 18),
+                  tooltip: 'Remove row',
+                  onPressed: !widget.enabled
+                      ? null
+                      : () => setState(() {
+                            _params[i].dispose();
+                            _values[i].dispose();
+                            _units[i].dispose();
+                            _params.removeAt(i);
+                            _values.removeAt(i);
+                            _units.removeAt(i);
+                            _emit();
+                          }),
+                ),
+              ],
+            ),
+          ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            key: const Key('add_param_row_button'),
+            onPressed: !widget.enabled || _params.length >= 50
+                ? null
+                : () => setState(() {
+                      _params.add(TextEditingController());
+                      _values.add(TextEditingController());
+                      _units.add(TextEditingController());
+                      _emit();
+                    }),
+            icon: const Icon(Icons.add, size: 16),
+            label: const Text('Add parameter'),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Before/After photo grid for one execution scope (whole execution, one
+/// rectification item, or one inspection point). Locked photos show a lock
+/// and no delete affordance — the server rejects their removal.
+class ExecutionPhotoGrid extends StatelessWidget {
+  const ExecutionPhotoGrid({
+    super.key,
+    required this.photos,
+    required this.canManage,
+    required this.busy,
+    required this.onAdd,
+    required this.onDelete,
+    this.maxPerKind = 10,
+  });
+
+  final List<ExecutionPhoto> photos;
+  final bool canManage;
+  final bool busy;
+  final ValueChanged<String> onAdd;
+  final ValueChanged<ExecutionPhoto> onDelete;
+  final int maxPerKind;
+
+  List<ExecutionPhoto> _ofKind(String kind) =>
+      photos.where((p) => (p.kind ?? '').toUpperCase() == kind).toList();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final kind in const ['BEFORE', 'AFTER'])
+          Padding(
+            padding: EdgeInsets.only(bottom: kind == 'AFTER' ? 0 : 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        kind == 'BEFORE'
+                            ? 'Before photos (${_ofKind(kind).length})'
+                            : 'After photos (${_ofKind(kind).length})',
+                        style: Theme.of(context).textTheme.labelMedium,
+                      ),
+                    ),
+                    if (canManage && _ofKind(kind).length < maxPerKind)
+                      TextButton.icon(
+                        key: Key('add_${kind.toLowerCase()}_photo_button'),
+                        onPressed: busy ? null : () => onAdd(kind),
+                        icon: const Icon(Icons.photo_camera_outlined,
+                            size: 16),
+                        label: const Text('Add'),
+                      ),
+                  ],
+                ),
+                if (_ofKind(kind).isEmpty)
+                  Text('No $kind photos yet.',
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodySmall
+                          ?.copyWith(color: context.gssms.textSecondary)),
+                for (final photo in _ofKind(kind))
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Photo #${photo.id}${photo.fromComplaint ? ' (from breakdown report)' : ''}',
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ),
+                        if (photo.locked || photo.fromComplaint)
+                          const Icon(Icons.lock_outline, size: 16)
+                        else if (canManage)
+                          IconButton(
+                            key: Key('delete_exec_photo_${photo.id}'),
+                            icon: const Icon(Icons.delete_outline, size: 18),
+                            tooltip: 'Delete photo',
+                            onPressed: busy ? null : () => onDelete(photo),
+                          ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+/// BEFORE/AFTER choice dialog. Returns null on cancel.
+Future<String?> pickPhotoKind(BuildContext context) {
+  return showDialog<String>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Photo type'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            title: const Text('Before'),
+            onTap: () => Navigator.of(ctx).pop('BEFORE'),
+          ),
+          ListTile(
+            title: const Text('After'),
+            onTap: () => Navigator.of(ctx).pop('AFTER'),
+          ),
+        ],
+      ),
+    ),
+  );
+}

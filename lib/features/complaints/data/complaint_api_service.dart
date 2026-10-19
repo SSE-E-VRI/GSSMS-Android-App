@@ -16,6 +16,7 @@ class ComplaintApiService {
 
   Future<List<Complaint>> getComplaints({
     String? status,
+    String? excludeStatus,
     int? zoneId,
     int? divisionId,
     int? depotId,
@@ -24,6 +25,9 @@ class ComplaintApiService {
   }) async {
     final query = <String, dynamic>{};
     if (status != null && status.isNotEmpty) query['status'] = status;
+    if (excludeStatus != null && excludeStatus.isNotEmpty) {
+      query['exclude_status'] = excludeStatus;
+    }
     // No `severity` filter — per SSOT §10.6 the backend Complaint API has no
     // severity field/filter.
     // depot/division/zone are mutually exclusive server-side (ComplaintViewSet
@@ -89,11 +93,63 @@ class ComplaintApiService {
   /// Convert complaint to work order — POST
   /// /api/v1/complaints/{id}/convert_to_work_order/. Same ConversionService
   /// backing (and response shape: `{message, work_order_id}`) as the
-  /// inspection conversion endpoint.
+  /// inspection conversion endpoint. A null body still means success, so an
+  /// empty map is returned rather than throwing.
   Future<Map<String, dynamic>> convertToWorkOrder(int complaintId) async {
     final response =
         await _dio.post('/api/v1/complaints/$complaintId/convert_to_work_order/');
     final data = _asObject(response.data);
     return data ?? const {};
+  }
+
+  /// Direct close/reject with no Job Work — POST
+  /// /api/v1/complaints/{id}/close/ {closure_reason, closure_remarks}.
+  /// DEPOT_INCHARGE only server-side; OPEN complaints only (else 409).
+  Future<Complaint> closeComplaint(
+    int complaintId, {
+    required String closureReason,
+    required String closureRemarks,
+  }) async {
+    final response = await _dio.post(
+      '/api/v1/complaints/$complaintId/close/',
+      data: {
+        'closure_reason': closureReason,
+        'closure_remarks': closureRemarks,
+      },
+    );
+    final data = _asObject(response.data);
+    if (data == null) {
+      throw DioException(
+        requestOptions: response.requestOptions,
+        response: response,
+        type: DioExceptionType.badResponse,
+        message: 'Unexpected close payload',
+      );
+    }
+    return Complaint.fromJson(data);
+  }
+
+  /// Upload a registration-time evidence photo (JPEG, OPEN complaints only,
+  /// max 5 server-side). Returns the created photo; duplicate content
+  /// returns the existing row (201) server-side.
+  Future<ComplaintPhoto> uploadPhoto({
+    required int complaintId,
+    required MultipartFile file,
+  }) async {
+    final form = FormData.fromMap({'image': file});
+    final response = await _dio.post(
+      '/api/v1/complaints/$complaintId/photos/',
+      data: form,
+    );
+    final data = _asObject(response.data);
+    if (data == null) {
+      throw DioException(
+        requestOptions: response.requestOptions,
+        response: response,
+        type: DioExceptionType.badResponse,
+        message: 'Unexpected photo payload',
+      );
+    }
+    return ComplaintPhoto.fromJson(data);
   }
 }

@@ -7,8 +7,12 @@ import 'package:gssms_mobile/core/sync/outbox_command.dart';
 import 'package:gssms_mobile/core/sync/sync_manager.dart';
 import 'package:gssms_mobile/features/work_orders/data/work_order_api_service.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/batch_convert_result.dart';
+import 'package:gssms_mobile/features/work_orders/domain/models/deficiency_severity_option.dart';
+import 'package:gssms_mobile/features/work_orders/domain/models/group_inclusion_result.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/maintenance_master.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/maintenance_record.dart';
+import 'package:gssms_mobile/features/work_orders/domain/models/pm_approval_request.dart';
+import 'package:gssms_mobile/features/work_orders/domain/models/supervisor_mandate.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/technician.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/verification_workspace.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/work_order.dart';
@@ -44,10 +48,18 @@ abstract class IWorkOrderRepository {
     String? type,
     String? dateFrom,
     String? dateTo,
+    String? updatedFrom,
+    String? updatedTo,
+    String? completionFrom,
+    String? completionTo,
     int? zoneId,
     int? divisionId,
     int? depotId,
     int? stationId,
+    int? lcGateId,
+    int? serviceBuildingId,
+    int? staffQuarterId,
+    String? infraType,
     bool assignedToMe = false,
   });
 
@@ -67,12 +79,63 @@ abstract class IWorkOrderRepository {
   Future<List<MaintenanceMaster>> fetchMaintenanceMasters();
   Future<BatchConvertResult> createWorkOrdersFromComplaints(List<int> complaintIds);
   Future<BatchConvertResult> createWorkOrdersFromInspections(List<int> inspectionIds);
-  Future<WorkOrderActionSet> fetchAllowedActions(int workOrderId);
+  Future<BatchConvertResult> createRectification(
+    List<int> deficiencyIds, {
+    bool onePerDeficiency = false,
+  });  Future<WorkOrderActionSet> fetchAllowedActions(int workOrderId);
   Future<WorkOrderAudit> fetchAudit(int workOrderId);
   Future<List<Technician>> fetchAssignableTechnicians({int? depotId});
   Future<WorkOrder> assignTechnician(int workOrderId, int technicianId);
   Future<WorkOrder> verifyWorkOrder(int workOrderId, {String? remarks});
   Future<VerificationWorkspace> fetchVerificationWorkspace(int workOrderId);
+
+  // Online-only mutations/reads (no outbox): errors are rethrown to the UI.
+  Future<WorkOrder> reassignWorkOrder(
+    int workOrderId, {
+    required int technicianId,
+    required String reason,
+  });
+  Future<PrepareChecklistResult> prepareChecklist(int workOrderId);
+  Future<List<SupervisorMandate>> getSupervisorMandates(int workOrderId);
+  Future<SupervisorMandate> setSupervisorMandate(
+    int workOrderId, {
+    int? assetCategoryId,
+    required String assetName,
+    required String action,
+    String reason = '',
+  });
+  Future<List<ChecklistGroupPreview>> getMasterChecklistGroups(int masterId);
+  Future<GroupInclusionResult> setGroupInclusion(
+    int recordId, {
+    int? assetCategoryId,
+    required String assetName,
+    required bool included,
+    String? reason,
+  });
+  Future<List<DeficiencySeverityOption>> getDeficiencySeverities();
+  Future<DeficiencySeverityUpdate> updateDeficiencySeverity(
+    int deficiencyId, {
+    required int severityId,
+    required int expectedVersion,
+  });
+  Future<RemarkFlagResult> flagRemarkDeficiency(
+    int recordId, {
+    required int remarkIndex,
+    String? assetUniqueId,
+    int? severityId,
+  });
+  Future<void> unflagRemarkDeficiency(int recordId, {required int remarkIndex});
+  Future<List<ScheduleAlternative>> getScheduleAlternatives(int scheduleId);
+  Future<ApprovalRequestSummary> requestPmSkip(
+    int scheduleId, {
+    required String reasonCode,
+    required String remarks,
+  });
+  Future<ApprovalRequestSummary> requestChecklistChange(
+    int scheduleId, {
+    required int maintenanceMasterId,
+    required String remarks,
+  });
   Future<int> startExecution(int workOrderId);
   Future<WorkOrder> transitionStatus(
     int workOrderId, {
@@ -83,6 +146,14 @@ abstract class IWorkOrderRepository {
   });
 
   Future<MaintenanceRecord> fetchMaintenanceRecord(int recordId);
+
+  /// Raw record rows for report resolution (`?work_order=` then `?schedule=`
+  /// fallback, mirroring web ReportsView). Returns decoded maps because
+  /// report shaping consumes the raw nested lines/options.
+  Future<List<Map<String, dynamic>>> fetchMaintenanceRecords({
+    int? workOrderId,
+    int? scheduleId,
+  });
   Future<MutationOutcome> submitChecklistLine(
       int recordId, Map<String, dynamic> lineData);
 
@@ -149,16 +220,48 @@ class WorkOrderRepository implements IWorkOrderRepository {
     return false;
   }
 
+  /// Enqueue unless an identical PENDING command is already queued
+  /// (double-tap offline must not create two idempotency keys for the same
+  /// logical write — the server would apply it twice).
+  /// Returns true when a new command was enqueued, false on dedup-hit.
+  Future<bool> _enqueueDeduped(
+    OutboxCommand cmd, {
+    bool Function(OutboxCommand existing)? matches,
+  }) async {
+    final sync = _syncManager;
+    if (sync == null) return false;
+    try {
+      final existing = await _cacheService.getOutboxCommands();
+      final isDup = existing.any((c) {
+        if (c.status != OutboxCommandStatus.pending) return false;
+        if (c.type != cmd.type || c.entityId != cmd.entityId) return false;
+        if (matches != null) return matches(c);
+        return true;
+      });
+      if (isDup) return false;
+    } catch (_) {}
+    await sync.enqueueCommand(cmd);
+    return true;
+  }
+
   @override
   Future<List<WorkOrder>> fetchWorkOrders({
     String? status,
     String? type,
     String? dateFrom,
     String? dateTo,
+    String? updatedFrom,
+    String? updatedTo,
+    String? completionFrom,
+    String? completionTo,
     int? zoneId,
     int? divisionId,
     int? depotId,
     int? stationId,
+    int? lcGateId,
+    int? serviceBuildingId,
+    int? staffQuarterId,
+    String? infraType,
     bool assignedToMe = false,
   }) async {
     // Only the unfiltered list is cached/restored — caching per filter
@@ -171,10 +274,18 @@ class WorkOrderRepository implements IWorkOrderRepository {
         type != null ||
         dateFrom != null ||
         dateTo != null ||
+        updatedFrom != null ||
+        updatedTo != null ||
+        completionFrom != null ||
+        completionTo != null ||
         zoneId != null ||
         divisionId != null ||
         depotId != null ||
         stationId != null ||
+        lcGateId != null ||
+        serviceBuildingId != null ||
+        staffQuarterId != null ||
+        infraType != null ||
         assignedToMe;
     try {
       final orders = await _apiService.getWorkOrders(
@@ -182,10 +293,18 @@ class WorkOrderRepository implements IWorkOrderRepository {
         type: type,
         dateFrom: dateFrom,
         dateTo: dateTo,
+        updatedFrom: updatedFrom,
+        updatedTo: updatedTo,
+        completionFrom: completionFrom,
+        completionTo: completionTo,
         zoneId: zoneId,
         divisionId: divisionId,
         depotId: depotId,
         stationId: stationId,
+        lcGateId: lcGateId,
+        serviceBuildingId: serviceBuildingId,
+        staffQuarterId: staffQuarterId,
+        infraType: infraType,
         assignedToMe: assignedToMe,
       );
       if (!hasFilters) await _cacheService.cacheWorkOrders(orders);
@@ -265,6 +384,16 @@ class WorkOrderRepository implements IWorkOrderRepository {
   Future<BatchConvertResult> createWorkOrdersFromInspections(List<int> inspectionIds) {
     return _apiService.createWorkOrdersFromInspections(inspectionIds);
   }
+  @override
+  Future<BatchConvertResult> createRectification(
+    List<int> deficiencyIds, {
+    bool onePerDeficiency = false,
+  }) {
+    return _apiService.createRectification(
+      deficiencyIds,
+      onePerDeficiency: onePerDeficiency,
+    );
+  }
 
   /// Transitions the server permits right now. These are deliberately not
   /// cached: an offline client cannot know whether a transition is still
@@ -304,6 +433,127 @@ class WorkOrderRepository implements IWorkOrderRepository {
   }
 
   @override
+  Future<WorkOrder> reassignWorkOrder(
+    int workOrderId, {
+    required int technicianId,
+    required String reason,
+  }) async {
+    final order = await _apiService.reassignWorkOrder(
+      workOrderId,
+      technicianId: technicianId,
+      reason: reason,
+    );
+    await _cacheService.cacheWorkOrderDetail(order);
+    return order;
+  }
+
+  @override
+  Future<PrepareChecklistResult> prepareChecklist(int workOrderId) =>
+      _apiService.prepareChecklist(workOrderId);
+
+  @override
+  Future<List<SupervisorMandate>> getSupervisorMandates(int workOrderId) =>
+      _apiService.getSupervisorMandates(workOrderId);
+
+  @override
+  Future<SupervisorMandate> setSupervisorMandate(
+    int workOrderId, {
+    int? assetCategoryId,
+    required String assetName,
+    required String action,
+    String reason = '',
+  }) =>
+      _apiService.setSupervisorMandate(
+        workOrderId,
+        assetCategoryId: assetCategoryId,
+        assetName: assetName,
+        action: action,
+        reason: reason,
+      );
+
+  @override
+  Future<List<ChecklistGroupPreview>> getMasterChecklistGroups(int masterId) =>
+      _apiService.getMasterChecklistGroups(masterId);
+
+  @override
+  Future<GroupInclusionResult> setGroupInclusion(
+    int recordId, {
+    int? assetCategoryId,
+    required String assetName,
+    required bool included,
+    String? reason,
+  }) =>
+      _apiService.setGroupInclusion(
+        recordId,
+        assetCategoryId: assetCategoryId,
+        assetName: assetName,
+        included: included,
+        reason: reason,
+      );
+
+  @override
+  Future<List<DeficiencySeverityOption>> getDeficiencySeverities() =>
+      _apiService.getDeficiencySeverities();
+
+  @override
+  Future<DeficiencySeverityUpdate> updateDeficiencySeverity(
+    int deficiencyId, {
+    required int severityId,
+    required int expectedVersion,
+  }) =>
+      _apiService.updateDeficiencySeverity(
+        deficiencyId,
+        severityId: severityId,
+        expectedVersion: expectedVersion,
+      );
+
+  @override
+  Future<RemarkFlagResult> flagRemarkDeficiency(
+    int recordId, {
+    required int remarkIndex,
+    String? assetUniqueId,
+    int? severityId,
+  }) =>
+      _apiService.flagRemarkDeficiency(
+        recordId,
+        remarkIndex: remarkIndex,
+        assetUniqueId: assetUniqueId,
+        severityId: severityId,
+      );
+
+  @override
+  Future<void> unflagRemarkDeficiency(int recordId, {required int remarkIndex}) =>
+      _apiService.unflagRemarkDeficiency(recordId, remarkIndex: remarkIndex);
+
+  @override
+  Future<List<ScheduleAlternative>> getScheduleAlternatives(int scheduleId) =>
+      _apiService.getScheduleAlternatives(scheduleId);
+
+  @override
+  Future<ApprovalRequestSummary> requestPmSkip(
+    int scheduleId, {
+    required String reasonCode,
+    required String remarks,
+  }) =>
+      _apiService.requestPmSkip(
+        scheduleId,
+        reasonCode: reasonCode,
+        remarks: remarks,
+      );
+
+  @override
+  Future<ApprovalRequestSummary> requestChecklistChange(
+    int scheduleId, {
+    required int maintenanceMasterId,
+    required String remarks,
+  }) =>
+      _apiService.requestChecklistChange(
+        scheduleId,
+        maintenanceMasterId: maintenanceMasterId,
+        remarks: remarks,
+      );
+
+  @override
   Future<int> startExecution(int workOrderId) async {
     try {
       final recordId = await _apiService.startExecution(workOrderId);
@@ -325,7 +575,7 @@ class WorkOrderRepository implements IWorkOrderRepository {
           payload: const {},
           createdAt: DateTime.now(),
         );
-        await _syncManager.enqueueCommand(cmd);
+        await _enqueueDeduped(cmd);
         throw const StartExecutionQueuedOffline();
       }
       rethrow;
@@ -370,7 +620,8 @@ class WorkOrderRepository implements IWorkOrderRepository {
           },
           createdAt: DateTime.now(),
         );
-        await _syncManager.enqueueCommand(cmd);
+        await _enqueueDeduped(cmd,
+            matches: (c) => c.payload['status'] == status);
 
         // Optimistic update in cache. `remarks` is the transition note, not
         // the work order's description — copyWith'ing it into `description`
@@ -406,6 +657,19 @@ class WorkOrderRepository implements IWorkOrderRepository {
   }
 
   @override
+  Future<List<Map<String, dynamic>>> fetchMaintenanceRecords({
+    int? workOrderId,
+    int? scheduleId,
+  }) {
+    // Report resolution is online-only (like the Register export itself):
+    // a stale cached record must never render as a signed report.
+    return _apiService.fetchMaintenanceRecords(
+      workOrderId: workOrderId,
+      scheduleId: scheduleId,
+    );
+  }
+
+  @override
   Future<MutationOutcome> submitChecklistLine(
       int recordId, Map<String, dynamic> lineData) async {
     try {
@@ -421,7 +685,8 @@ class WorkOrderRepository implements IWorkOrderRepository {
           payload: lineData,
           createdAt: DateTime.now(),
         );
-        await _syncManager.enqueueCommand(cmd);
+        await _enqueueDeduped(cmd,
+            matches: (c) => c.payload['line_id'] == lineId);
         return MutationOutcome.queued;
       }
       rethrow;
@@ -451,7 +716,7 @@ class WorkOrderRepository implements IWorkOrderRepository {
       return MutationOutcome.synced;
     } catch (e) {
       if (_isNetworkException(e) && _syncManager != null) {
-        await _syncManager.enqueueCommand(OutboxCommand(
+        await _enqueueDeduped(OutboxCommand(
           idempotencyKey: 'evidence_${recordId}_${DateTime.now().millisecondsSinceEpoch}',
           type: OutboxCommandType.uploadEvidence,
           entityId: recordId,
@@ -461,7 +726,7 @@ class WorkOrderRepository implements IWorkOrderRepository {
             if (otherStaff != null) 'other_staff': otherStaff,
           },
           createdAt: DateTime.now(),
-        ));
+        ), matches: (c) => c.payload['proof_path'] == proofJpegPath);
         return MutationOutcome.queued;
       }
       rethrow;
@@ -478,7 +743,7 @@ class WorkOrderRepository implements IWorkOrderRepository {
   }) async {
     final syncManager = _syncManager;
     Future<MutationOutcome> enqueue(SyncManager sync) async {
-      await sync.enqueueCommand(OutboxCommand(
+      await _enqueueDeduped(OutboxCommand(
         idempotencyKey: 'complete_${recordId}_${DateTime.now().millisecondsSinceEpoch}',
         type: OutboxCommandType.completeRecord,
         entityId: recordId,
@@ -541,7 +806,11 @@ class WorkOrderRepository implements IWorkOrderRepository {
           },
           createdAt: DateTime.now(),
         );
-        await _syncManager.enqueueCommand(cmd);
+        await _enqueueDeduped(cmd,
+            matches: (c) =>
+                c.payload['line_id'] == lineId &&
+                c.payload['kind'] == kind &&
+                c.payload['file_path'] == imagePath);
 
         return LineAttachment(
           id: -DateTime.now().millisecondsSinceEpoch,

@@ -13,7 +13,7 @@ class PagedFetchResult {
   final bool truncated;
 }
 
-/// Default page cap. Only `AssetViewSet` paginates today
+/// Default page cap. `AssetViewSet` and the inspections endpoints paginate
 /// (StandardResultsSetPagination, `page_size` up to 100), so at
 /// [preferredPageSize] this is 2,000 rows before truncation — comfortably past
 /// any one depot's register, while still bounding a global-scoped fetch that
@@ -42,7 +42,7 @@ Future<PagedFetchResult> fetchAllPages(
   int maxPages = defaultMaxPages,
 }) async {
   final items = <dynamic>[];
-  final seenPaths = <String>{};
+  final seenPaths = <String>{path};
 
   String? currentPath = path;
   Map<String, dynamic>? currentQuery = {
@@ -61,14 +61,19 @@ Future<PagedFetchResult> fetchAllPages(
     currentQuery = null;
 
     final data = response.data;
-    if (data is Map<String, dynamic>) {
-      if (data['results'] is List) {
-        items.addAll(data['results'] as List<dynamic>);
+    if (data is Map) {
+      final map = data is Map<String, dynamic>
+          ? data
+          : Map<String, dynamic>.from(data);
+      if (map['results'] is List) {
+        items.addAll(map['results'] as List<dynamic>);
       }
-      final nextUrl = data['next'] as String?;
+      final nextRaw = map['next'];
+      final nextUrl = nextRaw?.toString();
       if (nextUrl == null || nextUrl.isEmpty) break;
 
-      final uri = Uri.parse(nextUrl);
+      final uri = Uri.tryParse(nextUrl);
+      if (uri == null) break;
       final nextPath = uri.hasQuery ? '${uri.path}?${uri.query}' : uri.path;
       // A `next` that points back at a page already fetched would loop
       // forever. Treat it as the end of the list, not as more data.
