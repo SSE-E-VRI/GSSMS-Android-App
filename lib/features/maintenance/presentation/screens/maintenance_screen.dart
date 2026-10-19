@@ -41,7 +41,7 @@ class _MaintenanceScreenState extends ConsumerState<MaintenanceScreen> {
 
   Future<void> _handleRefresh(UserSession? session) async {
     if (canViewDeficiencyModule(session)) {
-      ref.refresh(deficiencyNeedsActionCountProvider);
+      ref.invalidate(deficiencyNeedsActionCountProvider);
     }
     await ref.read(dashboardControllerProvider.notifier).loadDashboard();
   }

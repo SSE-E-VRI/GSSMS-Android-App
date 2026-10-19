@@ -5,7 +5,6 @@ import 'package:gssms_mobile/features/complaints/domain/models/complaint.dart';
 import 'package:gssms_mobile/features/complaints/presentation/controllers/complaint_controllers.dart';
 import 'package:gssms_mobile/features/deficiencies/data/deficiency_api_service.dart';
 import 'package:gssms_mobile/features/deficiencies/data/deficiency_repository.dart';
-import 'package:gssms_mobile/features/deficiencies/domain/deficiency_bucket.dart';
 import 'package:gssms_mobile/features/deficiencies/domain/models/deficiency.dart';
 
 export 'package:gssms_mobile/features/deficiencies/domain/deficiency_bucket.dart'

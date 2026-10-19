@@ -13,8 +13,8 @@ analyzer:
     - build/**
     - android/**
     - ios/**
-  plugins:
-    - custom_lint
+  # The legacy `plugins: - custom_lint` entry is deprecated by Dart 3.13 and fails
+  # `flutter analyze` with a warning. Run the project lints with `dart run custom_lint`.
 
 # P1-5 / P1-6: ban Color(0xFF…) and bare fontSize: inside lib/features/.
 # Severity is WARNING (see LintCode in packages/gssms_lints) so the existing

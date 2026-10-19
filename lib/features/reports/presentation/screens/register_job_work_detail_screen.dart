@@ -6,7 +6,6 @@ import 'package:gssms_mobile/core/network/api_error.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
 import 'package:gssms_mobile/core/widgets/section_card.dart';
 import 'package:gssms_mobile/features/auth/domain/rbac.dart';
-import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:gssms_mobile/features/auth/presentation/widgets/permission_denied_view.dart';
 import 'package:gssms_mobile/features/reports/domain/register_job_work_adapter.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/job_work_report.dart';
