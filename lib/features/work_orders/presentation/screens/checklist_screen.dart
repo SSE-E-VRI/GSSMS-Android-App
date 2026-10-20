@@ -5,6 +5,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:gssms_mobile/core/network/api_error.dart';
 import 'package:gssms_mobile/core/sync/sync_manager.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
+import 'package:gssms_mobile/core/utils/gallery_permission.dart';
 import 'package:gssms_mobile/core/utils/numbered_list.dart';
 import 'package:gssms_mobile/core/widgets/confirmation_dialog.dart';
 import 'package:gssms_mobile/core/widgets/empty_state_view.dart';
@@ -630,6 +631,11 @@ class _CompletionSheetState extends ConsumerState<_CompletionSheet> {
   }
 
   Future<void> _capture(ImageSource source) async {
+    if (source == ImageSource.gallery &&
+        !await ref.read(galleryPermissionServiceProvider).request(context)) {
+      return;
+    }
+    if (!mounted) return;
     setState(() => _capturing = true);
     try {
       final file = await ref

@@ -1,16 +1,20 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:gssms_mobile/core/network/api_error.dart';
+import 'package:gssms_mobile/core/utils/gallery_permission.dart';
 import 'package:gssms_mobile/core/widgets/confirmation_dialog.dart';
 import 'package:gssms_mobile/core/widgets/section_card.dart';
 import 'package:gssms_mobile/features/auth/domain/rbac.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:gssms_mobile/features/auth/presentation/widgets/permission_denied_view.dart';
+import 'package:gssms_mobile/features/work_orders/data/evidence_service.dart';
 import 'package:gssms_mobile/features/work_orders/data/execution_api_service.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/mode_execution.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/widgets/execution_autosave.dart';
@@ -24,6 +28,10 @@ import 'package:gssms_mobile/features/work_orders/presentation/widgets/failure_d
 /// parameters, Before + After photos (5 max per kind, JPEG), debounced
 /// autosave, Save Progress and Sign & Submit → TECH_COMPLETED. Completeness is enforced
 /// server-side; client checks are advisory.
+///
+/// Photos are captured/picked straight to a durable local file and stay
+/// local (surviving app restarts) until Save Progress or Sign & Submit —
+/// neither auto-uploads on every Add/Retake tap.
 class ComplaintExecutionScreen extends ConsumerStatefulWidget {
   const ComplaintExecutionScreen({
     super.key,
@@ -63,7 +71,16 @@ class _ComplaintExecutionScreenState
   late final ExecutionApiService _api;
   late final ExecutionAutosaveController _autosave;
 
+  /// Photos captured/picked this session (or a prior one) that haven't been
+  /// uploaded yet — durable on disk via EvidenceService, indexed in
+  /// SharedPreferences under [_pendingPhotosKey] so they survive the app
+  /// being killed before Save Progress / Sign & Submit is tapped.
+  final List<PendingExecutionPhoto> _pendingPhotos = [];
+
   bool get _busy => _saving || _submitting;
+
+  String get _pendingPhotosKey =>
+      'complaint_execution_pending_photos_${widget.workOrderId}';
 
   @override
   void initState() {
@@ -79,6 +96,7 @@ class _ComplaintExecutionScreenState
     }
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+    unawaited(_loadPendingPhotos());
   }
 
   void _onEdited() {
@@ -149,6 +167,45 @@ class _ComplaintExecutionScreenState
     }
   }
 
+  /// Restores any pending (not-yet-uploaded) photos left from a previous
+  /// session, dropping entries whose local file no longer exists.
+  Future<void> _loadPendingPhotos() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString(_pendingPhotosKey);
+    if (raw == null) return;
+    List<dynamic> decoded;
+    try {
+      decoded = jsonDecode(raw) as List<dynamic>;
+    } catch (_) {
+      return;
+    }
+    final restored = <PendingExecutionPhoto>[];
+    for (final entry in decoded) {
+      if (entry is! Map) continue;
+      final kind = entry['kind'] as String?;
+      final localPath = entry['localPath'] as String?;
+      if (kind == null || localPath == null) continue;
+      if (!await File(localPath).exists()) continue;
+      restored.add(PendingExecutionPhoto(kind: kind, localPath: localPath));
+    }
+    if (!mounted) return;
+    setState(() {
+      _pendingPhotos
+        ..clear()
+        ..addAll(restored);
+    });
+  }
+
+  Future<void> _persistPendingPhotos() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(
+      _pendingPhotosKey,
+      jsonEncode(_pendingPhotos
+          .map((p) => {'kind': p.kind, 'localPath': p.localPath})
+          .toList()),
+    );
+  }
+
   void _onFailureCodeChanged(int? code) {
     setState(() {
       _failureCode = code;
@@ -177,9 +234,18 @@ class _ComplaintExecutionScreenState
         'restored_time': _restoredTime?.toIso8601String(),
       };
 
+  /// Save Progress: uploads any pending local photos first (they must be on
+  /// the server before a draft save is meaningful), then saves the text
+  /// fields. Stops at the first photo upload failure, leaving the rest
+  /// pending — nothing already uploaded gets re-sent on retry.
   Future<void> _saveDraft() async {
     setState(() => _saving = true);
     try {
+      if (_pendingPhotos.isNotEmpty) {
+        final uploaded = await _uploadPendingPhotos();
+        if (!uploaded || !mounted) return;
+        await _load();
+      }
       final ok = await _autosave.flush(manual: true);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -194,57 +260,69 @@ class _ComplaintExecutionScreenState
     }
   }
 
-  /// Lets the user choose camera or gallery, then captures/picks a JPEG and
-  /// uploads it for [kind]. Returns null if the user cancelled the source
-  /// choice or the picker, or picked an unusable file (no error, nothing
-  /// happened), true once the upload is confirmed on the server, or false
-  /// if the upload itself failed (error already shown).
-  Future<bool?> _pickAndUploadPhoto(String kind) async {
-    final source = await pickExecutionImageSource(context);
-    if (source == null || !mounted) return null;
-    XFile? picked;
-    try {
-      picked = await ImagePicker().pickImage(source: source, imageQuality: 85);
-    } catch (_) {
-      return null;
+  /// Uploads every pending local photo to the server, discarding the local
+  /// copy and removing it from [_pendingPhotos] (and the persisted index)
+  /// only once the server confirms it. Returns false and surfaces the error
+  /// on the first failure, leaving everything from that point on pending —
+  /// calling this again never re-uploads what already succeeded.
+  Future<bool> _uploadPendingPhotos() async {
+    for (final photo in List<PendingExecutionPhoto>.from(_pendingPhotos)) {
+      try {
+        final filename = photo.localPath.split(Platform.pathSeparator).last;
+        await _api.uploadComplaintPhoto(
+          widget.workOrderId,
+          kind: photo.kind,
+          file: await MultipartFile.fromFile(
+            photo.localPath,
+            filename: filename.isNotEmpty ? filename : 'evidence.jpg',
+            contentType: DioMediaType('image', 'jpeg'),
+          ),
+        );
+        await ref.read(evidenceServiceProvider).discard(photo.localPath);
+        if (mounted) {
+          setState(() => _pendingPhotos.remove(photo));
+        } else {
+          _pendingPhotos.remove(photo);
+        }
+        await _persistPendingPhotos();
+      } catch (e) {
+        if (!mounted) return false;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content:
+                  Text('Could not upload a pending photo: ${userFacingError(e)}')),
+        );
+        return false;
+      }
     }
-    if (picked == null || !mounted) return null;
-    final lower = picked.path.toLowerCase();
-    if (!lower.endsWith('.jpg') && !lower.endsWith('.jpeg')) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Only JPEG photos are allowed.')),
-      );
-      return null;
-    }
-    try {
-      final file = File(picked.path);
-      if (!await file.exists()) return null;
-      final filename = picked.path.split(Platform.pathSeparator).last;
-      await ref.read(executionApiServiceProvider).uploadComplaintPhoto(
-            widget.workOrderId,
-            kind: kind,
-            file: await MultipartFile.fromFile(
-              picked.path,
-              filename: filename.isNotEmpty ? filename : 'evidence.jpg',
-              contentType: DioMediaType('image', 'jpeg'),
-            ),
-          );
-      return true;
-    } catch (e) {
-      if (!mounted) return false;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not upload: ${userFacingError(e)}')),
-      );
-      return false;
-    }
+    return true;
   }
 
+  /// Captures/picks a photo and keeps it on-device as pending — it is not
+  /// uploaded until Save Progress or Sign & Submit.
   Future<void> _addPhoto(String kind) async {
+    final source = await pickExecutionImageSource(context);
+    if (source == null || !mounted) return;
+    if (source == ImageSource.gallery &&
+        !await ref.read(galleryPermissionServiceProvider).request(context)) {
+      return;
+    }
+    if (!mounted) return;
     setState(() => _saving = true);
     try {
-      await _pickAndUploadPhoto(kind);
-      await _autosave.flush();
-      await _load();
+      final captured = await ref.read(evidenceServiceProvider).capture(
+            kind: kind == 'AFTER' ? EvidenceKind.after : EvidenceKind.before,
+            source: source,
+          );
+      if (captured == null || !mounted) return; // user cancelled
+      setState(() => _pendingPhotos
+          .add(PendingExecutionPhoto(kind: kind, localPath: captured.path)));
+      await _persistPendingPhotos();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not capture photo: ${userFacingError(e)}')),
+      );
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -277,9 +355,10 @@ class _ComplaintExecutionScreenState
     }
   }
 
-  /// Uploads a replacement photo first, then removes [photo] — only once the
-  /// new one is confirmed on the server, so a failed pick/upload never
-  /// leaves the record with neither photo.
+  /// Already-uploaded photo retake: still swaps immediately (upload
+  /// replacement, then delete old) rather than deferring — the photo being
+  /// replaced is already safely on the server, so there's no local-only
+  /// state to stage; only newly-added photos defer to Save/Submit.
   Future<void> _retakePhoto(ExecutionPhoto photo) async {
     final confirmed = await showConfirmationDialog(
       context,
@@ -291,13 +370,33 @@ class _ComplaintExecutionScreenState
       confirmKey: Key('confirm_retake_exec_photo_${photo.id}'),
     );
     if (!confirmed || !mounted) return;
+    final source = await pickExecutionImageSource(context);
+    if (source == null || !mounted) return;
+    if (source == ImageSource.gallery &&
+        !await ref.read(galleryPermissionServiceProvider).request(context)) {
+      return;
+    }
+    if (!mounted) return;
     setState(() => _saving = true);
     try {
-      final uploaded = await _pickAndUploadPhoto(photo.kind ?? 'BEFORE');
-      // null: user cancelled or picked something unusable — leave the old
-      // photo in place. false: upload failed, error already shown above.
-      // Only a confirmed upload (true) clears the way to delete the old one.
-      if (uploaded != true || !mounted) return;
+      final captured = await ref.read(evidenceServiceProvider).capture(
+            kind: (photo.kind ?? 'BEFORE') == 'AFTER'
+                ? EvidenceKind.after
+                : EvidenceKind.before,
+            source: source,
+          );
+      if (captured == null || !mounted) return;
+      final filename = captured.path.split(Platform.pathSeparator).last;
+      await _api.uploadComplaintPhoto(
+        widget.workOrderId,
+        kind: photo.kind ?? 'BEFORE',
+        file: await MultipartFile.fromFile(
+          captured.path,
+          filename: filename.isNotEmpty ? filename : 'evidence.jpg',
+          contentType: DioMediaType('image', 'jpeg'),
+        ),
+      );
+      await ref.read(evidenceServiceProvider).discard(captured.path);
       await ref
           .read(executionApiServiceProvider)
           .deleteComplaintPhoto(widget.workOrderId, photo.id);
@@ -307,8 +406,7 @@ class _ComplaintExecutionScreenState
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-            content:
-                Text('New photo uploaded, but could not remove the old one: ${userFacingError(e)}')),
+            content: Text('Could not retake photo: ${userFacingError(e)}')),
       );
       await _load();
     } finally {
@@ -316,8 +414,72 @@ class _ComplaintExecutionScreenState
     }
   }
 
+  /// Pending (not-yet-uploaded) photo retake: purely local, no network —
+  /// discard the old local file and capture a new one in its place.
+  Future<void> _retakePendingPhoto(PendingExecutionPhoto photo) async {
+    final source = await pickExecutionImageSource(context);
+    if (source == null || !mounted) return;
+    if (source == ImageSource.gallery &&
+        !await ref.read(galleryPermissionServiceProvider).request(context)) {
+      return;
+    }
+    if (!mounted) return;
+    setState(() => _saving = true);
+    try {
+      final captured = await ref.read(evidenceServiceProvider).capture(
+            kind: photo.kind == 'AFTER' ? EvidenceKind.after : EvidenceKind.before,
+            source: source,
+          );
+      if (captured == null || !mounted) return;
+      await ref.read(evidenceServiceProvider).discard(photo.localPath);
+      final index = _pendingPhotos.indexOf(photo);
+      if (index >= 0) {
+        setState(() => _pendingPhotos[index] =
+            PendingExecutionPhoto(kind: photo.kind, localPath: captured.path));
+      }
+      await _persistPendingPhotos();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not capture photo: ${userFacingError(e)}')),
+      );
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  /// Pending (not-yet-uploaded) photo delete: local-only, no network call.
+  Future<void> _deletePendingPhoto(PendingExecutionPhoto photo) async {
+    final confirmed = await showConfirmationDialog(
+      context,
+      title: 'Remove photo?',
+      icon: Icons.delete_outline,
+      message:
+          'This photo has not been uploaded yet and will be removed from this device.',
+      confirmLabel: 'Remove',
+      confirmKey: Key('confirm_delete_pending_photo_${photo.localPath.hashCode}'),
+    );
+    if (!confirmed || !mounted) return;
+    await ref.read(evidenceServiceProvider).discard(photo.localPath);
+    setState(() => _pendingPhotos.remove(photo));
+    await _persistPendingPhotos();
+  }
+
   Future<void> _submit() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
+    // Submit's Before/After check reads server state, so any pending local
+    // photos must land on the server — and _execution must be refreshed —
+    // before that check runs, or a fully-captured-but-not-yet-saved pair
+    // would be wrongly rejected as missing.
+    if (_pendingPhotos.isNotEmpty) {
+      setState(() => _submitting = true);
+      final uploaded = await _uploadPendingPhotos();
+      if (!mounted) return;
+      setState(() => _submitting = false);
+      if (!uploaded) return;
+      await _load();
+      if (!mounted) return;
+    }
     final exec = _execution;
     if (exec != null && (!exec.hasBefore || !exec.hasAfter)) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -547,12 +709,15 @@ class _ComplaintExecutionScreenState
                           children: [
                             ExecutionPhotoGrid(
                               photos: _execution?.photos ?? const [],
+                              pendingPhotos: _pendingPhotos,
                               canManage: true,
                               busy: _busy,
                               maxPerKind: 5,
                               onAdd: _addPhoto,
                               onDelete: _deletePhoto,
                               onRetake: _retakePhoto,
+                              onDeletePending: _deletePendingPhoto,
+                              onRetakePending: _retakePendingPhoto,
                             ),
                           ],
                         ),

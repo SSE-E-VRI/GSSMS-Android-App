@@ -4,6 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:gssms_mobile/core/network/api_error.dart';
 import 'package:gssms_mobile/core/services/profile_photo_cache.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
+import 'package:gssms_mobile/core/utils/gallery_permission.dart';
 import 'package:gssms_mobile/core/widgets/profile_avatar.dart';
 import 'package:gssms_mobile/features/auth/data/auth_repository.dart';
 import 'package:gssms_mobile/features/auth/domain/models/auth_exceptions.dart';
@@ -158,6 +159,11 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
   }
 
   Future<void> _pickAndUploadPhoto(ImageSource source) async {
+    if (source == ImageSource.gallery &&
+        !await ref.read(galleryPermissionServiceProvider).request(context)) {
+      return;
+    }
+    if (!mounted) return;
     final picker = widget.imagePicker ?? ImagePicker();
     final picked = await picker.pickImage(
       source: source,

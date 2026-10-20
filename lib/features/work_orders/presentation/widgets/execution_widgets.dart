@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -149,6 +151,17 @@ class _ParamRowsEditorState extends State<ParamRowsEditor> {
   }
 }
 
+/// A photo captured/picked locally but not yet uploaded to the server —
+/// stays on-device until the caller explicitly uploads it (e.g. on Save
+/// Progress or Sign & Submit), rather than on every Add/Retake tap.
+class PendingExecutionPhoto {
+  const PendingExecutionPhoto({required this.kind, required this.localPath});
+
+  /// 'BEFORE' | 'AFTER'
+  final String kind;
+  final String localPath;
+}
+
 /// Before/After photo grid for one execution scope (whole execution, one
 /// rectification item, or one inspection point). Locked photos show a lock
 /// and no delete/retake affordance — the server rejects their removal.
@@ -161,6 +174,9 @@ class ExecutionPhotoGrid extends ConsumerWidget {
     required this.onAdd,
     required this.onDelete,
     this.onRetake,
+    this.pendingPhotos = const [],
+    this.onDeletePending,
+    this.onRetakePending,
     this.maxPerKind = 10,
   });
 
@@ -175,10 +191,19 @@ class ExecutionPhotoGrid extends ConsumerWidget {
   /// support it yet.
   final ValueChanged<ExecutionPhoto>? onRetake;
 
+  /// Locally-captured photos not yet uploaded — rendered after the
+  /// server-confirmed ones, with a "not uploaded" indicator.
+  final List<PendingExecutionPhoto> pendingPhotos;
+  final ValueChanged<PendingExecutionPhoto>? onDeletePending;
+  final ValueChanged<PendingExecutionPhoto>? onRetakePending;
+
   final int maxPerKind;
 
   List<ExecutionPhoto> _ofKind(String kind) =>
       photos.where((p) => (p.kind ?? '').toUpperCase() == kind).toList();
+
+  List<PendingExecutionPhoto> _pendingOfKind(String kind) =>
+      pendingPhotos.where((p) => p.kind.toUpperCase() == kind).toList();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -203,12 +228,14 @@ class ExecutionPhotoGrid extends ConsumerWidget {
                     Expanded(
                       child: Text(
                         kind == 'BEFORE'
-                            ? 'Before photos (${_ofKind(kind).length}/$maxPerKind)'
-                            : 'After photos (${_ofKind(kind).length}/$maxPerKind)',
+                            ? 'Before photos (${_ofKind(kind).length + _pendingOfKind(kind).length}/$maxPerKind)'
+                            : 'After photos (${_ofKind(kind).length + _pendingOfKind(kind).length}/$maxPerKind)',
                         style: Theme.of(context).textTheme.labelMedium,
                       ),
                     ),
-                    if (canManage && _ofKind(kind).length < maxPerKind)
+                    if (canManage &&
+                        _ofKind(kind).length + _pendingOfKind(kind).length <
+                            maxPerKind)
                       TextButton.icon(
                         key: Key('add_${kind.toLowerCase()}_photo_button'),
                         onPressed: busy ? null : () => onAdd(kind),
@@ -218,7 +245,7 @@ class ExecutionPhotoGrid extends ConsumerWidget {
                       ),
                   ],
                 ),
-                if (_ofKind(kind).isEmpty)
+                if (_ofKind(kind).isEmpty && _pendingOfKind(kind).isEmpty)
                   Text('No $kind photos yet.',
                       style: Theme.of(context)
                           .textTheme
@@ -232,6 +259,14 @@ class ExecutionPhotoGrid extends ConsumerWidget {
                     onDelete: onDelete,
                     onRetake: onRetake,
                     headers: headers,
+                  ),
+                for (final photo in _pendingOfKind(kind))
+                  _PendingPhotoTile(
+                    photo: photo,
+                    canManage: canManage,
+                    busy: busy,
+                    onDelete: onDeletePending,
+                    onRetake: onRetakePending,
                   ),
               ],
             ),
@@ -281,11 +316,14 @@ class _ExecutionPhotoTile extends StatelessWidget {
                         photo.url!,
                         headers: headers,
                         fit: BoxFit.cover,
-                        // Decode at roughly the display size instead of full
-                        // resolution (uploads can be several MB) — the
-                        // dominant cost for a 48dp thumbnail is decode, not
-                        // the download itself.
-                        cacheWidth: 96,
+                        // No cacheWidth here deliberately: decoding
+                        // EXIF-rotated (portrait) camera JPEGs at a reduced
+                        // target size renders solid black on this device —
+                        // confirmed live (Photo #6, landscape, was fine;
+                        // Photo #1, portrait, was black until this was
+                        // removed). Full-resolution decode is slower but
+                        // correct; revisit only with a fix that also
+                        // verifies portrait EXIF orientation.
                         loadingBuilder: (context, child, progress) =>
                             progress == null
                                 ? child
@@ -341,19 +379,129 @@ class _ExecutionPhotoTile extends StatelessWidget {
 
   void _openPreview(BuildContext context) {
     Navigator.of(context).push(MaterialPageRoute<void>(
-      builder: (_) =>
-          _ExecutionPhotoPreviewPage(photo: photo, headers: headers),
+      builder: (_) => _PhotoPreviewScaffold(
+        title: 'Photo #${photo.id}',
+        image: (photo.url == null || photo.url!.isEmpty)
+            ? null
+            : Image.network(
+                photo.url!,
+                headers: headers,
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stack) => const Icon(
+                    Icons.broken_image_outlined,
+                    color: Colors.white54,
+                    size: 64),
+              ),
+      ),
       fullscreenDialog: true,
     ));
   }
 }
 
-/// Full-screen, pinch-to-zoom view of one execution photo.
-class _ExecutionPhotoPreviewPage extends StatelessWidget {
-  const _ExecutionPhotoPreviewPage({required this.photo, required this.headers});
+/// A locally-captured photo not yet uploaded. No lock/retake-on-server
+/// semantics apply — delete and retake act purely on the local file.
+class _PendingPhotoTile extends StatelessWidget {
+  const _PendingPhotoTile({
+    required this.photo,
+    required this.canManage,
+    required this.busy,
+    required this.onDelete,
+    required this.onRetake,
+  });
 
-  final ExecutionPhoto photo;
-  final Map<String, String>? headers;
+  final PendingExecutionPhoto photo;
+  final bool canManage;
+  final bool busy;
+  final ValueChanged<PendingExecutionPhoto>? onDelete;
+  final ValueChanged<PendingExecutionPhoto>? onRetake;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(GssmsRadius.r4),
+            onTap: () => _openPreview(context),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(GssmsRadius.r4),
+              child: SizedBox(
+                width: 48,
+                height: 48,
+                child: Image.file(
+                  File(photo.localPath),
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stack) => Container(
+                    color: context.gssms.surfaceInset,
+                    child:
+                        const Icon(Icons.broken_image_outlined, size: 20),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: GssmsSpacing.s8),
+          Expanded(
+            child: Row(
+              children: [
+                Icon(Icons.cloud_upload_outlined,
+                    size: 14, color: context.gssms.warning.foreground),
+                const SizedBox(width: 4),
+                Flexible(
+                  child: Text(
+                    'Not uploaded yet',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: context.gssms.warning.foreground,
+                        ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (canManage) ...[
+            if (onRetake != null)
+              IconButton(
+                icon: const Icon(Icons.replay_outlined, size: 18),
+                tooltip: 'Retake photo',
+                onPressed: busy ? null : () => onRetake!(photo),
+              ),
+            if (onDelete != null)
+              IconButton(
+                icon: const Icon(Icons.delete_outline, size: 18),
+                tooltip: 'Remove photo',
+                onPressed: busy ? null : () => onDelete!(photo),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  void _openPreview(BuildContext context) {
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => _PhotoPreviewScaffold(
+        title: 'Photo (not uploaded)',
+        image: Image.file(
+          File(photo.localPath),
+          fit: BoxFit.contain,
+          errorBuilder: (context, error, stack) => const Icon(
+              Icons.broken_image_outlined,
+              color: Colors.white54,
+              size: 64),
+        ),
+      ),
+      fullscreenDialog: true,
+    ));
+  }
+}
+
+/// Full-screen, pinch-to-zoom view shared by network- and local-file photos.
+class _PhotoPreviewScaffold extends StatelessWidget {
+  const _PhotoPreviewScaffold({required this.title, required this.image});
+
+  final String title;
+  final Widget? image;
 
   @override
   Widget build(BuildContext context) {
@@ -362,24 +510,15 @@ class _ExecutionPhotoPreviewPage extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
-        title: Text('Photo #${photo.id}'),
+        title: Text(title),
       ),
       body: Center(
         child: InteractiveViewer(
           minScale: 1,
           maxScale: 5,
-          child: photo.url == null || photo.url!.isEmpty
-              ? const Icon(Icons.broken_image_outlined,
-                  color: Colors.white54, size: 64)
-              : Image.network(
-                  photo.url!,
-                  headers: headers,
-                  fit: BoxFit.contain,
-                  errorBuilder: (context, error, stack) => const Icon(
-                      Icons.broken_image_outlined,
-                      color: Colors.white54,
-                      size: 64),
-                ),
+          child: image ??
+              const Icon(Icons.broken_image_outlined,
+                  color: Colors.white54, size: 64),
         ),
       ),
     );

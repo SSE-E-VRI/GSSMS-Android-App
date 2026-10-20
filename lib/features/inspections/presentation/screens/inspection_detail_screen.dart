@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:gssms_mobile/core/network/api_error.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
+import 'package:gssms_mobile/core/utils/gallery_permission.dart';
 import 'package:gssms_mobile/core/utils/json_parsing.dart';
 import 'package:gssms_mobile/core/widgets/confirmation_dialog.dart';
 import 'package:gssms_mobile/core/widgets/section_card.dart';
@@ -195,6 +196,7 @@ class _InspectionDetailScreenState
   }
 
   Future<XFile?> _pickPhoto() async {
+    if (!await ref.read(galleryPermissionServiceProvider).request(context) || !mounted) return null;
     try {
       return await ImagePicker()
           .pickImage(source: ImageSource.gallery, imageQuality: 85);

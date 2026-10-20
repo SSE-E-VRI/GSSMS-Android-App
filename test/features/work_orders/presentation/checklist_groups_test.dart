@@ -6,6 +6,7 @@ import 'package:gssms_mobile/core/database/local_cache_service.dart';
 import 'package:gssms_mobile/core/sync/mutation_outcome.dart';
 import 'package:gssms_mobile/core/sync/sync_manager.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
+import 'package:gssms_mobile/core/utils/gallery_permission.dart';
 import 'package:gssms_mobile/features/auth/domain/models/auth_role.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:gssms_mobile/features/work_orders/data/evidence_service.dart';
@@ -46,6 +47,15 @@ MaintenanceRecord _record(List<MaintenanceRecordLine> lines,
         {String status = 'IN_PROGRESS'}) =>
     MaintenanceRecord(id: 55, lines: lines, status: status);
 
+/// Bypasses the real permission_handler platform channel (unmocked in
+/// widget tests) — gallery access is always granted here.
+class _AlwaysGrantedGalleryPermission extends GalleryPermissionService {
+  const _AlwaysGrantedGalleryPermission();
+
+  @override
+  Future<bool> request(BuildContext context) async => true;
+}
+
 Future<void> _pump(
   WidgetTester tester,
   IWorkOrderRepository repo, {
@@ -64,6 +74,8 @@ Future<void> _pump(
         workOrderRepositoryProvider.overrideWithValue(repo),
         if (evidence != null)
           evidenceServiceProvider.overrideWithValue(evidence),
+        galleryPermissionServiceProvider
+            .overrideWithValue(const _AlwaysGrantedGalleryPermission()),
         authControllerProvider.overrideWith(
           () => FakeAuthenticatedController(
             fakeSession(

@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:gssms_mobile/core/network/api_error.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
+import 'package:gssms_mobile/core/utils/gallery_permission.dart';
 import 'package:gssms_mobile/core/widgets/confirmation_dialog.dart';
 import 'package:gssms_mobile/core/widgets/section_card.dart';
 import 'package:gssms_mobile/features/auth/domain/rbac.dart';
@@ -257,6 +258,36 @@ class _InspectionExecutionScreenState
     }
   }
 
+  /// Lets the user choose camera or gallery, then captures/picks a JPEG.
+  /// Returns null if the user cancelled the source choice, gallery
+  /// permission was refused, or the picker was cancelled/picked something
+  /// unusable (no error, nothing happened) — a non-null [XFile] is ready
+  /// to upload.
+  Future<XFile?> _pickPhoto() async {
+    final source = await pickExecutionImageSource(context);
+    if (source == null || !mounted) return null;
+    if (source == ImageSource.gallery &&
+        !await ref.read(galleryPermissionServiceProvider).request(context)) {
+      return null;
+    }
+    if (!mounted) return null;
+    XFile? picked;
+    try {
+      picked = await ImagePicker().pickImage(source: source, imageQuality: 85);
+    } catch (_) {
+      return null;
+    }
+    if (picked == null || !mounted) return null;
+    final lower = picked.path.toLowerCase();
+    if (!lower.endsWith('.jpg') && !lower.endsWith('.jpeg')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Only JPEG photos are allowed.')),
+      );
+      return null;
+    }
+    return picked;
+  }
+
   Future<void> _addPhoto(
       InspectionPointExecutionEntry point, String kind) async {
     if (point.photos
@@ -270,21 +301,8 @@ class _InspectionExecutionScreenState
       );
       return;
     }
-    XFile? picked;
-    try {
-      picked = await ImagePicker()
-          .pickImage(source: ImageSource.gallery, imageQuality: 85);
-    } catch (_) {
-      return;
-    }
+    final picked = await _pickPhoto();
     if (picked == null || !mounted) return;
-    final lower = picked.path.toLowerCase();
-    if (!lower.endsWith('.jpg') && !lower.endsWith('.jpeg')) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Only JPEG photos are allowed.')),
-      );
-      return;
-    }
     setState(() => _saving = true);
     try {
       final filename = picked.path.split(Platform.pathSeparator).last;
@@ -332,6 +350,53 @@ class _InspectionExecutionScreenState
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Could not delete: ${userFacingError(e)}')),
       );
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  /// Uploads a replacement photo first, then removes [photo] — only once
+  /// the new one is confirmed on the server, so a failed pick/upload never
+  /// leaves the point with neither photo.
+  Future<void> _retakePhoto(
+      InspectionPointExecutionEntry point, ExecutionPhoto photo) async {
+    final confirmed = await showConfirmationDialog(
+      context,
+      title: 'Retake photo?',
+      icon: Icons.replay_outlined,
+      message:
+          'Capture a new photo to replace this one. The old photo stays until the new one uploads successfully.',
+      confirmLabel: 'Retake',
+      confirmKey: Key('confirm_retake_insp_exec_photo_${photo.id}'),
+    );
+    if (!confirmed || !mounted) return;
+    final picked = await _pickPhoto();
+    if (picked == null || !mounted) return;
+    setState(() => _saving = true);
+    try {
+      final filename = picked.path.split(Platform.pathSeparator).last;
+      await ref.read(executionApiServiceProvider).uploadInspectionPhoto(
+            widget.workOrderId,
+            pointJobWorkId: point.pointJobWorkId,
+            photoType: photo.kind ?? 'BEFORE',
+            file: await MultipartFile.fromFile(
+              picked.path,
+              filename: filename.isNotEmpty ? filename : 'evidence.jpg',
+              contentType: DioMediaType('image', 'jpeg'),
+            ),
+          );
+      await ref
+          .read(executionApiServiceProvider)
+          .deleteInspectionPhoto(widget.workOrderId, photo.id);
+      await _autosave.flush();
+      await _refresh();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text('Could not retake photo: ${userFacingError(e)}')),
+      );
+      await _refresh();
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -627,6 +692,7 @@ class _InspectionExecutionScreenState
             maxPerKind: 5,
             onAdd: (kind) => _addPhoto(pt, kind),
             onDelete: _deletePhoto,
+            onRetake: (photo) => _retakePhoto(pt, photo),
           ),
         ],
       ),

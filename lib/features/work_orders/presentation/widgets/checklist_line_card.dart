@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
+import 'package:gssms_mobile/core/utils/gallery_permission.dart';
 import 'package:gssms_mobile/core/widgets/feedback.dart';
 import 'package:gssms_mobile/features/auth/domain/rbac.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
@@ -689,6 +690,11 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
   }
 
   Future<void> _handleCapture(EvidenceKind kind, ImageSource source) async {
+    if (source == ImageSource.gallery &&
+        !await ref.read(galleryPermissionServiceProvider).request(context)) {
+      return;
+    }
+    if (!mounted) return;
     if (widget.onCapturePhoto != null) {
       try {
         await widget.onCapturePhoto!(kind, source);

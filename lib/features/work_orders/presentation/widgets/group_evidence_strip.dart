@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
+import 'package:gssms_mobile/core/utils/gallery_permission.dart';
 import 'package:gssms_mobile/core/widgets/confirmation_dialog.dart';
 import 'package:gssms_mobile/core/widgets/feedback.dart';
 import 'package:gssms_mobile/features/auth/domain/rbac.dart';
@@ -49,6 +50,11 @@ class _GroupEvidenceStripState extends ConsumerState<GroupEvidenceStrip> {
       ref.read(checklistControllerProvider(widget.recordId).notifier);
 
   Future<void> _capture(EvidenceKind kind, ImageSource source) async {
+    if (source == ImageSource.gallery &&
+        !await ref.read(galleryPermissionServiceProvider).request(context)) {
+      return;
+    }
+    if (!mounted) return;
     // Read everything ref-derived before the camera hand-off (the State can
     // be disposed while the camera app is in the foreground).
     final evidenceService = ref.read(evidenceServiceProvider);
