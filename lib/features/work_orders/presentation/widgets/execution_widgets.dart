@@ -147,7 +147,7 @@ class _ParamRowsEditorState extends State<ParamRowsEditor> {
 
 /// Before/After photo grid for one execution scope (whole execution, one
 /// rectification item, or one inspection point). Locked photos show a lock
-/// and no delete affordance — the server rejects their removal.
+/// and no delete/retake affordance — the server rejects their removal.
 class ExecutionPhotoGrid extends StatelessWidget {
   const ExecutionPhotoGrid({
     super.key,
@@ -156,6 +156,7 @@ class ExecutionPhotoGrid extends StatelessWidget {
     required this.busy,
     required this.onAdd,
     required this.onDelete,
+    this.onRetake,
     this.maxPerKind = 10,
   });
 
@@ -164,6 +165,12 @@ class ExecutionPhotoGrid extends StatelessWidget {
   final bool busy;
   final ValueChanged<String> onAdd;
   final ValueChanged<ExecutionPhoto> onDelete;
+
+  /// Replace this photo with a newly captured one. Shown next to Delete
+  /// when provided; omit to hide the affordance for callers that don't
+  /// support it yet.
+  final ValueChanged<ExecutionPhoto>? onRetake;
+
   final int maxPerKind;
 
   List<ExecutionPhoto> _ofKind(String kind) =>
@@ -185,8 +192,8 @@ class ExecutionPhotoGrid extends StatelessWidget {
                     Expanded(
                       child: Text(
                         kind == 'BEFORE'
-                            ? 'Before photos (${_ofKind(kind).length})'
-                            : 'After photos (${_ofKind(kind).length})',
+                            ? 'Before photos (${_ofKind(kind).length}/$maxPerKind)'
+                            : 'After photos (${_ofKind(kind).length}/$maxPerKind)',
                         style: Theme.of(context).textTheme.labelMedium,
                       ),
                     ),
@@ -207,32 +214,151 @@ class ExecutionPhotoGrid extends StatelessWidget {
                           .bodySmall
                           ?.copyWith(color: context.gssms.textSecondary)),
                 for (final photo in _ofKind(kind))
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 2),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            'Photo #${photo.id}${photo.fromComplaint ? ' (from breakdown report)' : ''}',
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                        ),
-                        if (photo.locked || photo.fromComplaint)
-                          const Icon(Icons.lock_outline, size: 16)
-                        else if (canManage)
-                          IconButton(
-                            key: Key('delete_exec_photo_${photo.id}'),
-                            icon: const Icon(Icons.delete_outline, size: 18),
-                            tooltip: 'Delete photo',
-                            onPressed: busy ? null : () => onDelete(photo),
-                          ),
-                      ],
-                    ),
+                  _ExecutionPhotoTile(
+                    photo: photo,
+                    canManage: canManage,
+                    busy: busy,
+                    onDelete: onDelete,
+                    onRetake: onRetake,
                   ),
               ],
             ),
           ),
       ],
+    );
+  }
+}
+
+class _ExecutionPhotoTile extends StatelessWidget {
+  const _ExecutionPhotoTile({
+    required this.photo,
+    required this.canManage,
+    required this.busy,
+    required this.onDelete,
+    required this.onRetake,
+  });
+
+  final ExecutionPhoto photo;
+  final bool canManage;
+  final bool busy;
+  final ValueChanged<ExecutionPhoto> onDelete;
+  final ValueChanged<ExecutionPhoto>? onRetake;
+
+  bool get _locked => photo.locked || photo.fromComplaint;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasUrl = photo.url != null && photo.url!.isNotEmpty;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        children: [
+          InkWell(
+            key: Key('preview_exec_photo_${photo.id}'),
+            borderRadius: BorderRadius.circular(GssmsRadius.r4),
+            onTap: hasUrl ? () => _openPreview(context) : null,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(GssmsRadius.r4),
+              child: SizedBox(
+                width: 48,
+                height: 48,
+                child: hasUrl
+                    ? Image.network(
+                        photo.url!,
+                        fit: BoxFit.cover,
+                        loadingBuilder: (context, child, progress) =>
+                            progress == null
+                                ? child
+                                : const Center(
+                                    child: SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2),
+                                    ),
+                                  ),
+                        errorBuilder: (context, error, stack) => Container(
+                          color: context.gssms.surfaceInset,
+                          child: const Icon(Icons.broken_image_outlined,
+                              size: 20),
+                        ),
+                      )
+                    : Container(
+                        color: context.gssms.surfaceInset,
+                        child: const Icon(Icons.image_outlined, size: 20),
+                      ),
+              ),
+            ),
+          ),
+          const SizedBox(width: GssmsSpacing.s8),
+          Expanded(
+            child: Text(
+              'Photo #${photo.id}${photo.fromComplaint ? ' (from breakdown report)' : ''}',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ),
+          if (_locked)
+            const Icon(Icons.lock_outline, size: 16)
+          else if (canManage) ...[
+            if (onRetake != null)
+              IconButton(
+                key: Key('retake_exec_photo_${photo.id}'),
+                icon: const Icon(Icons.replay_outlined, size: 18),
+                tooltip: 'Retake photo',
+                onPressed: busy ? null : () => onRetake!(photo),
+              ),
+            IconButton(
+              key: Key('delete_exec_photo_${photo.id}'),
+              icon: const Icon(Icons.delete_outline, size: 18),
+              tooltip: 'Delete photo',
+              onPressed: busy ? null : () => onDelete(photo),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  void _openPreview(BuildContext context) {
+    Navigator.of(context).push(MaterialPageRoute<void>(
+      builder: (_) => _ExecutionPhotoPreviewPage(photo: photo),
+      fullscreenDialog: true,
+    ));
+  }
+}
+
+/// Full-screen, pinch-to-zoom view of one execution photo.
+class _ExecutionPhotoPreviewPage extends StatelessWidget {
+  const _ExecutionPhotoPreviewPage({required this.photo});
+
+  final ExecutionPhoto photo;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
+        title: Text('Photo #${photo.id}'),
+      ),
+      body: Center(
+        child: InteractiveViewer(
+          minScale: 1,
+          maxScale: 5,
+          child: photo.url == null || photo.url!.isEmpty
+              ? const Icon(Icons.broken_image_outlined,
+                  color: Colors.white54, size: 64)
+              : Image.network(
+                  photo.url!,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stack) => const Icon(
+                      Icons.broken_image_outlined,
+                      color: Colors.white54,
+                      size: 64),
+                ),
+        ),
+      ),
     );
   }
 }

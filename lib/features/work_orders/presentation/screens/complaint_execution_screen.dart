@@ -21,7 +21,7 @@ import 'package:gssms_mobile/features/work_orders/presentation/widgets/failure_d
 ///
 /// Mirrors web `ComplaintExecutionForm`: Initial Assessment & Findings,
 /// Rectification / Action Taken, Final Remarks (all required), technical
-/// parameters, Before + After photos (10 max per kind, JPEG), debounced
+/// parameters, Before + After photos (5 max per kind, JPEG), debounced
 /// autosave, Save Progress and Sign & Submit → TECH_COMPLETED. Completeness is enforced
 /// server-side; client checks are advisory.
 class ComplaintExecutionScreen extends ConsumerStatefulWidget {
@@ -194,26 +194,29 @@ class _ComplaintExecutionScreenState
     }
   }
 
-  Future<void> _addPhoto(String kind) async {
+  /// Picks a JPEG from the gallery and uploads it for [kind]. Returns null
+  /// if the user cancelled or picked an unusable file (no error, nothing
+  /// happened), true once the upload is confirmed on the server, or false
+  /// if the upload itself failed (error already shown).
+  Future<bool?> _pickAndUploadPhoto(String kind) async {
     XFile? picked;
     try {
       picked = await ImagePicker()
           .pickImage(source: ImageSource.gallery, imageQuality: 85);
     } catch (_) {
-      return;
+      return null;
     }
-    if (picked == null || !mounted) return;
+    if (picked == null || !mounted) return null;
     final lower = picked.path.toLowerCase();
     if (!lower.endsWith('.jpg') && !lower.endsWith('.jpeg')) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Only JPEG photos are allowed.')),
       );
-      return;
+      return null;
     }
-    setState(() => _saving = true);
     try {
       final file = File(picked.path);
-      if (!await file.exists()) return;
+      if (!await file.exists()) return null;
       final filename = picked.path.split(Platform.pathSeparator).last;
       await ref.read(executionApiServiceProvider).uploadComplaintPhoto(
             widget.workOrderId,
@@ -224,13 +227,22 @@ class _ComplaintExecutionScreenState
               contentType: DioMediaType('image', 'jpeg'),
             ),
           );
-      await _autosave.flush();
-      await _load();
+      return true;
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted) return false;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Could not upload: ${userFacingError(e)}')),
       );
+      return false;
+    }
+  }
+
+  Future<void> _addPhoto(String kind) async {
+    setState(() => _saving = true);
+    try {
+      await _pickAndUploadPhoto(kind);
+      await _autosave.flush();
+      await _load();
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -258,6 +270,45 @@ class _ComplaintExecutionScreenState
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Could not delete: ${userFacingError(e)}')),
       );
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  /// Uploads a replacement photo first, then removes [photo] — only once the
+  /// new one is confirmed on the server, so a failed pick/upload never
+  /// leaves the record with neither photo.
+  Future<void> _retakePhoto(ExecutionPhoto photo) async {
+    final confirmed = await showConfirmationDialog(
+      context,
+      title: 'Retake photo?',
+      icon: Icons.replay_outlined,
+      message:
+          'Capture a new photo to replace this one. The old photo stays until the new one uploads successfully.',
+      confirmLabel: 'Retake',
+      confirmKey: Key('confirm_retake_exec_photo_${photo.id}'),
+    );
+    if (!confirmed || !mounted) return;
+    setState(() => _saving = true);
+    try {
+      final uploaded = await _pickAndUploadPhoto(photo.kind ?? 'BEFORE');
+      // null: user cancelled or picked something unusable — leave the old
+      // photo in place. false: upload failed, error already shown above.
+      // Only a confirmed upload (true) clears the way to delete the old one.
+      if (uploaded != true || !mounted) return;
+      await ref
+          .read(executionApiServiceProvider)
+          .deleteComplaintPhoto(widget.workOrderId, photo.id);
+      await _autosave.flush();
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content:
+                Text('New photo uploaded, but could not remove the old one: ${userFacingError(e)}')),
+      );
+      await _load();
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -496,9 +547,10 @@ class _ComplaintExecutionScreenState
                               photos: _execution?.photos ?? const [],
                               canManage: true,
                               busy: _busy,
-                              maxPerKind: 10,
+                              maxPerKind: 5,
                               onAdd: _addPhoto,
                               onDelete: _deletePhoto,
+                              onRetake: _retakePhoto,
                             ),
                           ],
                         ),
