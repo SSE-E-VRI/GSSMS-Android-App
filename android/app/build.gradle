@@ -92,6 +92,17 @@ android {
             } else {
                 signingConfig = signingConfigs.debug
             }
+            // AGP enables R8 minification by default for release even without
+            // minifyEnabled ever being set here. shared_preferences_android's
+            // JNI-based implementation does a runtime method lookup by exact
+            // signature string; R8 renames `Continuation` inside the
+            // implementing class without keeping the native JNI caller in
+            // sync, producing a NoSuchMethodError at runtime ("Could not load
+            // job works"). This app never opted into minification, so turn
+            // off the new default rather than chase proguard-keep gaps in a
+            // third-party plugin's packaging.
+            minifyEnabled = false
+            shrinkResources = false
         }
     }
 }
