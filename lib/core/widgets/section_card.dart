@@ -29,23 +29,43 @@ class SectionCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (title != null) ...[
-              Row(
-                children: [
-                  if (icon != null) ...[
-                    Icon(icon, size: GssmsSize.iconMd, color: tokens.textSecondary),
-                    const SizedBox(width: GssmsSpacing.s8),
-                  ],
-                  Expanded(
-                    child: Semantics(
-                      header: true,
-                      child: Text(
-                        title!,
-                        style: Theme.of(context).textTheme.titleMedium,
+              // A long title (e.g. "Failure Code & Restoration Details")
+              // next to a wide trailing (two StatusChips) could leave the
+              // title's Expanded share near zero width, collapsing it to
+              // one character per line. Measure and let trailing wrap onto
+              // its own line below when both can't fit on one.
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final titleAndIcon = Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (icon != null) ...[
+                        Icon(icon, size: GssmsSize.iconMd, color: tokens.textSecondary),
+                        const SizedBox(width: GssmsSpacing.s8),
+                      ],
+                      ConstrainedBox(
+                        constraints: BoxConstraints(
+                          maxWidth: constraints.maxWidth -
+                              (icon != null ? GssmsSize.iconMd + GssmsSpacing.s8 : 0),
+                        ),
+                        child: Semantics(
+                          header: true,
+                          child: Text(
+                            title!,
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                  if (trailing != null) trailing!,
-                ],
+                    ],
+                  );
+                  if (trailing == null) return titleAndIcon;
+                  return Wrap(
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    spacing: GssmsSpacing.s8,
+                    runSpacing: GssmsSpacing.s8,
+                    children: [titleAndIcon, trailing!],
+                  );
+                },
               ),
               const SizedBox(height: GssmsSpacing.s8),
               Divider(color: tokens.border, height: 1),
