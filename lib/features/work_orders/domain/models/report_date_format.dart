@@ -34,8 +34,17 @@ String webFormatDate(Object? raw) {
 
   if (dt == null) return '—';
 
-  // Convert to IST
-  final ist = dt.toUtc().add(_istOffset);
+  // A bare API date (`2026-09-09`) is decoded as device-local midnight, which
+  // carries no timezone meaning. Converting it to UTC then IST would print the
+  // previous day on devices east of IST (e.g. UTC+6), so format its own
+  // calendar fields instead.
+  final calendarDate = !dt.isUtc &&
+      dt.hour == 0 &&
+      dt.minute == 0 &&
+      dt.second == 0 &&
+      dt.millisecond == 0 &&
+      dt.microsecond == 0;
+  final ist = calendarDate ? dt : dt.toUtc().add(_istOffset);
   final d = ist.day.toString().padLeft(2, '0');
   final m = ist.month.toString().padLeft(2, '0');
   final y = ist.year.toString();

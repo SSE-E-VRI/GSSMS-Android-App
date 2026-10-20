@@ -90,7 +90,7 @@ class MoreScreen extends ConsumerWidget {
                         photoUrl: currentSession.profilePicture,
                         displayName: currentSession.displayName,
                         radius: 24,
-                        backgroundColor: Colors.white.withOpacity(0.18),
+                        backgroundColor: Colors.white.withValues(alpha: 0.18),
                         foregroundColor: Colors.white,
                       ),
                       const SizedBox(width: GssmsSpacing.s16),
@@ -110,7 +110,7 @@ class MoreScreen extends ConsumerWidget {
                               currentSession.primaryRole.displayName,
                               style: textTheme.bodyMedium?.copyWith(
                                 fontWeight: FontWeight.w500,
-                                color: Colors.white.withOpacity(0.85),
+                                color: Colors.white.withValues(alpha: 0.85),
                                 height: 1.15,
                               ),
                             ),
@@ -119,7 +119,7 @@ class MoreScreen extends ConsumerWidget {
                               Text(
                                 currentSession.depotName!,
                                 style: textTheme.labelSmall?.copyWith(
-                                  color: Colors.white.withOpacity(0.75),
+                                  color: Colors.white.withValues(alpha: 0.75),
                                 ),
                               ),
                             ],

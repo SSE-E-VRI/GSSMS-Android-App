@@ -271,7 +271,11 @@ class PendingActionsController extends Notifier<PendingActionsState> {
   @override
   PendingActionsState build() => const PendingActionsState();
 
+  /// Drops an older, slower response when a newer load has started (M9).
+  int _loadSeq = 0;
+
   Future<void> load() async {
+    final seq = ++_loadSeq;
     state = state.copyWith(loading: true, clearError: true);
     final scope = state.orgScope;
     try {
@@ -299,6 +303,7 @@ class PendingActionsController extends Notifier<PendingActionsState> {
               depotId: scope.depotId,
             ),
       ]);
+      if (seq != _loadSeq) return;
       state = state.copyWith(
         loading: false,
         schedules: results[0] as List<MaintenanceSchedule>,
@@ -312,6 +317,7 @@ class PendingActionsController extends Notifier<PendingActionsState> {
         selectedDeficiencyIds: const {},
       );
     } catch (e) {
+      if (seq != _loadSeq) return;
       state = state.copyWith(
         loading: false,
         error: 'Failed to load pending actions: ${workOrderReadableError(e)}',

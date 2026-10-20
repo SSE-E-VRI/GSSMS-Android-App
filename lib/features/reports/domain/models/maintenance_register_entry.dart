@@ -112,11 +112,12 @@ class MaintenanceRegisterEntry extends Equatable {
   }
 
   factory MaintenanceRegisterEntry.fromJson(Map<String, dynamic> json) {
-    final rawItems = json['items'] as List<dynamic>? ?? const [];
-    final org = json['organization'] as Map<String, dynamic>?;
+    final rawItems = json['items'] is List ? json['items'] as List<dynamic> : const <dynamic>[];
+    final rawOrg = json['organization'];
+    final org = rawOrg is Map ? Map<String, dynamic>.from(rawOrg) : null;
 
     return MaintenanceRegisterEntry(
-      id: json['id'] as int? ?? 0,
+      id: asJsonInt(json['id']) ?? 0,
       masterName: asJsonString(json['master']) ?? asJsonString(json['master_name']) ?? 'Maintenance Schedule',
       date: json['date'] != null ? asJsonDateTime(json['date']) : null,
       railwayName: asJsonString(org?['railway_name']),
@@ -127,7 +128,10 @@ class MaintenanceRegisterEntry extends Equatable {
       technician: asJsonString(json['technician']),
       supervisor: asJsonString(json['supervisor']),
       remarks: asJsonString(json['remarks']),
-      items: rawItems.whereType<Map<String, dynamic>>().map(RegisterLineItem.fromJson).toList(),
+      items: rawItems
+          .whereType<Map>()
+          .map((m) => RegisterLineItem.fromJson(Map<String, dynamic>.from(m)))
+          .toList(),
     );
   }
 

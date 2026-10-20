@@ -28,6 +28,9 @@ class DashboardController extends Notifier<DashboardState> {
     return const DashboardLoading();
   }
 
+  /// Drops an older, slower response when a newer load has started (M9).
+  int _requestSeq = 0;
+
   IDashboardRepository get _repository => ref.read(dashboardRepositoryProvider);
 
   DashboardLoaded? _resolvePrevious() {
@@ -50,6 +53,7 @@ class DashboardController extends Notifier<DashboardState> {
       _load(scope, _resolvePrevious());
 
   Future<void> _load(OrgScopeSelection scope, DashboardLoaded? previous) async {
+    final seq = ++_requestSeq;
     try {
       final results = await Future.wait([
         // attention and summary both now accept zone/division/depot
@@ -68,12 +72,14 @@ class DashboardController extends Notifier<DashboardState> {
         ),
       ]);
 
+      if (seq != _requestSeq) return;
       state = DashboardLoaded(
         attention: results[0] as AttentionSummary,
         summary: results[1] as DashboardSummary,
         orgScope: scope,
       );
     } catch (e) {
+      if (seq != _requestSeq) return;
       state = DashboardError(
         userFacingError(e),
         previousLoaded: previous?.copyWith(orgScope: scope),

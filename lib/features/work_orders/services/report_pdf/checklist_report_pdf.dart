@@ -153,7 +153,7 @@ List<pw.Widget> buildChecklistReportPdf(
   }
   for (var i = 0; i < r.groups.length; i++) {
     out.add(_Gap(18.0));
-    out.addAll(_buildGroupWidgets(r.groups[i]));
+    out.addAll(_buildGroupWidgets(r.groups[i], photos));
     if (i == r.groups.length - 1) out.add(_Gap(36.0));
   }
 
@@ -284,7 +284,8 @@ pw.Widget _headerTable(double extra) => pw.Table(
 
 /// The top-level `MultiPage` children for one asset group (`.assetGroup`:
 /// `break-inside: avoid`).
-List<pw.Widget> _buildGroupWidgets(ChecklistReportGroup g) {
+List<pw.Widget> _buildGroupWidgets(
+    ChecklistReportGroup g, Map<String, Uint8List?> photos) {
   // Row heights follow Chrome: every row is `lines * 19.5 + 12.2` css px and
   // the cumulative row edges are snapped to whole px, so rows alternate
   // 24 / 23.25pt. The difference to each row's natural height is added as
@@ -303,7 +304,9 @@ List<pw.Widget> _buildGroupWidgets(ChecklistReportGroup g) {
   for (final sp in spans) {
     final span = rows.sublist(sp.$1, sp.$1 + sp.$2);
     px.addAll(_spanRowPx(nameOf(sp.$1), span));
-    natural.addAll([for (final row in span) _naturalPt(_rowLines(row))]);
+    natural.addAll([
+      for (final row in span) _naturalPt(_rowLines(row)) + _attachmentsPt(row),
+    ]);
   }
   if (rows.isEmpty) {
     px.add(_rowPx(1));
@@ -316,7 +319,7 @@ List<pw.Widget> _buildGroupWidgets(ChecklistReportGroup g) {
   if (estimated > _maxKeptGroupHeight) {
     return [
       _pad(_groupHeading(g.name)),
-      _pad(_buildFlatTable(g, spans, extras, nameOf)),
+      _pad(_buildFlatTable(g, spans, extras, nameOf, photos)),
     ];
   }
 
@@ -338,7 +341,7 @@ List<pw.Widget> _buildGroupWidgets(ChecklistReportGroup g) {
   for (final sp in spans) {
     final span = rows.sublist(sp.$1, sp.$1 + sp.$2);
     blocks.add(_buildItemBlock(nameOf(sp.$1), span,
-        extras.sublist(rowCursor, rowCursor + span.length)));
+        extras.sublist(rowCursor, rowCursor + span.length), photos));
     rowCursor += span.length;
   }
 
@@ -369,7 +372,8 @@ List<pw.Widget> _buildGroupWidgets(ChecklistReportGroup g) {
 /// cell sits in the first row of its span (the cell border is merged down the
 /// span), so it can paginate between rows and repeat its header row.
 pw.Widget _buildFlatTable(ChecklistReportGroup g, List<(int, int)> spans,
-    List<double> extras, String Function(int) nameOf) {
+    List<double> extras, String Function(int) nameOf,
+    Map<String, Uint8List?> photos) {
   pw.Widget bordered(pw.Widget child, {required bool bottom}) => CssBox(
       alignment: pw.Alignment.centerLeft,
       bottom: bottom ? const CssSide(0.75, ReportPdfTheme.borderPrint) : null,
@@ -408,8 +412,8 @@ pw.Widget _buildFlatTable(ChecklistReportGroup g, List<(int, int)> spans,
         children: [
           bordered(r == 0 ? _td(nameOf(sp.$1), extraV: extra) : pw.SizedBox(),
               bottom: r == sp.$2 - 1),
-          for (final c in _rowTexts(row))
-            bordered(_td(c.$1, weight: c.$2, extraV: extra), bottom: true),
+          for (final cell in _rowCells(row, extra, photos))
+            bordered(cell, bottom: true),
         ],
       ));
     }
@@ -457,7 +461,10 @@ double _naturalPt(int lines) => lines * 14.625 + 9.15;
 /// Row heights (css px) of an item's rows. When the item-name cell is taller
 /// than the rows it spans Chrome spreads the excess over those rows.
 List<double> _spanRowPx(String name, List<ChecklistReportRow> span) {
-  final h = [for (final row in span) _rowPx(_rowLines(row))];
+  final h = [
+    for (final row in span)
+      _rowPx(_rowLines(row)) + _attachmentsPt(row) / 0.75,
+  ];
   final rowsH = h.fold(0.0, (a, b) => a + b);
   final nameH = _rowPx(_lines(name, 600, _grid[0]));
   if (nameH > rowsH) {
@@ -473,6 +480,52 @@ List<double> _spanRowPx(String name, List<ChecklistReportRow> span) {
 List<double> _snapExtras(List<double> px, List<double> natural) {
   final snapped = cssSnapRowsPt(px);
   return [for (var i = 0; i < px.length; i++) snapped[i] - natural[i]];
+}
+
+/// Height in pt the attachment photo strip adds under a row's checkpoint text
+/// (web FormPreview renders a LineAttachmentStrip there): a 6pt gap, then the
+/// thumbs wrapped into as many runs as fit the checkpoint column.
+double _attachmentsPt(ChecklistReportRow row) {
+  final n = row.attachments.length;
+  if (n == 0) return 0;
+  const gap = 6.0;
+  // Regular rows carry the strip under the (wide) checkpoint cell; record-
+  // parameter rows have a narrow checkpoint cell, so it goes under the value.
+  final width = _grid[row.isRecordParameter ? 3 : 1] * 510.0 - 12.75;
+  final perRun = math.max(1, ((width + gap) / (thumbBoxW + gap)).floor());
+  final runs = (n + perRun - 1) ~/ perRun;
+  return gap + runs * thumbBoxH + (runs - 1) * gap;
+}
+
+/// A cell's text plus, when the line has attachments, the photo strip
+/// beneath it.
+pw.Widget _cellWithPhotos(ChecklistReportRow row, String text, int weight,
+    double extra, Map<String, Uint8List?> photos) {
+  if (row.attachments.isEmpty) return _td(text, weight: weight, extraV: extra);
+  return pw.Padding(
+    padding: pw.EdgeInsets.symmetric(
+        horizontal: 6.375, vertical: 4.575 + extra / 2),
+    child: pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      mainAxisSize: pw.MainAxisSize.min,
+      children: [
+        cssText(text, sizePt: _tdSizePt, weight: weight),
+        pw.SizedBox(height: 6.0),
+        photoRow(row.attachments, photos, ''),
+      ],
+    ),
+  );
+}
+
+/// The three right-hand cells of a regular row (checkpoint, status, action).
+List<pw.Widget> _rowCells(ChecklistReportRow row, double extra,
+    Map<String, Uint8List?> photos) {
+  final t = _rowTexts(row);
+  final onValue = row.isRecordParameter;
+  pw.Widget cell(int i) => (i == (onValue ? 2 : 0))
+      ? _cellWithPhotos(row, t[i].$1, t[i].$2, extra, photos)
+      : _td(t[i].$1, weight: t[i].$2, extraV: extra);
+  return [cell(0), cell(1), cell(2)];
 }
 
 /// (text, weight) for the three right-hand columns of a regular row.
@@ -527,8 +580,8 @@ pw.Widget _centredCell(String text) => pw.Container(
       ),
     );
 
-pw.Widget _buildItemBlock(
-    String name, List<ChecklistReportRow> span, List<double> extras) {
+pw.Widget _buildItemBlock(String name, List<ChecklistReportRow> span,
+    List<double> extras, Map<String, Uint8List?> photos) {
   // Each segment draws its bottom edge unless it is the last one (the item
   // block's own bottom edge is drawn by the outer table).
   final segments = <pw.Widget Function(bool last)>[];
@@ -546,10 +599,9 @@ pw.Widget _buildItemBlock(
           ]),
           children: [
             for (final k in rowsOfSegment)
-              pw.TableRow(verticalAlignment: _middle, children: [
-                for (final c in _rowTexts(span[k]))
-                  _td(c.$1, weight: c.$2, extraV: extras[k]),
-              ]),
+              pw.TableRow(
+                  verticalAlignment: _middle,
+                  children: _rowCells(span[k], extras[k], photos)),
           ],
         ));
     normal = [];
@@ -588,7 +640,8 @@ pw.Widget _buildItemBlock(
                 pw.TableRow(verticalAlignment: _middle, children: [
                   _td(run[k].checkpoint,
                       weight: 400, extraV: extras[runStart + k]),
-                  _td(_valueText(run[k]), extraV: extras[runStart + k]),
+                  _cellWithPhotos(run[k], _valueText(run[k]), 600,
+                      extras[runStart + k], photos),
                 ]),
             ],
           ),

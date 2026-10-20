@@ -321,7 +321,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 photoUrl: currentSession.profilePicture,
                 displayName: currentSession.displayName,
                 radius: 16,
-                backgroundColor: Colors.white.withOpacity(0.18),
+                backgroundColor: Colors.white.withValues(alpha: 0.18),
                 foregroundColor: Colors.white,
               ),
               const SizedBox(width: GssmsSpacing.s8),
@@ -346,7 +346,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: textTheme.labelSmall?.copyWith(
-                        color: Colors.white.withOpacity(0.8),
+                        color: Colors.white.withValues(alpha: 0.8),
                         height: 1.15,
                       ),
                     ),
@@ -653,11 +653,40 @@ class _AttentionSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final totalAttention = ref.watch(
       dashboardControllerProvider.select((dashboardState) {
-        if (dashboardState is! DashboardLoaded) return 0;
-        return dashboardState.attention.overdue.length +
-            dashboardState.attention.dueSoon.length;
+        // A failed load must not read as "nothing needs attention": report
+        // -1 (unknown) unless a previous good load can still be shown.
+        final loaded = dashboardState is DashboardError
+            ? dashboardState.previousLoaded
+            : dashboardState;
+        if (dashboardState is DashboardError && loaded == null) return -1;
+        if (loaded is! DashboardLoaded) return 0;
+        return loaded.attention.overdue.length +
+            loaded.attention.dueSoon.length;
       }),
     );
+    if (totalAttention < 0) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: GssmsSpacing.s20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const _HomeSectionLabel('ATTENTION REQUIRED'),
+            const SizedBox(height: GssmsSpacing.s8),
+            _InfoPanel(
+              icon: Icons.cloud_off_outlined,
+              tone: GssmsTone.neutral,
+              message: 'Could not load attention items.',
+              action: TextButton(
+                onPressed: () => ref
+                    .read(dashboardControllerProvider.notifier)
+                    .loadDashboard(),
+                child: const Text('Retry'),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
     final needsAttention = totalAttention > 0;
 
     return Padding(
@@ -800,7 +829,7 @@ class _ModuleCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(GssmsSpacing.s8),
                 decoration: BoxDecoration(
-                  color: accent.withOpacity(0.14),
+                  color: accent.withValues(alpha: 0.14),
                   borderRadius: BorderRadius.circular(GssmsRadius.r8),
                 ),
                 child: Icon(icon, color: accent, size: GssmsSize.iconLg),

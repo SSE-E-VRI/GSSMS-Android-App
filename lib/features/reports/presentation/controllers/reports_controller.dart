@@ -41,6 +41,9 @@ class ReportsController extends Notifier<ReportsState> {
   InfrastructureOptionsService get _options =>
       ref.read(infrastructureOptionsServiceProvider);
 
+  /// Drops an older, slower response when a newer load has started (M9).
+  int _requestSeq = 0;
+
   Future<void> loadRegister({
     DateTime? startDate,
     DateTime? endDate,
@@ -61,6 +64,7 @@ class ReportsController extends Notifier<ReportsState> {
     final id = (typeChanged || clearInfraId) ? null : (infraId ?? previous?.infraId);
     final scope = orgScope ?? previous?.orgScope ?? OrgScopeSelection.empty;
 
+    final seq = ++_requestSeq;
     state = const ReportsLoading();
 
     final df = DateFormat('yyyy-MM-dd');
@@ -108,6 +112,7 @@ class ReportsController extends Notifier<ReportsState> {
       );
       final entries = await entriesFuture;
       if (optionsFuture != null) options = await optionsFuture;
+      if (seq != _requestSeq) return;
 
       state = ReportsLoaded(
         entries: entries,
@@ -119,6 +124,7 @@ class ReportsController extends Notifier<ReportsState> {
         orgScope: scope,
       );
     } catch (e) {
+      if (seq != _requestSeq) return;
       state = ReportsError(userFacingError(e), previousLoaded: previous);
     }
   }

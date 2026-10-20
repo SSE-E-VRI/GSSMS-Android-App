@@ -248,7 +248,7 @@ class OrgScopeAppBarFilter extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
       child: Material(
-        color: Colors.white.withOpacity(0.18),
+        color: Colors.white.withValues(alpha: 0.18),
         borderRadius: BorderRadius.circular(20),
         child: InkWell(
           key: const Key('org_scope_active_chip'),

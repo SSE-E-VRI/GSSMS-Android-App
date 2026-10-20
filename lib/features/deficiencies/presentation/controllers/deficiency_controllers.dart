@@ -207,25 +207,32 @@ class DeficiencyListController extends Notifier<DeficiencyListState> {
     }
   }
 
+  /// M12: client-side filter setters also work from the Error state —
+  /// the carried-forward [previousLoaded] becomes the filter target.
+  DeficiencyListLoaded? _filterTarget() {
+    final s = state;
+    if (s is DeficiencyListLoaded) return s;
+    if (s is DeficiencyListError) return s.previousLoaded;
+    return null;
+  }
+
   void setBucketFilter(PendingBucket? bucket) {
-    if (state is DeficiencyListLoaded) {
-      final loaded = state as DeficiencyListLoaded;
-      state = loaded.copyWith(
-        selectedBucket: bucket,
-        clearBucket: bucket == null,
-        selectedDeficiencyIds: const {},
-      );
-    }
+    final loaded = _filterTarget();
+    if (loaded == null) return;
+    state = loaded.copyWith(
+      selectedBucket: bucket,
+      clearBucket: bucket == null,
+      selectedDeficiencyIds: const {},
+    );
   }
 
   void setSearchQuery(String query) {
-    if (state is DeficiencyListLoaded) {
-      final loaded = state as DeficiencyListLoaded;
-      state = loaded.copyWith(
-        searchQuery: query.trim(),
-        selectedDeficiencyIds: const {},
-      );
-    }
+    final loaded = _filterTarget();
+    if (loaded == null) return;
+    state = loaded.copyWith(
+      searchQuery: query.trim(),
+      selectedDeficiencyIds: const {},
+    );
   }
 
   void toggleSelection(int id) {

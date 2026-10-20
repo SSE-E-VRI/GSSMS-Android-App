@@ -213,20 +213,28 @@ class ComplaintListController extends Notifier<ComplaintListState> {
     }
   }
 
+  /// M12: filter setters also work from the Error state — the carried-forward
+  /// [previousLoaded] becomes the filter target, so a tap is no longer
+  /// swallowed after a failed refresh.
+  ComplaintListLoaded? _filterTarget() {
+    final s = state;
+    if (s is ComplaintListLoaded) return s;
+    if (s is ComplaintListError) return s.previousLoaded;
+    return null;
+  }
+
   void setStatusFilter(ComplaintStatus? status) {
-    if (state is ComplaintListLoaded) {
-      final loaded = state as ComplaintListLoaded;
-      state = loaded.copyWith(
-        selectedStatus: status,
-        clearStatus: status == null,
-      );
-    }
+    final loaded = _filterTarget();
+    if (loaded == null) return;
+    state = loaded.copyWith(
+      selectedStatus: status,
+      clearStatus: status == null,
+    );
   }
 
   void setSearchQuery(String query) {
-    if (state is ComplaintListLoaded) {
-      final loaded = state as ComplaintListLoaded;
-      state = loaded.copyWith(searchQuery: query.trim());
-    }
+    final loaded = _filterTarget();
+    if (loaded == null) return;
+    state = loaded.copyWith(searchQuery: query.trim());
   }
 }

@@ -269,7 +269,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: context.gssms.textSecondary.withOpacity(0.8),
+                    color: context.gssms.textSecondary.withValues(alpha: 0.8),
                   ),
                 ),
               ),

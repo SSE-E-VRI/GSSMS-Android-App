@@ -4,6 +4,8 @@ import 'package:gssms_mobile/features/work_orders/domain/models/work_order_audit
 import 'package:gssms_mobile/features/work_orders/services/work_order_pdf_service.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   test('WorkOrderPdfService builds a document with meta + history', () async {
     const wo = WorkOrder(
       id: 101,

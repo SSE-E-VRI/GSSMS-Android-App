@@ -247,13 +247,15 @@ class WorkOrderListController extends Notifier<WorkOrderListState> {
 }
 
 // --- Work Order Detail Controller ---
-final workOrderDetailControllerProvider = NotifierProvider.family<
+// H7: autoDispose so per-id detail controllers (incl. full audit history)
+// don't accumulate for the whole app session — the screen re-fetches on open.
+final workOrderDetailControllerProvider = NotifierProvider.autoDispose.family<
     WorkOrderDetailController, WorkOrderDetailState, int>(() {
   return WorkOrderDetailController();
 });
 
 class WorkOrderDetailController
-    extends FamilyNotifier<WorkOrderDetailState, int> {
+    extends AutoDisposeFamilyNotifier<WorkOrderDetailState, int> {
   @override
   WorkOrderDetailState build(int arg) {
     return const WorkOrderDetailLoading();
@@ -305,9 +307,23 @@ class WorkOrderDetailController
         isTransitioning: true, actionMessage: 'Starting execution...');
     try {
       final recordId = await _repository.startExecution(arg);
-      // Reload updated work order status
+      // Reload updated work order status. Keep the loaded actions/audit
+      // through the copy (M10) — a fresh WorkOrderDetailLoaded would wipe the
+      // enrichment until the refetch returns.
       final updatedWo = await _repository.fetchWorkOrderById(arg);
-      state = WorkOrderDetailLoaded(workOrder: updatedWo);
+      final latest = state;
+      if (latest is WorkOrderDetailLoaded) {
+        state = latest.copyWith(
+          workOrder: updatedWo,
+          isTransitioning: false,
+          actionMessage: 'Execution started.',
+          errorMessage: null,
+        );
+      } else {
+        state = WorkOrderDetailLoaded(workOrder: updatedWo);
+      }
+      // Refresh permitted actions/history for the new status.
+      unawaited(loadActionsAndAudit());
       // Also refresh list
       unawaited(ref
           .read(workOrderListControllerProvider.notifier)
@@ -352,7 +368,18 @@ class WorkOrderDetailController
         arg,
         status: 'ASSIGNED',
       );
-      state = WorkOrderDetailLoaded(workOrder: updatedWo);
+      // M10: preserve the loaded actions/audit until the refetch returns.
+      final latest = state;
+      if (latest is WorkOrderDetailLoaded) {
+        state = latest.copyWith(
+          workOrder: updatedWo,
+          isTransitioning: false,
+          actionMessage: null,
+          errorMessage: null,
+        );
+      } else {
+        state = WorkOrderDetailLoaded(workOrder: updatedWo);
+      }
       unawaited(loadActionsAndAudit());
       unawaited(
         ref.read(workOrderListControllerProvider.notifier).fetchWorkOrders(
@@ -380,7 +407,18 @@ class WorkOrderDetailController
     try {
       final updatedWo =
           await _repository.verifyWorkOrder(arg, remarks: remarks);
-      state = WorkOrderDetailLoaded(workOrder: updatedWo);
+      // M10: preserve the loaded actions/audit until the refetch returns.
+      final latest = state;
+      if (latest is WorkOrderDetailLoaded) {
+        state = latest.copyWith(
+          workOrder: updatedWo,
+          isTransitioning: false,
+          actionMessage: null,
+          errorMessage: null,
+        );
+      } else {
+        state = WorkOrderDetailLoaded(workOrder: updatedWo);
+      }
       unawaited(loadActionsAndAudit());
       unawaited(
         ref.read(workOrderListControllerProvider.notifier).fetchWorkOrders(
@@ -417,7 +455,18 @@ class WorkOrderDetailController
         checklist: checklist,
         evidence: evidence,
       );
-      state = WorkOrderDetailLoaded(workOrder: updatedWo);
+      // M10: preserve the loaded actions/audit until the refetch returns.
+      final latest = state;
+      if (latest is WorkOrderDetailLoaded) {
+        state = latest.copyWith(
+          workOrder: updatedWo,
+          isTransitioning: false,
+          actionMessage: null,
+          errorMessage: null,
+        );
+      } else {
+        state = WorkOrderDetailLoaded(workOrder: updatedWo);
+      }
       // The permitted transitions and history both change with the status, so
       // refresh them rather than leaving the previous status's buttons on screen.
       unawaited(loadActionsAndAudit());
@@ -439,12 +488,14 @@ class WorkOrderDetailController
 }
 
 // --- Checklist Controller ---
+// H7: autoDispose — per-record checklist state (all lines, attachments,
+// responses) must not be retained for visited records for the app lifetime.
 final checklistControllerProvider =
-    NotifierProvider.family<ChecklistController, ChecklistState, int>(() {
+    NotifierProvider.autoDispose.family<ChecklistController, ChecklistState, int>(() {
   return ChecklistController();
 });
 
-class ChecklistController extends FamilyNotifier<ChecklistState, int> {
+class ChecklistController extends AutoDisposeFamilyNotifier<ChecklistState, int> {
   @override
   ChecklistState build(int arg) {
     return const ChecklistLoading();
@@ -698,7 +749,12 @@ class ChecklistController extends FamilyNotifier<ChecklistState, int> {
       );
       return true;
     } catch (e) {
-      state = current.copyWith(
+      // M11: re-read state, not the pre-await `current` — a line save or
+      // attachment upload completing during the long round trip would be
+      // silently discarded by copying the stale snapshot.
+      final latest = state;
+      if (latest is! ChecklistLoaded) return false;
+      state = latest.copyWith(
         isSubmitting: false,
         errorMessage: 'Failed to complete execution: ${_readableError(e)}',
       );

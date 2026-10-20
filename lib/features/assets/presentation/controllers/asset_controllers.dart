@@ -29,35 +29,38 @@ final assetRepositoryProvider = Provider<IAssetRepository>((ref) {
 // loading/error/data states are handled independently rather than forcing
 // one shared "everything loaded or nothing did" state across six tabs.
 
+// autoDispose-families: releasing the asset detail screen releases each tab's
+// payload too. Buttons that must refresh call either `ref.invalidate` on a
+// provider (returning FutureOr) — keepAlive is deliberately not used.
 final assetMaintenanceSummaryProvider =
-    FutureProvider.family<AssetMaintenanceSummary, int>((ref, assetId) {
+    FutureProvider.autoDispose.family<AssetMaintenanceSummary, int>((ref, assetId) {
   return ref.watch(assetRepositoryProvider).fetchMaintenanceSummary(assetId);
 });
 
 /// 30-day default window, matching the server's own default when
 /// `start_date`/`end_date` are both omitted (`calculate_reliability_metrics`).
 final assetReliabilityMetricsProvider =
-    FutureProvider.family<ReliabilityMetrics, int>((ref, assetId) {
+    FutureProvider.autoDispose.family<ReliabilityMetrics, int>((ref, assetId) {
   return ref.watch(assetRepositoryProvider).fetchReliabilityMetrics(assetId);
 });
 
 final assetSpecificationsProvider =
-    FutureProvider.family<AssetSpecificationWorkspace, int>((ref, assetId) {
+    FutureProvider.autoDispose.family<AssetSpecificationWorkspace, int>((ref, assetId) {
   return ref.watch(assetRepositoryProvider).fetchSpecifications(assetId);
 });
 
 final assetComponentsProvider =
-    FutureProvider.family<List<AssetComponent>, int>((ref, assetId) {
+    FutureProvider.autoDispose.family<List<AssetComponent>, int>((ref, assetId) {
   return ref.watch(assetRepositoryProvider).fetchComponents(assetId);
 });
 
 final assetReplacementHistoryProvider =
-    FutureProvider.family<List<AssetReplacementEvent>, int>((ref, assetId) {
+    FutureProvider.autoDispose.family<List<AssetReplacementEvent>, int>((ref, assetId) {
   return ref.watch(assetRepositoryProvider).fetchReplacementHistory(assetId);
 });
 
 final assetDeficienciesProvider =
-    FutureProvider.family<List<Deficiency>, int>((ref, assetId) {
+    FutureProvider.autoDispose.family<List<Deficiency>, int>((ref, assetId) {
   return ref.watch(deficiencyRepositoryProvider).fetchDeficienciesForAsset(assetId);
 });
 
@@ -196,6 +199,10 @@ class AssetListController extends Notifier<AssetListState> {
     return null;
   }
 
+  /// Guards against an older, slower response overwriting a newer filter's
+  /// (same pattern as the complaint list controller) — M9 audit fix.
+  int _requestSeq = 0;
+
   Future<void> fetchAssets({bool forceRefresh = false}) async {
     if (!forceRefresh && state is AssetListLoaded) return;
 
@@ -214,6 +221,7 @@ class AssetListController extends Notifier<AssetListState> {
   }
 
   Future<void> _load(OrgScopeSelection scope, AssetListLoaded? previous) async {
+    final seq = ++_requestSeq;
     try {
       final page = await _repository.fetchAssets(
         zoneId: scope.zoneId,
@@ -221,6 +229,7 @@ class AssetListController extends Notifier<AssetListState> {
         depotId: scope.depotId,
         stationId: scope.stationId,
       );
+      if (seq != _requestSeq) return;
       // Carry the in-memory filters across the refetch: the search field and
       // chips on screen still show them, so rebuilding from scratch would
       // leave the list contradicting the visible filter.
@@ -233,6 +242,7 @@ class AssetListController extends Notifier<AssetListState> {
         orgScope: scope,
       );
     } catch (e) {
+      if (seq != _requestSeq) return;
       state = AssetListError(
         userFacingError(e),
         previousLoaded: previous?.copyWith(orgScope: scope),
@@ -240,31 +250,38 @@ class AssetListController extends Notifier<AssetListState> {
     }
   }
 
+  /// M12: client-side filter setters also work from the Error state —
+  /// the carried-forward [previousLoaded] becomes the filter target, so a
+  /// tap is no longer swallowed after a failed refresh.
+  AssetListLoaded? _filterTarget() {
+    final s = state;
+    if (s is AssetListLoaded) return s;
+    if (s is AssetListError) return s.previousLoaded;
+    return null;
+  }
+
   void setSearchQuery(String query) {
-    if (state is AssetListLoaded) {
-      final loaded = state as AssetListLoaded;
-      state = loaded.copyWith(searchQuery: query.trim());
-    }
+    final loaded = _filterTarget();
+    if (loaded == null) return;
+    state = loaded.copyWith(searchQuery: query.trim());
   }
 
   void setCategoryFilter(String? category) {
-    if (state is AssetListLoaded) {
-      final loaded = state as AssetListLoaded;
-      state = loaded.copyWith(
-        selectedCategory: category,
-        clearCategory: category == null,
-      );
-    }
+    final loaded = _filterTarget();
+    if (loaded == null) return;
+    state = loaded.copyWith(
+      selectedCategory: category,
+      clearCategory: category == null,
+    );
   }
 
   void setCriticalityFilter(AssetCriticality? criticality) {
-    if (state is AssetListLoaded) {
-      final loaded = state as AssetListLoaded;
-      state = loaded.copyWith(
-        selectedCriticality: criticality,
-        clearCriticality: criticality == null,
-      );
-    }
+    final loaded = _filterTarget();
+    if (loaded == null) return;
+    state = loaded.copyWith(
+      selectedCriticality: criticality,
+      clearCriticality: criticality == null,
+    );
   }
 }
 
@@ -297,12 +314,14 @@ class AssetDetailError extends AssetDetailState {
   List<Object?> get props => [message];
 }
 
+// H7: autoDispose — per-asset detail state must not accumulate per asset.
 final assetDetailControllerProvider =
-    NotifierProvider.family<AssetDetailController, AssetDetailState, int>(() {
+    NotifierProvider.autoDispose.family<AssetDetailController, AssetDetailState, int>(() {
   return AssetDetailController();
 });
 
-class AssetDetailController extends FamilyNotifier<AssetDetailState, int> {
+class AssetDetailController
+    extends AutoDisposeFamilyNotifier<AssetDetailState, int> {
   @override
   AssetDetailState build(int arg) {
     return const AssetDetailLoading();

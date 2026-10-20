@@ -6,7 +6,9 @@ import 'package:gssms_mobile/features/work_orders/domain/models/verification_wor
 import 'package:gssms_mobile/features/work_orders/presentation/controllers/verification_workspace_state.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_order_controllers.dart';
 
-final verificationWorkspaceControllerProvider = NotifierProvider.family<
+// H7: autoDispose — per-WO workspaces (full checklists, severities) must not
+// accumulate for the whole session; the screen re-fetches on open.
+final verificationWorkspaceControllerProvider = NotifierProvider.autoDispose.family<
     VerificationWorkspaceController, VerificationWorkspaceState, int>(() {
   return VerificationWorkspaceController();
 });
@@ -15,7 +17,7 @@ const verificationSeverityConflictMessage =
     'This deficiency was updated by someone else. The latest state has been reloaded.';
 
 class VerificationWorkspaceController
-    extends FamilyNotifier<VerificationWorkspaceState, int> {
+    extends AutoDisposeFamilyNotifier<VerificationWorkspaceState, int> {
   @override
   VerificationWorkspaceState build(int arg) {
     return const VerificationWorkspaceLoading();

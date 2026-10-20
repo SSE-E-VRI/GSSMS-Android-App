@@ -411,7 +411,7 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(color: context.gssms.border),
                     boxShadow: [
-                      BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 12, offset: const Offset(0, 4)),
+                      BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12, offset: const Offset(0, 4)),
                     ],
                   ),
                   child: Column(
@@ -648,7 +648,7 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
         color: Theme.of(context).cardTheme.color,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: context.gssms.border),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 8, offset: const Offset(0, 2))],
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 8, offset: const Offset(0, 2))],
       ),
       padding: const EdgeInsets.all(14),
       child: Column(

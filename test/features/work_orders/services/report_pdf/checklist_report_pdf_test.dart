@@ -176,6 +176,36 @@ void main() {
     ]);
     expect(await _pages(r), greaterThanOrEqualTo(3));
   });
+  test('line attachment photos are painted and grow the layout (M14)',
+      () async {
+    ChecklistReportRow withPhotos(int i, {bool record = false}) =>
+        ChecklistReportRow(
+          itemName: 'Item $i',
+          checkpoint: 'Checkpoint $i',
+          isRecordParameter: record,
+          statusLabel: 'Normal',
+          actionLabel: '',
+          formattedValue: record ? '12' : '',
+          unit: record ? 'V' : '',
+          attachments: [
+            for (var k = 0; k < 4; k++)
+              ReportPhoto(key: 'u$i-$k', url: 'u$i-$k', caption: 'p$k'),
+          ],
+          itemSpanLen: 1,
+        );
+
+    final plain = _report(groups: [_group('PLAIN', 14)]);
+    final photo = _report(groups: [
+      ChecklistReportGroup(name: 'PHOTO', rows: [
+        for (var i = 0; i < 14; i++) withPhotos(i, record: i.isOdd),
+      ]),
+    ]);
+
+    // Photos make each row taller (strip under the cell), so the same number
+    // of rows needs more pages than the photo-less report.
+    expect(await _pages(photo), greaterThan(await _pages(plain)));
+  });
+
 }
 
 WorkOrder _wo() => const WorkOrder(
