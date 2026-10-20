@@ -41,6 +41,15 @@ class WorkOrderListScreen extends ConsumerStatefulWidget {
 
 class _WorkOrderListScreenState extends ConsumerState<WorkOrderListScreen> {
   final TextEditingController _searchController = TextEditingController();
+  Timer? _searchDebounce;
+
+  void _onSearchChanged(String value) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 250), () {
+      if (!mounted) return;
+      _controller.setSearchQuery(value);
+    });
+  }
 
   WorkOrderListController get _controller =>
       ref.read(workOrderListControllerProvider.notifier);
@@ -64,6 +73,7 @@ class _WorkOrderListScreenState extends ConsumerState<WorkOrderListScreen> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -90,6 +100,7 @@ class _WorkOrderListScreenState extends ConsumerState<WorkOrderListScreen> {
   }
 
   Future<void> _clearFilters() async {
+    _searchDebounce?.cancel();
     _searchController.clear();
     _controller
       ..setStatusFilter(null)
@@ -165,7 +176,7 @@ class _WorkOrderListScreenState extends ConsumerState<WorkOrderListScreen> {
                           child: GssmsSearchField(
                             controller: _searchController,
                             hintText: 'Search ticket, title, asset',
-                            onChanged: _controller.setSearchQuery,
+                            onChanged: _onSearchChanged,
                           ),
                         ),
                         const SizedBox(width: GssmsSpacing.s8),
@@ -190,7 +201,7 @@ class _WorkOrderListScreenState extends ConsumerState<WorkOrderListScreen> {
             if (loaded != null)
               SliverToBoxAdapter(
                 child: ListResultHeader(
-                  shown: loaded.filteredOrders.length,
+                  shown: loaded.filteredOrders.length, // cached per state
                   total: loaded.workOrders.length,
                   noun: 'Job Works',
                   nounSingular: 'Job Work',

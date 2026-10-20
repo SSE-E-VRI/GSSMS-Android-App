@@ -49,37 +49,10 @@ class LocalCacheService implements ILocalCacheService {
   @override
   Future<void> cacheWorkOrders(List<WorkOrder> workOrders) async {
     final prefs = await _getPrefs();
-    final jsonList = workOrders.map((wo) => {
-      'id': wo.id,
-      'status': wo.status.code,
-      'type': wo.type.code,
-      'title': wo.title,
-      'description': wo.description,
-      'priority': wo.priority.code,
-      'asset': wo.assetId,
-      'asset_name': wo.assetName,
-      'asset_criticality': wo.assetCriticality,
-      'depot': wo.depotId,
-      'depot_name': wo.depotName,
-      'station_name': wo.stationName,
-      'infrastructure_name': wo.infrastructureName,
-      'infrastructure_type': wo.infrastructureType,
-      'assigned_to': wo.assignedToId,
-      'assigned_to_name': wo.assignedToName,
-      'reported_by_name': wo.reportedByName,
-      'verified_by_name': wo.verifiedByName,
-      'due_date': wo.dueDate?.toIso8601String(),
-      'created_at': wo.createdAt?.toIso8601String(),
-      'report_completed_at': wo.reportCompletedAt?.toIso8601String(),
-      'linked_record_id': wo.linkedRecordId,
-      'ticket_number': wo.ticketNumber,
-      'maintenance_master_name': wo.maintenanceMasterName,
-      'sla_status': wo.slaStatus,
-      'escalation_level': wo.escalationLevel,
-      'station': wo.stationId,
-    }).toList();
-
-    await prefs.setString(_kWorkOrdersListKey, jsonEncode(jsonList));
+    final encoded = workOrders.length > 200
+        ? await compute(_encodeWorkOrders, workOrders)
+        : _encodeWorkOrders(workOrders);
+    await prefs.setString(_kWorkOrdersListKey, encoded);
   }
 
   @override
@@ -89,22 +62,13 @@ class LocalCacheService implements ILocalCacheService {
     if (raw == null || raw.isEmpty) return [];
 
     try {
-      final decoded = jsonDecode(raw) as List<dynamic>;
-      final result = <WorkOrder>[];
-      var corrupt = 0;
-      for (final e in decoded) {
-        if (e is! Map) {
-          corrupt++;
-          continue;
-        }
-        try {
-          result.add(WorkOrder.fromJson(Map<String, dynamic>.from(e)));
-        } catch (_) {
-          corrupt++;
-        }
+      final decoded = raw.length > 100000
+          ? await compute(_decodeWorkOrders, raw)
+          : _decodeWorkOrders(raw);
+      if (decoded.corrupt > 0) {
+        debugPrint('getCachedWorkOrders: quarantined ${decoded.corrupt} corrupt entries');
       }
-      if (corrupt > 0) debugPrint('getCachedWorkOrders: quarantined $corrupt corrupt entries');
-      return result;
+      return decoded.orders;
     } catch (e) {
       debugPrint('getCachedWorkOrders: top-level corrupt, returning empty: $e');
       return [];
@@ -217,7 +181,11 @@ class LocalCacheService implements ILocalCacheService {
   Future<List<OutboxCommand>> getOutboxCommands() async {
     final prefs = await _getPrefs();
     final raw = prefs.getString(_kOutboxCommandsKey);
-    if (raw == null || raw.isEmpty) return List<OutboxCommand>.from(_lastGoodOutbox);
+    if (raw == null || raw.isEmpty) {
+      final fallback = await _lastGoodOutboxForOwner(prefs);
+      if (fallback != null) return fallback;
+      return const [];
+    }
 
     List<dynamic>? decoded;
     try {
@@ -238,7 +206,9 @@ class LocalCacheService implements ILocalCacheService {
         }
       } catch (_) {}
       if (decoded == null) {
-        return List<OutboxCommand>.from(_lastGoodOutbox);
+        final fallback = await _lastGoodOutboxForOwner(prefs);
+        if (fallback != null) return fallback;
+        return const [];
       }
     }
 
@@ -262,6 +232,24 @@ class LocalCacheService implements ILocalCacheService {
     return validCommands;
   }
 
+  /// Memory fallback for outbox reads. Returns null when the last-good copy
+  /// must not be used (empty, or it belongs to a different user than the
+  /// cache owner currently recorded in prefs — e.g. after an owner change
+  /// without a full crash-free wipe).
+  Future<List<OutboxCommand>?> _lastGoodOutboxForOwner(SharedPreferences prefs) async {
+    final memory = _lastGoodOutbox;
+    if (memory.isEmpty) return const [];
+    final owner = prefs.getInt(_kCacheOwnerUserIdKey);
+    if (owner == null) {
+      // No recorded owner: the memory copy predates owner tracking or belongs
+      // to a signed-out session — do not resurrect it.
+      return const [];
+    }
+    final foreign = memory.any((c) => c.ownerUserId != null && c.ownerUserId != owner);
+    if (foreign) return const [];
+    return List<OutboxCommand>.from(memory);
+  }
+
   @override
   Future<int?> getCacheOwnerUserId() async {
     final prefs = await _getPrefs();
@@ -283,6 +271,10 @@ class LocalCacheService implements ILocalCacheService {
         await prefs.remove(key);
       }
     }
+    // The in-memory last-good copy must die with the persisted store: after a
+    // sign-out wipe, getOutboxCommands() must never resurrect the previous
+    // user's queued mutations from memory.
+    _lastGoodOutbox = const [];
   }
 }
 
@@ -347,4 +339,66 @@ class InMemoryLocalCacheService implements ILocalCacheService {
   Future<void> clearAllCache() async {
     _storage.clear();
   }
+}
+
+/// Result of [_decodeWorkOrders]: parsed rows plus the number of entries that
+/// were skipped as corrupt (logged by the caller, not inside the isolate).
+class _DecodedWorkOrders {
+  const _DecodedWorkOrders(this.orders, this.corrupt);
+  final List<WorkOrder> orders;
+  final int corrupt;
+}
+
+/// Top-level so it can run via `compute()` for large lists.
+String _encodeWorkOrders(List<WorkOrder> workOrders) {
+  final jsonList = workOrders.map((wo) => {
+    'id': wo.id,
+    'status': wo.status.code,
+    'type': wo.type.code,
+    'title': wo.title,
+    'description': wo.description,
+    'priority': wo.priority.code,
+    'asset': wo.assetId,
+    'asset_name': wo.assetName,
+    'asset_criticality': wo.assetCriticality,
+    'depot': wo.depotId,
+    'depot_name': wo.depotName,
+    'station_name': wo.stationName,
+    'infrastructure_name': wo.infrastructureName,
+    'infrastructure_type': wo.infrastructureType,
+    'assigned_to': wo.assignedToId,
+    'assigned_to_name': wo.assignedToName,
+    'reported_by_name': wo.reportedByName,
+    'verified_by_name': wo.verifiedByName,
+    'due_date': wo.dueDate?.toIso8601String(),
+    'created_at': wo.createdAt?.toIso8601String(),
+    'report_completed_at': wo.reportCompletedAt?.toIso8601String(),
+    'linked_record_id': wo.linkedRecordId,
+    'ticket_number': wo.ticketNumber,
+    'maintenance_master_name': wo.maintenanceMasterName,
+    'sla_status': wo.slaStatus,
+    'escalation_level': wo.escalationLevel,
+    'station': wo.stationId,
+  }).toList();
+  return jsonEncode(jsonList);
+}
+
+/// Top-level so it can run via `compute()` for large payloads. Throws if the
+/// top level is not a JSON list.
+_DecodedWorkOrders _decodeWorkOrders(String raw) {
+  final decoded = jsonDecode(raw) as List<dynamic>;
+  final result = <WorkOrder>[];
+  var corrupt = 0;
+  for (final e in decoded) {
+    if (e is! Map) {
+      corrupt++;
+      continue;
+    }
+    try {
+      result.add(WorkOrder.fromJson(Map<String, dynamic>.from(e)));
+    } catch (_) {
+      corrupt++;
+    }
+  }
+  return _DecodedWorkOrders(result, corrupt);
 }

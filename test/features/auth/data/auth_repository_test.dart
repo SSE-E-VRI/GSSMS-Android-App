@@ -20,7 +20,9 @@ void main() {
     late MockLocalCacheService mockCache;
     late AuthRepository repository;
 
-    const dummyJwt = 'eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJ1c2VybmFtZSI6InRlc3RfdXNlciIsInJvbGUiOiJNQUlOVEVOQU5DRV9TVEFGRiIsInJvbGVzIjpbIk1BSU5URU5BTkNFX1NUQUZGIl0sInBlcm1pc3Npb25zIjpbIm1haW50ZW5hbmNlLnZpZXciXX0.';
+    // JWT with user_id and a far-future `exp` (2100). M5 fail-closed:
+    // UserSession.fromJwt throws UnauthorizedException when exp is missing.
+    const dummyJwt = 'eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJ1c2VybmFtZSI6InRlc3RfdXNlciIsInJvbGUiOiJNQUlOVEVOQU5DRV9TVEFGRiIsInJvbGVzIjpbIk1BSU5URU5BTkNFX1NUQUZGIl0sInBlcm1pc3Npb25zIjpbIm1haW50ZW5hbmNlLnZpZXciXSwidXNlcl9pZCI6MSwiZXhwIjo0MTAyNDQ0ODAwfQ.';
 
     setUp(() {
       mockApiService = MockAuthApiService();
@@ -128,7 +130,11 @@ void main() {
       String unsignedJwt(Map<String, dynamic> claims) {
         String enc(String raw) =>
             base64Url.encode(utf8.encode(raw)).replaceAll('=', '');
-        return '${enc('{"alg":"none","typ":"JWT"}')}.${enc(jsonEncode(claims))}.';
+        // exp far in the future (2100) — fromJwt fails closed without it.
+        return '${enc('{"alg":"none","typ":"JWT"}')}.${enc(jsonEncode({
+              'exp': 4102444800,
+              ...claims,
+            }))}.';
       }
 
       final originalJwt = unsignedJwt({
@@ -169,6 +175,65 @@ void main() {
       verify(() => mockCache.clearAllCache()).called(1);
       expect(repository.currentSession?.depotId, 99);
       expect(repository.currentSession?.permissions, ['maintenance.view']);
+    });
+
+    test('login started before a logout later persists nothing (H2)', () async {
+      final tokens = const AuthTokens(
+        accessToken: dummyJwt,
+        refreshToken: 'user_a_refresh',
+      );
+      when(
+        () => mockApiService.login(
+          username: 'test_user',
+          password: 'password123',
+        ),
+      ).thenAnswer((_) async {
+        // A concurrent logout(…) fires while the network call is finishing.
+        await repository.logout();
+        return tokens;
+      });
+      when(() => mockSecureStorage.clearTokens()).thenAnswer((_) async {});
+      when(() => mockSecureStorage.saveRefreshToken(any()))
+          .thenAnswer((_) async {});
+
+      await expectLater(
+        repository.login(username: 'test_user', password: 'password123'),
+        throwsA(isA<UnauthorizedException>()),
+      );
+
+      // The superseded login must not repopulate state or storage.
+      verifyNever(() => mockSecureStorage.saveRefreshToken(any()));
+      expect(repository.currentAccessToken, isNull);
+      expect(repository.currentSession, isNull);
+    });
+
+    test('loginWithOtp started before a logout later persists nothing (H2)',
+        () async {
+      final tokens = const AuthTokens(
+        accessToken: dummyJwt,
+        refreshToken: 'user_a_refresh',
+      );
+      when(
+        () => mockApiService.loginWithOtp(
+          email: 'a@example.com',
+          otp: '123456',
+        ),
+      ).thenAnswer((_) async {
+        await repository.logout();
+        return tokens;
+      });
+      when(() => mockSecureStorage.clearTokens()).thenAnswer((_) async {});
+      when(() => mockSecureStorage.saveRefreshToken(any()))
+          .thenAnswer((_) async {});
+
+      await expectLater(
+        repository.loginWithOtp(email: 'a@example.com', otp: '123456'),
+        throwsA(isA<UnauthorizedException>()),
+      );
+
+      verifyNever(() => mockSecureStorage.saveRefreshToken(any()));
+      expect(repository.currentAccessToken, isNull);
+      expect(repository.currentSession, isNull);
     });
   });
 }

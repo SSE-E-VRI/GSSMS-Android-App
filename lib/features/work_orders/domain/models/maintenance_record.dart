@@ -36,7 +36,8 @@ enum MaintenanceValueType {
   bool get isMultiPart => componentKeys.isNotEmpty;
 
   bool get isNumeric =>
-      this == MaintenanceValueType.number || this == MaintenanceValueType.decimal;
+      this == MaintenanceValueType.number ||
+      this == MaintenanceValueType.decimal;
 
   static MaintenanceValueType fromString(String? code) {
     if (code == null) return MaintenanceValueType.unknown;
@@ -124,7 +125,8 @@ class MaintenanceStatusOption extends Equatable {
       isDeficiency: asJsonBool(json['is_deficiency']) ?? false,
       actionOptions: actionList
           .whereType<Map>()
-          .map((e) => MaintenanceActionOption.fromJson(Map<String, dynamic>.from(e)))
+          .map((e) =>
+              MaintenanceActionOption.fromJson(Map<String, dynamic>.from(e)))
           .toList(),
     );
   }
@@ -145,6 +147,7 @@ class LineAttachment extends Equatable {
   const LineAttachment({
     required this.id,
     required this.kind,
+    this.source = 'UNKNOWN',
     this.url = '',
     this.uploadedBy,
     this.capturedAt,
@@ -156,10 +159,18 @@ class LineAttachment extends Equatable {
     this.syncStatus,
     this.syncError,
     this.idempotencyKey,
+    this.latitude,
+    this.longitude,
+    this.locationAccuracyM,
+    this.locationRecordedAt,
   });
 
   final int id;
   final String kind;
+
+  /// CAMERA / GALLERY / UNKNOWN (audit §9.2 ME-01). Client-reported, never
+  /// inferred from filename or timestamp.
+  final String source;
   final String url;
   final String? uploadedBy;
   final DateTime? capturedAt;
@@ -172,9 +183,64 @@ class LineAttachment extends Equatable {
   final String? syncError;
   final String? idempotencyKey;
 
+  /// Separate GPS columns (ME-02) — never EXIF. All-or-nothing: the server
+  /// rejects partial location metadata, and non-camera rows never carry one.
+  final double? latitude;
+  final double? longitude;
+  final double? locationAccuracyM;
+  final DateTime? locationRecordedAt;
+
+  bool get isCameraSource => source == 'CAMERA';
+  bool get isGallerySource => source == 'GALLERY';
+
+  /// ME-06 display label. UNKNOWN also covers missing source on older rows.
+  String get sourceLabel {
+    switch (source) {
+      case 'CAMERA':
+        return 'Camera';
+      case 'GALLERY':
+        return 'Gallery';
+      default:
+        return 'Unknown';
+    }
+  }
+
+  /// Complete camera location or null. A partial set is never displayed —
+  /// the server only accepts an all-or-nothing set anyway (ME-05).
+  ({double latitude, double longitude, double accuracyM, DateTime recordedAt})?
+      get evidenceLocation {
+    if (!isCameraSource) return null;
+    final lat = latitude;
+    final lon = longitude;
+    final acc = locationAccuracyM;
+    final at = locationRecordedAt;
+    if (lat == null || lon == null || acc == null || at == null) return null;
+    if (!lat.isFinite || !lon.isFinite || !acc.isFinite || acc < 0) {
+      return null;
+    }
+    return (
+      latitude: lat,
+      longitude: lon,
+      accuracyM: acc,
+      recordedAt: at,
+    );
+  }
+
+  /// ME-06: camera rows without a fix display "Location unavailable";
+  /// gallery/unknown rows never render a fabricated location line at all.
+  String? get locationText {
+    final loc = evidenceLocation;
+    if (loc != null) {
+      return 'Location: ${loc.latitude.toStringAsFixed(5)}, '
+          '${loc.longitude.toStringAsFixed(5)} (±${loc.accuracyM.toStringAsFixed(0)} m)';
+    }
+    return isCameraSource ? 'Location unavailable' : null;
+  }
+
   bool get isSynced =>
       syncStatus == OutboxCommandStatus.synced ||
-      (url.isNotEmpty && (syncStatus == null || syncStatus == OutboxCommandStatus.synced));
+      (url.isNotEmpty &&
+          (syncStatus == null || syncStatus == OutboxCommandStatus.synced));
 
   bool get isPending =>
       syncStatus == OutboxCommandStatus.pending ||
@@ -187,6 +253,7 @@ class LineAttachment extends Equatable {
   LineAttachment copyWith({
     int? id,
     String? kind,
+    String? source,
     String? url,
     String? uploadedBy,
     DateTime? capturedAt,
@@ -199,10 +266,15 @@ class LineAttachment extends Equatable {
     String? syncError,
     bool clearError = false,
     String? idempotencyKey,
+    double? latitude,
+    double? longitude,
+    double? locationAccuracyM,
+    DateTime? locationRecordedAt,
   }) {
     return LineAttachment(
       id: id ?? this.id,
       kind: kind ?? this.kind,
+      source: source ?? this.source,
       url: url ?? this.url,
       uploadedBy: uploadedBy ?? this.uploadedBy,
       capturedAt: capturedAt ?? this.capturedAt,
@@ -214,6 +286,10 @@ class LineAttachment extends Equatable {
       syncStatus: syncStatus ?? this.syncStatus,
       syncError: clearError ? null : (syncError ?? this.syncError),
       idempotencyKey: idempotencyKey ?? this.idempotencyKey,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+      locationAccuracyM: locationAccuracyM ?? this.locationAccuracyM,
+      locationRecordedAt: locationRecordedAt ?? this.locationRecordedAt,
     );
   }
 
@@ -222,6 +298,7 @@ class LineAttachment extends Equatable {
     return LineAttachment(
       id: asJsonInt(json['id']) ?? 0,
       kind: asJsonString(json['kind'])?.toUpperCase() ?? 'BEFORE',
+      source: asJsonString(json['source'])?.toUpperCase() ?? 'UNKNOWN',
       url: asJsonString(json['url']) ?? asJsonString(json['image']) ?? '',
       uploadedBy: asJsonString(json['uploaded_by']),
       capturedAt: _asDate(json['captured_at']),
@@ -230,15 +307,21 @@ class LineAttachment extends Equatable {
       displayOrder: asJsonInt(json['display_order']) ?? 0,
       uploadedAt: _asDate(json['uploaded_at']),
       localPath: asJsonString(json['local_path']),
-      syncStatus: statusStr != null ? OutboxCommandStatus.fromCode(statusStr) : null,
+      syncStatus:
+          statusStr != null ? OutboxCommandStatus.fromCode(statusStr) : null,
       syncError: asJsonString(json['sync_error']),
       idempotencyKey: asJsonString(json['idempotency_key']),
+      latitude: asJsonDouble(json['latitude']),
+      longitude: asJsonDouble(json['longitude']),
+      locationAccuracyM: asJsonDouble(json['location_accuracy_m']),
+      locationRecordedAt: _asDate(json['location_recorded_at']),
     );
   }
 
   Map<String, dynamic> toJson() => {
         'id': id,
         'kind': kind,
+        'source': source,
         'url': url,
         'uploaded_by': uploadedBy,
         'captured_at': capturedAt?.toIso8601String(),
@@ -250,12 +333,18 @@ class LineAttachment extends Equatable {
         if (syncStatus != null) 'sync_status': syncStatus!.code,
         if (syncError != null) 'sync_error': syncError,
         if (idempotencyKey != null) 'idempotency_key': idempotencyKey,
+        if (latitude != null) 'latitude': latitude,
+        if (longitude != null) 'longitude': longitude,
+        if (locationAccuracyM != null) 'location_accuracy_m': locationAccuracyM,
+        if (locationRecordedAt != null)
+          'location_recorded_at': locationRecordedAt!.toIso8601String(),
       };
 
   @override
   List<Object?> get props => [
         id,
         kind,
+        source,
         url,
         uploadedBy,
         capturedAt,
@@ -267,6 +356,10 @@ class LineAttachment extends Equatable {
         syncStatus,
         syncError,
         idempotencyKey,
+        latitude,
+        longitude,
+        locationAccuracyM,
+        locationRecordedAt,
       ];
 }
 
@@ -472,8 +565,9 @@ class MaintenanceRecordLine extends Equatable {
       observationAction: identical(observationAction, _unset)
           ? this.observationAction
           : observationAction as String?,
-      deficiency:
-          identical(deficiency, _unset) ? this.deficiency : deficiency as String?,
+      deficiency: identical(deficiency, _unset)
+          ? this.deficiency
+          : deficiency as String?,
       deficiencyAttended: deficiencyAttended ?? this.deficiencyAttended,
       excluded: excluded ?? this.excluded,
       exclusionReason: identical(exclusionReason, _unset)
@@ -481,9 +575,8 @@ class MaintenanceRecordLine extends Equatable {
           : exclusionReason as String?,
       isSaved: isSaved ?? this.isSaved,
       attachments: attachments ?? this.attachments,
-      checkedOut: identical(checkedOut, _unset)
-          ? this.checkedOut
-          : checkedOut as bool?,
+      checkedOut:
+          identical(checkedOut, _unset) ? this.checkedOut : checkedOut as bool?,
       checkoutSource: checkoutSource ?? this.checkoutSource,
       assetCategoryId: assetCategoryId,
       assetUniqueId: assetUniqueId,
@@ -498,7 +591,8 @@ class MaintenanceRecordLine extends Equatable {
 
   factory MaintenanceRecordLine.fromJson(Map<String, dynamic> json) {
     final rawStatusOptions = json['status_options'];
-    final statusOptionList = rawStatusOptions is List ? rawStatusOptions : const [];
+    final statusOptionList =
+        rawStatusOptions is List ? rawStatusOptions : const [];
     final rawAttachments = json['attachments'];
     final attachmentList = rawAttachments is List ? rawAttachments : const [];
 
@@ -509,7 +603,8 @@ class MaintenanceRecordLine extends Equatable {
           'Checklist Item',
       inspectionPoint: asJsonString(json['inspection_point']) ??
           asJsonString(json['checkpoint_snapshot']),
-      valueType: MaintenanceValueType.fromString(asJsonString(json['value_type'])),
+      valueType:
+          MaintenanceValueType.fromString(asJsonString(json['value_type'])),
       itemKind: MaintenanceItemKind.fromString(asJsonString(json['item_kind'])),
       isRequired: asJsonBool(json['required'] ?? json['is_required']) ?? false,
       assetCategory: asJsonString(json['asset_category']),
@@ -518,7 +613,8 @@ class MaintenanceRecordLine extends Equatable {
           json['reference_value_snapshot'] ?? json['reference_value']),
       statusOptions: statusOptionList
           .whereType<Map>()
-          .map((e) => MaintenanceStatusOption.fromJson(Map<String, dynamic>.from(e)))
+          .map((e) =>
+              MaintenanceStatusOption.fromJson(Map<String, dynamic>.from(e)))
           .toList(),
       recordedValue: json['recorded_value'],
       status: asJsonString(json['status']) ?? 'OK',
@@ -777,7 +873,8 @@ class MaintenanceRecord extends Equatable {
       dateOfMaintenance: _asDate(json['date_of_maintenance']),
       lines: lineList
           .whereType<Map>()
-          .map((e) => MaintenanceRecordLine.fromJson(Map<String, dynamic>.from(e)))
+          .map((e) =>
+              MaintenanceRecordLine.fromJson(Map<String, dynamic>.from(e)))
           .toList(),
       remarks: asJsonString(json['remarks']),
       status: asJsonString(json['status']),

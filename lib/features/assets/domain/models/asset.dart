@@ -148,32 +148,32 @@ class Asset extends Equatable {
     }
 
     return Asset(
-      id: json['id'] as int? ?? 0,
-      uniqueId: json['unique_id'] as String? ??
-          json['asset_code'] as String? ??
+      id: asJsonInt(json['id']) ?? 0,
+      uniqueId: asJsonString(json['unique_id']) ??
+          asJsonString(json['asset_code']) ??
           'AST-${json['id']}',
-      assetCategoryName: json['asset_category_name'] as String?,
-      assetCategoryCode: json['asset_category_code'] as String?,
-      assetTypeName: json['asset_type_name'] as String?,
-      assetTypeCode: json['asset_type_code'] as String?,
-      make: json['make'] as String?,
-      model: json['model'] as String?,
-      serialNumber: json['serial_number'] as String?,
-      capacity: json['capacity'] as String?,
-      criticality: AssetCriticality.fromString(json['criticality'] as String?),
+      assetCategoryName: asJsonString(json['asset_category_name']),
+      assetCategoryCode: asJsonString(json['asset_category_code']),
+      assetTypeName: asJsonString(json['asset_type_name']),
+      assetTypeCode: asJsonString(json['asset_type_code']),
+      make: asJsonString(json['make']),
+      model: asJsonString(json['model']),
+      serialNumber: asJsonString(json['serial_number']),
+      capacity: asJsonString(json['capacity']),
+      criticality: AssetCriticality.fromString(asJsonString(json['criticality'])),
       warrantyStatus:
-          AssetWarrantyStatus.fromString(json['warranty_status'] as String?),
-      stationName: json['station_name'] as String?,
-      stationCode: json['station_code'] as String?,
-      depotName: json['depot_name'] as String?,
-      infrastructureName: json['infrastructure_name'] as String?,
-      locationLabel: json['location_label'] as String?,
-      microLocation: json['micro_location'] as String?,
+          AssetWarrantyStatus.fromString(asJsonString(json['warranty_status'])),
+      stationName: asJsonString(json['station_name']),
+      stationCode: asJsonString(json['station_code']),
+      depotName: asJsonString(json['depot_name']),
+      infrastructureName: asJsonString(json['infrastructure_name']),
+      locationLabel: asJsonString(json['location_label']),
+      microLocation: asJsonString(json['micro_location']),
       installationDate: parseDate(json['installation_date']),
       warrantyExpiryDate: parseDate(json['warranty_expiry_date']),
       lastMaintenanceDate: parseDate(json['last_maintenance_date']),
-      remarks: json['remarks'] as String?,
-      isDeleted: json['is_deleted'] as bool? ?? false,
+      remarks: asJsonString(json['remarks']),
+      isDeleted: asJsonBool(json['is_deleted']) ?? false,
     );
   }
 

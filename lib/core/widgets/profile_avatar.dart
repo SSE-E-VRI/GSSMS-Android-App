@@ -126,11 +126,15 @@ class _ProfileAvatarState extends ConsumerState<ProfileAvatar> {
     );
   }
 
-  Widget _buildImageContent() {
+  Widget _buildImageContent(int px) {
     if (widget.imageProvider != null) {
       return Image(
         key: const Key('profile_avatar_image'),
-        image: widget.imageProvider!,
+        image: ResizeImage(
+          widget.imageProvider!,
+          width: px,
+          policy: ResizeImagePolicy.fit,
+        ),
         width: widget.radius * 2,
         height: widget.radius * 2,
         fit: BoxFit.cover,
@@ -138,9 +142,10 @@ class _ProfileAvatarState extends ConsumerState<ProfileAvatar> {
       );
     }
 
-    if (_cachedFile != null && _cachedFile!.existsSync()) {
+    if (_cachedFile != null) {
       return Image.file(
         _cachedFile!,
+        cacheWidth: px,
         key: const Key('profile_avatar_image'),
         width: widget.radius * 2,
         height: widget.radius * 2,
@@ -154,6 +159,8 @@ class _ProfileAvatarState extends ConsumerState<ProfileAvatar> {
 
   @override
   Widget build(BuildContext context) {
+    final px =
+        (widget.radius * 2 * MediaQuery.devicePixelRatioOf(context)).round();
     final avatar = Container(
       width: widget.radius * 2,
       height: widget.radius * 2,
@@ -162,7 +169,7 @@ class _ProfileAvatarState extends ConsumerState<ProfileAvatar> {
         color: widget.backgroundColor ?? context.gssms.surfaceInset,
       ),
       clipBehavior: Clip.antiAlias,
-      child: _buildImageContent(),
+      child: _buildImageContent(px),
     );
 
     return Stack(

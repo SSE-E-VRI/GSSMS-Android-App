@@ -239,38 +239,44 @@ class InspectionListController extends Notifier<InspectionListState> {
     }
   }
 
+  /// M12: client-side filter setters also work from the Error state —
+  /// the carried-forward [previousLoaded] becomes the filter target.
+  InspectionListLoaded? _filterTarget() {
+    final s = state;
+    if (s is InspectionListLoaded) return s;
+    if (s is InspectionListError) return s.previousLoaded;
+    return null;
+  }
+
   void setStatusFilter(InspectionStatus? status) {
-    if (state is InspectionListLoaded) {
-      final loaded = state as InspectionListLoaded;
-      final previous = _resolvePrevious();
-      state = loaded.copyWith(selectedStatus: status, clearStatus: status == null);
-      // Record filter narrows server-side — reload to match web register.
-      if (previous?.selectedStatus != status) {
-        unawaited(_load(
-          base: state is InspectionListLoaded
-              ? state as InspectionListLoaded
-              : previous,
-          dateFrom: previous?.dateFrom,
-          dateTo: previous?.dateTo,
-          scope: previous?.orgScope ?? OrgScopeSelection.empty,
-        ));
-      }
+    final target = _filterTarget();
+    if (target == null) return;
+    final previous = _resolvePrevious();
+    state = target.copyWith(selectedStatus: status, clearStatus: status == null);
+    // Record filter narrows server-side — reload to match web register.
+    if (previous?.selectedStatus != status) {
+      unawaited(_load(
+        base: state is InspectionListLoaded
+            ? state as InspectionListLoaded
+            : previous,
+        dateFrom: previous?.dateFrom,
+        dateTo: previous?.dateTo,
+        scope: previous?.orgScope ?? OrgScopeSelection.empty,
+      ));
     }
   }
 
   void setEffectiveStatusFilter(EffectiveInspectionStatus? status) {
-    if (state is InspectionListLoaded) {
-      final loaded = state as InspectionListLoaded;
-      state = loaded.copyWith(
-          selectedEffectiveStatus: status,
-          clearEffectiveStatus: status == null);
-    }
+    final loaded = _filterTarget();
+    if (loaded == null) return;
+    state = loaded.copyWith(
+        selectedEffectiveStatus: status,
+        clearEffectiveStatus: status == null);
   }
 
   void setSearchQuery(String query) {
-    if (state is InspectionListLoaded) {
-      final loaded = state as InspectionListLoaded;
-      state = loaded.copyWith(searchQuery: query.trim());
-    }
+    final loaded = _filterTarget();
+    if (loaded == null) return;
+    state = loaded.copyWith(searchQuery: query.trim());
   }
 }

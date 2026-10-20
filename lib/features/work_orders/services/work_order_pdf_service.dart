@@ -3,6 +3,8 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:gssms_mobile/features/work_orders/domain/models/work_order.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/work_order_audit.dart';
+import 'package:gssms_mobile/features/work_orders/services/job_work_report_pdf_primitives.dart';
+import 'package:gssms_mobile/features/work_orders/services/report_pdf/report_fonts.dart';
 
 /// Printable Job Work sheet for one work order — mirrors web's per-row PDF
 /// action on Job Works (Manage/Audit/PDF): header meta + asset/location +
@@ -14,12 +16,19 @@ class WorkOrderPdfService {
     WorkOrder wo, {
     WorkOrderAudit? audit,
   }) async {
+    // The default pdf font is WinAnsi-only (no ₹, no extended glyphs); use the
+    // bundled Selawik faces like the other reports.
+    await ReportFonts.load();
     final doc = pw.Document();
     final df = DateFormat('dd MMM yyyy, HH:mm');
 
     doc.addPage(
       pw.MultiPage(
         pageFormat: PdfPageFormat.a4,
+        theme: pw.ThemeData.withFont(
+          base: ReportFonts.regular,
+          bold: ReportFonts.bold,
+        ),
         margin: const pw.EdgeInsets.all(28),
         footer: (context) => pw.Row(
           mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
@@ -48,7 +57,7 @@ class WorkOrderPdfService {
                 borderRadius:
                     const pw.BorderRadius.all(pw.Radius.circular(4)),
               ),
-              child: pw.Text(wo.description!,
+              child: pw.Text(pdfSafe(wo.description!),
                   style: const pw.TextStyle(fontSize: 9.5)),
             ),
             pw.SizedBox(height: 12),
@@ -82,7 +91,7 @@ class WorkOrderPdfService {
               style: pw.TextStyle(
                   fontSize: 16, fontWeight: pw.FontWeight.bold)),
           pw.SizedBox(height: 2),
-          pw.Text(wo.displayTitle,
+          pw.Text(pdfSafe(wo.displayTitle),
               textAlign: pw.TextAlign.center,
               style: const pw.TextStyle(fontSize: 11)),
           pw.SizedBox(height: 4),
@@ -125,7 +134,7 @@ class WorkOrderPdfService {
               padding:
                   const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4),
               child:
-                  pw.Text(v, style: const pw.TextStyle(fontSize: 9))),
+                  pw.Text(pdfSafe(v), style: const pw.TextStyle(fontSize: 9))),
         ]);
     String fmt(DateTime? d) => d == null ? '-' : df.format(d);
     return pw.Table(
@@ -170,7 +179,7 @@ class WorkOrderPdfService {
     pw.Widget c(String t) => pw.Container(
           padding:
               const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-          child: pw.Text(t, style: const pw.TextStyle(fontSize: 8.5)),
+          child: pw.Text(pdfSafe(t), style: const pw.TextStyle(fontSize: 8.5)),
         );
     return pw.Table(
       columnWidths: const {

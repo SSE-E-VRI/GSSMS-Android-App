@@ -12,6 +12,7 @@ import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_
 import 'package:mocktail/mocktail.dart';
 
 class MockWorkOrderApiService extends Mock implements WorkOrderApiService {}
+
 class MockEvidenceService extends Mock implements EvidenceService {}
 
 void main() {
@@ -39,13 +40,15 @@ void main() {
 
     tearDown(() => container.dispose());
 
-    test('offline capture queues command -> reconnect drains multipart upload and discards local file',
+    test(
+        'offline capture queues command -> reconnect drains multipart upload and discards local file',
         () async {
       const recordId = 15;
       const lineId = 8;
       final tempDir = await Directory.systemTemp.createTemp('gssms_test_');
       final tempFile = File('${tempDir.path}/before_mock.jpg');
-      await tempFile.writeAsBytes([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10]); // JPEG magic bytes
+      await tempFile.writeAsBytes(
+          [0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10]); // JPEG magic bytes
 
       try {
         final syncManager = container.read(syncManagerProvider.notifier);
@@ -62,6 +65,11 @@ void main() {
               kind: 'BEFORE',
               imagePath: tempFile.path,
               capturedAt: any(named: 'capturedAt'),
+              source: any(named: 'source'),
+              latitude: any(named: 'latitude'),
+              longitude: any(named: 'longitude'),
+              locationAccuracyM: any(named: 'locationAccuracyM'),
+              locationRecordedAt: any(named: 'locationRecordedAt'),
               idempotencyKey: any(named: 'idempotencyKey'),
             )).thenThrow(
           DioException(
@@ -99,11 +107,17 @@ void main() {
               kind: 'BEFORE',
               imagePath: tempFile.path,
               capturedAt: any(named: 'capturedAt'),
+              source: any(named: 'source'),
+              latitude: any(named: 'latitude'),
+              longitude: any(named: 'longitude'),
+              locationAccuracyM: any(named: 'locationAccuracyM'),
+              locationRecordedAt: any(named: 'locationRecordedAt'),
               idempotencyKey: any(named: 'idempotencyKey'),
             )).thenAnswer((_) async => {
               'id': 701,
               'kind': 'BEFORE',
-              'url': 'https://api.railways.gov.in/media/evidence/before_mock.jpg',
+              'url':
+                  'https://api.railways.gov.in/media/evidence/before_mock.jpg',
             });
 
         when(() => mockEvidenceService.discard(tempFile.path))
@@ -114,13 +128,20 @@ void main() {
 
         // Verify API was called with multipart parameters
         verify(() => mockApiService.uploadLineAttachment(
-              recordId,
-              lineId: lineId,
-              kind: 'BEFORE',
-              imagePath: tempFile.path,
-              capturedAt: any(named: 'capturedAt'),
-              idempotencyKey: any(named: 'idempotencyKey'),
-            )).called(3); // 1 offline direct attempt + 1 autoDrain attempt + 1 successful drain on reconnect
+                  recordId,
+                  lineId: lineId,
+                  kind: 'BEFORE',
+                  imagePath: tempFile.path,
+                  capturedAt: any(named: 'capturedAt'),
+                  source: any(named: 'source'),
+                  latitude: any(named: 'latitude'),
+                  longitude: any(named: 'longitude'),
+                  locationAccuracyM: any(named: 'locationAccuracyM'),
+                  locationRecordedAt: any(named: 'locationRecordedAt'),
+                  idempotencyKey: any(named: 'idempotencyKey'),
+                ))
+            .called(
+                3); // 1 offline direct attempt + 1 autoDrain attempt + 1 successful drain on reconnect
 
         // Verify discard was called on accepted upload
         verify(() => mockEvidenceService.discard(tempFile.path)).called(1);
@@ -129,7 +150,8 @@ void main() {
         final remaining = await cacheService.getOutboxCommands();
         expect(remaining, isEmpty);
         expect(container.read(syncManagerProvider).pendingCount, 0);
-        expect(container.read(syncManagerProvider).mode, SyncConnectivityMode.online);
+        expect(container.read(syncManagerProvider).mode,
+            SyncConnectivityMode.online);
       } finally {
         if (await tempDir.exists()) {
           await tempDir.delete(recursive: true);

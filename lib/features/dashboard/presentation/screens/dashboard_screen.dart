@@ -519,7 +519,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         tileColor: context.gssms.surfaceInset,
         leading: CircleAvatar(
-            backgroundColor: color.withOpacity(0.12),
+            backgroundColor: color.withValues(alpha: 0.12),
             child: Icon(icon, color: color, size: 20)),
         title: Text(title,
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),

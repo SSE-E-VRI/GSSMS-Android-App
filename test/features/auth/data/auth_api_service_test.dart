@@ -268,5 +268,84 @@ void main() {
         ),
       ).called(1);
     });
+
+    group('error message sanitisation (M1 audit fix)', () {
+      Future<void> expectLoginThrows(AuthException expected, Response response) async {
+        when(
+          () => mockDio.post<Map<String, dynamic>>(
+            '/api/v1/auth/login/',
+            data: any(named: 'data'),
+          ),
+        ).thenThrow(
+          DioException(
+            requestOptions: RequestOptions(path: '/api/v1/auth/login/'),
+            response: response,
+          ),
+        );
+        try {
+          await apiService.login(username: 'u', password: 'p');
+          fail('expected AuthException');
+        } on AuthException catch (e) {
+          expect(e.runtimeType, expected.runtimeType);
+          expect(e.code, expected.code);
+          expect(e.message, expected.message);
+        }
+      }
+
+      test('never surfaces a raw HTML gateway error page', () async {
+        await expectLoginThrows(
+          const AuthException(
+            'The service is temporarily unavailable. Please try again.',
+            code: 'SERVICE_UNAVAILABLE',
+          ),
+          Response(
+            requestOptions: RequestOptions(path: '/api/v1/auth/login/'),
+            statusCode: 502,
+            data: '<html><body>502 Bad Gateway nginx/1.18</body></html>',
+          ),
+        );
+      });
+
+      test('plain 502 no longer misreports as EMAIL_DELIVERY_FAILED', () async {
+        await expectLoginThrows(
+          const AuthException(
+            'The service is temporarily unavailable. Please try again.',
+            code: 'SERVICE_UNAVAILABLE',
+          ),
+          Response(
+            requestOptions: RequestOptions(path: '/api/v1/auth/login/'),
+            statusCode: 502,
+            data: {'detail': 'upstream error'},
+          ),
+        );
+      });
+
+      test('server-declared EMAIL_DELIVERY_FAILED still mapped', () async {
+        await expectLoginThrows(
+          const AuthException(
+            'Could not send the verification email.',
+            code: 'EMAIL_DELIVERY_FAILED',
+          ),
+          Response(
+            requestOptions: RequestOptions(path: '/api/v1/auth/login/'),
+            statusCode: 502,
+            data: {'detail': 'Could not send the verification email.', 'code': 'EMAIL_DELIVERY_FAILED'},
+          ),
+        );
+      });
+
+      test('nested DRF field errors are flattened, not stringified', () async {
+        await expectLoginThrows(
+          const AuthException('Email: Enter a valid email address.'),
+          Response(
+            requestOptions: RequestOptions(path: '/api/v1/auth/login/'),
+            statusCode: 400,
+            data: {
+              'email': ['Enter a valid email address.'],
+            },
+          ),
+        );
+      });
+    });
   });
 }

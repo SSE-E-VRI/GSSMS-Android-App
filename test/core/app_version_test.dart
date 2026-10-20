@@ -8,7 +8,8 @@ void main() {
     final line = File('pubspec.yaml')
         .readAsLinesSync()
         .firstWhere((l) => l.startsWith('version:'));
-    final pubspecVersion = line.substring('version:'.length).trim();
+    final pubspecVersion =
+        line.substring('version:'.length).trim().split('+').first;
     expect(appVersion, pubspecVersion,
         reason: 'Bump lib/core/config/app_version.dart together with pubspec.yaml');
   });

@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
@@ -28,6 +30,84 @@ enum EvidenceKind {
 
 /// Long edge, in pixels, that a stored evidence photo is scaled down to.
 const int kEvidenceMaxEdge = 1600;
+
+/// Source reported to the server for a line attachment (audit §9.2 ME-01).
+/// Never inferred from filename or timestamp; camera/gallery distinction is
+/// chosen by the user flow that produced the capture.
+enum EvidenceSource {
+  camera('CAMERA'),
+  gallery('GALLERY'),
+  unknown('UNKNOWN');
+
+  const EvidenceSource(this.code);
+  final String code;
+
+  static EvidenceSource fromCode(String? code) {
+    final upper = code?.trim().toUpperCase();
+    for (final s in EvidenceSource.values) {
+      if (s.code == upper) return s;
+    }
+    return EvidenceSource.unknown;
+  }
+}
+
+/// Bounded wait for the one fresh camera-photo location fix (ME-02/ME-03).
+const Duration kEvidenceLocationTimeout = Duration(seconds: 8);
+
+/// One fresh foreground location fix, stored as attachment columns — never
+/// inside the image (the normalizer strips EXIF GPS, audit §9.1).
+class EvidenceLocation {
+  const EvidenceLocation({
+    required this.latitude,
+    required this.longitude,
+    required this.accuracyM,
+    required this.recordedAt,
+  });
+
+  final double latitude;
+  final double longitude;
+
+  /// Horizontal accuracy in meters (non-negative, finite).
+  final double accuracyM;
+  final DateTime recordedAt;
+
+  /// ME-05 validation: all four fields required together (no partial
+  /// location), coordinates finite and ranged, accuracy non-negative finite
+  /// and a valid fix timestamp. Returns null instead of throwing so callers
+  /// can simply keep the photo without GPS.
+  static EvidenceLocation? validated(
+    double? latitude,
+    double? longitude,
+    double? accuracyM,
+    DateTime? recordedAt,
+  ) {
+    if (latitude == null ||
+        longitude == null ||
+        accuracyM == null ||
+        recordedAt == null) {
+      return null;
+    }
+    final valid = latitude.isFinite &&
+        longitude.isFinite &&
+        accuracyM.isFinite &&
+        accuracyM >= 0 &&
+        !recordedAt.isBefore(DateTime(2000)) &&
+        !recordedAt.isAfter(DateTime.now().add(const Duration(minutes: 5)));
+    if (!valid) return null;
+    if (latitude < -90 ||
+        latitude > 90 ||
+        longitude < -180 ||
+        longitude > 180) {
+      return null;
+    }
+    return EvidenceLocation(
+      latitude: latitude,
+      longitude: longitude,
+      accuracyM: accuracyM,
+      recordedAt: recordedAt,
+    );
+  }
+}
 
 /// JPEG quality used for the re-encode.
 const int kEvidenceJpegQuality = 80;
@@ -78,15 +158,48 @@ class EvidenceFile {
     required this.path,
     required this.sizeBytes,
     required this.kind,
+    this.source = EvidenceSource.unknown,
+    this.capturedAt,
+    this.location,
   });
 
   final String path;
   final int sizeBytes;
   final EvidenceKind kind;
 
+  /// CAMERA for camera captures, GALLERY for gallery picks (ME-01).
+  final EvidenceSource source;
+
+  /// App-recorded capture-flow time — set for camera captures only; gallery
+  /// picks carry no invented `captured_at` (ME-04).
+  final DateTime? capturedAt;
+
+  /// Fresh GPS fix taken at capture time for camera evidence only (ME-02).
+  /// Null when the user denied the permission, location was off, or the fix
+  /// timed out — the photo is kept without GPS (ME-03).
+  final EvidenceLocation? location;
+
   String get fileName => path.split(Platform.pathSeparator).last;
 
   bool get isWithinSizeLimit => sizeBytes <= EvidenceLimits.maxBytes;
+
+  /// Attaches capture-flow provenance. Skips location on non-camera sources
+  /// even if a fix slipped in, and drops a partial/invalid location.
+  EvidenceFile withCapture({
+    required EvidenceSource source,
+    DateTime? capturedAt,
+    EvidenceLocation? location,
+  }) {
+    final isCamera = source == EvidenceSource.camera;
+    return EvidenceFile(
+      path: path,
+      sizeBytes: sizeBytes,
+      kind: kind,
+      source: source,
+      capturedAt: isCamera ? capturedAt : null,
+      location: isCamera ? location : null,
+    );
+  }
 }
 
 /// Captures proof-of-execution and line-scoped photos and keeps them somewhere
@@ -99,10 +212,17 @@ class EvidenceService {
   EvidenceService({
     ImagePicker? picker,
     this.retentionPeriod = const Duration(hours: 48),
-  }) : _picker = picker ?? ImagePicker();
+    EvidenceLocationResolver? locationResolver,
+  })  : _picker = picker ?? ImagePicker(),
+        _locationResolver =
+            locationResolver ?? _resolveCameraLocationFromDevice;
 
   final ImagePicker _picker;
   final Duration retentionPeriod;
+
+  /// Supplies the one fresh foreground fix for camera captures. Injectable
+  /// so tests can fake success/failure/timeout without device GPS.
+  final EvidenceLocationResolver _locationResolver;
 
   static const String _evidenceDirName = 'gssms_evidence';
 
@@ -114,13 +234,30 @@ class EvidenceService {
   ///
   /// Downscales to 1600px long edge at JPEG quality 80 and strips EXIF except
   /// orientation (baked into pixel data) per MOBILE_APP_SSOT.md §12.
+  ///
+  /// ME-01/ME-02/ME-04: the returned [EvidenceFile] carries the
+  /// CAMERA/GALLERY distinction, an app-recorded capture-flow time for
+  /// camera-only, and — when [captureLocation] is true — at most one fresh
+  /// foreground GPS fix attempted near capture time. Gallery picks never get
+  /// a fix or a `captured_at`. ME-03: permission denial, location disabled
+  /// or the bounded timeout keep the photo, just without coordinates.
   Future<EvidenceFile?> capture({
     required EvidenceKind kind,
     ImageSource source = ImageSource.camera,
+    bool captureLocation = false,
     int imageQuality = 80,
     double maxWidth = 1600,
     double maxHeight = 1600,
   }) async {
+    final evidenceSource = source == ImageSource.camera
+        ? EvidenceSource.camera
+        : EvidenceSource.gallery;
+    // App-recorded capture-flow time (not a shutter timestamp — ME-04).
+    // Recorded before the camera hand-off so a slow camera session still
+    // reflects when the capture was requested, and gallery picks get none.
+    final capturedAt =
+        evidenceSource == EvidenceSource.camera ? DateTime.now() : null;
+
     final picked = await _picker.pickImage(
       source: source,
       imageQuality: imageQuality,
@@ -129,7 +266,59 @@ class EvidenceService {
       requestFullMetadata: false,
     );
     if (picked == null) return null;
-    return persist(picked.path, kind: kind);
+    final stored = await persist(picked.path, kind: kind);
+
+    EvidenceLocation? location;
+    if (captureLocation && evidenceSource == EvidenceSource.camera) {
+      location = await _locationResolver();
+    }
+    return stored.withCapture(
+      source: evidenceSource,
+      capturedAt: capturedAt,
+      location: location,
+    );
+  }
+
+  /// One fresh foreground fix with a bounded timeout (ME-02/ME-03):
+  /// - asks for the runtime permission when needed,
+  /// - refuses to substitute a last-known position or track in background,
+  /// - returns null (photo kept without GPS) on denial, disabled services or
+  ///   timeout.
+  static Future<EvidenceLocation?> _resolveCameraLocationFromDevice() async {
+    try {
+      var permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        // Foreground runtime prompt — the only permission interaction here.
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        return null;
+      }
+      final servicesEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!servicesEnabled) return null;
+
+      // getCurrentPosition — never getLastKnownPosition: no cached fix may
+      // stand in for a capture-time fix (ME-03).
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.medium,
+          timeLimit: kEvidenceLocationTimeout,
+        ),
+      ).timeout(kEvidenceLocationTimeout);
+
+      return EvidenceLocation.validated(
+        position.latitude,
+        position.longitude,
+        position.accuracy,
+        position.timestamp.toUtc(),
+      );
+    } on TimeoutException {
+      return null;
+    } catch (_) {
+      // Unsupported platform, plugin failure, etc. — photo without GPS.
+      return null;
+    }
   }
 
   /// Copies and normalizes [sourcePath] into the app's evidence directory:
@@ -148,13 +337,15 @@ class EvidenceService {
       throw FileSystemException('Source photo not found', sourcePath);
     }
     final docs = await getApplicationDocumentsDirectory();
-    final dir = Directory('${docs.path}${Platform.pathSeparator}$_evidenceDirName');
+    final dir =
+        Directory('${docs.path}${Platform.pathSeparator}$_evidenceDirName');
     if (!await dir.exists()) {
       await dir.create(recursive: true);
     }
 
     final stamp = DateTime.now().millisecondsSinceEpoch;
-    final target = '${dir.path}${Platform.pathSeparator}${kind.name}_$stamp.jpg';
+    final target =
+        '${dir.path}${Platform.pathSeparator}${kind.name}_$stamp.jpg';
 
     try {
       final sourceLen = await source.length();
@@ -163,7 +354,8 @@ class EvidenceService {
       const maxSourceBytes = 30 * 1024 * 1024;
       if (sourceLen > maxSourceBytes) {
         throw FileSystemException(
-            'Photo is too large (${(sourceLen / 1048576).toStringAsFixed(1)} MB)', sourcePath);
+            'Photo is too large (${(sourceLen / 1048576).toStringAsFixed(1)} MB)',
+            sourcePath);
       }
       final rawBytes = await source.readAsBytes();
 
@@ -193,7 +385,8 @@ class EvidenceService {
         );
       }
     } on FileSystemException catch (e) {
-      throw FileSystemException('Could not save proof photo: ${e.message}', target);
+      throw FileSystemException(
+          'Could not save proof photo: ${e.message}', target);
     }
   }
 
@@ -217,7 +410,8 @@ class EvidenceService {
   Future<int> getTotalPendingEvidenceBytes() async {
     try {
       final docs = await getApplicationDocumentsDirectory();
-      final dir = Directory('${docs.path}${Platform.pathSeparator}$_evidenceDirName');
+      final dir =
+          Directory('${docs.path}${Platform.pathSeparator}$_evidenceDirName');
       if (!await dir.exists()) return 0;
       int total = 0;
       await for (final entity in dir.list(recursive: false)) {
@@ -255,7 +449,8 @@ class EvidenceService {
   }) async {
     try {
       final docs = await getApplicationDocumentsDirectory();
-      final dir = Directory('${docs.path}${Platform.pathSeparator}$_evidenceDirName');
+      final dir =
+          Directory('${docs.path}${Platform.pathSeparator}$_evidenceDirName');
       if (!await dir.exists()) return;
       final cutoff = DateTime.now().subtract(maxAge ?? retentionPeriod);
       // Canonicalize once: callers pass File.absolute paths (see SyncManager)
@@ -291,6 +486,10 @@ class EvidenceService {
     } catch (_) {}
   }
 }
+
+/// Resolves the single camera-capture location fix (or null). Injectable so
+/// tests can drive success/failure without device GPS.
+typedef EvidenceLocationResolver = Future<EvidenceLocation?> Function();
 
 final evidenceServiceProvider = Provider<EvidenceService>((ref) {
   return EvidenceService();

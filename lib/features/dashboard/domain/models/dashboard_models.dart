@@ -109,7 +109,7 @@ class MaintenanceTypeStat extends Equatable {
     return MaintenanceTypeStat(
       label: asJsonString(json['label']) ?? asJsonString(json['type']) ?? 'General',
       count: asJsonInt(json['count']) ?? 0,
-      percentage: (json['percentage'] as num?)?.toDouble() ?? 0.0,
+      percentage: asJsonDouble(json['percentage']) ?? 0.0,
     );
   }
 
@@ -149,7 +149,7 @@ class DashboardStats extends Equatable {
 
     return DashboardStats(
       totalWorkOrders: asJsonInt(json['total_work_orders']) ?? asJsonInt(json['total_job_works']) ?? 0,
-      complianceRate: (json['compliance_rate'] as num?)?.toDouble() ?? 0.0,
+      complianceRate: asJsonDouble(json['compliance_rate']) ?? 0.0,
       pendingVerificationCount: asJsonInt(json['pending_verification_count']) ?? 0,
       pendingTaskCount: asJsonInt(json['pending_task_count']) ?? 0,
       scheduledTaskCount: asJsonInt(json['scheduled_task_count']),
@@ -260,10 +260,8 @@ class PendingAction extends Equatable {
           json['depot_name'] ??
           json['remarks']),
       workOrderId: workOrderId,
-      complaintId:
-          _fkId(json['complaint_id'] ?? json['complaint']),
-      inspectionId:
-          _fkId(json['inspection_id'] ?? json['inspection']),
+      complaintId: complaintId,
+      inspectionId: inspectionId,
       dueDate: json['due_date'] != null
           ? asJsonDateTime(json['due_date'])
           : (json['created_at'] != null

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:gssms_mobile/features/auth/domain/models/auth_exceptions.dart';
+import 'package:jwt_decoder/jwt_decoder.dart';
 
 typedef TokenProvider = String? Function();
 typedef RefreshTokenHandler = Future<String?> Function();
@@ -52,6 +53,33 @@ class AuthInterceptor extends QueuedInterceptor {
         path.contains('/auth/totp/validate/');
   }
 
+  /// `user_id` claim of a bearer token, or null when the token is not a
+  /// decodable JWT (tests / opaque tokens) — identity checks are skipped then.
+  int? _userIdClaim(String? token) {
+    if (token == null || token.isEmpty) return null;
+    final bearer = token.startsWith('Bearer ') ? token.substring(7) : token;
+    try {
+      final claims = JwtDecoder.decode(bearer);
+      final raw = claims['user_id'] ?? claims['id'];
+      if (raw is int) return raw;
+      return int.tryParse('$raw');
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// True when the failed request was issued under a *different* session than
+  /// the one currently active (e.g. user B is signed in while user A's queued
+  /// request arrives). Such a request must not be replayed with the new user's
+  /// token, and its failure must not tear down the new session.
+  bool _identitySuperseded(RequestOptions options) {
+    final requestUser = _userIdClaim(options.headers['Authorization'] as String?);
+    final current = tokenProvider();
+    final currentUser = _userIdClaim(current);
+    if (requestUser == null || currentUser == null) return false;
+    return requestUser != currentUser;
+  }
+
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
     _logRequest(options);
@@ -86,8 +114,19 @@ class AuthInterceptor extends QueuedInterceptor {
     // Do not attempt token refresh for non-401, auth endpoints, or already retried requests
     if (!is401 || isAuth || alreadyRetried) {
       if (is401 && alreadyRetried) {
-        await onSessionExpired();
+        // Check the identity first: a stale request from a superseded session
+        // must not tear down the newer session.
+        if (!_identitySuperseded(err.requestOptions)) {
+          await onSessionExpired();
+        }
+        return handler.next(err);
       }
+      return handler.next(err);
+    }
+
+    // Stale request from a superseded session: never replay it (it would run
+    // as the *current* user) and never fire session-expired for it.
+    if (_identitySuperseded(err.requestOptions)) {
       return handler.next(err);
     }
 
@@ -128,7 +167,10 @@ class AuthInterceptor extends QueuedInterceptor {
         return handler.next(err);
       }
 
-      // Prepare request options for single retry
+      // Prepare request options for single retry. A FormData has already been
+      // finalized by the failed attempt (its body was fully sent before the
+      // server could answer 401): re-sending it as-is throws
+      // "FormData has already been finalized", so clone it for the replay.
       final requestOptions = err.requestOptions.copyWith(
         headers: {
           ...err.requestOptions.headers,
@@ -139,6 +181,13 @@ class AuthInterceptor extends QueuedInterceptor {
           kRetriedKey: true,
         },
       );
+      if (requestOptions.data is FormData) {
+        try {
+          requestOptions.data = (requestOptions.data as FormData).clone();
+        } catch (e) {
+          debugPrint('AuthInterceptor: unable to clone FormData for retry: $e');
+        }
+      }
 
       // Replay through a bare Dio that shares this client's adapter and options.
       // Re-enforce the HTTPS-only guard from DioClient: the retry client is

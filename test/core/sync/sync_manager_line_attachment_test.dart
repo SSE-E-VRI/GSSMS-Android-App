@@ -10,6 +10,7 @@ import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_
 import 'package:mocktail/mocktail.dart';
 
 class MockWorkOrderApiService extends Mock implements WorkOrderApiService {}
+
 class MockEvidenceService extends Mock implements EvidenceService {}
 
 void main() {
@@ -35,7 +36,9 @@ void main() {
 
     tearDown(() => container.dispose());
 
-    test('attachment command does NOT execute if submitLine for same line fails', () async {
+    test(
+        'attachment command does NOT execute if submitLine for same line fails',
+        () async {
       const recordId = 10;
       const lineId = 5;
 
@@ -100,7 +103,8 @@ void main() {
       expect(remaining[1].status, OutboxCommandStatus.pending);
     });
 
-    test('attachment executes and discards local file once submitLine succeeds', () async {
+    test('attachment executes and discards local file once submitLine succeeds',
+        () async {
       const recordId = 10;
       const lineId = 5;
       const filePath = '/storage/evidence/before_123.jpg';
@@ -117,10 +121,16 @@ void main() {
             kind: 'BEFORE',
             imagePath: filePath,
             capturedAt: any(named: 'capturedAt'),
+            source: any(named: 'source'),
+            latitude: any(named: 'latitude'),
+            longitude: any(named: 'longitude'),
+            locationAccuracyM: any(named: 'locationAccuracyM'),
+            locationRecordedAt: any(named: 'locationRecordedAt'),
             idempotencyKey: any(named: 'idempotencyKey'),
           )).thenAnswer((_) async => {'id': 99, 'kind': 'BEFORE'});
 
-      when(() => mockEvidenceService.discard(filePath)).thenAnswer((_) async {});
+      when(() => mockEvidenceService.discard(filePath))
+          .thenAnswer((_) async {});
 
       final submitCmd = OutboxCommand(
         idempotencyKey: 'cmd_submit_line_5',
@@ -158,6 +168,11 @@ void main() {
             kind: 'BEFORE',
             imagePath: filePath,
             capturedAt: any(named: 'capturedAt'),
+            source: 'UNKNOWN',
+            latitude: null,
+            longitude: null,
+            locationAccuracyM: null,
+            locationRecordedAt: null,
             idempotencyKey: 'cmd_attach_line_5',
           )).called(1);
 

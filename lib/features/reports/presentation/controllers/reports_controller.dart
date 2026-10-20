@@ -41,6 +41,9 @@ class ReportsController extends Notifier<ReportsState> {
   InfrastructureOptionsService get _options =>
       ref.read(infrastructureOptionsServiceProvider);
 
+  /// Drops an older, slower response when a newer load has started (M9).
+  int _requestSeq = 0;
+
   Future<void> loadRegister({
     DateTime? startDate,
     DateTime? endDate,
@@ -61,11 +64,13 @@ class ReportsController extends Notifier<ReportsState> {
     final id = (typeChanged || clearInfraId) ? null : (infraId ?? previous?.infraId);
     final scope = orgScope ?? previous?.orgScope ?? OrgScopeSelection.empty;
 
+    final seq = ++_requestSeq;
     state = const ReportsLoading();
 
     final df = DateFormat('yyyy-MM-dd');
     try {
       var options = previous?.infraOptions ?? const [];
+      Future<List<InfrastructureOption>>? optionsFuture;
       if (type != previous?.infraType) {
         // The item dropdown's options are an enrichment of the register, not
         // the register itself — a role without infrastructure.view (or a
@@ -78,15 +83,19 @@ class ReportsController extends Notifier<ReportsState> {
         if (type == InfraFilterType.all) {
           options = const [];
         } else {
-          try {
-            options = await _options.fetchOptions(type);
-          } catch (_) {
-            options = const [];
-          }
+          // Started now and awaited together with the register below so the
+          // two requests run concurrently. Failures degrade to empty options.
+          optionsFuture = () async {
+            try {
+              return await _options.fetchOptions(type);
+            } catch (_) {
+              return const <InfrastructureOption>[];
+            }
+          }();
         }
       }
 
-      final entries = await _workOrders.fetchWorkOrders(
+      final entriesFuture = _workOrders.fetchWorkOrders(
         // Web Register query (ReportsView.generateReport): completed Job
         // Works in the completion-date range. Statuses are comma-separated
         // server-side; depot scoping beyond the explicit depot comes from
@@ -101,6 +110,9 @@ class ReportsController extends Notifier<ReportsState> {
         staffQuarterId: type == InfraFilterType.staffQuarter ? id : null,
         infraType: type.registerTypeParam,
       );
+      final entries = await entriesFuture;
+      if (optionsFuture != null) options = await optionsFuture;
+      if (seq != _requestSeq) return;
 
       state = ReportsLoaded(
         entries: entries,
@@ -112,6 +124,7 @@ class ReportsController extends Notifier<ReportsState> {
         orgScope: scope,
       );
     } catch (e) {
+      if (seq != _requestSeq) return;
       state = ReportsError(userFacingError(e), previousLoaded: previous);
     }
   }

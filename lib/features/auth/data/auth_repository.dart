@@ -79,11 +79,15 @@ class AuthRepository implements IAuthRepository {
     required String password,
     String? otp,
   }) async {
+    final gen = _opGeneration;
     final tokens = await _apiService.login(
       username: username,
       password: password,
       otp: otp,
     );
+    if (gen != _opGeneration) {
+      throw const UnauthorizedException('Login superseded by sign-out.');
+    }
 
     final newSession = UserSession.fromJwt(tokens.accessToken);
     if (tokens.refreshToken != null && tokens.refreshToken!.isNotEmpty) {
@@ -91,10 +95,18 @@ class AuthRepository implements IAuthRepository {
     } else {
       await _secureStorage.clearTokens();
     }
+    if (gen != _opGeneration) {
+      // A concurrent logout cleared the tokens while we were persisting — do
+      // not repopulate the session of a signed-out user.
+      throw const UnauthorizedException('Login superseded by sign-out.');
+    }
 
     _currentAccessToken = tokens.accessToken;
     _currentSession = newSession;
     await _bindCacheToSession(newSession, previous: null);
+    if (gen != _opGeneration) {
+      throw const UnauthorizedException('Login superseded by sign-out.');
+    }
     return _currentSession!;
   }
 
@@ -190,15 +202,25 @@ class AuthRepository implements IAuthRepository {
     required String email,
     required String otp,
   }) async {
+    final gen = _opGeneration;
     final tokens = await _apiService.loginWithOtp(email: email, otp: otp);
+    if (gen != _opGeneration) {
+      throw const UnauthorizedException('Login superseded by sign-out.');
+    }
     if (tokens.refreshToken != null && tokens.refreshToken!.isNotEmpty) {
       await _secureStorage.saveRefreshToken(tokens.refreshToken!);
     } else {
       await _secureStorage.clearTokens();
     }
+    if (gen != _opGeneration) {
+      throw const UnauthorizedException('Login superseded by sign-out.');
+    }
     _currentAccessToken = tokens.accessToken;
     _currentSession = UserSession.fromJwt(tokens.accessToken);
     await _bindCacheToSession(_currentSession!, previous: null);
+    if (gen != _opGeneration) {
+      throw const UnauthorizedException('Login superseded by sign-out.');
+    }
     return _currentSession!;
   }
 

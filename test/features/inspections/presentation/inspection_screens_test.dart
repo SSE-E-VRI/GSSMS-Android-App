@@ -178,7 +178,7 @@ void main() {
     });
 
     testWidgets(
-        'tapping a logged inspection opens its detail screen with Convert action',
+        'tapping a logged inspection opens its detail screen with no Convert action (owner decision 2026-10-02)',
         (tester) async {
       when(() => mockRepo.fetchInspections())
           .thenAnswer((_) async => testInspections);
@@ -205,10 +205,10 @@ void main() {
       expect(find.byType(InspectionDetailScreen), findsOneWidget);
       expect(find.text('Inspection #1'), findsOneWidget);
       expect(find.text('Earth resistance and cleaning'), findsOneWidget);
-      // DEPOT_INCHARGE holding inspections.edit on an unconverted inspection
-      // is exactly who ConversionService allows to convert.
+      // Owner decision 2026-10-02: legacy point-less inspections are NOT
+      // converted (held/cancelled via Job Works) — no conversion path.
       expect(find.byKey(const Key('convert_to_work_order_button')),
-          findsOneWidget);
+          findsNothing);
     });
 
     testWidgets(
@@ -242,13 +242,10 @@ void main() {
     });
 
     testWidgets(
-        'Convert to Job Work calls the repository and shows the linked Work Order link',
+        'point-less legacy inspection offers no Convert action and never calls convert (owner decision 2026-10-02)',
         (tester) async {
       when(() => mockRepo.fetchInspections())
           .thenAnswer((_) async => testInspections);
-      when(() => mockRepo.convertToWorkOrder(1)).thenAnswer(
-        (_) async => {'message': 'Converted successfully', 'work_order_id': 42},
-      );
 
       await tester.pumpWidget(
         ProviderScope(
@@ -269,23 +266,12 @@ void main() {
       await tester.tap(find.byKey(const Key('inspection_card_1')));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byKey(const Key('convert_to_work_order_button')));
-      await tester.pumpAndSettle();
-      // Confirmation dialog states the consequence before converting.
-      expect(find.textContaining('A Job Work will be created'), findsOneWidget);
-      await tester.tap(find.byKey(const Key('confirm_convert_button')));
-      await tester.pumpAndSettle();
-
-      verify(() => mockRepo.convertToWorkOrder(1)).called(1);
-      expect(find.text('Converted. A Job Work has been created.'),
-          findsOneWidget);
-      // Off the initial viewport below the Location card — scroll to it like
-      // a real user would rather than asserting on unpainted content.
-      await tester.scrollUntilVisible(
-        find.byKey(const Key('view_linked_work_order')),
-        200,
-      );
-      expect(find.byKey(const Key('view_linked_work_order')), findsOneWidget);
+      expect(find.byType(InspectionDetailScreen), findsOneWidget);
+      // Owner decision 2026-10-02: legacy point-less inspections are NOT
+      // converted (held/cancelled via Job Works) — no conversion path.
+      expect(find.byKey(const Key('convert_to_work_order_button')),
+          findsNothing);
+      verifyNever(() => mockRepo.convertToWorkOrder(any()));
     });
 
     testWidgets(
@@ -534,7 +520,7 @@ void main() {
     });
 
     testWidgets(
-        'convert coerces string work_order_id and refetches full record with ticket',
+        'point-less detail shows held/cancelled copy and no Convert button',
         (tester) async {
       const open = Inspection(
         id: 8,
@@ -543,30 +529,8 @@ void main() {
         status: InspectionStatus.open,
         stationName: 'Thalanallur',
       );
-      const converted = Inspection(
-        id: 8,
-        title: 'EB Bunk Monthly Check',
-        notes: 'Earth resistance and cleaning',
-        status: InspectionStatus.converted,
-        stationName: 'Thalanallur',
-        isConverted: true,
-        workOrderId: 42,
-        workOrderStatus: 'IN_PROGRESS',
-        jobWorks: [
-          InspectionJobWorkRef(
-            id: 42,
-            ticketNumber: 'JW-2026-42',
-            status: 'IN_PROGRESS',
-          ),
-        ],
-      );
-      var fetchCount = 0;
-      when(() => mockRepo.fetchInspectionById(8)).thenAnswer((_) async {
-        fetchCount++;
-        return fetchCount == 1 ? open : converted;
-      });
-      when(() => mockRepo.convertToWorkOrder(8))
-          .thenAnswer((_) async => {'work_order_id': '42'});
+      when(() => mockRepo.fetchInspectionById(8))
+          .thenAnswer((_) async => open);
 
       await tester.pumpWidget(
         ProviderScope(
@@ -583,23 +547,17 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(fetchCount, 1);
 
-      await tester.tap(find.byKey(const Key('convert_to_work_order_button')));
-      await tester.pumpAndSettle();
-      expect(find.textContaining('A Job Work will be created'), findsOneWidget);
-      await tester.tap(find.byKey(const Key('confirm_convert_button')));
-      await tester.pumpAndSettle();
-
-      verify(() => mockRepo.convertToWorkOrder(8)).called(1);
-      expect(find.text('Converted. A Job Work has been created.'),
-          findsOneWidget);
-      expect(fetchCount, 2);
+      // Owner decision 2026-10-02: no conversion path for point-less legacy.
+      expect(find.byKey(const Key('convert_to_work_order_button')),
+          findsNothing);
+      verifyNever(() => mockRepo.convertToWorkOrder(any()));
       await tester.scrollUntilVisible(
-        find.textContaining('JW-2026-42'),
+        find.textContaining('held/cancelled via Job Works'),
         200,
       );
-      expect(find.textContaining('JW-2026-42'), findsWidgets);
+      expect(find.textContaining('held/cancelled via Job Works'),
+          findsOneWidget);
     });
   });
 }

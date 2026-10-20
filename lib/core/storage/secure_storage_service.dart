@@ -26,10 +26,10 @@ class SecureStorageService implements ISecureStorageService {
     try {
       return await _storage.read(key: _refreshTokenKey);
     } catch (_) {
-      // If KeyStore or decryption fails on Android 12-14, safely reset and return null
-      try {
-        await _storage.delete(key: _refreshTokenKey);
-      } catch (_) {}
+      // KeyStore/decryption can fail transiently (e.g. right after boot while
+      // the device is locked). Deleting here would irrecoverably destroy a
+      // possibly-valid session, so return null only and let the next
+      // successful read (or save) resolve the state.
       return null;
     }
   }

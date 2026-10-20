@@ -36,6 +36,10 @@ const PdfPageFormat reportPageFormat = PdfPageFormat(
 /// Width in pt of the report content column (720 css px).
 const double reportContentWidth = 540.0;
 
+final RegExp _kTokenSplitRe = RegExp(r'\n|[^\S\n]+|[^\s]+');
+final RegExp _kWordOrSpaceRe = RegExp(r'\S+|\s+');
+final RegExp _kWhitespaceRe = RegExp(r'\s+');
+
 const pdfBorderColor = ReportPdfTheme.border;
 const pdfBorderSide = pw.BorderSide(color: pdfBorderColor, width: 0.75);
 
@@ -308,7 +312,7 @@ List<List<_Run>> _wrapRuns(List<_Run> runs, double maxW) {
   }
 
   for (final r in runs) {
-    final tokens = RegExp(r'\n|[^\S\n]+|[^\s]+')
+    final tokens = _kTokenSplitRe
         .allMatches(r.text)
         .map((m) => m[0]!)
         .toList();
@@ -382,7 +386,7 @@ List<pw.TextSpan> _cssSpans(
   final ls = letterSpacingPt + trackingPt;
   final exactLs = letterSpacingPt.abs() >= _exactSpacingPt;
   final tokens =
-      RegExp(r'\S+|\s+').allMatches(text).map((m) => m[0]!).toList();
+      _kWordOrSpaceRe.allMatches(text).map((m) => m[0]!).toList();
   var lastWord = -1;
   final kerned = <int>{};
   for (var i = 0; i < tokens.length; i++) {
@@ -1627,7 +1631,7 @@ int cssWrapLineCount(String text, double widthPt, double sizePt,
   for (final line in pdfSafe(text).split('\n')) {
     var cur = 0.0;
     var lines = 1;
-    for (final word in line.split(RegExp(r'\s+'))) {
+    for (final word in line.split(_kWhitespaceRe)) {
       if (word.isEmpty) continue;
       final ww = w(word);
       if (cur == 0) {
@@ -1826,7 +1830,7 @@ List<pw.Widget> cssTableRows(
       final safe = pdfSafe(text);
       maxs[col] =
           math.max(maxs[col], measureText(safe, sizePt, weight: weight));
-      for (final word in safe.split(RegExp(r'\s+'))) {
+      for (final word in safe.split(_kWhitespaceRe)) {
         mins[col] =
             math.max(mins[col], measureText(word, sizePt, weight: weight));
       }

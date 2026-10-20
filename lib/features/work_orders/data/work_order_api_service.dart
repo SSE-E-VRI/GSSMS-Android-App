@@ -87,10 +87,12 @@ class WorkOrderApiService {
     // `created_at`. Sending the wrong names is silently ignored server-side,
     // so "My Work" date filters previously did nothing.
     if (assignedToMe) {
-      if (dateFrom != null && dateFrom.isNotEmpty) queryParams['start_date'] = dateFrom;
+      if (dateFrom != null && dateFrom.isNotEmpty)
+        queryParams['start_date'] = dateFrom;
       if (dateTo != null && dateTo.isNotEmpty) queryParams['end_date'] = dateTo;
     } else {
-      if (dateFrom != null && dateFrom.isNotEmpty) queryParams['date_from'] = dateFrom;
+      if (dateFrom != null && dateFrom.isNotEmpty)
+        queryParams['date_from'] = dateFrom;
       if (dateTo != null && dateTo.isNotEmpty) queryParams['date_to'] = dateTo;
     }
     if (updatedFrom != null && updatedFrom.isNotEmpty) {
@@ -160,7 +162,8 @@ class WorkOrderApiService {
   /// Batch-converts open Complaints into Work Orders in one all-or-nothing
   /// request — POST /work-orders/create_from_complaints/ {ids}. Response
   /// shape: `{work_order_ids, work_order_id, count, message}`.
-  Future<BatchConvertResult> createWorkOrdersFromComplaints(List<int> ids) async {
+  Future<BatchConvertResult> createWorkOrdersFromComplaints(
+      List<int> ids) async {
     final response = await _dio.post(
       '$_workOrders/create_from_complaints/',
       data: {'ids': ids},
@@ -170,7 +173,8 @@ class WorkOrderApiService {
 
   /// Same as [createWorkOrdersFromComplaints] for Inspections — POST
   /// /work-orders/create_from_inspections/ {ids}.
-  Future<BatchConvertResult> createWorkOrdersFromInspections(List<int> ids) async {
+  Future<BatchConvertResult> createWorkOrdersFromInspections(
+      List<int> ids) async {
     final response = await _dio.post(
       '$_workOrders/create_from_inspections/',
       data: {'ids': ids},
@@ -229,7 +233,8 @@ class WorkOrderApiService {
 
   /// Transitions the server currently permits for this work order.
   Future<WorkOrderActionSet> getAllowedActions(int workOrderId) async {
-    final response = await _dio.get('$_workOrders/$workOrderId/allowed-actions/');
+    final response =
+        await _dio.get('$_workOrders/$workOrderId/allowed-actions/');
     final data = _asObject(response.data);
     if (data == null) {
       throw DioException(
@@ -312,7 +317,8 @@ class WorkOrderApiService {
     return getWorkOrder(workOrderId);
   }
 
-  Future<VerificationWorkspace> getVerificationWorkspace(int workOrderId) async {
+  Future<VerificationWorkspace> getVerificationWorkspace(
+      int workOrderId) async {
     final response =
         await _dio.get('$_workOrders/$workOrderId/verification-workspace/');
     final data = _asObject(response.data);
@@ -332,7 +338,10 @@ class WorkOrderApiService {
     final response = await _dio.post(
       '$_staffWorkOrders/$workOrderId/execute/',
       options: idempotencyKey != null
-          ? Options(headers: {'X-Idempotency-Key': idempotencyKey, 'Idempotency-Key': idempotencyKey})
+          ? Options(headers: {
+              'X-Idempotency-Key': idempotencyKey,
+              'Idempotency-Key': idempotencyKey
+            })
           : null,
     );
     final data = response.data;
@@ -368,7 +377,10 @@ class WorkOrderApiService {
       '$_workOrders/$workOrderId/change-status/',
       data: payload,
       options: idempotencyKey != null
-          ? Options(headers: {'X-Idempotency-Key': idempotencyKey, 'Idempotency-Key': idempotencyKey})
+          ? Options(headers: {
+              'X-Idempotency-Key': idempotencyKey,
+              'Idempotency-Key': idempotencyKey
+            })
           : null,
     );
 
@@ -418,12 +430,16 @@ class WorkOrderApiService {
         .toList();
   }
 
-  Future<void> submitLine(int recordId, Map<String, dynamic> lineData, {String? idempotencyKey}) async {
+  Future<void> submitLine(int recordId, Map<String, dynamic> lineData,
+      {String? idempotencyKey}) async {
     await _dio.post(
       '$_records/$recordId/submit_line/',
       data: lineData,
       options: idempotencyKey != null
-          ? Options(headers: {'X-Idempotency-Key': idempotencyKey, 'Idempotency-Key': idempotencyKey})
+          ? Options(headers: {
+              'X-Idempotency-Key': idempotencyKey,
+              'Idempotency-Key': idempotencyKey
+            })
           : null,
     );
   }
@@ -464,7 +480,10 @@ class WorkOrderApiService {
       '$_records/$recordId/',
       data: form,
       options: idempotencyKey != null
-          ? Options(headers: {'X-Idempotency-Key': idempotencyKey, 'Idempotency-Key': idempotencyKey})
+          ? Options(headers: {
+              'X-Idempotency-Key': idempotencyKey,
+              'Idempotency-Key': idempotencyKey
+            })
           : null,
     );
   }
@@ -493,23 +512,35 @@ class WorkOrderApiService {
         'technician_signature': technicianSignature,
         'remarks': remarks,
         if (supervisorName != null) 'supervisor_name': supervisorName,
-        if (supervisorSignature != null) 'supervisor_signature': supervisorSignature,
+        if (supervisorSignature != null)
+          'supervisor_signature': supervisorSignature,
       },
       options: idempotencyKey != null
-          ? Options(headers: {'X-Idempotency-Key': idempotencyKey, 'Idempotency-Key': idempotencyKey})
+          ? Options(headers: {
+              'X-Idempotency-Key': idempotencyKey,
+              'Idempotency-Key': idempotencyKey
+            })
           : null,
     );
   }
 
   /// Uploads a line-scoped evidence photo (BEFORE, DURING, AFTER).
   ///
-  /// The server accepts JPEG only, up to 5 MB.
+  /// The server accepts JPEG only, up to 5 MB. `source` (ME-01) and, for
+  /// CAMERA only, the capture-time GPS columns (ME-02/ME-05 — the server
+  /// rejects partial location metadata and location on non-camera uploads)
+  /// travel alongside the image as multipart text fields.
   Future<Map<String, dynamic>> uploadLineAttachment(
     int recordId, {
     required int lineId,
     required String kind,
     required String imagePath,
     DateTime? capturedAt,
+    String? source,
+    double? latitude,
+    double? longitude,
+    double? locationAccuracyM,
+    DateTime? locationRecordedAt,
     String? idempotencyKey,
   }) async {
     final file = File(imagePath);
@@ -520,10 +551,26 @@ class WorkOrderApiService {
       throw ArgumentError('Attachment photo exceeds the 5 MB server limit');
     }
 
+    final isCamera = (source ?? '').toUpperCase() == 'CAMERA';
+    final hasLocation = isCamera &&
+        latitude != null &&
+        longitude != null &&
+        locationAccuracyM != null &&
+        locationRecordedAt != null;
     final filename = imagePath.split(Platform.pathSeparator).last;
     final form = FormData.fromMap({
       'kind': kind.toUpperCase(),
-      if (capturedAt != null) 'captured_at': capturedAt.toIso8601String(),
+      if (source != null) 'source': source.toUpperCase(),
+      // ME-04: only a camera capture-flow time; never invented for gallery.
+      if (isCamera && capturedAt != null)
+        'captured_at': capturedAt.toIso8601String(),
+      if (hasLocation)
+        ...{
+          'latitude': latitude.toString(),
+          'longitude': longitude.toString(),
+          'location_accuracy_m': locationAccuracyM.toString(),
+          'location_recorded_at': locationRecordedAt.toIso8601String(),
+        },
       'image': await MultipartFile.fromFile(
         imagePath,
         filename: filename.isNotEmpty ? filename : 'attachment.jpg',
@@ -535,7 +582,10 @@ class WorkOrderApiService {
       '$_records/$recordId/lines/$lineId/attachments/',
       data: form,
       options: idempotencyKey != null
-          ? Options(headers: {'X-Idempotency-Key': idempotencyKey, 'Idempotency-Key': idempotencyKey})
+          ? Options(headers: {
+              'X-Idempotency-Key': idempotencyKey,
+              'Idempotency-Key': idempotencyKey
+            })
           : null,
     );
 
@@ -637,8 +687,8 @@ class WorkOrderApiService {
     if (groups is! List) return const [];
     return groups
         .whereType<Map>()
-        .map((e) =>
-            ChecklistGroupPreview.fromJson(Map<String, dynamic>.from(e)))
+        .map(
+            (e) => ChecklistGroupPreview.fromJson(Map<String, dynamic>.from(e)))
         .toList();
   }
 

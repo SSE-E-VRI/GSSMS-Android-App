@@ -273,8 +273,8 @@ class _MasterDataTab extends ConsumerWidget {
             _sectionCard(title: 'Remarks', children: [
               Text(asset.remarks!, style: const TextStyle(fontSize: 14)),
             ]),
-          _buildMaintenanceStatusCard(ref),
-          _buildReliabilityCard(ref),
+          _MaintenanceStatusCard(assetId: assetId),
+          _ReliabilityCard(assetId: assetId),
         ],
       ),
     );
@@ -313,6 +313,11 @@ class _MasterDataTab extends ConsumerWidget {
       ),
     );
   }
+}
+
+class _MaintenanceStatusCard extends ConsumerWidget {
+  const _MaintenanceStatusCard({required this.assetId});
+  final int assetId;
 
   static const _cadences = [
     ('MONTHLY', 'Monthly Schedule'),
@@ -321,7 +326,8 @@ class _MasterDataTab extends ConsumerWidget {
     ('YEARLY', 'Yearly Schedule'),
   ];
 
-  Widget _buildMaintenanceStatusCard(WidgetRef ref) {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
     final summary = ref.watch(assetMaintenanceSummaryProvider(assetId));
     final dateFormat = DateFormat('dd MMM yyyy');
 
@@ -358,8 +364,14 @@ class _MasterDataTab extends ConsumerWidget {
       ],
     );
   }
+}
 
-  Widget _buildReliabilityCard(WidgetRef ref) {
+class _ReliabilityCard extends ConsumerWidget {
+  const _ReliabilityCard({required this.assetId});
+  final int assetId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
     final metrics = ref.watch(assetReliabilityMetricsProvider(assetId));
 
     return _sectionCard(

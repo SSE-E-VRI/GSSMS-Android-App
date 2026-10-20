@@ -36,8 +36,8 @@ const int _kMaxPointPhotos = 5;
 /// general evidence, observation points with disposition workflows
 /// (resolve/dispose/mark-unresolved/approve-JW2), point-wise Job Work
 /// creation (JW-001/JW-002), post-JW2 breakdown escalation, and explicit
-/// close. Legacy whole-inspection Convert stays only for point-less legacy
-/// records — web 400s `STRUCTURED_CONVERSION_FORBIDDEN` otherwise.
+/// close. Owner decision 2026-10-02: legacy point-less inspections are NOT
+/// converted (held/cancelled via Job Works) — no conversion path by design.
 class InspectionDetailScreen extends ConsumerStatefulWidget {
   const InspectionDetailScreen({super.key, required this.inspection});
 
@@ -98,12 +98,12 @@ class _InspectionDetailScreenState
       sessionAllows(session, 'inspections.view') &&
       sessionAllows(session, 'inspections.edit');
 
-  /// Legacy conversion gate: depot roles only, unconverted, point-less.
+  /// Legacy conversion gate (owner decision 2026-10-02): legacy point-less
+  /// inspections are NOT converted (held/cancelled via Job Works), so the
+  /// Convert action is never offered. Kept as always-false (rather than
+  /// deleting `_confirmConvert`/repository/API) so the backend path stays.
   bool _canConvert(UserSession? session) {
-    if (session == null) return false;
-    if (_inspection.isConverted) return false;
-    if (_inspection.points.isNotEmpty) return false;
-    return canConvertInspection(session);
+    return false;
   }
 
   bool _canClose(UserSession? session) {
@@ -947,7 +947,7 @@ class _InspectionDetailScreenState
                   const TextWell(
                       text: null,
                       placeholder:
-                          'No structured points. Legacy note — convert as a whole or review web.'),
+                          'No structured points. Legacy note — held/cancelled via Job Works — no conversion.'),
                 for (final point in points)
                   _PointCard(
                     point: point,
@@ -1106,6 +1106,7 @@ class _InspectionDetailScreenState
           ],
         ),
       ),
+      // Owner decision 2026-10-02: no conversion — _canConvert is always false.
       bottomNavigationBar: _canConvert(session)
           ? StickyActionBar(
               child: FilledButton.icon(

@@ -87,6 +87,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   else
                     _buildStandardLoginForm(authState, isGeneralLoading),
                   const SizedBox(height: 24),
+                  _buildDeveloperCredit(context),
+                  const SizedBox(height: 12),
                   Text(
                     'Version $appVersion',
                     key: const Key('login_version_footer'),
@@ -99,6 +101,32 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  /// Same credit the web login shows (LoginView.jsx).
+  Widget _buildDeveloperCredit(BuildContext context) {
+    final theme = Theme.of(context).textTheme;
+    final secondary = theme.bodySmall?.copyWith(
+      color: context.gssms.textSecondary,
+    );
+    return Column(
+      key: const Key('login_developer_credit'),
+      children: [
+        Text('Designed and Developed by',
+            textAlign: TextAlign.center, style: secondary),
+        const SizedBox(height: 2),
+        Text(
+          'D. Manikandan B.E',
+          textAlign: TextAlign.center,
+          style: theme.bodyMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: context.gssms.textPrimary,
+          ),
+        ),
+        Text('SSE/E/VRI', textAlign: TextAlign.center, style: secondary),
+        Text('Mob: 9444861302', textAlign: TextAlign.center, style: secondary),
+      ],
     );
   }
 
@@ -241,7 +269,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: context.gssms.textSecondary.withOpacity(0.8),
+                    color: context.gssms.textSecondary.withValues(alpha: 0.8),
                   ),
                 ),
               ),

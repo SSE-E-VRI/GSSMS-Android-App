@@ -7,6 +7,10 @@ import 'package:gssms_mobile/features/work_orders/domain/models/work_order_actio
 import 'package:gssms_mobile/features/work_orders/domain/models/work_order_audit.dart';
 
 // --- Work Order List State ---
+
+/// Per-instance cache for [WorkOrderListLoaded.filteredOrders]; keeps the
+/// state class const/Equatable.
+final Expando<List<WorkOrder>> _filteredCache = Expando<List<WorkOrder>>();
 sealed class WorkOrderListState extends Equatable {
   const WorkOrderListState();
 
@@ -80,42 +84,39 @@ class WorkOrderListLoaded extends WorkOrderListState {
     }
   }
 
-  List<WorkOrder> get filteredOrders {
-    var result = workOrders;
-    if (selectedStatusFilter != null) {
-      result = result.where((wo) => wo.status == selectedStatusFilter).toList();
-    }
-    if (selectedTypeFilter != null) {
-      result = result.where((wo) => wo.type == selectedTypeFilter).toList();
-    }
-    if (infraType != InfraFilterType.all) {
-      result = result.where((wo) => _matchesInfraType(wo, infraType)).toList();
-    }
-    if (infraName != null && infraName!.trim().isNotEmpty) {
-      final q = infraName!.trim().toLowerCase();
-      result = result.where((wo) {
-        return (wo.infrastructureName?.toLowerCase() == q) ||
-            (wo.stationName?.toLowerCase() == q);
-      }).toList();
-    }
-    if (searchQuery.trim().isNotEmpty) {
-      final q = searchQuery.toLowerCase();
-      result = result.where((wo) {
-        final title = wo.displayTitle.toLowerCase();
-        final asset = (wo.assetName ?? '').toLowerCase();
-        final station = (wo.stationName ?? '').toLowerCase();
-        final infra = (wo.infrastructureName ?? '').toLowerCase();
-        final ticket = (wo.ticketNumber ?? '').toLowerCase();
-        final idStr = wo.id.toString();
-        return title.contains(q) ||
-            asset.contains(q) ||
-            station.contains(q) ||
-            infra.contains(q) ||
-            ticket.contains(q) ||
-            idStr.contains(q);
-      }).toList();
-    }
-    return result;
+  /// Filtered rows, computed once per state instance (see [_filteredCache]).
+  List<WorkOrder> get filteredOrders =>
+      _filteredCache[this] ??= _computeFilteredOrders();
+
+  List<WorkOrder> _computeFilteredOrders() {
+    final status = selectedStatusFilter;
+    final type = selectedTypeFilter;
+    final infra = infraType;
+    final nameQ = infraName?.trim().toLowerCase();
+    final hasName = nameQ != null && nameQ.isNotEmpty;
+    final q = searchQuery.trim().toLowerCase();
+    final hasQuery = q.isNotEmpty;
+    return workOrders.where((wo) {
+      if (status != null && wo.status != status) return false;
+      if (type != null && wo.type != type) return false;
+      if (infra != InfraFilterType.all && !_matchesInfraType(wo, infra)) {
+        return false;
+      }
+      if (hasName &&
+          !((wo.infrastructureName?.toLowerCase() == nameQ) ||
+              (wo.stationName?.toLowerCase() == nameQ))) {
+        return false;
+      }
+      if (hasQuery) {
+        return wo.displayTitle.toLowerCase().contains(q) ||
+            (wo.assetName ?? '').toLowerCase().contains(q) ||
+            (wo.stationName ?? '').toLowerCase().contains(q) ||
+            (wo.infrastructureName ?? '').toLowerCase().contains(q) ||
+            (wo.ticketNumber ?? '').toLowerCase().contains(q) ||
+            wo.id.toString().contains(q);
+      }
+      return true;
+    }).toList(growable: false);
   }
 
   WorkOrderListLoaded copyWith({

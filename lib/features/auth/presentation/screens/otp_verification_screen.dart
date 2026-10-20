@@ -323,7 +323,7 @@ class _OtpVerificationScreenState extends ConsumerState<OtpVerificationScreen> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 12, vertical: 6),
                         decoration: BoxDecoration(
-                          color: context.gssms.border.withOpacity(0.5),
+                          color: context.gssms.border.withValues(alpha: 0.5),
                           borderRadius: BorderRadius.circular(16),
                         ),
                         child: Row(
