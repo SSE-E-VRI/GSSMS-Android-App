@@ -194,17 +194,17 @@ class _ComplaintExecutionScreenState
     }
   }
 
-  /// Captures a JPEG with the camera and uploads it for [kind]. Evidence
-  /// photos must be taken live, not picked from the gallery, so an old or
-  /// unrelated image can't be passed off as before/after proof. Returns null
-  /// if the user cancelled or captured an unusable file (no error, nothing
+  /// Lets the user choose camera or gallery, then captures/picks a JPEG and
+  /// uploads it for [kind]. Returns null if the user cancelled the source
+  /// choice or the picker, or picked an unusable file (no error, nothing
   /// happened), true once the upload is confirmed on the server, or false
   /// if the upload itself failed (error already shown).
   Future<bool?> _pickAndUploadPhoto(String kind) async {
+    final source = await pickExecutionImageSource(context);
+    if (source == null || !mounted) return null;
     XFile? picked;
     try {
-      picked = await ImagePicker()
-          .pickImage(source: ImageSource.camera, imageQuality: 85);
+      picked = await ImagePicker().pickImage(source: source, imageQuality: 85);
     } catch (_) {
       return null;
     }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/mode_execution.dart';
 
@@ -379,6 +380,32 @@ Future<String?> pickPhotoKind(BuildContext context) {
           ListTile(
             title: const Text('After'),
             onTap: () => Navigator.of(ctx).pop('AFTER'),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+/// Camera/Gallery choice dialog for adding or retaking an execution photo.
+/// Returns null on cancel.
+Future<ImageSource?> pickExecutionImageSource(BuildContext context) {
+  return showDialog<ImageSource>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      title: const Text('Add photo'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          ListTile(
+            leading: const Icon(Icons.photo_camera_outlined),
+            title: const Text('Take photo'),
+            onTap: () => Navigator.of(ctx).pop(ImageSource.camera),
+          ),
+          ListTile(
+            leading: const Icon(Icons.photo_library_outlined),
+            title: const Text('Choose from gallery'),
+            onTap: () => Navigator.of(ctx).pop(ImageSource.gallery),
           ),
         ],
       ),
