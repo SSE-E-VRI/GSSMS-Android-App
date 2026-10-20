@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gssms_mobile/features/auth/domain/models/auth_exceptions.dart';
 import 'package:gssms_mobile/features/auth/domain/models/auth_role.dart';
@@ -185,6 +186,53 @@ void main() {
         }, 'token'),
         throwsA(isA<GuestExpiredException>()),
       );
+    });
+
+    group('fromJwt expiry parsing (M5 audit fix)', () {
+      String unsignedJwt(Map<String, dynamic> claims) {
+        String enc(String raw) {
+          final b = base64Url.encode(utf8.encode(raw));
+          return b.replaceAll('=', '');
+        }
+
+        return '${enc('{"alg":"none","typ":"JWT"}')}.${enc(jsonEncode(claims))}.';
+      }
+
+      test('throws UnauthorizedException when exp is missing (fail closed)',
+          () {
+        expect(
+          () => UserSession.fromJwt(unsignedJwt({
+            'username': 'test_user',
+            'user_id': 1,
+            'role': 'DEPOT_USER',
+          })),
+          throwsA(isA<UnauthorizedException>()),
+        );
+      });
+
+      test('throws UnauthorizedException when exp is non-numeric (fail closed)',
+          () {
+        expect(
+          () => UserSession.fromJwt(unsignedJwt({
+            'username': 'test_user',
+            'user_id': 1,
+            'role': 'DEPOT_USER',
+            'exp': 'not-a-number',
+          })),
+          throwsA(isA<UnauthorizedException>()),
+        );
+      });
+
+      test('accepts a valid future exp', () {
+        final session = UserSession.fromJwt(unsignedJwt({
+          'username': 'test_user',
+          'user_id': 1,
+          'role': 'DEPOT_USER',
+          'exp': (DateTime.now().toUtc().millisecondsSinceEpoch ~/ 1000) + 3600,
+        }));
+        expect(session.username, 'test_user');
+        expect(session.userId, 1);
+      });
     });
   });
 }

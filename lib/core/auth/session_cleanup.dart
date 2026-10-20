@@ -29,21 +29,32 @@ Future<bool> clearOperationalSession(Ref ref) async {
     debugPrint('clearOperationalSession: clearAllCache failed: $e');
     ok = false;
   }
-  try {
-    ref.invalidate(workOrderListControllerProvider);
-    ref.invalidate(workOrderDetailControllerProvider);
-    ref.invalidate(checklistControllerProvider);
-    ref.invalidate(verificationWorkspaceControllerProvider);
-    ref.invalidate(dashboardControllerProvider);
-    ref.invalidate(reportsControllerProvider);
-    ref.invalidate(complaintListControllerProvider);
-    ref.invalidate(inspectionListControllerProvider);
-    ref.invalidate(assetListControllerProvider);
-    ref.invalidate(assetDetailControllerProvider);
-    ref.invalidate(notificationsListProvider);
-  } catch (e) {
-    debugPrint('clearOperationalSession: invalidate providers failed: $e');
-    ok = false;
+  for (final invalidate in _invalidates) {
+    try {
+      invalidate(ref);
+    } catch (e) {
+      // One provider being listened/disposed must not abort the rest of the
+      // teardown — a partial wipe is exactly what this function guards
+      // against, but each provider still deserves its own attempt.
+      debugPrint('clearOperationalSession: invalidate failed: $e');
+      ok = false;
+    }
   }
   return ok;
 }
+
+typedef _Invalidate = void Function(Ref ref);
+
+final List<_Invalidate> _invalidates = [
+  (ref) => ref.invalidate(workOrderListControllerProvider),
+  (ref) => ref.invalidate(workOrderDetailControllerProvider),
+  (ref) => ref.invalidate(checklistControllerProvider),
+  (ref) => ref.invalidate(verificationWorkspaceControllerProvider),
+  (ref) => ref.invalidate(dashboardControllerProvider),
+  (ref) => ref.invalidate(reportsControllerProvider),
+  (ref) => ref.invalidate(complaintListControllerProvider),
+  (ref) => ref.invalidate(inspectionListControllerProvider),
+  (ref) => ref.invalidate(assetListControllerProvider),
+  (ref) => ref.invalidate(assetDetailControllerProvider),
+  (ref) => ref.invalidate(notificationsListProvider),
+];

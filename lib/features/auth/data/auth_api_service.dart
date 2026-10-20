@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:gssms_mobile/core/network/api_error.dart';
 import '../domain/models/auth_exceptions.dart';
 import '../domain/models/auth_tokens.dart';
 
@@ -266,29 +267,15 @@ class AuthApiService {
       int? attemptsRemaining;
 
       if (data is Map) {
-        detail = data['error']?.toString() ??
-            data['detail']?.toString() ??
-            data['message']?.toString() ??
-            detail;
+        // serverMessage() filters HTML pages, oversized dumps and nested DRF
+        // shapes — never surface a proxy error page on the login screen.
+        detail = serverMessage(data) ?? detail;
         code = data['code']?.toString();
         if (data['attempts_remaining'] != null) {
           attemptsRemaining = int.tryParse(data['attempts_remaining'].toString());
         }
-        if (data['error'] == null &&
-            data['detail'] == null &&
-            data['message'] == null) {
-          final parts = <String>[];
-          for (final value in data.values) {
-            if (value is List) {
-              parts.addAll(value.map((e) => e.toString()));
-            } else if (value is String && value.isNotEmpty) {
-              parts.add(value);
-            }
-          }
-          if (parts.isNotEmpty) detail = parts.join(' ');
-        }
       } else if (data is String && data.isNotEmpty) {
-        detail = data;
+        detail = serverMessage(data) ?? detail;
       }
 
       // Check specific error codes and messages
@@ -309,8 +296,17 @@ class AuthApiService {
       if (code == 'RATE_LIMIT_EXCEEDED' || (statusCode == 429 && lowerDetail.contains('wait'))) {
         return RateLimitExceededException(detail);
       }
-      if (statusCode == 502 || code == 'EMAIL_DELIVERY_FAILED') {
+      // Map EMAIL_DELIVERY_FAILED only when the server says so — a bare 502
+      // from a gateway has nothing to do with email delivery and telling the
+      // user otherwise is misleading.
+      if (code == 'EMAIL_DELIVERY_FAILED') {
         return AuthException(detail, code: 'EMAIL_DELIVERY_FAILED');
+      }
+      if (statusCode == 502) {
+        return const AuthException(
+          'The service is temporarily unavailable. Please try again.',
+          code: 'SERVICE_UNAVAILABLE',
+        );
       }
       if (code == 'GUEST_EXPIRED' ||
           lowerDetail.contains('demo access has expired') ||

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gssms_mobile/core/auth/session_cleanup.dart';
 import 'package:gssms_mobile/core/config/app_config.dart';
@@ -132,19 +133,30 @@ class AuthController extends Notifier<AuthState> {
       return;
     }
 
+    final op = _opGenBox = Object();
     state = const AuthLoading('Signing in with OTP...');
     try {
       final session = await _repository.loginWithOtp(
         email: email.trim().toLowerCase(),
         otp: otp.trim(),
       );
+      if (!identical(op, _opGenBox)) return;
       _pendingPassword = null;
       state = Authenticated(session);
+    } on UnauthorizedException catch (e) {
+      // Stale login that a concurrent logout superseded — do not surface
+      // "expired" to a user who is not logging in anymore.
+      if (!identical(op, _opGenBox)) return;
+      _pendingPassword = null;
+      state = AuthError(e.message, code: e.code);
+      rethrow;
     } on AuthException catch (e) {
+      if (!identical(op, _opGenBox)) return;
       _pendingPassword = null;
       state = AuthError(e.message, code: e.code);
       rethrow;
     } catch (_) {
+      if (!identical(op, _opGenBox)) return;
       _pendingPassword = null;
       const err =
           AuthError('An unexpected authentication error occurred. Please try again.');
@@ -241,9 +253,12 @@ class AuthController extends Notifier<AuthState> {
     try {
       ref.read(syncManagerProvider.notifier).invalidateSessionBoundWork();
     } catch (_) {}
-    await clearOperationalSession(ref);
+    // Surface a failed wipe (contract of clearOperationalSession): the user
+    // must be able to see that prior offline data may still be on the device.
+    final wiped = await clearOperationalSession(ref);
     state = AuthError(
-      reason ?? 'Your session has expired. Please log in again.',
+      (reason ?? 'Your session has expired. Please log in again.') +
+          (wiped ? '' : ' Note: some offline data could not be cleared.'),
       code: 'SESSION_EXPIRED',
     );
   }
@@ -266,7 +281,12 @@ class AuthController extends Notifier<AuthState> {
     _pendingPassword = null;
     state = const AuthLoading('Signing out...');
     try {
-      await clearOperationalSession(ref);
+      final wiped = await clearOperationalSession(ref);
+      if (!wiped) {
+        // Surface the failed wipe (see clearOperationalSession contract).
+        debugPrint('AuthController.logout: operational cache wipe failed; ' 
+            'prior user data may still be on disk.');
+      }
     } catch (_) {}
     await _repository.logout();
     state = const Unauthenticated();

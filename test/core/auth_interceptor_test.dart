@@ -173,4 +173,124 @@ void main() {
       expect(refreshCount, 1); // Exact single refresh call shared across both
     });
   });
+
+  group('AuthInterceptor retry body + identity (H1/H3 audit fixes)', () {
+    test('re-sends a consumed FormData on retry after refresh (multipart survives 401)', () async {
+      int requestCount = 0;
+      String? currentToken = 'old_token';
+
+      final dio = Dio(BaseOptions(baseUrl: 'https://gssms.share.zrok.io'));
+      dio.httpClientAdapter = MockHttpClientAdapter((options) async {
+        requestCount++;
+        if (options.headers['Authorization'] == 'Bearer new_token') {
+          return _jsonResponse({'status': 'ok'}, 200);
+        }
+        return _jsonResponse({'detail': 'Token expired'}, 401);
+      });
+      dio.interceptors.add(
+        AuthInterceptor(
+          dio: dio,
+          tokenProvider: () => currentToken,
+          refreshTokenHandler: () async {
+            currentToken = 'new_token';
+            return currentToken;
+          },
+          onSessionExpired: () async {},
+        ),
+      );
+
+      FormData buildForm() {
+        final form = FormData();
+        form.fields.add(MapEntry('profile', 'minus'));
+        form.files.add(MapEntry(
+          'profile_picture',
+          MultipartFile.fromBytes(Uint8List.fromList('jpeg-bytes'.codeUnits),
+              filename: 'photo.jpg'),
+        ));
+        return form;
+      }
+
+      final form = buildForm();
+      await dio.patch('/api/v1/users/7/', data: form);
+
+      expect(requestCount, 2, reason: 'both attempts must have sent a body');
+    });
+
+    test('a 401 from a superseded identity is dropped — not replayed, no session teardown (H3)', () async {
+      int refreshCount = 0;
+      int sessionExpiredCount = 0;
+      // The request is launched under user 7's token; while it is in flight
+      // user 42 signs in, so the provider returns 42 when the 401 arrives.
+      final staleUserToken = _jwtForUser(7);
+      final currentUserToken = _jwtForUser(42);
+      String currentToken = staleUserToken;
+
+      final dio = Dio(BaseOptions(baseUrl: 'https://gssms.share.zrok.io'));
+      dio.httpClientAdapter = MockHttpClientAdapter((options) async {
+        // Supersession happens in flight.
+        currentToken = currentUserToken;
+        return _jsonResponse({'detail': 'Token expired'}, 401);
+      });
+      dio.interceptors.add(
+        AuthInterceptor(
+          dio: dio,
+          tokenProvider: () => currentToken,
+          refreshTokenHandler: () async {
+            refreshCount++;
+            return currentUserToken;
+          },
+          onSessionExpired: () async => sessionExpiredCount++,
+        ),
+      );
+
+      await expectLater(
+        dio.get('/api/v1/work-orders/'),
+        throwsA(isA<DioException>()),
+      );
+
+      expect(refreshCount, 0, reason: 'stale request must not trigger a refresh for the new session');
+      expect(sessionExpiredCount, 0, reason: 'stale request must not tear down the newer session');
+    });
+
+    test('a stale 401 that already retried once must not fire onSessionExpired across identities (H3)', () async {
+      int sessionExpiredCount = 0;
+      final staleUserToken = _jwtForUser(7);
+      final currentUserToken = _jwtForUser(42);
+      String currentToken = staleUserToken;
+
+      final dio = Dio(BaseOptions(baseUrl: 'https://gssms.share.zrok.io'));
+      dio.httpClientAdapter = MockHttpClientAdapter((options) async {
+        currentToken = currentUserToken;
+        return _jsonResponse({'detail': 'Token expired'}, 401);
+      });
+      dio.interceptors.add(
+        AuthInterceptor(
+          dio: dio,
+          tokenProvider: () => currentToken,
+          refreshTokenHandler: () async => currentUserToken,
+          onSessionExpired: () async => sessionExpiredCount++,
+        ),
+      );
+
+      await expectLater(
+        dio.get('/api/v1/work-orders/', options: Options(
+          extra: {'k_auth_retried': true},
+        )),
+        throwsA(isA<DioException>()),
+      );
+
+      expect(sessionExpiredCount, 0);
+    });
+  });
+}
+
+String _jwtForUser(int userId) {
+  String enc(String raw) {
+    final b = base64Url.encode(utf8.encode(raw));
+    return b.replaceAll('=', '');
+  }
+  return '${enc('{"alg":"none","typ":"JWT"}')}.${enc(jsonEncode({
+        'user_id': userId,
+        'exp': (DateTime.now().toUtc().millisecondsSinceEpoch ~/ 1000) + 3600,
+      }))}.';
 }

@@ -181,7 +181,11 @@ class LocalCacheService implements ILocalCacheService {
   Future<List<OutboxCommand>> getOutboxCommands() async {
     final prefs = await _getPrefs();
     final raw = prefs.getString(_kOutboxCommandsKey);
-    if (raw == null || raw.isEmpty) return List<OutboxCommand>.from(_lastGoodOutbox);
+    if (raw == null || raw.isEmpty) {
+      final fallback = await _lastGoodOutboxForOwner(prefs);
+      if (fallback != null) return fallback;
+      return const [];
+    }
 
     List<dynamic>? decoded;
     try {
@@ -202,7 +206,9 @@ class LocalCacheService implements ILocalCacheService {
         }
       } catch (_) {}
       if (decoded == null) {
-        return List<OutboxCommand>.from(_lastGoodOutbox);
+        final fallback = await _lastGoodOutboxForOwner(prefs);
+        if (fallback != null) return fallback;
+        return const [];
       }
     }
 
@@ -226,6 +232,24 @@ class LocalCacheService implements ILocalCacheService {
     return validCommands;
   }
 
+  /// Memory fallback for outbox reads. Returns null when the last-good copy
+  /// must not be used (empty, or it belongs to a different user than the
+  /// cache owner currently recorded in prefs — e.g. after an owner change
+  /// without a full crash-free wipe).
+  Future<List<OutboxCommand>?> _lastGoodOutboxForOwner(SharedPreferences prefs) async {
+    final memory = _lastGoodOutbox;
+    if (memory.isEmpty) return const [];
+    final owner = prefs.getInt(_kCacheOwnerUserIdKey);
+    if (owner == null) {
+      // No recorded owner: the memory copy predates owner tracking or belongs
+      // to a signed-out session — do not resurrect it.
+      return const [];
+    }
+    final foreign = memory.any((c) => c.ownerUserId != null && c.ownerUserId != owner);
+    if (foreign) return const [];
+    return List<OutboxCommand>.from(memory);
+  }
+
   @override
   Future<int?> getCacheOwnerUserId() async {
     final prefs = await _getPrefs();
@@ -247,6 +271,10 @@ class LocalCacheService implements ILocalCacheService {
         await prefs.remove(key);
       }
     }
+    // The in-memory last-good copy must die with the persisted store: after a
+    // sign-out wipe, getOutboxCommands() must never resurrect the previous
+    // user's queued mutations from memory.
+    _lastGoodOutbox = const [];
   }
 }
 

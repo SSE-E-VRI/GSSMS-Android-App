@@ -118,16 +118,19 @@ class UserSession extends Equatable {
     try {
       final Map<String, dynamic> claims = JwtDecoder.decode(token);
       final expSeconds = claims['exp'];
-      if (expSeconds is num) {
-        // Allow a small leeway for device/server clock skew so a token issued
-        // moments ago by login()/refreshToken() isn't rejected as already
-        // expired just because the device clock runs ahead of the server's.
-        const clockSkewLeeway = Duration(seconds: 30);
-        final expiresAt = DateTime.fromMillisecondsSinceEpoch(
-            (expSeconds * 1000).round(), isUtc: true);
-        if (DateTime.now().toUtc().isAfter(expiresAt.add(clockSkewLeeway))) {
-          throw const UnauthorizedException('Token is expired');
-        }
+      // Fail closed: a token without a numeric `exp` cannot be trusted to
+      // expire at all, so it must not create a "forever-valid" session.
+      if (expSeconds is! num) {
+        throw const UnauthorizedException('Token has no valid expiry claim.');
+      }
+      // Allow a small leeway for device/server clock skew so a token issued
+      // moments ago by login()/refreshToken() isn't rejected as already
+      // expired just because the device clock runs ahead of the server's.
+      const clockSkewLeeway = Duration(seconds: 30);
+      final expiresAt = DateTime.fromMillisecondsSinceEpoch(
+          (expSeconds * 1000).round(), isUtc: true);
+      if (DateTime.now().toUtc().isAfter(expiresAt.add(clockSkewLeeway))) {
+        throw const UnauthorizedException('Token is expired');
       }
       return UserSession.fromClaims(claims, token);
     } catch (e) {
