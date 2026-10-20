@@ -69,6 +69,19 @@ android {
         prod {
             dimension "environment"
             resValue "string", "app_name", "GSSMS"
+            // prod must never fall back to debug signing (OEM installers, e.g. Vivo/Funtouch,
+            // reject debug-signed APKs as "appears to be invalid" on sideload) — always use the
+            // real release keystore, and fail loudly here if android/key.properties is missing
+            // rather than silently shipping a debug-signed build.
+            if (!keystorePropertiesFile.exists()) {
+                throw new GradleException(
+                    "android/key.properties is missing. The prod flavor refuses to build " +
+                    "without a real release keystore — a debug-signed prod APK gets rejected " +
+                    "by OEM installers (e.g. 'App not installed as package appears to be invalid'). " +
+                    "See SSOT/GSSMS_SOURCE_VERSION_DISTRIBUTION_PLAN.md for the signing setup."
+                )
+            }
+            signingConfig = signingConfigs.release
         }
     }
 
