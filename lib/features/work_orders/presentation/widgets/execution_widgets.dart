@@ -64,62 +64,67 @@ class _ParamRowsEditorState extends State<ParamRowsEditor> {
       children: [
         for (var i = 0; i < _params.length; i++)
           Padding(
-            padding: EdgeInsets.only(bottom: i == _params.length - 1 ? 0 : 8),
-            child: Row(
+            padding: EdgeInsets.only(bottom: i == _params.length - 1 ? 0 : 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  flex: 3,
-                  child: TextFormField(
-                    controller: _params[i],
-                    enabled: widget.enabled,
-                    decoration: const InputDecoration(
-                      labelText: 'Parameter',
-                      isDense: true,
+                // Parameter + Unit share a row (both tend to be short codes
+                // like "AT" / "V"); Value gets its own full-width row below
+                // since it routinely holds longer free text (e.g. "voltage")
+                // that a cramped 3-field row clips silently with no ellipsis.
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: TextFormField(
+                        controller: _params[i],
+                        enabled: widget.enabled,
+                        decoration: const InputDecoration(
+                          labelText: 'Parameter',
+                          isDense: true,
+                        ),
+                        onChanged: (_) => _emit(),
+                      ),
                     ),
-                    onChanged: (_) => _emit(),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  flex: 3,
-                  child: TextFormField(
-                    controller: _values[i],
-                    enabled: widget.enabled,
-                    decoration: const InputDecoration(
-                      labelText: 'Value',
-                      isDense: true,
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _units[i],
+                        enabled: widget.enabled,
+                        decoration: const InputDecoration(
+                          labelText: 'Unit',
+                          isDense: true,
+                        ),
+                        onChanged: (_) => _emit(),
+                      ),
                     ),
-                    onChanged: (_) => _emit(),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  flex: 2,
-                  child: TextFormField(
-                    controller: _units[i],
-                    enabled: widget.enabled,
-                    decoration: const InputDecoration(
-                      labelText: 'Unit',
-                      isDense: true,
+                    IconButton(
+                      key: Key('remove_param_row_$i'),
+                      icon: const Icon(Icons.delete_outline, size: 18),
+                      tooltip: 'Remove row',
+                      onPressed: !widget.enabled
+                          ? null
+                          : () => setState(() {
+                                _params[i].dispose();
+                                _values[i].dispose();
+                                _units[i].dispose();
+                                _params.removeAt(i);
+                                _values.removeAt(i);
+                                _units.removeAt(i);
+                                _emit();
+                              }),
                     ),
-                    onChanged: (_) => _emit(),
-                  ),
+                  ],
                 ),
-                IconButton(
-                  key: Key('remove_param_row_$i'),
-                  icon: const Icon(Icons.delete_outline, size: 18),
-                  tooltip: 'Remove row',
-                  onPressed: !widget.enabled
-                      ? null
-                      : () => setState(() {
-                            _params[i].dispose();
-                            _values[i].dispose();
-                            _units[i].dispose();
-                            _params.removeAt(i);
-                            _values.removeAt(i);
-                            _units.removeAt(i);
-                            _emit();
-                          }),
+                const SizedBox(height: 8),
+                TextFormField(
+                  controller: _values[i],
+                  enabled: widget.enabled,
+                  decoration: const InputDecoration(
+                    labelText: 'Value',
+                    isDense: true,
+                  ),
+                  onChanged: (_) => _emit(),
                 ),
               ],
             ),
