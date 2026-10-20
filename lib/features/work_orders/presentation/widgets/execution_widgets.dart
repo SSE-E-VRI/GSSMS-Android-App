@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
+import 'package:gssms_mobile/features/auth/domain/rbac.dart';
+import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/mode_execution.dart';
 
 /// Editable {parameter, value, unit} rows (max 50 server-side). Used by the
@@ -149,7 +152,7 @@ class _ParamRowsEditorState extends State<ParamRowsEditor> {
 /// Before/After photo grid for one execution scope (whole execution, one
 /// rectification item, or one inspection point). Locked photos show a lock
 /// and no delete/retake affordance — the server rejects their removal.
-class ExecutionPhotoGrid extends StatelessWidget {
+class ExecutionPhotoGrid extends ConsumerWidget {
   const ExecutionPhotoGrid({
     super.key,
     required this.photos,
@@ -178,7 +181,14 @@ class ExecutionPhotoGrid extends StatelessWidget {
       photos.where((p) => (p.kind ?? '').toUpperCase() == kind).toList();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    // `protected_media` requires authentication and Image.network sends
+    // none by itself, so photos would otherwise render as broken images
+    // (same reasoning as ChecklistLineCard's evidence thumbnails).
+    final token = sessionFromAuth(ref.read(authControllerProvider))?.accessToken;
+    final headers = (token == null || token.isEmpty)
+        ? null
+        : {'Authorization': 'Bearer $token'};
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -221,6 +231,7 @@ class ExecutionPhotoGrid extends StatelessWidget {
                     busy: busy,
                     onDelete: onDelete,
                     onRetake: onRetake,
+                    headers: headers,
                   ),
               ],
             ),
@@ -237,6 +248,7 @@ class _ExecutionPhotoTile extends StatelessWidget {
     required this.busy,
     required this.onDelete,
     required this.onRetake,
+    required this.headers,
   });
 
   final ExecutionPhoto photo;
@@ -244,6 +256,7 @@ class _ExecutionPhotoTile extends StatelessWidget {
   final bool busy;
   final ValueChanged<ExecutionPhoto> onDelete;
   final ValueChanged<ExecutionPhoto>? onRetake;
+  final Map<String, String>? headers;
 
   bool get _locked => photo.locked || photo.fromComplaint;
 
@@ -266,7 +279,13 @@ class _ExecutionPhotoTile extends StatelessWidget {
                 child: hasUrl
                     ? Image.network(
                         photo.url!,
+                        headers: headers,
                         fit: BoxFit.cover,
+                        // Decode at roughly the display size instead of full
+                        // resolution (uploads can be several MB) — the
+                        // dominant cost for a 48dp thumbnail is decode, not
+                        // the download itself.
+                        cacheWidth: 96,
                         loadingBuilder: (context, child, progress) =>
                             progress == null
                                 ? child
@@ -322,7 +341,8 @@ class _ExecutionPhotoTile extends StatelessWidget {
 
   void _openPreview(BuildContext context) {
     Navigator.of(context).push(MaterialPageRoute<void>(
-      builder: (_) => _ExecutionPhotoPreviewPage(photo: photo),
+      builder: (_) =>
+          _ExecutionPhotoPreviewPage(photo: photo, headers: headers),
       fullscreenDialog: true,
     ));
   }
@@ -330,9 +350,10 @@ class _ExecutionPhotoTile extends StatelessWidget {
 
 /// Full-screen, pinch-to-zoom view of one execution photo.
 class _ExecutionPhotoPreviewPage extends StatelessWidget {
-  const _ExecutionPhotoPreviewPage({required this.photo});
+  const _ExecutionPhotoPreviewPage({required this.photo, required this.headers});
 
   final ExecutionPhoto photo;
+  final Map<String, String>? headers;
 
   @override
   Widget build(BuildContext context) {
@@ -352,6 +373,7 @@ class _ExecutionPhotoPreviewPage extends StatelessWidget {
                   color: Colors.white54, size: 64)
               : Image.network(
                   photo.url!,
+                  headers: headers,
                   fit: BoxFit.contain,
                   errorBuilder: (context, error, stack) => const Icon(
                       Icons.broken_image_outlined,
