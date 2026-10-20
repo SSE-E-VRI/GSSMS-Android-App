@@ -250,14 +250,17 @@ class WorkOrderListController extends Notifier<WorkOrderListState> {
 // H7: autoDispose so per-id detail controllers (incl. full audit history)
 // don't accumulate for the whole app session — the screen re-fetches on open.
 final workOrderDetailControllerProvider = NotifierProvider.autoDispose.family<
-    WorkOrderDetailController, WorkOrderDetailState, int>(() {
-  return WorkOrderDetailController();
+    WorkOrderDetailController, WorkOrderDetailState, int>((arg) {
+  return WorkOrderDetailController(arg);
 });
 
-class WorkOrderDetailController
-    extends AutoDisposeFamilyNotifier<WorkOrderDetailState, int> {
+class WorkOrderDetailController extends Notifier<WorkOrderDetailState> {
+  WorkOrderDetailController(this.arg);
+
+  final int arg;
+
   @override
-  WorkOrderDetailState build(int arg) {
+  WorkOrderDetailState build() {
     return const WorkOrderDetailLoading();
   }
 
@@ -491,13 +494,17 @@ class WorkOrderDetailController
 // H7: autoDispose — per-record checklist state (all lines, attachments,
 // responses) must not be retained for visited records for the app lifetime.
 final checklistControllerProvider =
-    NotifierProvider.autoDispose.family<ChecklistController, ChecklistState, int>(() {
-  return ChecklistController();
+    NotifierProvider.autoDispose.family<ChecklistController, ChecklistState, int>((arg) {
+  return ChecklistController(arg);
 });
 
-class ChecklistController extends AutoDisposeFamilyNotifier<ChecklistState, int> {
+class ChecklistController extends Notifier<ChecklistState> {
+  ChecklistController(this.arg);
+
+  final int arg;
+
   @override
-  ChecklistState build(int arg) {
+  ChecklistState build() {
     return const ChecklistLoading();
   }
 

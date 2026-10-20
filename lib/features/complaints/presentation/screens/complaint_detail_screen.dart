@@ -326,7 +326,7 @@ class _ComplaintDetailScreenState extends ConsumerState<ComplaintDetailScreen> {
     final department = _complaint.department;
     final departmentOptions = department == null
         ? null
-        : ref.watch(lookupOptionsProvider('complaint_department')).valueOrNull;
+        : ref.watch(lookupOptionsProvider('complaint_department')).value;
 
     return Scaffold(
       appBar: AppBar(

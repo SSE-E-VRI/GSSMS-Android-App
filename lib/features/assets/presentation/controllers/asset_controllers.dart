@@ -316,14 +316,17 @@ class AssetDetailError extends AssetDetailState {
 
 // H7: autoDispose — per-asset detail state must not accumulate per asset.
 final assetDetailControllerProvider =
-    NotifierProvider.autoDispose.family<AssetDetailController, AssetDetailState, int>(() {
-  return AssetDetailController();
+    NotifierProvider.autoDispose.family<AssetDetailController, AssetDetailState, int>((arg) {
+  return AssetDetailController(arg);
 });
 
-class AssetDetailController
-    extends AutoDisposeFamilyNotifier<AssetDetailState, int> {
+class AssetDetailController extends Notifier<AssetDetailState> {
+  AssetDetailController(this.arg);
+
+  final int arg;
+
   @override
-  AssetDetailState build(int arg) {
+  AssetDetailState build() {
     return const AssetDetailLoading();
   }
 

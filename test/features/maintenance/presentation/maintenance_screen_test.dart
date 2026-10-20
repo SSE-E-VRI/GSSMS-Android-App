@@ -100,6 +100,11 @@ void main() {
     }
 
     return ProviderScope(
+      // Riverpod 3 auto-retries failed providers by default (up to 10x,
+      // exponential backoff); disable it so the error test below sees the
+      // fallback UI immediately instead of a 35s retry storm, matching the
+      // no-retry policy main.dart sets for the real app.
+      retry: (_, __) => null,
       overrides: [
         dashboardRepositoryProvider.overrideWithValue(mockDashboardRepo),
         deficiencyRepositoryProvider.overrideWithValue(mockDeficiencyRepo),

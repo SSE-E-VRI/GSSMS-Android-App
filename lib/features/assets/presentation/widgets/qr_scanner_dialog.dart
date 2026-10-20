@@ -253,7 +253,7 @@ class _QrScannerDialogState extends State<QrScannerDialog>
           MobileScanner(
             controller: _scannerController,
             onDetect: _onDetect,
-            errorBuilder: (context, error, child) {
+            errorBuilder: (context, error) {
               final isPermission =
                   error.errorCode == MobileScannerErrorCode.permissionDenied;
               final msg = isPermission

@@ -9,17 +9,20 @@ import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_
 // H7: autoDispose — per-WO workspaces (full checklists, severities) must not
 // accumulate for the whole session; the screen re-fetches on open.
 final verificationWorkspaceControllerProvider = NotifierProvider.autoDispose.family<
-    VerificationWorkspaceController, VerificationWorkspaceState, int>(() {
-  return VerificationWorkspaceController();
+    VerificationWorkspaceController, VerificationWorkspaceState, int>((arg) {
+  return VerificationWorkspaceController(arg);
 });
 
 const verificationSeverityConflictMessage =
     'This deficiency was updated by someone else. The latest state has been reloaded.';
 
-class VerificationWorkspaceController
-    extends AutoDisposeFamilyNotifier<VerificationWorkspaceState, int> {
+class VerificationWorkspaceController extends Notifier<VerificationWorkspaceState> {
+  VerificationWorkspaceController(this.arg);
+
+  final int arg;
+
   @override
-  VerificationWorkspaceState build(int arg) {
+  VerificationWorkspaceState build() {
     return const VerificationWorkspaceLoading();
   }
 

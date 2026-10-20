@@ -269,7 +269,7 @@ class OrgScopeAppBarFilter extends StatelessWidget {
                           final u = _unresolved!;
                           final name = ref
                               .watch(orgUnitNamesProvider(u.level))
-                              .valueOrNull?[u.id];
+                              .value?[u.id];
                           return _chipText(
                               context,
                               name != null

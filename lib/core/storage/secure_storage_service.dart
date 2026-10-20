@@ -12,8 +12,10 @@ class SecureStorageService implements ISecureStorageService {
   SecureStorageService([FlutterSecureStorage? storage])
       : _storage = storage ??
             const FlutterSecureStorage(
+              // v11 dropped the encryptedSharedPreferences flag: AES-GCM +
+              // RSA OAEP key wrapping is now the only (and default) Android
+              // storage mode, so there's nothing left to opt into here.
               aOptions: AndroidOptions(
-                encryptedSharedPreferences: true,
                 resetOnError: true,
               ),
             );
