@@ -73,17 +73,25 @@ Future<PagedFetchResult> fetchAllPages(
       if (nextUrl == null || nextUrl.isEmpty) break;
 
       final uri = Uri.tryParse(nextUrl);
-      if (uri == null) break;
+      // M4: a malformed-but-present `next` means the walk stopped with pages
+      // left — that is truncation by the same contract as the page cap.
+      if (uri == null) {
+        return PagedFetchResult(items: items, truncated: true);
+      }
       final nextPath = uri.hasQuery ? '${uri.path}?${uri.query}' : uri.path;
       // A `next` that points back at a page already fetched would loop
       // forever. Treat it as the end of the list, not as more data.
-      if (!seenPaths.add(nextPath)) break;
+      if (!seenPaths.add(nextPath)) {
+        return PagedFetchResult(items: items, truncated: true);
+      }
       currentPath = nextPath;
     } else if (data is List<dynamic>) {
       items.addAll(data);
       break;
     } else {
-      break;
+      // Unexpected payload shape: nothing more can be walked, but we also
+      // cannot claim the rows seen are complete. Surface as truncated.
+      return PagedFetchResult(items: items, truncated: true);
     }
   }
 

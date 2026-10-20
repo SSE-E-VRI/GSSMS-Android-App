@@ -40,7 +40,10 @@ enum OutboxCommandStatus {
     for (final s in OutboxCommandStatus.values) {
       if (s.code == code) return s;
     }
-    return OutboxCommandStatus.pending;
+    // Low 5: an unknown/corrupt status must never become replayable work.
+    // Park it as FAILED (attention), so a bad write surfaces to the user
+    // instead of silently draining a command whose shape we cannot verify.
+    return OutboxCommandStatus.failed;
   }
 }
 

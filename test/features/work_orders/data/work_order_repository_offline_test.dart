@@ -1,4 +1,4 @@
-import 'package:dio/dio.dart';
+﻿import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gssms_mobile/core/database/local_cache_service.dart';
 import 'package:gssms_mobile/core/sync/outbox_command.dart';
@@ -87,11 +87,11 @@ void main() {
         ),
       );
 
-      when(() => mockSyncManager.enqueueCommand(any())).thenAnswer((_) async {});
+      when(() => mockSyncManager.enqueueDeduped(any(), isDuplicate: any(named: 'isDuplicate'))).thenAnswer((_) async => true);
 
       await repository.submitChecklistLine(55, {'line_id': 12, 'value': '240V'});
 
-      verify(() => mockSyncManager.enqueueCommand(any())).called(1);
+      verify(() => mockSyncManager.enqueueDeduped(any(), isDuplicate: any(named: 'isDuplicate'))).called(1);
     });
 
     // Regression: the single cache key only ever holds the last *unfiltered*
@@ -124,13 +124,13 @@ void main() {
           type: DioExceptionType.connectionError,
         ),
       );
-      when(() => mockSyncManager.enqueueCommand(any())).thenAnswer((_) async {});
+      when(() => mockSyncManager.enqueueDeduped(any(), isDuplicate: any(named: 'isDuplicate'))).thenAnswer((_) async => true);
 
       await expectLater(
         repository.startExecution(101),
         throwsA(isA<StartExecutionQueuedOffline>()),
       );
-      verify(() => mockSyncManager.enqueueCommand(any())).called(1);
+      verify(() => mockSyncManager.enqueueDeduped(any(), isDuplicate: any(named: 'isDuplicate'))).called(1);
     });
 
     // Regression: the optimistic offline cache update copyWith'd `remarks`
@@ -157,7 +157,7 @@ void main() {
           type: DioExceptionType.connectionError,
         ),
       );
-      when(() => mockSyncManager.enqueueCommand(any())).thenAnswer((_) async {});
+      when(() => mockSyncManager.enqueueDeduped(any(), isDuplicate: any(named: 'isDuplicate'))).thenAnswer((_) async => true);
 
       final updated = await repository.transitionStatus(
         101,
@@ -195,10 +195,11 @@ void main() {
         repository.transitionStatus(101, status: 'VERIFIED'),
         throwsA(isA<OnlineRequiredException>()),
       );
-      verifyNever(() => mockSyncManager.enqueueCommand(any()));
+      verifyNever(() => mockSyncManager.enqueueDeduped(any(), isDuplicate: any(named: 'isDuplicate')));
 
       final cached = await cacheService.getCachedWorkOrderDetail(101);
       expect(cached?.status, WorkOrderStatus.techCompleted);
     });
   });
 }
+

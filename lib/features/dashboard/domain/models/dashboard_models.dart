@@ -260,10 +260,8 @@ class PendingAction extends Equatable {
           json['depot_name'] ??
           json['remarks']),
       workOrderId: workOrderId,
-      complaintId:
-          _fkId(json['complaint_id'] ?? json['complaint']),
-      inspectionId:
-          _fkId(json['inspection_id'] ?? json['inspection']),
+      complaintId: complaintId,
+      inspectionId: inspectionId,
       dueDate: json['due_date'] != null
           ? asJsonDateTime(json['due_date'])
           : (json['created_at'] != null

@@ -232,24 +232,28 @@ class WorkOrderRepository implements IWorkOrderRepository {
   /// (double-tap offline must not create two idempotency keys for the same
   /// logical write — the server would apply it twice).
   /// Returns true when a new command was enqueued, false on dedup-hit.
+  ///
+  /// H4: the read/check/save runs atomically inside SyncManager's lock via
+  /// [SyncManager.enqueueDeduped] — a check outside the lock let two
+  /// near-simultaneous calls both pass and enqueue duplicates.
   Future<bool> _enqueueDeduped(
     OutboxCommand cmd, {
     bool Function(OutboxCommand existing)? matches,
   }) async {
     final sync = _syncManager;
     if (sync == null) return false;
-    try {
-      final existing = await _cacheService.getOutboxCommands();
-      final isDup = existing.any((c) {
-        if (c.status != OutboxCommandStatus.pending) return false;
-        if (c.type != cmd.type || c.entityId != cmd.entityId) return false;
-        if (matches != null) return matches(c);
+    return sync.enqueueDeduped(
+      cmd,
+      isDuplicate: (existing) {
+        // Same logical write only: same command type + entity, and any
+        // caller-supplied content match.
+        if (existing.type != cmd.type || existing.entityId != cmd.entityId) {
+          return false;
+        }
+        if (matches != null) return matches(existing);
         return true;
-      });
-      if (isDup) return false;
-    } catch (_) {}
-    await sync.enqueueCommand(cmd);
-    return true;
+      },
+    );
   }
 
   @override
@@ -749,7 +753,21 @@ class WorkOrderRepository implements IWorkOrderRepository {
               },
               createdAt: DateTime.now(),
             ),
-            matches: (c) => c.payload['proof_path'] == proofJpegPath);
+            matches: (c) {
+              // H6: match on proof_path only when caller sent one. When no
+              // photo was attached, `null == null` would treat a *different*
+              // no-photo submission (different remarks/staff) as a duplicate
+              // and silently drop it — compare the other fields instead.
+              if (proofJpegPath != null) {
+                return c.payload['proof_path'] == proofJpegPath;
+              }
+              final existingProof = c.payload['proof_path'];
+              if (existingProof is String && existingProof.isNotEmpty) {
+                return false;
+              }
+              return c.payload['remarks'] == remarks &&
+                  c.payload['other_staff'] == otherStaff;
+            });
         return MutationOutcome.queued;
       }
       rethrow;

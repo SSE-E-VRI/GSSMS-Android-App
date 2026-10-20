@@ -97,6 +97,12 @@ class SyncManager extends Notifier<SyncState> {
   Future<void> _lock = Future.value();
   int _sessionEpoch = 0;
 
+  // M6: backoff for automatic (resume-triggered) drains. Every failed
+  // offline drain pushes connectivity re-checks further out so a device
+  // leaving coverage cannot burn the auto-retry cap with app resumes.
+  DateTime _offlineBackoffUntil = DateTime.fromMillisecondsSinceEpoch(0);
+  int _offlineStrikes = 0;
+
   @override
   SyncState build() {
     // Initial sync count check — guarded so a startup storage error
@@ -140,6 +146,26 @@ class SyncManager extends Notifier<SyncState> {
             !syncedKeys.contains(c.idempotencyKey));
         if (hasUnsyncedSubmitLine) return true;
       }
+    }
+
+    // A record must not close server-side while its line observations or a
+    // line attachment are still queued/unsynced — the observations that
+    // justify the completion could later FAIL, and a completed record may
+    // reject them (M8 audit fix). Terminal status transitions get the same
+    // rule so a closure can never overtake pending line work for the
+    // same/linked entity.
+    final transitionStatus = asJsonString(cmd.payload['status'])?.toUpperCase();
+    final isTerminalTransition = cmd.type == OutboxCommandType.transitionStatus &&
+        (transitionStatus == 'TECH_COMPLETED' ||
+            transitionStatus == 'VERIFIED' ||
+            transitionStatus == 'CLOSED');
+    if (cmd.type == OutboxCommandType.completeRecord || isTerminalTransition) {
+      final hasUnsyncedLineWork = scopedCommands.any((c) =>
+          (c.type == OutboxCommandType.submitLine ||
+                  c.type == OutboxCommandType.uploadLineAttachment) &&
+          c.entityId == cmd.entityId &&
+          !syncedKeys.contains(c.idempotencyKey));
+      if (hasUnsyncedLineWork) return true;
     }
 
     return false;
@@ -201,6 +227,39 @@ class SyncManager extends Notifier<SyncState> {
     }
   }
 
+  /// Atomically enqueues [command] unless a PENDING duplicate already exists.
+  ///
+  /// The dedup read, check and save all run inside `_synchronized`, closing
+  /// the check-then-act race in which two near-simultaneous calls both read
+  /// the outbox before either save lands and both enqueue the same logical
+  /// write under different idempotency keys (double-tap offline).
+  ///
+  /// Returns true when a new command was enqueued, false on dedup-hit.
+  Future<bool> enqueueDeduped(
+    OutboxCommand command, {
+    required bool Function(OutboxCommand existing) isDuplicate,
+    bool autoDrain = true,
+  }) {
+    return _synchronized(() async {
+      final ownerId = command.ownerUserId ?? await _cacheOwnerUserId();
+      final stamped =
+          ownerId == null ? command : command.copyWith(ownerUserId: ownerId);
+      final commands = await _cacheService.getOutboxCommands();
+      final isDup = commands.any((c) =>
+          c.status == OutboxCommandStatus.pending && isDuplicate(c));
+      if (isDup) return false;
+      commands.add(stamped);
+      await _cacheService.saveOutboxCommands(commands);
+      await refreshPendingCount();
+      return true;
+    }).then((enqueued) async {
+      if (autoDrain && enqueued) {
+        await drainOutbox();
+      }
+      return enqueued;
+    });
+  }
+
   Future<void> drainOutbox() async {
     // Set the guard synchronously (no `await` before it) so a second call
     // arriving before this one's queued action even starts can't slip past
@@ -238,11 +297,17 @@ class SyncManager extends Notifier<SyncState> {
           // Epoch changed (logout/identity switch): return without writing
           // so we never persist the previous user's outbox view.
           if (epoch != _sessionEpoch) return;
-          await persistScoped(_evictStale(scopedCommands));
+          // Low 7/8/10: no silent eviction on automatic drains; FAILED/CONFLICT
+          // commands are only removed by explicit user discard. Counts come
+          // from the full persisted list (this user's scope plus other
+          // users' untouched commands), so the badge never reports
+          // fully-synced while stuck work remains on disk.
+          await persistScoped(scopedCommands);
+          final fullPersisted = [...unscopedCommands, ...scopedCommands];
           state = state.copyWith(
             mode: SyncConnectivityMode.online,
-            pendingCount: _countQueued(scopedCommands),
-            attentionCount: _countNeedsAttention(scopedCommands),
+            pendingCount: _countQueued(fullPersisted),
+            attentionCount: _countNeedsAttention(fullPersisted),
             lastSyncTime: DateTime.now(),
           );
           return;
@@ -285,7 +350,9 @@ class SyncManager extends Notifier<SyncState> {
               // Keep command in pending state and pause outbox draining.
               // Cap retries so an always-offline queue cannot grow its
               // retryCount unboundedly; after the cap it parks as FAILED
-              // for the user to retry explicitly.
+              // for the user to retry explicitly. The backoff in
+              // [resumePendingSync] means the cap is only reached after
+              // real spread-out attempts, not twenty consecutive app resumes.
               const maxAutoRetries = 25;
               if (cmd.retryCount >= maxAutoRetries) {
                 remainingCommands.add(cmd.copyWith(
@@ -303,6 +370,11 @@ class SyncManager extends Notifier<SyncState> {
               state = state.copyWith(
                 mode: SyncConnectivityMode.offline,
                 lastError: 'Network offline. Queued for background sync.',
+              );
+              _offlineStrikes = (_offlineStrikes + 1).clamp(0, 4);
+              final backoffSeconds = 30 << _offlineStrikes;
+              _offlineBackoffUntil = DateTime.now().add(
+                Duration(seconds: backoffSeconds > 480 ? 480 : backoffSeconds),
               );
               break;
             }
@@ -334,7 +406,7 @@ class SyncManager extends Notifier<SyncState> {
         if (epoch != _sessionEpoch) {
           return;
         }
-        final prunedRemaining = _evictStale(remainingCommands);
+        final prunedRemaining = remainingCommands;
         // Persist first, discard evidence files only afterwards: a crash
         // between discard and persist must never leave a replay pointing
         // at a missing file (permanent FAILED).
@@ -377,13 +449,22 @@ class SyncManager extends Notifier<SyncState> {
           );
         } catch (_) {}
         final queued = _countQueued(prunedRemaining);
+        if (queued == 0) {
+          // A drain that ended with an empty queue proves connectivity.
+          _offlineStrikes = 0;
+          _offlineBackoffUntil = DateTime.fromMillisecondsSinceEpoch(0);
+        }
 
+        // Low 8/10: badge counts from the full persisted list (this user's
+        // scope plus other users' untouched commands) — isFullySynced cannot
+        // pass while stuck work is still on disk.
+        final persistedAll = [...unscopedCommands, ...prunedRemaining];
         state = state.copyWith(
-          mode: queued == 0
+          mode: _countQueued(persistedAll) == 0
               ? SyncConnectivityMode.online
               : SyncConnectivityMode.offline,
-          pendingCount: queued,
-          attentionCount: _countNeedsAttention(prunedRemaining),
+          pendingCount: _countQueued(persistedAll),
+          attentionCount: _countNeedsAttention(persistedAll),
           lastSyncTime: DateTime.now(),
         );
       } finally {
@@ -399,10 +480,20 @@ class SyncManager extends Notifier<SyncState> {
   /// mutation or tapped the sync strip. Only PENDING commands replay —
   /// FAILED/CONFLICT still wait for the user — and every command carries its
   /// idempotency key, so an extra drain cannot duplicate a server mutation.
-  Future<void> resumePendingSync() async {
+  ///
+  /// M6: while a connectivity failure has placed the manager in backoff,
+  /// resume-triggered drains are skipped so repeated app resumes (commute,
+  /// dead coverage) do not burn the 25-attempt auto-retry cap without any
+  /// real network attempts in between. Explicit user action (`retryCommand`,
+  /// `retryAllFailed`, badge tap) still drains immediately.
+  Future<void> resumePendingSync({bool skipBackoffGate = false}) async {
     try {
       await refreshPendingCount();
       if (state.pendingCount == 0) return;
+      if (!skipBackoffGate &&
+          DateTime.now().isBefore(_offlineBackoffUntil)) {
+        return;
+      }
       await drainOutbox();
     } catch (_) {
       // Storage unavailable (tests, early start-up): the next trigger retries.
@@ -417,6 +508,9 @@ class SyncManager extends Notifier<SyncState> {
         if (c.idempotencyKey == idempotencyKey) {
           return c.copyWith(
             status: OutboxCommandStatus.pending,
+            // M7: an explicit user retry must get a fresh auto-retry budget —
+            // a capped command otherwise re-fails after a single attempt.
+            retryCount: 0,
             clearError: true,
           );
         }
@@ -442,6 +536,8 @@ class SyncManager extends Notifier<SyncState> {
                   c.status == OutboxCommandStatus.conflict
               ? c.copyWith(
                   status: OutboxCommandStatus.pending,
+                  // M7: fresh auto-retry budget on an explicit retry-all too.
+                  retryCount: 0,
                   clearError: true,
                 )
               : c)
@@ -460,20 +556,6 @@ class SyncManager extends Notifier<SyncState> {
       await _cacheService.saveOutboxCommands(commands);
       await refreshPendingCount();
     });
-  }
-
-  /// Drops FAILED/CONFLICT commands older than 7 days so a permanently
-  /// rejected queue cannot grow unboundedly. PENDING commands are never
-  /// evicted here — only the UI (discard) removes those.
-  List<OutboxCommand> _evictStale(List<OutboxCommand> commands) {
-    final cutoff = DateTime.now().subtract(const Duration(days: 7));
-    return commands.where((c) {
-      if (c.status == OutboxCommandStatus.failed ||
-          c.status == OutboxCommandStatus.conflict) {
-        return c.createdAt.isAfter(cutoff);
-      }
-      return true;
-    }).toList();
   }
 
   String _canonicalPath(String path) {
