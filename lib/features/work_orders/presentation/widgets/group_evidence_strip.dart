@@ -64,14 +64,25 @@ class _GroupEvidenceStripState extends ConsumerState<GroupEvidenceStrip> {
           tone: GssmsTone.warning,
         );
       }
-      final evidence =
-          await evidenceService.capture(kind: kind, source: source);
+      final evidence = await evidenceService.capture(
+        kind: kind,
+        source: source,
+        // ME-02/ME-03: one fresh fix for camera captures only; the photo is
+        // kept without GPS when the fix fails. Gallery never gets a fix or
+        // an invented captured_at (ME-04).
+        captureLocation: source == ImageSource.camera,
+      );
       if (evidence == null) return;
       await controller.uploadLineAttachment(
         lineId: lineId,
         kind: kind.name.toUpperCase(),
         imagePath: evidence.path,
-        capturedAt: DateTime.now(),
+        capturedAt: evidence.capturedAt,
+        source: evidence.source.code,
+        latitude: evidence.location?.latitude,
+        longitude: evidence.location?.longitude,
+        locationAccuracyM: evidence.location?.accuracyM,
+        locationRecordedAt: evidence.location?.recordedAt,
       );
     } catch (e) {
       if (mounted) {
@@ -154,11 +165,32 @@ class _GroupEvidenceStripState extends ConsumerState<GroupEvidenceStrip> {
                 ),
               ),
             ),
-            if (attachment.capturedAt != null)
+            // ME-06: source label is always shown (Camera/Gallery/Unknown);
+            // captured time and location line are appended when available.
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                12,
+                0,
+                12,
+                attachment.uploadedBy != null ? 4 : 12,
+              ),
+              child: Text(
+                [
+                  attachment.sourceLabel,
+                  if (attachment.capturedAt != null)
+                    'Captured: ${DateFormat('dd MMM yyyy, hh:mm a').format(attachment.capturedAt!.toLocal())}',
+                  attachment.locationText,
+                ].whereType<String>().join(' · '),
+                style: Theme.of(ctx).textTheme.labelSmall?.copyWith(
+                      color: ctx.gssms.textSecondary,
+                    ),
+              ),
+            ),
+            if (attachment.uploadedBy != null)
               Padding(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
                 child: Text(
-                  'Captured: ${DateFormat('dd MMM yyyy, hh:mm a').format(attachment.capturedAt!.toLocal())}',
+                  'By: ${attachment.uploadedBy}',
                   style: Theme.of(ctx).textTheme.labelSmall?.copyWith(
                         color: ctx.gssms.textSecondary,
                       ),
@@ -387,6 +419,17 @@ class _GroupEvidenceStripState extends ConsumerState<GroupEvidenceStrip> {
                   ),
                 ),
               ),
+              // ME-07: visible delete in front of the long-press gesture.
+              // Same confirmed handler; long press is retained below.
+              if (!widget.isPastTechCompleted)
+                Positioned(
+                  right: 0,
+                  bottom: 0,
+                  child: AttachmentDeleteCorner(
+                    key: Key('delete_attachment_$thumbKey'),
+                    onPressed: () => _delete(attachment),
+                  ),
+                ),
             ],
           ),
         ),

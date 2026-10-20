@@ -57,7 +57,7 @@ class _GssmsAppState extends ConsumerState<GssmsApp>
 
   @override
   Widget build(BuildContext context) {
-    final authState = ref.watch(authControllerProvider);
+    final phase = ref.watch(authControllerProvider.select(_phaseOf));
     final themeMode = ref.watch(themeModeProvider);
 
     return MaterialApp(
@@ -66,23 +66,36 @@ class _GssmsAppState extends ConsumerState<GssmsApp>
       darkTheme: AppTheme.darkTheme,
       themeMode: themeMode,
       debugShowCheckedModeBanner: false,
-      home: _buildHomeForState(authState),
+      home: _buildHomeForPhase(phase),
     );
   }
 
-  Widget _buildHomeForState(AuthState state) {
-    if (state is Authenticated) {
-      return HomeScreen(session: state.session, autoLoadData: true);
-    }
-
+  static _AuthPhase _phaseOf(AuthState state) {
+    if (state is Authenticated) return _AuthPhase.authenticated;
     if (state is AuthInitial ||
         (state is AuthLoading && state.message == 'Restoring session...')) {
-      return const _StartupView();
+      return _AuthPhase.startup;
     }
+    return _AuthPhase.login;
+  }
 
-    return const LoginScreen();
+  Widget _buildHomeForPhase(_AuthPhase phase) {
+    switch (phase) {
+      case _AuthPhase.authenticated:
+        final state = ref.read(authControllerProvider);
+        if (state is Authenticated) {
+          return HomeScreen(session: state.session, autoLoadData: true);
+        }
+        return const LoginScreen();
+      case _AuthPhase.startup:
+        return const _StartupView();
+      case _AuthPhase.login:
+        return const LoginScreen();
+    }
   }
 }
+
+enum _AuthPhase { authenticated, startup, login }
 
 class _StartupView extends StatelessWidget {
   const _StartupView();

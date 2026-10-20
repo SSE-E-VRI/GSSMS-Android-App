@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -36,7 +34,8 @@ const _session = UserSession(
 );
 
 void main() {
-  testWidgets('Close button is disabled while a convert is in flight',
+  testWidgets(
+      'point-less legacy offers no Convert action, close stays available (owner decision 2026-10-02)',
       (tester) async {
     final mockRepo = MockInspectionRepository();
     const open = Inspection(
@@ -47,8 +46,6 @@ void main() {
       stationName: 'Thalanallur',
     );
     when(() => mockRepo.fetchInspectionById(8)).thenAnswer((_) async => open);
-    final gate = Completer<Map<String, dynamic>>();
-    when(() => mockRepo.convertToWorkOrder(8)).thenAnswer((_) => gate.future);
 
     await tester.pumpWidget(
       ProviderScope(
@@ -66,22 +63,16 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const Key('convert_to_work_order_button')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('confirm_convert_button')));
-    await tester.pump();
-    await tester.pump();
+    // Owner decision 2026-10-02: legacy point-less inspections are NOT
+    // converted (held/cancelled via Job Works) — no conversion path.
+    expect(find.byKey(const Key('convert_to_work_order_button')),
+        findsNothing);
+    verifyNever(() => mockRepo.convertToWorkOrder(8));
 
     await tester.scrollUntilVisible(
       find.byKey(const Key('close_inspection_button')),
       200,
     );
-    await tester.pump();
-    final closeButton = tester
-        .widget<FilledButton>(find.byKey(const Key('close_inspection_button')));
-    expect(closeButton.onPressed, isNull);
-
-    gate.complete({'work_order_id': 42});
-    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('close_inspection_button')), findsOneWidget);
   });
 }

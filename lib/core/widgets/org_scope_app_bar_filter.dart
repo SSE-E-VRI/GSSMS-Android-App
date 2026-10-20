@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../data/org_scope_options_service.dart';
 import '../../features/auth/domain/models/org_scope.dart';
 import '../theme/app_theme.dart';
 import 'org_scope_filter_bar.dart';
@@ -47,8 +49,49 @@ class OrgScopeAppBarFilter extends StatelessWidget {
   /// chip reads "Depot: Vriddhachalam ▾" instead of "Depot: #7 ▾".
   String? _ownUnitName(OrgUnitInfo? unit, int? selectedId) {
     final name = unit?.name;
-    if (unit?.id != null && unit?.id == selectedId && name != null && name.isNotEmpty) {
+    if (unit?.id != null &&
+        unit?.id == selectedId &&
+        name != null &&
+        name.isNotEmpty) {
       return name;
+    }
+    return null;
+  }
+
+  /// The level+id whose name is not known locally, or null when the label is
+  /// already fully resolved.
+  ({OrgUnitLevel level, int id, String prefix})? get _unresolved {
+    if (selection.stationId != null) {
+      return (
+        level: OrgUnitLevel.station,
+        id: selection.stationId!,
+        prefix: 'Station'
+      );
+    }
+    if (selection.depotId != null) {
+      if (_ownUnitName(scope.depot, selection.depotId) != null ||
+          depotLabel != null) {
+        return null;
+      }
+      return (
+        level: OrgUnitLevel.depot,
+        id: selection.depotId!,
+        prefix: 'Depot'
+      );
+    }
+    if (selection.divisionId != null) {
+      if (_ownUnitName(scope.division, selection.divisionId) != null) {
+        return null;
+      }
+      return (
+        level: OrgUnitLevel.division,
+        id: selection.divisionId!,
+        prefix: 'Division'
+      );
+    }
+    if (selection.zoneId != null) {
+      if (_ownUnitName(scope.zone, selection.zoneId) != null) return null;
+      return (level: OrgUnitLevel.zone, id: selection.zoneId!, prefix: 'Zone');
     }
     return null;
   }
@@ -87,8 +130,7 @@ class OrgScopeAppBarFilter extends StatelessWidget {
           key: const Key('org_scope_bottom_sheet'),
           decoration: BoxDecoration(
             color: Theme.of(sheetContext).cardTheme.color,
-            borderRadius:
-                const BorderRadius.vertical(top: Radius.circular(16)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
           ),
           child: SafeArea(
             child: Padding(
@@ -180,6 +222,13 @@ class OrgScopeAppBarFilter extends StatelessWidget {
     );
   }
 
+  Widget _chipText(BuildContext context, String label) => Text(
+        label,
+        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: Colors.white,
+            ),
+      );
+
   @override
   Widget build(BuildContext context) {
     if (!_hasFilterableOptions) {
@@ -213,12 +262,21 @@ class OrgScopeAppBarFilter extends StatelessWidget {
                 const Icon(Icons.filter_list_rounded,
                     size: 16, color: Colors.white),
                 const SizedBox(width: 6),
-                Text(
-                  _activeLabel,
-                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                        color: Colors.white,
+                _unresolved == null
+                    ? _chipText(context, _activeLabel)
+                    : Consumer(
+                        builder: (context, ref, _) {
+                          final u = _unresolved!;
+                          final name = ref
+                              .watch(orgUnitNamesProvider(u.level))
+                              .valueOrNull?[u.id];
+                          return _chipText(
+                              context,
+                              name != null
+                                  ? '${u.prefix}: $name ▾'
+                                  : _activeLabel);
+                        },
                       ),
-                ),
               ],
             ),
           ),

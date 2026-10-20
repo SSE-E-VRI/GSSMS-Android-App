@@ -24,6 +24,7 @@ dependencies:
   pdf: ^3.11.3
   printing: ^5.14.3
   mobile_scanner: ^5.2.3
+  geolocator: ^14.0.2
 
 
 dev_dependencies:

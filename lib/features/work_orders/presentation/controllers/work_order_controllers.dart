@@ -28,7 +28,8 @@ final workOrderRepositoryProvider = Provider<IWorkOrderRepository>((ref) {
   final api = ref.watch(workOrderApiServiceProvider);
   final cache = ref.watch(localCacheServiceProvider);
   final syncManager = ref.watch(syncManagerProvider.notifier);
-  return WorkOrderRepository(api, cacheService: cache, syncManager: syncManager);
+  return WorkOrderRepository(api,
+      cacheService: cache, syncManager: syncManager);
 });
 
 // --- Work Order List Controller ---
@@ -246,12 +247,13 @@ class WorkOrderListController extends Notifier<WorkOrderListState> {
 }
 
 // --- Work Order Detail Controller ---
-final workOrderDetailControllerProvider =
-    NotifierProvider.family<WorkOrderDetailController, WorkOrderDetailState, int>(() {
+final workOrderDetailControllerProvider = NotifierProvider.family<
+    WorkOrderDetailController, WorkOrderDetailState, int>(() {
   return WorkOrderDetailController();
 });
 
-class WorkOrderDetailController extends FamilyNotifier<WorkOrderDetailState, int> {
+class WorkOrderDetailController
+    extends FamilyNotifier<WorkOrderDetailState, int> {
   @override
   WorkOrderDetailState build(int arg) {
     return const WorkOrderDetailLoading();
@@ -277,8 +279,14 @@ class WorkOrderDetailController extends FamilyNotifier<WorkOrderDetailState, int
   /// detail state, ignoring failures of either.
   Future<void> loadActionsAndAudit() async {
     final results = await Future.wait([
-      _repository.fetchAllowedActions(arg).then<Object?>((v) => v).catchError((_) => null),
-      _repository.fetchAudit(arg).then<Object?>((v) => v).catchError((_) => null),
+      _repository
+          .fetchAllowedActions(arg)
+          .then<Object?>((v) => v)
+          .catchError((_) => null),
+      _repository
+          .fetchAudit(arg)
+          .then<Object?>((v) => v)
+          .catchError((_) => null),
     ]);
 
     final current = state;
@@ -293,20 +301,24 @@ class WorkOrderDetailController extends FamilyNotifier<WorkOrderDetailState, int
     final current = state;
     if (current is! WorkOrderDetailLoaded) return null;
 
-    state = current.copyWith(isTransitioning: true, actionMessage: 'Starting execution...');
+    state = current.copyWith(
+        isTransitioning: true, actionMessage: 'Starting execution...');
     try {
       final recordId = await _repository.startExecution(arg);
       // Reload updated work order status
       final updatedWo = await _repository.fetchWorkOrderById(arg);
       state = WorkOrderDetailLoaded(workOrder: updatedWo);
       // Also refresh list
-      unawaited(ref.read(workOrderListControllerProvider.notifier).fetchWorkOrders(forceRefresh: true));
+      unawaited(ref
+          .read(workOrderListControllerProvider.notifier)
+          .fetchWorkOrders(forceRefresh: true));
       return recordId;
     } on StartExecutionQueuedOffline catch (e) {
       // Queued for later, not a failure — stay on the detail view (there is
       // no real record id yet to navigate anywhere with) and surface it as
       // an informational message rather than a full error screen.
-      state = current.copyWith(isTransitioning: false, actionMessage: e.toString());
+      state =
+          current.copyWith(isTransitioning: false, actionMessage: e.toString());
       return null;
     } catch (e) {
       // Stay on Loaded with an inline message (consistent with
@@ -320,7 +332,8 @@ class WorkOrderDetailController extends FamilyNotifier<WorkOrderDetailState, int
 
   Future<List<Technician>> fetchAssignableTechnicians() {
     final current = state;
-    final depotId = current is WorkOrderDetailLoaded ? current.workOrder.depotId : null;
+    final depotId =
+        current is WorkOrderDetailLoaded ? current.workOrder.depotId : null;
     return _repository.fetchAssignableTechnicians(depotId: depotId);
   }
 
@@ -362,9 +375,11 @@ class WorkOrderDetailController extends FamilyNotifier<WorkOrderDetailState, int
     final current = state;
     if (current is! WorkOrderDetailLoaded) return false;
 
-    state = current.copyWith(isTransitioning: true, actionMessage: 'Verifying...');
+    state =
+        current.copyWith(isTransitioning: true, actionMessage: 'Verifying...');
     try {
-      final updatedWo = await _repository.verifyWorkOrder(arg, remarks: remarks);
+      final updatedWo =
+          await _repository.verifyWorkOrder(arg, remarks: remarks);
       state = WorkOrderDetailLoaded(workOrder: updatedWo);
       unawaited(loadActionsAndAudit());
       unawaited(
@@ -392,7 +407,8 @@ class WorkOrderDetailController extends FamilyNotifier<WorkOrderDetailState, int
     final current = state;
     if (current is! WorkOrderDetailLoaded) return false;
 
-    state = current.copyWith(isTransitioning: true, actionMessage: 'Updating status...');
+    state = current.copyWith(
+        isTransitioning: true, actionMessage: 'Updating status...');
     try {
       final updatedWo = await _repository.transitionStatus(
         arg,
@@ -405,7 +421,9 @@ class WorkOrderDetailController extends FamilyNotifier<WorkOrderDetailState, int
       // The permitted transitions and history both change with the status, so
       // refresh them rather than leaving the previous status's buttons on screen.
       unawaited(loadActionsAndAudit());
-      unawaited(ref.read(workOrderListControllerProvider.notifier).fetchWorkOrders(forceRefresh: true));
+      unawaited(ref
+          .read(workOrderListControllerProvider.notifier)
+          .fetchWorkOrders(forceRefresh: true));
       return true;
     } catch (e) {
       state = current.copyWith(
@@ -696,6 +714,11 @@ class ChecklistController extends FamilyNotifier<ChecklistState, int> {
     required String kind,
     required String imagePath,
     DateTime? capturedAt,
+    String? source,
+    double? latitude,
+    double? longitude,
+    double? locationAccuracyM,
+    DateTime? locationRecordedAt,
   }) async {
     final current = state;
     if (current is! ChecklistLoaded) return false;
@@ -707,6 +730,11 @@ class ChecklistController extends FamilyNotifier<ChecklistState, int> {
         kind: kind,
         imagePath: imagePath,
         capturedAt: capturedAt,
+        source: source,
+        latitude: latitude,
+        longitude: longitude,
+        locationAccuracyM: locationAccuracyM,
+        locationRecordedAt: locationRecordedAt,
       );
 
       // Direct (online) success returns the server row — the local durable
@@ -737,7 +765,8 @@ class ChecklistController extends FamilyNotifier<ChecklistState, int> {
     } catch (e) {
       final latest = state;
       if (latest is! ChecklistLoaded) return false;
-      state = latest.copyWith(errorMessage: 'Failed to upload photo: ${_readableError(e)}');
+      state = latest.copyWith(
+          errorMessage: 'Failed to upload photo: ${_readableError(e)}');
       return false;
     }
   }
@@ -774,7 +803,8 @@ class ChecklistController extends FamilyNotifier<ChecklistState, int> {
       final updatedLines = latest.record.lines.map((l) {
         if (l.id == lineId) {
           return l.copyWith(
-            attachments: l.attachments.where((a) => a.id != attachmentId).toList(),
+            attachments:
+                l.attachments.where((a) => a.id != attachmentId).toList(),
           );
         }
         return l;
@@ -787,7 +817,8 @@ class ChecklistController extends FamilyNotifier<ChecklistState, int> {
     } catch (e) {
       final latest = state;
       if (latest is! ChecklistLoaded) return false;
-      state = latest.copyWith(errorMessage: 'Failed to delete photo: ${_readableError(e)}');
+      state = latest.copyWith(
+          errorMessage: 'Failed to delete photo: ${_readableError(e)}');
       return false;
     }
   }
@@ -804,7 +835,8 @@ class ChecklistController extends FamilyNotifier<ChecklistState, int> {
     if (current is! ChecklistLoaded) return;
     try {
       final fresh = await _repository.fetchMaintenanceRecord(arg);
-      final outbox = await ref.read(localCacheServiceProvider).getOutboxCommands();
+      final outbox =
+          await ref.read(localCacheServiceProvider).getOutboxCommands();
       final byKey = <String, OutboxCommand>{};
       for (final cmd in outbox) {
         if (cmd.type == OutboxCommandType.uploadLineAttachment) {
@@ -839,7 +871,8 @@ class ChecklistController extends FamilyNotifier<ChecklistState, int> {
     } catch (_) {}
   }
 
-  Future<void> retryAttachment(LineAttachment attachment) async {    if (attachment.idempotencyKey != null) {
+  Future<void> retryAttachment(LineAttachment attachment) async {
+    if (attachment.idempotencyKey != null) {
       await _syncManager.retryCommand(attachment.idempotencyKey!);
       final latest = state;
       if (latest is ChecklistLoaded) {
@@ -855,7 +888,8 @@ class ChecklistController extends FamilyNotifier<ChecklistState, int> {
           }).toList();
           return l.copyWith(attachments: updatedAtts);
         }).toList();
-        state = latest.copyWith(record: latest.record.copyWith(lines: updatedLines));
+        state = latest.copyWith(
+            record: latest.record.copyWith(lines: updatedLines));
       }
     }
   }
@@ -867,4 +901,3 @@ class ChecklistController extends FamilyNotifier<ChecklistState, int> {
 /// entry point because several screens import it; the mapping lives in
 /// [userFacingError].
 String workOrderReadableError(Object error) => userFacingError(error);
-

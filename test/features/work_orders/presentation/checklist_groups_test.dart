@@ -59,9 +59,11 @@ Future<void> _pump(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
-        localCacheServiceProvider.overrideWithValue(InMemoryLocalCacheService()),
+        localCacheServiceProvider
+            .overrideWithValue(InMemoryLocalCacheService()),
         workOrderRepositoryProvider.overrideWithValue(repo),
-        if (evidence != null) evidenceServiceProvider.overrideWithValue(evidence),
+        if (evidence != null)
+          evidenceServiceProvider.overrideWithValue(evidence),
         authControllerProvider.overrideWith(
           () => FakeAuthenticatedController(
             fakeSession(
@@ -91,8 +93,8 @@ void main() {
   testWidgets('unchecked group hides its lines and explains why',
       (tester) async {
     final repo = _MockRepo();
-    when(() => repo.fetchMaintenanceRecord(55)).thenAnswer(
-        (_) async => _record([_line(1, checkedOut: false), _line(2, checkedOut: false)]));
+    when(() => repo.fetchMaintenanceRecord(55)).thenAnswer((_) async =>
+        _record([_line(1, checkedOut: false), _line(2, checkedOut: false)]));
     await _pump(tester, repo);
 
     expect(find.byType(ChecklistLineCard), findsNothing);
@@ -103,8 +105,8 @@ void main() {
   testWidgets('checking out calls the API and reveals the lines',
       (tester) async {
     final repo = _MockRepo();
-    when(() => repo.fetchMaintenanceRecord(55)).thenAnswer(
-        (_) async => _record([_line(1, checkedOut: false), _line(2, checkedOut: false)]));
+    when(() => repo.fetchMaintenanceRecord(55)).thenAnswer((_) async =>
+        _record([_line(1, checkedOut: false), _line(2, checkedOut: false)]));
     when(() => repo.setGroupInclusion(
           55,
           assetCategoryId: any(named: 'assetCategoryId'),
@@ -138,8 +140,8 @@ void main() {
   testWidgets('un-check control is disabled without group_uncheckout',
       (tester) async {
     final repo = _MockRepo();
-    when(() => repo.fetchMaintenanceRecord(55)).thenAnswer(
-        (_) async => _record([_line(1, checkedOut: true, source: 'TECHNICIAN')]));
+    when(() => repo.fetchMaintenanceRecord(55)).thenAnswer((_) async =>
+        _record([_line(1, checkedOut: true, source: 'TECHNICIAN')]));
     await _pump(tester, repo);
 
     final sw = tester
@@ -150,8 +152,8 @@ void main() {
   testWidgets('un-check control is enabled with group_uncheckout',
       (tester) async {
     final repo = _MockRepo();
-    when(() => repo.fetchMaintenanceRecord(55)).thenAnswer(
-        (_) async => _record([_line(1, checkedOut: true, source: 'TECHNICIAN')]));
+    when(() => repo.fetchMaintenanceRecord(55)).thenAnswer((_) async =>
+        _record([_line(1, checkedOut: true, source: 'TECHNICIAN')]));
     await _pump(tester, repo, permissions: const [
       'maintenance.view',
       'maintenance.edit',
@@ -178,12 +180,16 @@ void main() {
       (tester) async {
     final repo = _MockRepo();
     final evidence = _MockEvidence();
-    when(() => repo.fetchMaintenanceRecord(55)).thenAnswer((_) async =>
-        _record([_line(11, checkedOut: true, source: 'TECHNICIAN'), _line(12, checkedOut: true, source: 'TECHNICIAN')]));
+    when(() => repo.fetchMaintenanceRecord(55))
+        .thenAnswer((_) async => _record([
+              _line(11, checkedOut: true, source: 'TECHNICIAN'),
+              _line(12, checkedOut: true, source: 'TECHNICIAN')
+            ]));
     when(() => evidence.isStorageNearCap()).thenAnswer((_) async => false);
     when(() => evidence.capture(
           kind: any(named: 'kind'),
           source: any(named: 'source'),
+          captureLocation: any(named: 'captureLocation'),
         )).thenAnswer((inv) async => EvidenceFile(
           path: '/tmp/x.jpg',
           sizeBytes: 10,
@@ -196,6 +202,11 @@ void main() {
           kind: any(named: 'kind'),
           imagePath: any(named: 'imagePath'),
           capturedAt: any(named: 'capturedAt'),
+          source: any(named: 'source'),
+          latitude: any(named: 'latitude'),
+          longitude: any(named: 'longitude'),
+          locationAccuracyM: any(named: 'locationAccuracyM'),
+          locationRecordedAt: any(named: 'locationRecordedAt'),
         )).thenAnswer((_) async => const LineAttachment(
           id: 900,
           kind: 'BEFORE',
@@ -217,20 +228,25 @@ void main() {
           kind: 'BEFORE',
           imagePath: '/tmp/x.jpg',
           capturedAt: any(named: 'capturedAt'),
+          source: 'UNKNOWN',
+          latitude: null,
+          longitude: null,
+          locationAccuracyM: null,
+          locationRecordedAt: null,
         )).called(1);
   });
 
   testWidgets('completion sends remarks as a numbered list', (tester) async {
     final repo = _MockRepo();
-    when(() => repo.fetchMaintenanceRecord(55)).thenAnswer((_) async =>
-        _record([
-          const MaintenanceRecordLine(
-            id: 1,
-            itemName: 'Battery Bank',
-            assetCategory: 'Power',
-            recordedValue: 'ok',
-          ),
-        ]));
+    when(() => repo.fetchMaintenanceRecord(55))
+        .thenAnswer((_) async => _record([
+              const MaintenanceRecordLine(
+                id: 1,
+                itemName: 'Battery Bank',
+                assetCategory: 'Power',
+                recordedValue: 'ok',
+              ),
+            ]));
     when(() => repo.completeMaintenanceRecord(
           55,
           technicianName: any(named: 'technicianName'),
@@ -246,8 +262,8 @@ void main() {
     // Empty remarks are rejected before any request.
     await tester.tap(find.byKey(const Key('completion_confirm_button')));
     await tester.pumpAndSettle();
-    expect(find.text('Add at least one remark (10+ characters).'),
-        findsOneWidget);
+    expect(
+        find.text('Add at least one remark (10+ characters).'), findsOneWidget);
 
     await tester.enterText(
         find.byKey(const Key('completion_remarks_field')), 'alpha');

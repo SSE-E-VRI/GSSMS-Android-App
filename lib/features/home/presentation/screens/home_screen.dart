@@ -251,178 +251,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Widget _buildMyWorkSection(BuildContext context, UserSession session) {
-    // "My Work" surfaces the record assigned to *this person as executor* --
-    // a technician concept. Every other role (Depot Incharge and above) works
-    // through the Maintenance/Work Orders module instead, so showing this
-    // banner there would point at a job that isn't theirs to execute.
-    if (!session.roles.contains(AuthRole.maintenanceStaff)) {
-      return const SizedBox.shrink();
-    }
-
-    final tokens = context.gssms;
-    final textTheme = Theme.of(context).textTheme;
-    final listState = ref.watch(workOrderListControllerProvider);
-
-    WorkOrder? inProgress;
-    WorkOrder? assigned;
-
-    if (listState is WorkOrderListLoaded) {
-      for (final wo in listState.workOrders) {
-        if (wo.status == WorkOrderStatus.inProgress && inProgress == null) {
-          inProgress = wo;
-        } else if (wo.status == WorkOrderStatus.assigned && assigned == null) {
-          assigned = wo;
-        }
-      }
-    }
-
-    final activeWo = inProgress ?? assigned;
-    final isContinue = inProgress != null;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: GssmsSpacing.s20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Expanded(child: _HomeSectionLabel('MY WORK')),
-              if (activeWo != null)
-                StatusChip(
-                  label: isContinue ? 'In Progress' : 'Assigned to You',
-                  tone: isContinue ? GssmsTone.accent : GssmsTone.info,
-                  icon: isContinue
-                      ? Icons.construction_outlined
-                      : Icons.assignment_ind_outlined,
-                ),
-            ],
-          ),
-          const SizedBox(height: GssmsSpacing.s8),
-          if (activeWo != null)
-            Card(
-              margin: EdgeInsets.zero,
-              child: Padding(
-                padding: const EdgeInsets.all(GssmsSpacing.s16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(GssmsSpacing.s8),
-                          decoration: BoxDecoration(
-                            color: tokens.info.background,
-                            borderRadius: BorderRadius.circular(GssmsRadius.r8),
-                          ),
-                          child: Icon(
-                            Icons.engineering_outlined,
-                            color: tokens.info.foreground,
-                            size: GssmsSize.iconLg,
-                          ),
-                        ),
-                        const SizedBox(width: GssmsSpacing.s12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                activeWo.displayTitle,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: textTheme.titleMedium,
-                              ),
-                              const SizedBox(height: GssmsSpacing.s2),
-                              Text(
-                                '${activeWo.displayReference} • '
-                                '${activeWo.stationName ?? activeWo.depotName ?? 'Location not set'}',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: textTheme.bodySmall
-                                    ?.copyWith(color: tokens.textSecondary),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: GssmsSpacing.s16),
-                    SizedBox(
-                      width: double.infinity,
-                      height: GssmsSize.primaryAction,
-                      child: FilledButton.icon(
-                        key: Key(isContinue
-                            ? 'home_continue_work_button'
-                            : 'home_start_work_button'),
-                        style: isContinue
-                            ? FilledButton.styleFrom(
-                                backgroundColor: tokens.accent.solid,
-                                foregroundColor: tokens.accent.onSolid,
-                              )
-                            : null,
-                        icon: const Icon(Icons.play_arrow_rounded),
-                        label: Text(isContinue ? 'Continue work' : 'Open to start'),
-                        onPressed: () =>
-                            _open(WorkOrderDetailScreen(workOrderId: activeWo.id)),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            )
-          else
-            _InfoPanel(
-              icon: Icons.task_alt_rounded,
-              tone: GssmsTone.success,
-              message:
-                  'No active job works in progress. Ready for new field assignments.',
-              action: TextButton(
-                onPressed: () => _open(const WorkOrderListScreen()),
-                child: const Text('View All'),
-              ),
-            ),
-        ],
-      ),
-    );
+    return _MyWorkSection(session: session, onOpen: _open);
   }
 
   Widget _buildAttentionSection(BuildContext context, UserSession session) {
-    final dashboardState = ref.watch(dashboardControllerProvider);
-
-    int totalAttention = 0;
-    if (dashboardState is DashboardLoaded) {
-      final overdue = dashboardState.attention.overdue.length;
-      final dueSoon = dashboardState.attention.dueSoon.length;
-      totalAttention = overdue + dueSoon;
-    }
-    final needsAttention = totalAttention > 0;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: GssmsSpacing.s20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const _HomeSectionLabel('ATTENTION REQUIRED'),
-          const SizedBox(height: GssmsSpacing.s8),
-          _InfoPanel(
-            icon: needsAttention
-                ? Icons.warning_amber_rounded
-                : Icons.check_circle_outline,
-            tone: needsAttention ? GssmsTone.warning : GssmsTone.success,
-            tinted: needsAttention,
-            emphasize: needsAttention,
-            message: needsAttention
-                ? '$totalAttention action${totalAttention > 1 ? 's' : ''} need attention'
-                : 'All scheduled maintenance and items are up to date.',
-            action: needsAttention && sessionAllows(session, 'dashboard.view')
-                ? TextButton(
-                    onPressed: () => _open(const DashboardScreen()),
-                    child: const Text('Review'),
-                  )
-                : null,
-          ),
-        ],
-      ),
-    );
+    return _AttentionSection(session: session, onOpen: _open);
   }
 
   Widget _buildQuickActionsSection(BuildContext context, UserSession session) {
@@ -662,6 +495,197 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           children: modules,
         );
       },
+    );
+  }
+}
+
+class _MyWorkSection extends ConsumerWidget {
+  const _MyWorkSection({required this.session, required this.onOpen});
+
+  final UserSession session;
+  final void Function(Widget screen) onOpen;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    // "My Work" surfaces the record assigned to *this person as executor* --
+    // a technician concept. Every other role (Depot Incharge and above) works
+    // through the Maintenance/Work Orders module instead, so showing this
+    // banner there would point at a job that isn't theirs to execute.
+    if (!session.roles.contains(AuthRole.maintenanceStaff)) {
+      return const SizedBox.shrink();
+    }
+
+    final tokens = context.gssms;
+    final textTheme = Theme.of(context).textTheme;
+    // Select only the record this section renders; WorkOrder is Equatable so
+    // unrelated list changes do not rebuild the section.
+    final activeWo = ref.watch(
+      workOrderListControllerProvider.select((listState) {
+        if (listState is! WorkOrderListLoaded) return null;
+        WorkOrder? inProgress;
+        WorkOrder? assigned;
+        for (final wo in listState.workOrders) {
+          if (wo.status == WorkOrderStatus.inProgress && inProgress == null) {
+            inProgress = wo;
+          } else if (wo.status == WorkOrderStatus.assigned && assigned == null) {
+            assigned = wo;
+          }
+        }
+        return inProgress ?? assigned;
+      }),
+    );
+    final isContinue = activeWo?.status == WorkOrderStatus.inProgress;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: GssmsSpacing.s20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(child: _HomeSectionLabel('MY WORK')),
+              if (activeWo != null)
+                StatusChip(
+                  label: isContinue ? 'In Progress' : 'Assigned to You',
+                  tone: isContinue ? GssmsTone.accent : GssmsTone.info,
+                  icon: isContinue
+                      ? Icons.construction_outlined
+                      : Icons.assignment_ind_outlined,
+                ),
+            ],
+          ),
+          const SizedBox(height: GssmsSpacing.s8),
+          if (activeWo != null)
+            Card(
+              margin: EdgeInsets.zero,
+              child: Padding(
+                padding: const EdgeInsets.all(GssmsSpacing.s16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(GssmsSpacing.s8),
+                          decoration: BoxDecoration(
+                            color: tokens.info.background,
+                            borderRadius: BorderRadius.circular(GssmsRadius.r8),
+                          ),
+                          child: Icon(
+                            Icons.engineering_outlined,
+                            color: tokens.info.foreground,
+                            size: GssmsSize.iconLg,
+                          ),
+                        ),
+                        const SizedBox(width: GssmsSpacing.s12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                activeWo.displayTitle,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: textTheme.titleMedium,
+                              ),
+                              const SizedBox(height: GssmsSpacing.s2),
+                              Text(
+                                '${activeWo.displayReference} • '
+                                '${activeWo.stationName ?? activeWo.depotName ?? 'Location not set'}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: textTheme.bodySmall
+                                    ?.copyWith(color: tokens.textSecondary),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: GssmsSpacing.s16),
+                    SizedBox(
+                      width: double.infinity,
+                      height: GssmsSize.primaryAction,
+                      child: FilledButton.icon(
+                        key: Key(isContinue
+                            ? 'home_continue_work_button'
+                            : 'home_start_work_button'),
+                        style: isContinue
+                            ? FilledButton.styleFrom(
+                                backgroundColor: tokens.accent.solid,
+                                foregroundColor: tokens.accent.onSolid,
+                              )
+                            : null,
+                        icon: const Icon(Icons.play_arrow_rounded),
+                        label: Text(isContinue ? 'Continue work' : 'Open to start'),
+                        onPressed: () =>
+                            onOpen(WorkOrderDetailScreen(workOrderId: activeWo.id)),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            _InfoPanel(
+              icon: Icons.task_alt_rounded,
+              tone: GssmsTone.success,
+              message:
+                  'No active job works in progress. Ready for new field assignments.',
+              action: TextButton(
+                onPressed: () => onOpen(const WorkOrderListScreen()),
+                child: const Text('View All'),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AttentionSection extends ConsumerWidget {
+  const _AttentionSection({required this.session, required this.onOpen});
+
+  final UserSession session;
+  final void Function(Widget screen) onOpen;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final totalAttention = ref.watch(
+      dashboardControllerProvider.select((dashboardState) {
+        if (dashboardState is! DashboardLoaded) return 0;
+        return dashboardState.attention.overdue.length +
+            dashboardState.attention.dueSoon.length;
+      }),
+    );
+    final needsAttention = totalAttention > 0;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: GssmsSpacing.s20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _HomeSectionLabel('ATTENTION REQUIRED'),
+          const SizedBox(height: GssmsSpacing.s8),
+          _InfoPanel(
+            icon: needsAttention
+                ? Icons.warning_amber_rounded
+                : Icons.check_circle_outline,
+            tone: needsAttention ? GssmsTone.warning : GssmsTone.success,
+            tinted: needsAttention,
+            emphasize: needsAttention,
+            message: needsAttention
+                ? '$totalAttention action${totalAttention > 1 ? 's' : ''} need attention'
+                : 'All scheduled maintenance and items are up to date.',
+            action: needsAttention && sessionAllows(session, 'dashboard.view')
+                ? TextButton(
+                    onPressed: () => onOpen(const DashboardScreen()),
+                    child: const Text('Review'),
+                  )
+                : null,
+          ),
+        ],
+      ),
     );
   }
 }

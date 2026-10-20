@@ -183,7 +183,8 @@ class SyncManager extends Notifier<SyncState> {
     return completer.future;
   }
 
-  Future<void> enqueueCommand(OutboxCommand command, {bool autoDrain = true}) async {
+  Future<void> enqueueCommand(OutboxCommand command,
+      {bool autoDrain = true}) async {
     await _synchronized(() async {
       final ownerId = command.ownerUserId ?? await _cacheOwnerUserId();
       final stamped =
@@ -209,7 +210,8 @@ class SyncManager extends Notifier<SyncState> {
 
     await _synchronized(() async {
       final epoch = _sessionEpoch;
-      state = state.copyWith(mode: SyncConnectivityMode.syncing, clearError: true);
+      state =
+          state.copyWith(mode: SyncConnectivityMode.syncing, clearError: true);
 
       try {
         if (epoch != _sessionEpoch) {
@@ -228,8 +230,9 @@ class SyncManager extends Notifier<SyncState> {
             : commands.where((c) => c.ownerUserId != actorUserId).toList();
         Future<void> persistScoped(List<OutboxCommand> scoped) =>
             _cacheService.saveOutboxCommands([...unscopedCommands, ...scoped]);
-        final pendingCommands =
-            scopedCommands.where((c) => c.status == OutboxCommandStatus.pending).toList();
+        final pendingCommands = scopedCommands
+            .where((c) => c.status == OutboxCommandStatus.pending)
+            .toList();
 
         if (pendingCommands.isEmpty) {
           // Epoch changed (logout/identity switch): return without writing
@@ -268,13 +271,15 @@ class SyncManager extends Notifier<SyncState> {
             syncedKeys.add(cmd.idempotencyKey);
           } on DioException catch (dioErr) {
             final errStr = dioErr.toString().toLowerCase();
-            final isNetwork = dioErr.type == DioExceptionType.connectionTimeout ||
-                dioErr.type == DioExceptionType.connectionError ||
-                dioErr.type == DioExceptionType.receiveTimeout ||
-                dioErr.type == DioExceptionType.sendTimeout ||
-                (dioErr.type == DioExceptionType.unknown && dioErr.error is SocketException) ||
-                errStr.contains('socketexception') ||
-                errStr.contains('network is unreachable');
+            final isNetwork =
+                dioErr.type == DioExceptionType.connectionTimeout ||
+                    dioErr.type == DioExceptionType.connectionError ||
+                    dioErr.type == DioExceptionType.receiveTimeout ||
+                    dioErr.type == DioExceptionType.sendTimeout ||
+                    (dioErr.type == DioExceptionType.unknown &&
+                        dioErr.error is SocketException) ||
+                    errStr.contains('socketexception') ||
+                    errStr.contains('network is unreachable');
 
             if (isNetwork) {
               // Keep command in pending state and pause outbox draining.
@@ -285,7 +290,8 @@ class SyncManager extends Notifier<SyncState> {
               if (cmd.retryCount >= maxAutoRetries) {
                 remainingCommands.add(cmd.copyWith(
                   status: OutboxCommandStatus.failed,
-                  lastError: 'Network offline. Retry limit reached — tap retry.',
+                  lastError:
+                      'Network offline. Retry limit reached — tap retry.',
                 ));
               } else {
                 remainingCommands.add(cmd.copyWith(
@@ -493,7 +499,8 @@ class SyncManager extends Notifier<SyncState> {
       case OutboxCommandType.transitionStatus:
         final status = asJsonString(cmd.payload['status']);
         if (status == null || status.isEmpty) {
-          throw const FormatException('Missing status in transitionStatus payload');
+          throw const FormatException(
+              'Missing status in transitionStatus payload');
         }
         final rawChecklist = cmd.payload['checklist'];
         final checklist = rawChecklist is Map
@@ -501,10 +508,7 @@ class SyncManager extends Notifier<SyncState> {
             : null;
         final rawEvidence = cmd.payload['evidence'];
         final evidence = rawEvidence is List
-            ? rawEvidence
-                .map((e) => asJsonInt(e))
-                .whereType<int>()
-                .toList()
+            ? rawEvidence.map((e) => asJsonInt(e)).whereType<int>().toList()
             : null;
         await _apiService.changeStatus(
           cmd.entityId,
@@ -543,25 +547,44 @@ class SyncManager extends Notifier<SyncState> {
       case OutboxCommandType.uploadLineAttachment:
         final filePath = asJsonString(cmd.payload['file_path']);
         if (filePath == null || filePath.isEmpty) {
-          throw const FormatException('Missing file_path in line attachment payload');
+          throw const FormatException(
+              'Missing file_path in line attachment payload');
         }
         final lineId = asJsonInt(cmd.payload['line_id']);
         if (lineId == null) {
-          throw const FormatException('Missing line_id in line attachment payload');
+          throw const FormatException(
+              'Missing line_id in line attachment payload');
         }
         final kind = asJsonString(cmd.payload['kind']);
         if (kind == null || kind.isEmpty) {
-          throw const FormatException('Missing kind in line attachment payload');
+          throw const FormatException(
+              'Missing kind in line attachment payload');
         }
         final capturedAtStr = asJsonString(cmd.payload['captured_at']);
         final capturedAt =
             capturedAtStr != null ? DateTime.tryParse(capturedAtStr) : null;
+        // ME-02/ME-04: provenance was frozen when the command was enqueued —
+        // replay it verbatim. Never re-derive `captured_at` or take a fresh
+        // GPS fix during sync; sync-time location would be a substitution.
+        final source =
+            asJsonString(cmd.payload['source'])?.toUpperCase() ?? 'UNKNOWN';
+        final latitude = asJsonDouble(cmd.payload['latitude']);
+        final longitude = asJsonDouble(cmd.payload['longitude']);
+        final accuracyM = asJsonDouble(cmd.payload['location_accuracy_m']);
+        final recordedStr = asJsonString(cmd.payload['location_recorded_at']);
+        final recordedAt =
+            recordedStr != null ? DateTime.tryParse(recordedStr) : null;
         await _apiService.uploadLineAttachment(
           cmd.entityId,
           lineId: lineId,
           kind: kind,
           imagePath: filePath,
           capturedAt: capturedAt,
+          source: source,
+          latitude: latitude,
+          longitude: longitude,
+          locationAccuracyM: accuracyM,
+          locationRecordedAt: recordedAt,
           idempotencyKey: cmd.idempotencyKey,
         );
         break;

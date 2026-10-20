@@ -114,7 +114,7 @@ class AppTheme {
     labelSmall: TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
   );
 
-  static ThemeData get lightTheme => _theme(
+  static final ThemeData lightTheme = _theme(
         colorScheme: ColorScheme.fromSeed(
           seedColor: primaryBlue,
           primary: primaryBlue,
@@ -134,7 +134,7 @@ class AppTheme {
   /// Deliberately designed dark theme: the primary comes from the seed's
   /// dark tonal palette (a light blue with dark on-primary text) instead of
   /// the light-theme brand blue, which is unreadable on dark surfaces.
-  static ThemeData get darkTheme => _theme(
+  static final ThemeData darkTheme = _theme(
         colorScheme: ColorScheme.fromSeed(
           seedColor: primaryBlue,
           brightness: Brightness.dark,

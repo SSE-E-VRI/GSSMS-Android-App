@@ -27,6 +27,7 @@ class AssetListScreen extends ConsumerStatefulWidget {
 
 class _AssetListScreenState extends ConsumerState<AssetListScreen> {
   final TextEditingController _searchController = TextEditingController();
+  Timer? _searchDebounce;
 
   /// True while a scanned code is being resolved to an asset.
   bool _isLookingUp = false;
@@ -55,6 +56,7 @@ class _AssetListScreenState extends ConsumerState<AssetListScreen> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -96,6 +98,7 @@ class _AssetListScreenState extends ConsumerState<AssetListScreen> {
       return;
     }
 
+    _searchDebounce?.cancel();
     _searchController.text = code;
     ref.read(assetListControllerProvider.notifier).setSearchQuery(code);
     ScaffoldMessenger.of(context).showSnackBar(
@@ -225,6 +228,7 @@ class _AssetListScreenState extends ConsumerState<AssetListScreen> {
                   icon: const Icon(Icons.clear, size: 18),
                   tooltip: 'Clear search',
                   onPressed: () {
+                    _searchDebounce?.cancel();
                     _searchController.clear();
                     ref
                         .read(assetListControllerProvider.notifier)
@@ -247,7 +251,11 @@ class _AssetListScreenState extends ConsumerState<AssetListScreen> {
           ),
         ),
         onChanged: (val) {
-          ref.read(assetListControllerProvider.notifier).setSearchQuery(val);
+          _searchDebounce?.cancel();
+          _searchDebounce = Timer(const Duration(milliseconds: 250), () {
+            if (!mounted) return;
+            ref.read(assetListControllerProvider.notifier).setSearchQuery(val);
+          });
         },
       ),
     );

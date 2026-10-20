@@ -63,6 +63,9 @@ final assetDeficienciesProvider =
 
 // --- Asset List State & Notifier ---
 
+/// Per-instance cache for [AssetListLoaded.filteredAssets] (keeps the state const).
+final Expando<List<Asset>> _filteredAssetsCache = Expando<List<Asset>>();
+
 sealed class AssetListState extends Equatable {
   const AssetListState();
 
@@ -114,26 +117,26 @@ class AssetListLoaded extends AssetListState {
     return cats;
   }
 
-  List<Asset> get filteredAssets {
+  /// Filtered rows, computed once per state instance.
+  List<Asset> get filteredAssets =>
+      _filteredAssetsCache[this] ??= _computeFilteredAssets();
+
+  List<Asset> _computeFilteredAssets() {
+    final crit = selectedCriticality;
+    final cat = selectedCategory;
+    final q = searchQuery.toLowerCase();
+    final hasQuery = searchQuery.isNotEmpty;
     return assets.where((a) {
-      if (selectedCriticality != null && a.criticality != selectedCriticality) {
-        return false;
-      }
-      if (selectedCategory != null && a.assetCategoryName != selectedCategory) {
-        return false;
-      }
-      if (searchQuery.isNotEmpty) {
-        final q = searchQuery.toLowerCase();
-        final matchName = a.displayName.toLowerCase().contains(q);
-        final matchCode = a.uniqueId.toLowerCase().contains(q);
-        final matchStation = a.stationName?.toLowerCase().contains(q) ?? false;
-        final matchSerial = a.serialNumber?.toLowerCase().contains(q) ?? false;
-        if (!matchName && !matchCode && !matchStation && !matchSerial) {
-          return false;
-        }
+      if (crit != null && a.criticality != crit) return false;
+      if (cat != null && a.assetCategoryName != cat) return false;
+      if (hasQuery) {
+        return a.displayName.toLowerCase().contains(q) ||
+            a.uniqueId.toLowerCase().contains(q) ||
+            (a.stationName?.toLowerCase().contains(q) ?? false) ||
+            (a.serialNumber?.toLowerCase().contains(q) ?? false);
       }
       return true;
-    }).toList();
+    }).toList(growable: false);
   }
 
   AssetListLoaded copyWith({

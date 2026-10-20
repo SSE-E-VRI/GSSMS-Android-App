@@ -55,3 +55,25 @@ class OrgScopeOptionsService {
         {if (depotId != null) 'depot': depotId},
       );
 }
+
+enum OrgUnitLevel { zone, division, depot, station }
+
+/// id -> name lookup for one org level, fetched once and cached by Riverpod.
+/// Lets the app-bar scope chip read "Depot: Vriddhachalam" instead of
+/// "Depot: #23" when the selection was picked from a dropdown. A failure
+/// resolves to an empty map so callers fall back to the "#id" label.
+final orgUnitNamesProvider =
+    FutureProvider.family<Map<int, String>, OrgUnitLevel>((ref, level) async {
+  final service = ref.watch(orgScopeOptionsServiceProvider);
+  try {
+    final options = switch (level) {
+      OrgUnitLevel.zone => await service.fetchZones(),
+      OrgUnitLevel.division => await service.fetchDivisions(),
+      OrgUnitLevel.depot => await service.fetchDepots(),
+      OrgUnitLevel.station => await service.fetchStations(),
+    };
+    return {for (final o in options) o.id: o.name};
+  } catch (_) {
+    return const {};
+  }
+});

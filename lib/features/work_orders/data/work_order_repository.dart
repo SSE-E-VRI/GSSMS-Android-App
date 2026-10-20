@@ -77,12 +77,15 @@ abstract class IWorkOrderRepository {
     int? maintenanceMasterId,
   });
   Future<List<MaintenanceMaster>> fetchMaintenanceMasters();
-  Future<BatchConvertResult> createWorkOrdersFromComplaints(List<int> complaintIds);
-  Future<BatchConvertResult> createWorkOrdersFromInspections(List<int> inspectionIds);
+  Future<BatchConvertResult> createWorkOrdersFromComplaints(
+      List<int> complaintIds);
+  Future<BatchConvertResult> createWorkOrdersFromInspections(
+      List<int> inspectionIds);
   Future<BatchConvertResult> createRectification(
     List<int> deficiencyIds, {
     bool onePerDeficiency = false,
-  });  Future<WorkOrderActionSet> fetchAllowedActions(int workOrderId);
+  });
+  Future<WorkOrderActionSet> fetchAllowedActions(int workOrderId);
   Future<WorkOrderAudit> fetchAudit(int workOrderId);
   Future<List<Technician>> fetchAssignableTechnicians({int? depotId});
   Future<WorkOrder> assignTechnician(int workOrderId, int technicianId);
@@ -180,6 +183,11 @@ abstract class IWorkOrderRepository {
     required String kind,
     required String imagePath,
     DateTime? capturedAt,
+    String? source,
+    double? latitude,
+    double? longitude,
+    double? locationAccuracyM,
+    DateTime? locationRecordedAt,
   });
 
   Future<void> deleteLineAttachment(
@@ -363,7 +371,8 @@ class WorkOrderRepository implements IWorkOrderRepository {
       // Optional checklist template — `maintenance_master` is a plain
       // writable FK on WorkOrderSerializer (not in read_only_fields), same
       // field the web "New Job Work" template picker sends.
-      if (maintenanceMasterId != null) 'maintenance_master': maintenanceMasterId,
+      if (maintenanceMasterId != null)
+        'maintenance_master': maintenanceMasterId,
     };
     final order = await _apiService.createWorkOrder(payload);
     await _cacheService.cacheWorkOrderDetail(order);
@@ -376,14 +385,17 @@ class WorkOrderRepository implements IWorkOrderRepository {
   }
 
   @override
-  Future<BatchConvertResult> createWorkOrdersFromComplaints(List<int> complaintIds) {
+  Future<BatchConvertResult> createWorkOrdersFromComplaints(
+      List<int> complaintIds) {
     return _apiService.createWorkOrdersFromComplaints(complaintIds);
   }
 
   @override
-  Future<BatchConvertResult> createWorkOrdersFromInspections(List<int> inspectionIds) {
+  Future<BatchConvertResult> createWorkOrdersFromInspections(
+      List<int> inspectionIds) {
     return _apiService.createWorkOrdersFromInspections(inspectionIds);
   }
+
   @override
   Future<BatchConvertResult> createRectification(
     List<int> deficiencyIds, {
@@ -422,7 +434,8 @@ class WorkOrderRepository implements IWorkOrderRepository {
 
   @override
   Future<WorkOrder> verifyWorkOrder(int workOrderId, {String? remarks}) async {
-    final order = await _apiService.verifyWorkOrder(workOrderId, remarks: remarks);
+    final order =
+        await _apiService.verifyWorkOrder(workOrderId, remarks: remarks);
     await _cacheService.cacheWorkOrderDetail(order);
     return order;
   }
@@ -522,7 +535,8 @@ class WorkOrderRepository implements IWorkOrderRepository {
       );
 
   @override
-  Future<void> unflagRemarkDeficiency(int recordId, {required int remarkIndex}) =>
+  Future<void> unflagRemarkDeficiency(int recordId,
+          {required int remarkIndex}) =>
       _apiService.unflagRemarkDeficiency(recordId, remarkIndex: remarkIndex);
 
   @override
@@ -569,7 +583,8 @@ class WorkOrderRepository implements IWorkOrderRepository {
         // caller can tell "queued for later" apart from a genuine failure
         // and skip navigation rather than guess an id.
         final cmd = OutboxCommand(
-          idempotencyKey: 'start_exec_${workOrderId}_${DateTime.now().millisecondsSinceEpoch}',
+          idempotencyKey:
+              'start_exec_${workOrderId}_${DateTime.now().millisecondsSinceEpoch}',
           type: OutboxCommandType.startExecution,
           entityId: workOrderId,
           payload: const {},
@@ -609,7 +624,8 @@ class WorkOrderRepository implements IWorkOrderRepository {
           );
         }
         final cmd = OutboxCommand(
-          idempotencyKey: 'trans_${workOrderId}_${status}_${DateTime.now().millisecondsSinceEpoch}',
+          idempotencyKey:
+              'trans_${workOrderId}_${status}_${DateTime.now().millisecondsSinceEpoch}',
           type: OutboxCommandType.transitionStatus,
           entityId: workOrderId,
           payload: {
@@ -626,12 +642,14 @@ class WorkOrderRepository implements IWorkOrderRepository {
         // Optimistic update in cache. `remarks` is the transition note, not
         // the work order's description — copyWith'ing it into `description`
         // overwrote the real description with e.g. a rework reason.
-        final cached = await _cacheService.getCachedWorkOrderDetail(workOrderId);
+        final cached =
+            await _cacheService.getCachedWorkOrderDetail(workOrderId);
         if (cached != null) {
           final updated = cached.copyWith(
             status: WorkOrderStatus.fromString(status),
-            reportCompletedAt:
-                status == 'TECH_COMPLETED' ? DateTime.now() : cached.reportCompletedAt,
+            reportCompletedAt: status == 'TECH_COMPLETED'
+                ? DateTime.now()
+                : cached.reportCompletedAt,
           );
           await _cacheService.cacheWorkOrderDetail(updated);
           return updated;
@@ -679,7 +697,8 @@ class WorkOrderRepository implements IWorkOrderRepository {
       if (_isNetworkException(e) && _syncManager != null) {
         final lineId = lineData['line_id'] ?? 0;
         final cmd = OutboxCommand(
-          idempotencyKey: 'line_${recordId}_${lineId}_${DateTime.now().millisecondsSinceEpoch}',
+          idempotencyKey:
+              'line_${recordId}_${lineId}_${DateTime.now().millisecondsSinceEpoch}',
           type: OutboxCommandType.submitLine,
           entityId: recordId,
           payload: lineData,
@@ -694,6 +713,7 @@ class WorkOrderRepository implements IWorkOrderRepository {
   }
 
   @override
+
   /// Uploads proof of execution, queueing it when offline.
   ///
   /// The queued command keeps the file path rather than the bytes: the photo
@@ -716,17 +736,20 @@ class WorkOrderRepository implements IWorkOrderRepository {
       return MutationOutcome.synced;
     } catch (e) {
       if (_isNetworkException(e) && _syncManager != null) {
-        await _enqueueDeduped(OutboxCommand(
-          idempotencyKey: 'evidence_${recordId}_${DateTime.now().millisecondsSinceEpoch}',
-          type: OutboxCommandType.uploadEvidence,
-          entityId: recordId,
-          payload: {
-            if (proofJpegPath != null) 'proof_path': proofJpegPath,
-            if (remarks != null) 'remarks': remarks,
-            if (otherStaff != null) 'other_staff': otherStaff,
-          },
-          createdAt: DateTime.now(),
-        ), matches: (c) => c.payload['proof_path'] == proofJpegPath);
+        await _enqueueDeduped(
+            OutboxCommand(
+              idempotencyKey:
+                  'evidence_${recordId}_${DateTime.now().millisecondsSinceEpoch}',
+              type: OutboxCommandType.uploadEvidence,
+              entityId: recordId,
+              payload: {
+                if (proofJpegPath != null) 'proof_path': proofJpegPath,
+                if (remarks != null) 'remarks': remarks,
+                if (otherStaff != null) 'other_staff': otherStaff,
+              },
+              createdAt: DateTime.now(),
+            ),
+            matches: (c) => c.payload['proof_path'] == proofJpegPath);
         return MutationOutcome.queued;
       }
       rethrow;
@@ -744,7 +767,8 @@ class WorkOrderRepository implements IWorkOrderRepository {
     final syncManager = _syncManager;
     Future<MutationOutcome> enqueue(SyncManager sync) async {
       await _enqueueDeduped(OutboxCommand(
-        idempotencyKey: 'complete_${recordId}_${DateTime.now().millisecondsSinceEpoch}',
+        idempotencyKey:
+            'complete_${recordId}_${DateTime.now().millisecondsSinceEpoch}',
         type: OutboxCommandType.completeRecord,
         entityId: recordId,
         payload: {
@@ -767,7 +791,8 @@ class WorkOrderRepository implements IWorkOrderRepository {
       );
       return MutationOutcome.synced;
     } catch (e) {
-      if (_isNetworkException(e) && syncManager != null) return enqueue(syncManager);
+      if (_isNetworkException(e) && syncManager != null)
+        return enqueue(syncManager);
       rethrow;
     }
   }
@@ -779,9 +804,18 @@ class WorkOrderRepository implements IWorkOrderRepository {
     required String kind,
     required String imagePath,
     DateTime? capturedAt,
+    String? source,
+    double? latitude,
+    double? longitude,
+    double? locationAccuracyM,
+    DateTime? locationRecordedAt,
   }) async {
     final idempotencyKey =
         'line_att_${recordId}_${lineId}_${DateTime.now().millisecondsSinceEpoch}';
+    // Capture the provenance ONCE, here. The outbox payload is frozen with
+    // these exact values, so an offline retry never re-derives source,
+    // captured_at or a replacement GPS fix (audit §9.2 ME-02/ME-04).
+    final resolvedSource = (source ?? 'UNKNOWN').toUpperCase();
     try {
       final data = await _apiService.uploadLineAttachment(
         recordId,
@@ -789,6 +823,11 @@ class WorkOrderRepository implements IWorkOrderRepository {
         kind: kind,
         imagePath: imagePath,
         capturedAt: capturedAt,
+        source: resolvedSource,
+        latitude: latitude,
+        longitude: longitude,
+        locationAccuracyM: locationAccuracyM,
+        locationRecordedAt: locationRecordedAt,
         idempotencyKey: idempotencyKey,
       );
       return LineAttachment.fromJson(data);
@@ -802,7 +841,16 @@ class WorkOrderRepository implements IWorkOrderRepository {
             'line_id': lineId,
             'kind': kind,
             'file_path': imagePath,
+            // Frozen provenance — replayed verbatim by SyncManager.
+            'source': resolvedSource,
             if (capturedAt != null) 'captured_at': capturedAt.toIso8601String(),
+            if (latitude != null && longitude != null && locationAccuracyM != null && locationRecordedAt != null)
+              ...{
+                'latitude': latitude,
+                'longitude': longitude,
+                'location_accuracy_m': locationAccuracyM,
+                'location_recorded_at': locationRecordedAt.toIso8601String(),
+              },
           },
           createdAt: DateTime.now(),
         );
@@ -815,10 +863,15 @@ class WorkOrderRepository implements IWorkOrderRepository {
         return LineAttachment(
           id: -DateTime.now().millisecondsSinceEpoch,
           kind: kind.toUpperCase(),
+          source: resolvedSource,
           localPath: imagePath,
-          capturedAt: capturedAt ?? DateTime.now(),
+          capturedAt: capturedAt,
           syncStatus: OutboxCommandStatus.pending,
           idempotencyKey: idempotencyKey,
+          latitude: latitude,
+          longitude: longitude,
+          locationAccuracyM: locationAccuracyM,
+          locationRecordedAt: locationRecordedAt,
         );
       }
       rethrow;

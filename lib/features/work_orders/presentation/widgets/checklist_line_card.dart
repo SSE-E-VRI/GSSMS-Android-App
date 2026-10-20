@@ -49,7 +49,8 @@ class ChecklistLineCard extends ConsumerStatefulWidget {
   final void Function(ChecklistLineEdit edit) onSave;
   final int? recordId;
   final bool isPastTechCompleted;
-  final Future<void> Function(EvidenceKind kind, ImageSource source)? onCapturePhoto;
+  final Future<void> Function(EvidenceKind kind, ImageSource source)?
+      onCapturePhoto;
   final Future<void> Function(LineAttachment attachment)? onDeletePhoto;
   final Future<void> Function(LineAttachment attachment)? onRetryPhoto;
 
@@ -292,10 +293,11 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
   Widget _buildHeader(BuildContext context, MaintenanceRecordLine line) {
     final textTheme = Theme.of(context).textTheme;
     final tokens = context.gssms;
-    final hasPoint = line.inspectionPoint != null &&
-        line.inspectionPoint!.trim().isNotEmpty;
-    final hasObservations =
-        line.isCompleted || line.recordedValue != null || line.statusOptionId != null;
+    final hasPoint =
+        line.inspectionPoint != null && line.inspectionPoint!.trim().isNotEmpty;
+    final hasObservations = line.isCompleted ||
+        line.recordedValue != null ||
+        line.statusOptionId != null;
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -364,7 +366,8 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
             width: 24,
             height: 24,
             decoration: BoxDecoration(
-              color: line.isCompleted ? tokens.success.solid : Colors.transparent,
+              color:
+                  line.isCompleted ? tokens.success.solid : Colors.transparent,
               border: line.isCompleted
                   ? null
                   : Border.all(color: tokens.borderStrong, width: 1.5),
@@ -403,8 +406,8 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
 
   Widget _buildScalarInput(MaintenanceRecordLine line) {
     final isNumeric = line.valueType.isNumeric;
-    final hasReference = line.referenceValue != null &&
-        line.referenceValue!.trim().isNotEmpty;
+    final hasReference =
+        line.referenceValue != null && line.referenceValue!.trim().isNotEmpty;
     final hasUnit = line.unit != null && line.unit!.trim().isNotEmpty;
     return TextField(
       key: Key('line_value_${line.id}'),
@@ -415,8 +418,7 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
           : TextInputType.text,
       inputFormatters: isNumeric
           ? [
-              FilteringTextInputFormatter.allow(
-                  RegExp(r'^-?[0-9]*\.?[0-9]*')),
+              FilteringTextInputFormatter.allow(RegExp(r'^-?[0-9]*\.?[0-9]*')),
             ]
           : null,
       decoration: InputDecoration(
@@ -464,7 +466,8 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
               key: Key('line_${line.id}_component_$key'),
               controller: _componentControllers[key],
               focusNode: _componentFocusNodes[key],
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
               inputFormatters: [
                 FilteringTextInputFormatter.allow(
                     RegExp(r'^-?[0-9]*\.?[0-9]*')),
@@ -729,14 +732,26 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
         );
       }
 
-      final evidence = await evidenceService.capture(kind: kind, source: source);
+      final evidence = await evidenceService.capture(
+        kind: kind,
+        source: source,
+        // ME-02/ME-03: one fresh fix for camera captures only; the photo is
+        // kept without GPS when the fix fails. Gallery never gets a fix or
+        // an invented captured_at (ME-04).
+        captureLocation: source == ImageSource.camera,
+      );
       if (evidence == null) return; // User cancelled — nothing was captured.
 
       await controller.uploadLineAttachment(
         lineId: lineId,
         kind: kind.name.toUpperCase(),
         imagePath: evidence.path,
-        capturedAt: DateTime.now(),
+        capturedAt: evidence.capturedAt,
+        source: evidence.source.code,
+        latitude: evidence.location?.latitude,
+        longitude: evidence.location?.longitude,
+        locationAccuracyM: evidence.location?.accuracyM,
+        locationRecordedAt: evidence.location?.recordedAt,
       );
     } catch (e) {
       if (mounted) {
@@ -857,27 +872,35 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
                 ),
               ),
             ),
-            if (attachment.capturedAt != null || attachment.uploadedBy != null)
+            // ME-06: source label is always shown (Camera/Gallery/Unknown);
+            // captured time and location line are appended when available.
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                12,
+                0,
+                12,
+                attachment.uploadedBy != null ? 4 : 12,
+              ),
+              child: Text(
+                [
+                  attachment.sourceLabel,
+                  if (attachment.capturedAt != null)
+                    'Captured: ${DateFormat('dd MMM yyyy, hh:mm a').format(attachment.capturedAt!.toLocal())}',
+                  attachment.locationText,
+                ].whereType<String>().join(' · '),
+                style: Theme.of(ctx).textTheme.labelSmall?.copyWith(
+                      color: ctx.gssms.textSecondary,
+                    ),
+              ),
+            ),
+            if (attachment.uploadedBy != null)
               Padding(
-                padding: const EdgeInsets.all(12),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    if (attachment.capturedAt != null)
-                      Text(
-                        'Captured: ${DateFormat('dd MMM yyyy, hh:mm a').format(attachment.capturedAt!.toLocal())}',
-                        style: Theme.of(ctx).textTheme.labelSmall?.copyWith(
-                              color: ctx.gssms.textSecondary,
-                            ),
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                child: Text(
+                  'By: ${attachment.uploadedBy}',
+                  style: Theme.of(ctx).textTheme.labelSmall?.copyWith(
+                        color: ctx.gssms.textSecondary,
                       ),
-                    if (attachment.uploadedBy != null)
-                      Text(
-                        'By: ${attachment.uploadedBy}',
-                        style: Theme.of(ctx).textTheme.labelSmall?.copyWith(
-                              color: ctx.gssms.textSecondary,
-                            ),
-                      ),
-                  ],
                 ),
               ),
           ],
@@ -887,9 +910,11 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
   }
 
   Widget _buildAttachmentsSection(MaintenanceRecordLine line) {
-    final beforeAtts = line.attachments.where((a) => a.kind == 'BEFORE').toList();
+    final beforeAtts =
+        line.attachments.where((a) => a.kind == 'BEFORE').toList();
     final afterAtts = line.attachments.where((a) => a.kind == 'AFTER').toList();
-    final duringAtts = line.attachments.where((a) => a.kind == 'DURING').toList();
+    final duringAtts =
+        line.attachments.where((a) => a.kind == 'DURING').toList();
 
     final countSummary = duringAtts.isEmpty
         ? 'Before ${beforeAtts.length} · After ${afterAtts.length}'
@@ -902,7 +927,8 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
         const SizedBox(height: GssmsSpacing.s6),
         InkWell(
           key: Key('line_${line.id}_attachments_toggle'),
-          onTap: () => setState(() => _attachmentsExpanded = !_attachmentsExpanded),
+          onTap: () =>
+              setState(() => _attachmentsExpanded = !_attachmentsExpanded),
           borderRadius: BorderRadius.circular(GssmsRadius.r8),
           child: Container(
             constraints: const BoxConstraints(minHeight: GssmsSize.touchTarget),
@@ -917,7 +943,9 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
                 Icon(
                   Icons.photo_camera_outlined,
                   size: 18,
-                  color: (beforeAtts.isNotEmpty || afterAtts.isNotEmpty || duringAtts.isNotEmpty)
+                  color: (beforeAtts.isNotEmpty ||
+                          afterAtts.isNotEmpty ||
+                          duringAtts.isNotEmpty)
                       ? tokens.link
                       : tokens.textSecondary,
                 ),
@@ -936,7 +964,8 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
                   _attachmentsExpanded ? Icons.expand_less : Icons.expand_more,
                   size: 20,
                   color: tokens.textSecondary,
-                  semanticLabel: _attachmentsExpanded ? 'Hide photos' : 'Show photos',
+                  semanticLabel:
+                      _attachmentsExpanded ? 'Hide photos' : 'Show photos',
                 ),
               ],
             ),
@@ -1002,7 +1031,9 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
                   key: Key('line_${widget.line.id}_camera_${kind.name}'),
                   icon: const Icon(Icons.photo_camera, size: 22),
                   tooltip: 'Capture from camera',
-                  onPressed: canAdd ? () => _handleCapture(kind, ImageSource.camera) : null,
+                  onPressed: canAdd
+                      ? () => _handleCapture(kind, ImageSource.camera)
+                      : null,
                   style: IconButton.styleFrom(
                     minimumSize: const Size(48, 48),
                     padding: EdgeInsets.zero,
@@ -1018,7 +1049,9 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
                   key: Key('line_${widget.line.id}_gallery_${kind.name}'),
                   icon: const Icon(Icons.photo_library_outlined, size: 22),
                   tooltip: 'Select from gallery',
-                  onPressed: canAdd ? () => _handleCapture(kind, ImageSource.gallery) : null,
+                  onPressed: canAdd
+                      ? () => _handleCapture(kind, ImageSource.gallery)
+                      : null,
                   style: IconButton.styleFrom(
                     minimumSize: const Size(48, 48),
                     padding: EdgeInsets.zero,
@@ -1084,7 +1117,8 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         GestureDetector(
-          key: Key('line_attachment_thumb_${attachment.idempotencyKey ?? attachment.id}'),
+          key: Key(
+              'line_attachment_thumb_${attachment.idempotencyKey ?? attachment.id}'),
           onTap: () => _showFullscreenImage(attachment),
           // Delete is hidden past TECH_COMPLETED (server rule); the dialog
           // handler keeps a refusal backstop for races.
@@ -1106,7 +1140,8 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
                     // Decode at thumbnail size: camera photos are 12+ MP, and
                     // decoding them in full for a 76 px tile is a large
                     // memory spike per photo on a long checklist.
-                    decodeWidth: 76 * MediaQuery.devicePixelRatioOf(context).ceil(),
+                    decodeWidth:
+                        76 * MediaQuery.devicePixelRatioOf(context).ceil(),
                   ),
                 ),
               ),
@@ -1127,14 +1162,28 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
                   ),
                 ),
               ),
+              // ME-07: visible delete in front of the long-press gesture.
+              // Same confirmed handler; long press is retained.
+              if (!widget.isPastTechCompleted)
+                Positioned(
+                  right: 0,
+                  bottom: 0,
+                  child: AttachmentDeleteCorner(
+                    key: Key(
+                        'delete_attachment_${attachment.idempotencyKey ?? attachment.id}'),
+                    onPressed: () => _handleDelete(attachment),
+                  ),
+                ),
             ],
           ),
         ),
         if (attachment.isFailed) ...[
           const SizedBox(height: 4),
           TextButton.icon(
-            key: Key('retry_attachment_${attachment.idempotencyKey ?? attachment.id}'),
-            icon: Icon(Icons.refresh, size: 16, color: tokens.danger.foreground),
+            key: Key(
+                'retry_attachment_${attachment.idempotencyKey ?? attachment.id}'),
+            icon:
+                Icon(Icons.refresh, size: 16, color: tokens.danger.foreground),
             label: Text(
               'Retry',
               style: Theme.of(context).textTheme.labelLarge?.copyWith(
@@ -1150,6 +1199,46 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
           ),
         ],
       ],
+    );
+  }
+}
+
+/// ME-07: compact visible delete affordance on the thumbnail (bottom-right
+/// corner of the 76 px tile). Wired to the existing confirmed-deletion
+/// handler; long-press on the remaining area is unchanged.
+/// ME-07: compact visible delete affordance on the bottom-right corner of a
+/// 76 px evidence thumbnail. Wired to the existing confirmed-deletion
+/// handler by the caller; long-press on the remaining tile area is unchanged.
+class AttachmentDeleteCorner extends StatelessWidget {
+  const AttachmentDeleteCorner({super.key, required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final tokens = context.gssms;
+    return Tooltip(
+      message: 'Delete photo',
+      child: InkWell(
+        onTap: onPressed,
+        borderRadius: const BorderRadius.only(
+          bottomRight: Radius.circular(8),
+          topLeft: Radius.circular(8),
+        ),
+        child: Container(
+          width: 30,
+          height: 30,
+          decoration: BoxDecoration(
+            color: tokens.danger.solid,
+            borderRadius: const BorderRadius.only(
+              bottomRight: Radius.circular(8),
+              topLeft: Radius.circular(8),
+            ),
+          ),
+          child: Icon(Icons.delete_outline,
+              size: 18, color: tokens.danger.onSolid),
+        ),
+      ),
     );
   }
 }

@@ -9,6 +9,17 @@ rootProject.buildDir = "../build"
 subprojects {
     project.buildDir = "${rootProject.buildDir}/${project.name}"
 }
+// Some plugins pin an old compileSdk (image_picker_android 0.8.12 uses 34) while
+// their androidx deps need 35+, which fails checkReleaseAarMetadata. Align every
+// plugin library with the app's compileSdk. Must be registered before the
+// evaluationDependsOn block below so it runs when each plugin is evaluated.
+subprojects {
+    afterEvaluate { p ->
+        if (p.hasProperty("android") && p.name != "app") {
+            p.android.compileSdk = 36
+        }
+    }
+}
 subprojects {
     project.evaluationDependsOn(":app")
 }

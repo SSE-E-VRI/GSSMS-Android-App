@@ -1,12 +1,34 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gssms_mobile/core/data/org_scope_options_service.dart';
+import 'package:gssms_mobile/core/domain/org_option.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:gssms_mobile/core/widgets/org_scope_app_bar_filter.dart';
 import 'package:gssms_mobile/core/widgets/org_scope_filter_bar.dart';
 import 'package:gssms_mobile/features/auth/domain/models/org_scope.dart';
 
+class _MockService extends Mock implements OrgScopeOptionsService {}
+
+_MockService _service() {
+  final m = _MockService();
+  when(m.fetchZones).thenAnswer((_) async => const []);
+  when(() => m.fetchDivisions(zoneId: any(named: 'zoneId')))
+      .thenAnswer((_) async => const []);
+  when(() => m.fetchDepots(
+        zoneId: any(named: 'zoneId'),
+        divisionId: any(named: 'divisionId'),
+      )).thenAnswer((_) async => const [OrgOption(id: 23, name: 'Cuddalore')]);
+  when(() => m.fetchStations(depotId: any(named: 'depotId')))
+      .thenAnswer((_) async => const []);
+  return m;
+}
+
 void main() {
   group('OrgScopeAppBarFilter Widget Tests', () {
-    testWidgets('collapses to nothing when user is depot-scoped and enableStation is false', (tester) async {
+    testWidgets(
+        'collapses to nothing when user is depot-scoped and enableStation is false',
+        (tester) async {
       const depotScope = OrgScope(
         level: OrgScopeLevel.depot,
         depot: OrgUnitInfo(id: 10, code: 'VRI', name: 'Vriddhachalam Depot'),
@@ -33,7 +55,8 @@ void main() {
       expect(find.byKey(const Key('org_scope_active_chip')), findsNothing);
     });
 
-    testWidgets('renders plain filter icon when selection is empty', (tester) async {
+    testWidgets('renders plain filter icon when selection is empty',
+        (tester) async {
       const globalScope = OrgScope(level: OrgScopeLevel.global);
 
       await tester.pumpWidget(
@@ -56,7 +79,8 @@ void main() {
       expect(find.byKey(const Key('org_scope_active_chip')), findsNothing);
     });
 
-    testWidgets('renders active chip when depot is selected in selection', (tester) async {
+    testWidgets('renders active chip when depot is selected in selection',
+        (tester) async {
       const globalScope = OrgScope(level: OrgScopeLevel.global);
       const selectionWithDepot = OrgScopeSelection(
         zoneId: 1,
@@ -86,23 +110,56 @@ void main() {
       expect(find.text('Depot: Vriddhachalam ▾'), findsOneWidget);
     });
 
-    testWidgets('tapping filter icon opens bottom sheet with Done and Clear buttons', (tester) async {
+    testWidgets('chip resolves a picked depot id to its name', (tester) async {
+      const globalScope = OrgScope(level: OrgScopeLevel.global);
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            orgScopeOptionsServiceProvider.overrideWithValue(_service()),
+          ],
+          child: MaterialApp(
+            home: Scaffold(
+              appBar: AppBar(
+                actions: [
+                  OrgScopeAppBarFilter(
+                    scope: globalScope,
+                    selection: const OrgScopeSelection(depotId: 23),
+                    onChanged: (_) {},
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Depot: Cuddalore ▾'), findsOneWidget);
+    });
+
+    testWidgets(
+        'tapping filter icon opens bottom sheet with Done and Clear buttons',
+        (tester) async {
       const globalScope = OrgScope(level: OrgScopeLevel.global);
       OrgScopeSelection? changedSelection;
 
       await tester.pumpWidget(
-        MaterialApp(
-          home: Scaffold(
-            appBar: AppBar(
-              actions: [
-                OrgScopeAppBarFilter(
-                  scope: globalScope,
-                  selection: const OrgScopeSelection(depotId: 5),
-                  onChanged: (s) {
-                    changedSelection = s;
-                  },
-                ),
-              ],
+        ProviderScope(
+          overrides: [
+            orgScopeOptionsServiceProvider.overrideWithValue(_service())
+          ],
+          child: MaterialApp(
+            home: Scaffold(
+              appBar: AppBar(
+                actions: [
+                  OrgScopeAppBarFilter(
+                    scope: globalScope,
+                    selection: const OrgScopeSelection(depotId: 5),
+                    onChanged: (s) {
+                      changedSelection = s;
+                    },
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -123,7 +180,9 @@ void main() {
       expect(find.byKey(const Key('org_scope_bottom_sheet')), findsNothing);
     });
 
-    testWidgets('shows filter icon for depot scope with station available (parity with bar)', (tester) async {
+    testWidgets(
+        'shows filter icon for depot scope with station available (parity with bar)',
+        (tester) async {
       const depotScope = OrgScope(
         level: OrgScopeLevel.depot,
         depot: OrgUnitInfo(id: 10, code: 'VRI', name: 'Vriddhachalam Depot'),
@@ -150,7 +209,9 @@ void main() {
       expect(find.byKey(const Key('org_scope_filter_icon')), findsOneWidget);
     });
 
-    testWidgets('collapses when no depot is resolved and only station could apply', (tester) async {
+    testWidgets(
+        'collapses when no depot is resolved and only station could apply',
+        (tester) async {
       const selfScope = OrgScope(level: OrgScopeLevel.self);
 
       await tester.pumpWidget(
@@ -174,7 +235,8 @@ void main() {
       expect(find.byKey(const Key('org_scope_active_chip')), findsNothing);
     });
 
-    testWidgets('chip label uses own depot name instead of #id', (tester) async {
+    testWidgets('chip label uses own depot name instead of #id',
+        (tester) async {
       const depotScope = OrgScope(
         level: OrgScopeLevel.depot,
         depot: OrgUnitInfo(id: 10, code: 'VRI', name: 'Vriddhachalam Depot'),

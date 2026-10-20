@@ -3,6 +3,15 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.CAMERA" />
+    <!--
+      ME-02: one fresh foreground location fix for CAMERA evidence photos.
+      COARSE alone is acceptable for image provenance; FINE is requested so
+      the accuracy column is meaningful, but the flow degrades silently
+      (photo kept without GPS) when only coarse is granted or denied.
+      Never used in background — no future/access_background variants.
+    -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <!-- Gallery via image_picker (API 33+). -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <!-- Gallery fallback on API <= 32. -->
