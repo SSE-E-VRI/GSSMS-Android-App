@@ -78,6 +78,10 @@ void main() {
       expect(find.text('WO #101'), findsOneWidget);
       expect(find.text('Monthly Transformer Inspection'), findsOneWidget);
       expect(find.text('tech_ramesh'), findsOneWidget);
+      expect(
+        find.bySemanticsLabel('Job Work WO #101, status: Assigned, VRI, Monthly Transformer Inspection, assigned to tech_ramesh'),
+        findsOneWidget,
+      );
 
       // Open filter bottom sheet
       await tester.tap(find.byKey(const Key('filters_button')));

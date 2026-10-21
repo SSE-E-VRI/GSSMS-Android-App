@@ -708,7 +708,29 @@ class _WorkOrderCard extends StatelessWidget {
             .where((s) => s != null && s.isNotEmpty)
             .join(' • ');
 
-    return Card(
+    final semanticsLabel = [
+      'Job Work ${workOrder.displayReference}',
+      'status: ${workOrder.status.displayName}',
+      if (location.isNotEmpty) location,
+      workOrder.displayTitle,
+      if (isOverdue && workOrder.dueDate != null)
+        'overdue, due ${_dateFormat.format(workOrder.dueDate!)}'
+      else if (workOrder.dueDate != null)
+        'due ${_dateFormat.format(workOrder.dueDate!)}',
+      if (workOrder.assignedToName != null &&
+          workOrder.assignedToName!.trim().isNotEmpty)
+        'assigned to ${workOrder.assignedToName!.trim()}'
+      else
+        'unassigned',
+    ].join(', ');
+
+    return Semantics(
+      container: true,
+      button: true,
+      onTap: onTap,
+      label: semanticsLabel,
+      child: ExcludeSemantics(
+        child: Card(
       key: Key('work_order_card_${workOrder.id}'),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -826,7 +848,9 @@ class _WorkOrderCard extends StatelessWidget {
           ),
         ),
       ),
-    );
+    ),
+  ),
+);
   }
 }
 

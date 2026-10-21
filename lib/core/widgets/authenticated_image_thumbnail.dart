@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
 import 'package:gssms_mobile/features/auth/domain/rbac.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
-import 'package:gssms_mobile/features/auth/presentation/controllers/auth_state.dart';
 
 /// Full-screen, pinch-to-zoom viewer for evidence photos.
 class PhotoPreviewScaffold extends StatelessWidget {

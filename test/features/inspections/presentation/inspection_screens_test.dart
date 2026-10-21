@@ -113,6 +113,10 @@ void main() {
       expect(find.text('#1'), findsOneWidget);
       // Inspections carry no priority in the API — no fabricated badge.
       expect(find.text('High'), findsNothing);
+      expect(
+        find.bySemanticsLabel('Inspection #1, status: Open, Thalanallur (Station), EB Bunk Monthly Check'),
+        findsOneWidget,
+      );
       expect(find.text('Medium'), findsNothing);
       // Points badge is hidden when pointsCount == 0
       expect(find.text('0 Points'), findsNothing);

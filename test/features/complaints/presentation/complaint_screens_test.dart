@@ -103,6 +103,10 @@ void main() {
       expect(find.text('High'), findsNothing);
       expect(find.text('Medium'), findsNothing);
       expect(find.byKey(const Key('fab_create_complaint')), findsOneWidget);
+      expect(
+        find.bySemanticsLabel('Breakdown #1, status: Open, VRI (Station), Transformer Leakage'),
+        findsOneWidget,
+      );
 
       // Open filter bottom sheet
       await tester.tap(find.byKey(const Key('complaint_filters_button')));

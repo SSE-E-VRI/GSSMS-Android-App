@@ -529,7 +529,24 @@ class _ComplaintCard extends StatelessWidget {
     final metaStyle = textTheme.bodySmall?.copyWith(color: tokens.textSecondary);
     final location = complaint.locationLabel ?? complaint.depotName;
 
-    return Card(
+    final semanticsLabel = [
+      'Breakdown ${complaint.reference}',
+      'status: ${complaint.status.displayName}',
+      if (location != null && location.isNotEmpty) location,
+      complaint.title,
+      if (complaint.complainantName != null &&
+          complaint.complainantName!.trim().isNotEmpty)
+        'reported by ${complaint.complainantName!.trim()}',
+      if (complaint.createdAt != null) _formatWhen(complaint.createdAt!),
+    ].join(', ');
+
+    return Semantics(
+      container: true,
+      button: true,
+      onTap: onTap,
+      label: semanticsLabel,
+      child: ExcludeSemantics(
+        child: Card(
       key: Key('complaint_card_${complaint.id}'),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -620,7 +637,9 @@ class _ComplaintCard extends StatelessWidget {
           ),
         ),
       ),
-    );
+    ),
+  ),
+);
   }
 }
 

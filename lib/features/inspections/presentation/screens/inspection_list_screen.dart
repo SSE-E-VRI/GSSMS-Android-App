@@ -529,8 +529,27 @@ class _InspectionCard extends StatelessWidget {
     final linkedJobWork = inspection.jobWorks.firstOrNull;
     final effectiveWorkOrderId = inspection.workOrderId ?? linkedJobWork?.id;
     final effectiveTicketNumber = linkedJobWork?.ticketNumber;
+    final location = inspection.locationLabel ?? inspection.depotName;
 
-    return Card(
+    final semanticsLabel = [
+      'Inspection ${inspection.reference}',
+      'status: ${inspection.status.displayName}',
+      if (inspection.pointsCount > 0) '${inspection.pointsCount} points',
+      if (location != null && location.isNotEmpty) location,
+      inspection.title,
+      if (inspection.createdByName != null &&
+          inspection.createdByName!.trim().isNotEmpty)
+        'created by ${inspection.createdByName!.trim()}',
+      if (when != null) _formatWhen(when),
+    ].join(', ');
+
+    return Semantics(
+      container: true,
+      button: true,
+      onTap: onTap,
+      label: semanticsLabel,
+      child: ExcludeSemantics(
+        child: Card(
       key: Key('inspection_card_${inspection.id}'),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -615,7 +634,9 @@ class _InspectionCard extends StatelessWidget {
           ),
         ),
       ),
-    );
+    ),
+  ),
+);
   }
 }
 
