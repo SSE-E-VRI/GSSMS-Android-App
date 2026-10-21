@@ -261,7 +261,7 @@ class AppTheme {
           foregroundColor: colorScheme.onPrimary,
           disabledBackgroundColor: tokens.border,
           disabledForegroundColor: tokens.textTertiary,
-          minimumSize: const Size.fromHeight(GssmsSize.touchTarget),
+          minimumSize: buttonMinSize,
           shape: buttonShape,
           textStyle: themedText.labelLarge,
         ),
