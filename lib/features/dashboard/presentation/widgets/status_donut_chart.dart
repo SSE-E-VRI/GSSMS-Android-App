@@ -65,15 +65,20 @@ class StatusDonutChart extends StatelessWidget {
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: context.gssms.link),
               ),
               const SizedBox(height: 16),
-              SizedBox(
-                height: 160,
-                child: Stack(
-                  children: [
-                    ExcludeSemantics(
-                      child: PieChart(
-                    PieChartData(
-                      sectionsSpace: 2,
-                      centerSpaceRadius: 50,
+              Builder(builder: (context) {
+                final textScale =
+                    (MediaQuery.textScalerOf(context).scale(14) / 14).clamp(1.0, 1.4);
+                final chartHeight = 160.0 * textScale;
+                final centerRadius = 50.0 * textScale;
+                return SizedBox(
+                  height: chartHeight,
+                  child: Stack(
+                    children: [
+                      ExcludeSemantics(
+                        child: PieChart(
+                      PieChartData(
+                        sectionsSpace: 2,
+                        centerSpaceRadius: centerRadius,
                       sections: List.generate(displaySegments.length, (i) {
                         final seg = displaySegments[i];
                         final color = _parseColor(context, seg.colorHex, i);
@@ -111,7 +116,8 @@ class StatusDonutChart extends StatelessWidget {
                   ),
                 ],
               ),
-            ),
+            );
+          }),
             const SizedBox(height: 16),
             Wrap(
               spacing: 12,

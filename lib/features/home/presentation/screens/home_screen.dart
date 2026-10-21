@@ -326,7 +326,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ),
               const SizedBox(width: GssmsSpacing.s8),
               ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 160),
+                constraints: BoxConstraints(
+                  maxWidth: MediaQuery.textScalerOf(context)
+                      .scale(160)
+                      .clamp(160.0, 220.0),
+                ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   mainAxisAlignment: MainAxisAlignment.center,
