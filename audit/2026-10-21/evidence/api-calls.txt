@@ -1,0 +1,166 @@
+lib\features\complaints\data\complaint_api_service.dart:49:    final page = await fetchAllPages(_dio, '/api/v1/complaints/', queryParameters: query);
+lib\features\complaints\data\complaint_api_service.dart:63:    final response = await _dio.get('/api/v1/complaints/$id/');
+lib\features\complaints\data\complaint_api_service.dart:77:    final response = await _dio.post(
+lib\features\complaints\data\complaint_api_service.dart:78:      '/api/v1/complaints/',
+lib\features\complaints\data\complaint_api_service.dart:94:  /// /api/v1/complaints/{id}/convert_to_work_order/. Same ConversionService
+lib\features\complaints\data\complaint_api_service.dart:100:        await _dio.post('/api/v1/complaints/$complaintId/convert_to_work_order/');
+lib\features\complaints\data\complaint_api_service.dart:106:  /// /api/v1/complaints/{id}/close/ {closure_reason, closure_remarks}.
+lib\features\complaints\data\complaint_api_service.dart:113:    final response = await _dio.post(
+lib\features\complaints\data\complaint_api_service.dart:114:      '/api/v1/complaints/$complaintId/close/',
+lib\features\complaints\data\complaint_api_service.dart:140:    final response = await _dio.post(
+lib\features\complaints\data\complaint_api_service.dart:141:      '/api/v1/complaints/$complaintId/photos/',
+lib\core\data\org_scope_options_service.dart:30:    final response = await _dio.get<dynamic>(path, queryParameters: query);
+lib\core\data\org_scope_options_service.dart:38:  Future<List<OrgOption>> fetchZones() => _fetch('/api/v1/zones/', const {});
+lib\core\data\org_scope_options_service.dart:41:        '/api/v1/divisions/',
+lib\core\data\org_scope_options_service.dart:46:        '/api/v1/depots/',
+lib\core\data\org_scope_options_service.dart:54:        '/api/v1/stations/',
+lib\core\data\lookup_options_service.dart:41:    final response = await _dio.get<dynamic>('/api/v1/lookup-options/$domain/');
+lib\features\assets\data\asset_api_service.dart:61:    final page = await fetchAllPages(_dio, '/api/v1/assets/', queryParameters: query);
+lib\features\assets\data\asset_api_service.dart:72:    final response = await _dio.get('/api/v1/assets/$id/');
+lib\features\assets\data\asset_api_service.dart:91:    final response = await _dio.get('/api/v1/assets/$assetId/maintenance-summary/');
+lib\features\assets\data\asset_api_service.dart:108:    final response = await _dio.get(
+lib\features\assets\data\asset_api_service.dart:109:      '/api/v1/maintenance/work-orders/reliability_metrics/',
+lib\features\assets\data\asset_api_service.dart:118:    final response = await _dio.get('/api/v1/assets/$assetId/specifications/');
+lib\features\assets\data\asset_api_service.dart:126:    final response = await _dio.get('/api/v1/assets/$assetId/components/');
+lib\features\assets\data\asset_api_service.dart:135:    final response = await _dio.get('/api/v1/assets/$assetId/replacement-history/');
+lib\features\maintenance_schedules\data\maintenance_schedule_api_service.dart:17:  static const String _schedules = '/api/v1/maintenance/schedules';
+lib\features\maintenance_schedules\data\maintenance_schedule_api_service.dart:51:    final response = await _dio.get('$_schedules/pending/', queryParameters: query);
+lib\features\maintenance_schedules\data\maintenance_schedule_api_service.dart:65:    final response = await _dio.post(
+lib\features\dashboard\data\dashboard_api_service.dart:25:    final response = await _dio.get<Map<String, dynamic>>(
+lib\features\dashboard\data\dashboard_api_service.dart:26:      '/api/v1/maintenance/schedules/attention/',
+lib\features\dashboard\data\dashboard_api_service.dart:49:    final response = await _dio.get<Map<String, dynamic>>(
+lib\features\dashboard\data\dashboard_api_service.dart:50:      '/api/v1/maintenance/dashboard/summary/',
+lib\features\deficiencies\data\deficiency_api_service.dart:42:        await _dio.get('/api/v1/deficiencies/pending/', queryParameters: query);
+lib\features\deficiencies\data\deficiency_api_service.dart:51:  /// `api.getDeficiencies({asset: id})` against `GET /api/v1/deficiencies/`.
+lib\features\deficiencies\data\deficiency_api_service.dart:53:    final response = await _dio.get(
+lib\features\deficiencies\data\deficiency_api_service.dart:54:      '/api/v1/deficiencies/',
+lib\features\auth\data\auth_api_service.dart:12:  /// Call POST /api/v1/auth/login/
+lib\features\auth\data\auth_api_service.dart:27:      final response = await _dio.post<Map<String, dynamic>>(
+lib\features\auth\data\auth_api_service.dart:28:        '/api/v1/auth/login/',
+lib\features\auth\data\auth_api_service.dart:54:  /// Request OTP for LOGIN or password_reset — POST /api/v1/auth/otp/request/
+lib\features\auth\data\auth_api_service.dart:60:      await _dio.post(
+lib\features\auth\data\auth_api_service.dart:61:        '/api/v1/auth/otp/request/',
+lib\features\auth\data\auth_api_service.dart:72:  /// Sign in with email OTP — POST /api/v1/auth/otp/login/
+lib\features\auth\data\auth_api_service.dart:78:      final response = await _dio.post<Map<String, dynamic>>(
+lib\features\auth\data\auth_api_service.dart:79:        '/api/v1/auth/otp/login/',
+lib\features\auth\data\auth_api_service.dart:107:  /// Reset password with verified OTP — POST /api/v1/auth/reset-password/
+lib\features\auth\data\auth_api_service.dart:114:      await _dio.post(
+lib\features\auth\data\auth_api_service.dart:115:        '/api/v1/auth/reset-password/',
+lib\features\auth\data\auth_api_service.dart:127:  /// TOTP setup/verify — POST /api/v1/auth/totp/setup/ etc.
+lib\features\auth\data\auth_api_service.dart:130:      final response = await _dio.post<Map<String, dynamic>>('/api/v1/auth/totp/setup/');
+lib\features\auth\data\auth_api_service.dart:139:      await _dio.post('/api/v1/auth/totp/verify/', data: {'code': code.trim()});
+lib\features\auth\data\auth_api_service.dart:147:      final response = await _dio.post<Map<String, dynamic>>(
+lib\features\auth\data\auth_api_service.dart:148:        '/api/v1/auth/totp/validate/',
+lib\features\auth\data\auth_api_service.dart:167:  /// GET /api/v1/users/{id}/ — same payload the web profile screen loads.
+lib\features\auth\data\auth_api_service.dart:170:      final response = await _dio.get('/api/v1/users/$userId/');
+lib\features\auth\data\auth_api_service.dart:180:  /// PATCH /api/v1/users/{id}/ — personal fields or `{password: …}`.
+lib\features\auth\data\auth_api_service.dart:183:      final response = await _dio.patch('/api/v1/users/$userId/', data: payload);
+lib\features\auth\data\auth_api_service.dart:194:  /// PATCH /api/v1/users/{id}/ — update or clear profile picture.
+lib\features\auth\data\auth_api_service.dart:216:      final response = await _dio.patch('/api/v1/users/$userId/', data: data);
+lib\features\auth\data\auth_api_service.dart:230:  /// Call POST /api/v1/auth/refresh/
+lib\features\auth\data\auth_api_service.dart:233:      final response = await _dio.post<Map<String, dynamic>>(
+lib\features\auth\data\auth_api_service.dart:234:        '/api/v1/auth/refresh/',
+lib\features\inspections\data\inspection_api_service.dart:63:    final page = await fetchAllPages(_dio, '/api/v1/inspections/',
+lib\features\inspections\data\inspection_api_service.dart:78:    final response = await _dio.get('/api/v1/inspections/$id/');
+lib\features\inspections\data\inspection_api_service.dart:102:        _dio, '/api/v1/inspection-points/',
+lib\features\inspections\data\inspection_api_service.dart:111:    final response = await _dio.get('/api/v1/inspection-points/$pointId/');
+lib\features\inspections\data\inspection_api_service.dart:125:    final response = await _dio.post('/api/v1/inspections/', data: payload);
+lib\features\inspections\data\inspection_api_service.dart:144:        .post('/api/v1/inspections/$inspectionId/convert_to_work_order/');
+lib\features\inspections\data\inspection_api_service.dart:169:    final response = await _dio.post(
+lib\features\inspections\data\inspection_api_service.dart:170:        '/api/v1/inspections/$inspectionId/create-job-work/',
+lib\features\inspections\data\inspection_api_service.dart:186:        await _dio.post('/api/v1/inspections/$inspectionId/close/', data: {});
+lib\features\inspections\data\inspection_api_service.dart:205:    final response = await _dio.post(
+lib\features\inspections\data\inspection_api_service.dart:206:        '/api/v1/inspection-points/$pointId/resolve/',
+lib\features\inspections\data\inspection_api_service.dart:225:    final response = await _dio.post(
+lib\features\inspections\data\inspection_api_service.dart:226:        '/api/v1/inspection-points/$pointId/dispose/',
+lib\features\inspections\data\inspection_api_service.dart:245:    final response = await _dio.post(
+lib\features\inspections\data\inspection_api_service.dart:246:        '/api/v1/inspection-points/$pointId/mark-unresolved/',
+lib\features\inspections\data\inspection_api_service.dart:264:    final response = await _dio.post(
+lib\features\inspections\data\inspection_api_service.dart:265:        '/api/v1/inspection-points/$pointId/approve-jw2/',
+lib\features\inspections\data\inspection_api_service.dart:308:    final response = await _dio.post(
+lib\features\inspections\data\inspection_api_service.dart:309:        '/api/v1/inspection-points/$pointId/escalate-breakdown/',
+lib\features\inspections\data\inspection_api_service.dart:334:    final response = await _dio.post(
+lib\features\inspections\data\inspection_api_service.dart:335:      '/api/v1/inspections/$inspectionId/evidence-photos/',
+lib\features\inspections\data\inspection_api_service.dart:359:    final response = await _dio.post(
+lib\features\inspections\data\inspection_api_service.dart:360:      '/api/v1/inspection-points/$pointId/evidence-photos/',
+lib\features\reports\data\reports_api_service.dart:47:    final response = await _dio.get<dynamic>(
+lib\features\reports\data\reports_api_service.dart:48:      '/api/v1/maintenance/records/register_report/',
+lib\features\reports\data\infrastructure_options_service.dart:6:/// Matches the web client: stations from `/api/v1/stations/`, other types from
+lib\features\reports\data\infrastructure_options_service.dart:7:/// `/api/v1/infrastructure/?type_code=LC|SB|SQ`.
+lib\features\reports\data\infrastructure_options_service.dart:29:      response = await _dio.get<dynamic>(
+lib\features\reports\data\infrastructure_options_service.dart:30:        '/api/v1/stations/',
+lib\features\reports\data\infrastructure_options_service.dart:34:      response = await _dio.get<dynamic>(
+lib\features\reports\data\infrastructure_options_service.dart:35:        '/api/v1/infrastructure/',
+lib\features\work_orders\data\replacement_api_service.dart:20:    await _dio.post('/api/v1/assets/$assetId/replace_asset/', data: request.toJson());
+lib\features\work_orders\data\replacement_api_service.dart:28:    await _dio.post(
+lib\features\work_orders\data\replacement_api_service.dart:29:      '/api/v1/installed-components/$installedComponentId/replace/',
+lib\features\work_orders\data\replacement_api_service.dart:39:    await _dio.post(
+lib\features\work_orders\data\replacement_api_service.dart:40:      '/api/v1/maintenance/work-orders/$workOrderId/log_replacement/',
+lib\features\work_orders\data\execution_api_service.dart:24:  String _wo(int workOrderId) => '/api/v1/staff-workorders/$workOrderId/';
+lib\features\work_orders\data\execution_api_service.dart:65:    final response = await _dio.get('${_wo(workOrderId)}complaint-execution/');
+lib\features\work_orders\data\execution_api_service.dart:77:    final response = await _dio.patch(
+lib\features\work_orders\data\execution_api_service.dart:92:    final response = await _dio.post(
+lib\features\work_orders\data\execution_api_service.dart:102:    await _dio.delete(
+lib\features\work_orders\data\execution_api_service.dart:112:    final response = await _dio.post(
+lib\features\work_orders\data\execution_api_service.dart:124:    final response = await _dio.get('${_wo(workOrderId)}rectification/');
+lib\features\work_orders\data\execution_api_service.dart:136:    final response = await _dio.patch(
+lib\features\work_orders\data\execution_api_service.dart:152:    final response = await _dio.post(
+lib\features\work_orders\data\execution_api_service.dart:166:    await _dio.delete(
+lib\features\work_orders\data\execution_api_service.dart:174:    final response = await _dio.post(
+lib\features\work_orders\data\execution_api_service.dart:189:        await _dio.get('${_wo(workOrderId)}inspection-execution/');
+lib\features\work_orders\data\execution_api_service.dart:200:    final response = await _dio.post(
+lib\features\work_orders\data\execution_api_service.dart:214:    final response = await _dio.patch(
+lib\features\work_orders\data\execution_api_service.dart:237:    final response = await _dio.post(
+lib\features\work_orders\data\execution_api_service.dart:255:    final response = await _dio.post(
+lib\features\work_orders\data\job_work_report_api_service.dart:19:  String _staff(int woId) => '/api/v1/staff-workorders/$woId/';
+lib\features\work_orders\data\job_work_report_api_service.dart:45:    final response = await _dio.get(path);
+lib\features\work_orders\data\job_work_report_api_service.dart:54:    final response = await _dio.get(
+lib\features\work_orders\data\job_work_report_api_service.dart:55:      '/api/v1/maintenance/records/',
+lib\features\work_orders\data\job_work_report_api_service.dart:84:      _getObject('/api/v1/maintenance/work-orders/$woId/', 'job work');
+lib\features\work_orders\data\job_work_report_api_service.dart:109:    final response = await _dio.get<List<int>>(
+lib\features\work_orders\data\work_order_api_service.dart:22:/// under `/api/v1/maintenance/`, while the technician-scoped work order views
+lib\features\work_orders\data\work_order_api_service.dart:23:/// live under `/api/v1/staff-workorders/`. Detail actions use the slug Django
+lib\features\work_orders\data\work_order_api_service.dart:31:  static const String _workOrders = '/api/v1/maintenance/work-orders';
+lib\features\work_orders\data\work_order_api_service.dart:32:  static const String _records = '/api/v1/maintenance/records';
+lib\features\work_orders\data\work_order_api_service.dart:33:  static const String _staffWorkOrders = '/api/v1/staff-workorders';
+lib\features\work_orders\data\work_order_api_service.dart:34:  static const String _masters = '/api/v1/maintenance/masters';
+lib\features\work_orders\data\work_order_api_service.dart:35:  static const String _schedules = '/api/v1/maintenance/schedules';
+lib\features\work_orders\data\work_order_api_service.dart:85:    // (`/api/v1/staff-workorders/`) reads `start_date`/`end_date`, while the
+lib\features\work_orders\data\work_order_api_service.dart:149:    final response = await _dio.post('$_workOrders/', data: payload);
+lib\features\work_orders\data\work_order_api_service.dart:167:    final response = await _dio.post(
+lib\features\work_orders\data\work_order_api_service.dart:178:    final response = await _dio.post(
+lib\features\work_orders\data\work_order_api_service.dart:197:    final response = await _dio.post(
+lib\features\work_orders\data\work_order_api_service.dart:213:    final response = await _dio.get('$_masters/');
+lib\features\work_orders\data\work_order_api_service.dart:221:    final response = await _dio.get('$_workOrders/$id/');
+lib\features\work_orders\data\work_order_api_service.dart:237:        await _dio.get('$_workOrders/$workOrderId/allowed-actions/');
+lib\features\work_orders\data\work_order_api_service.dart:252:    final response = await _dio.get('$_workOrders/$workOrderId/audit/');
+lib\features\work_orders\data\work_order_api_service.dart:274:    final response = await _dio.get(
+lib\features\work_orders\data\work_order_api_service.dart:275:      '/api/v1/users/',
+lib\features\work_orders\data\work_order_api_service.dart:290:    final response = await _dio.patch(
+lib\features\work_orders\data\work_order_api_service.dart:309:    final response = await _dio.post(
+lib\features\work_orders\data\work_order_api_service.dart:323:        await _dio.get('$_workOrders/$workOrderId/verification-workspace/');
+lib\features\work_orders\data\work_order_api_service.dart:338:    final response = await _dio.post(
+lib\features\work_orders\data\work_order_api_service.dart:376:    final response = await _dio.post(
+lib\features\work_orders\data\work_order_api_service.dart:397:    final response = await _dio.get('$_records/$recordId/');
+lib\features\work_orders\data\work_order_api_service.dart:411:  /// /api/v1/maintenance/records/` with `?work_order=<id>` and/or
+lib\features\work_orders\data\work_order_api_service.dart:423:    final response = await _dio.get(
+lib\features\work_orders\data\work_order_api_service.dart:435:    await _dio.post(
+lib\features\work_orders\data\work_order_api_service.dart:479:    await _dio.patch(
+lib\features\work_orders\data\work_order_api_service.dart:508:    await _dio.post(
+lib\features\work_orders\data\work_order_api_service.dart:581:    final response = await _dio.post(
+lib\features\work_orders\data\work_order_api_service.dart:608:    await _dio.delete(
+lib\features\work_orders\data\work_order_api_service.dart:628:    final response = await _dio.post(
+lib\features\work_orders\data\work_order_api_service.dart:641:    final response = await _dio.post(
+lib\features\work_orders\data\work_order_api_service.dart:652:        await _dio.get('$_workOrders/$workOrderId/supervisor-mandate/');
+lib\features\work_orders\data\work_order_api_service.dart:665:    final response = await _dio.post(
+lib\features\work_orders\data\work_order_api_service.dart:683:    final response = await _dio.get('$_masters/$masterId/workspace/');
+lib\features\work_orders\data\work_order_api_service.dart:704:    final response = await _dio.post(
+lib\features\work_orders\data\work_order_api_service.dart:719:    final response = await _dio.get(
+lib\features\work_orders\data\work_order_api_service.dart:720:      '/api/v1/deficiency-severities/',
+lib\features\work_orders\data\work_order_api_service.dart:733:    final response = await _dio.patch(
+lib\features\work_orders\data\work_order_api_service.dart:734:      '/api/v1/deficiencies/$deficiencyId/',
+lib\features\work_orders\data\work_order_api_service.dart:748:    final response = await _dio.post(
+lib\features\work_orders\data\work_order_api_service.dart:765:    await _dio.post(
+lib\features\work_orders\data\work_order_api_service.dart:777:        await _dio.get('$_schedules/$scheduleId/conversion-context/');
+lib\features\work_orders\data\work_order_api_service.dart:795:    final response = await _dio.post(
+lib\features\work_orders\data\work_order_api_service.dart:810:    final response = await _dio.post(
