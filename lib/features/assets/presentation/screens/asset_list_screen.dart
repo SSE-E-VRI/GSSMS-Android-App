@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gssms_mobile/core/sync/widgets/sync_status_badge.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
+import 'package:gssms_mobile/core/widgets/gssms_search_field.dart';
 import 'package:gssms_mobile/core/widgets/severity_chip.dart';
 import 'package:gssms_mobile/core/widgets/org_scope_app_bar_filter.dart';
 import 'package:gssms_mobile/core/widgets/org_scope_filter_bar.dart';
@@ -212,44 +213,11 @@ class _AssetListScreenState extends ConsumerState<AssetListScreen> {
 
 
   Widget _buildSearchBar() {
-    return Container(
-      color: context.gssms.surfaceRaised,
+    return FilterStrip(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-      child: TextField(
+      child: GssmsSearchField(
         controller: _searchController,
-        decoration: InputDecoration(
-          hintText: 'Search asset code, name, serial #...',
-          prefixIcon: Icon(Icons.search, color: context.gssms.textSecondary),
-          suffixIcon: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (_searchController.text.isNotEmpty)
-                IconButton(
-                  icon: const Icon(Icons.clear, size: 18),
-                  tooltip: 'Clear search',
-                  onPressed: () {
-                    _searchDebounce?.cancel();
-                    _searchController.clear();
-                    ref
-                        .read(assetListControllerProvider.notifier)
-                        .setSearchQuery('');
-                  },
-                ),
-              IconButton(
-                icon: Icon(Icons.qr_code_scanner, color: context.gssms.link),
-                tooltip: 'Scan Barcode / QR',
-                onPressed: _openQrScanner,
-              ),
-            ],
-          ),
-          filled: true,
-          fillColor: context.gssms.surfaceInset,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: BorderSide.none,
-          ),
-        ),
+        hintText: 'Search asset code, name, serial #...',
         onChanged: (val) {
           _searchDebounce?.cancel();
           _searchDebounce = Timer(const Duration(milliseconds: 250), () {
@@ -257,6 +225,11 @@ class _AssetListScreenState extends ConsumerState<AssetListScreen> {
             ref.read(assetListControllerProvider.notifier).setSearchQuery(val);
           });
         },
+        trailing: IconButton(
+          icon: Icon(Icons.qr_code_scanner, color: context.gssms.link),
+          tooltip: 'Scan Barcode / QR',
+          onPressed: _openQrScanner,
+        ),
       ),
     );
   }

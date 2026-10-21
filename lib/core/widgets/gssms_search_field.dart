@@ -12,12 +12,14 @@ class GssmsSearchField extends StatelessWidget {
     required this.controller,
     required this.hintText,
     required this.onChanged,
+    this.trailing,
     this.fieldKey,
   });
 
   final TextEditingController controller;
   final String hintText;
   final ValueChanged<String> onChanged;
+  final Widget? trailing;
   final Key? fieldKey;
 
   @override
@@ -32,19 +34,25 @@ class GssmsSearchField extends StatelessWidget {
       decoration: InputDecoration(
         hintText: hintText,
         prefixIcon: const Icon(Icons.search),
-        suffixIcon: ValueListenableBuilder<TextEditingValue>(
-          valueListenable: controller,
-          builder: (context, value, _) {
-            if (value.text.isEmpty) return const SizedBox.shrink();
-            return IconButton(
-              icon: const Icon(Icons.clear, size: 18),
-              tooltip: 'Clear search',
-              onPressed: () {
-                controller.clear();
-                onChanged('');
+        suffixIcon: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ValueListenableBuilder<TextEditingValue>(
+              valueListenable: controller,
+              builder: (context, value, _) {
+                if (value.text.isEmpty) return const SizedBox.shrink();
+                return IconButton(
+                  icon: const Icon(Icons.clear, size: 18),
+                  tooltip: 'Clear search',
+                  onPressed: () {
+                    controller.clear();
+                    onChanged('');
+                  },
+                );
               },
-            );
-          },
+            ),
+            if (trailing != null) trailing!,
+          ],
         ),
         filled: true,
         fillColor: tokens.surfaceInset,
