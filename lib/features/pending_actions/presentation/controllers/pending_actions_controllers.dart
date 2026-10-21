@@ -405,7 +405,7 @@ class PendingActionsController extends Notifier<PendingActionsState> {
       state = state.copyWith(
         converting: false,
         actionMessage:
-            '${result.count} Job Work${result.count == 1 ? '' : 's'} created.',
+            _batchMessage(tab, result),
       );
       await load();
       return true;
@@ -416,5 +416,23 @@ class PendingActionsController extends Notifier<PendingActionsState> {
       );
       return false;
     }
+  }
+
+  /// S2: the schedules batch reports per-item outcomes — surface refusals
+  /// (e.g. a blocked obligation with its ticket) instead of claiming every
+  /// selected row converted. All-or-nothing tabs keep the old message.
+  String _batchMessage(PendingActionTab tab, dynamic result) {
+    final created =
+        '${result.count} Job Work${result.count == 1 ? '' : 's'} created.';
+    if (tab != PendingActionTab.schedules) return created;
+    final failures = result.failures;
+    if (failures.isEmpty) return created;
+    final first = failures.first;
+    final reason = first.error ??
+        (first.code != null ? 'refused (${first.code})' : 'skipped');
+    final extra = failures.length > 1
+        ? ' (+${failures.length - 1} more)'
+        : '';
+    return '$created ${failures.length} skipped: $reason$extra';
   }
 }

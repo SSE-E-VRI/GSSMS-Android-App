@@ -131,5 +131,47 @@ void main() {
               .isBreakdown,
           isFalse);
     });
+    test('AttentionItem coerces non-string master_name/station_name/priority', () {
+      final item = AttentionItem.fromJson(const {
+        'id': 7,
+        'master_name': 2,
+        'station_name': 5,
+        'depot_name': 9,
+        'priority': 1,
+        'due_date': '2026-08-01',
+        'days_overdue': 3,
+      });
+
+      expect(item.masterName, '2');
+      expect(item.stationName, '5');
+      expect(item.depotName, '9');
+      expect(item.priority, '1');
+    });
+
+    test('AttentionItem parses asset fields when present', () {
+      final item = AttentionItem.fromJson(const {
+        'id': 21,
+        'master_name': 'Pump Monthly',
+        'station_name': 'VRI',
+        'due_date': '2026-09-01',
+        'asset_id': 44,
+        'asset_name': 'Pump 1 (Room A)',
+      });
+
+      expect(item.assetId, 44);
+      expect(item.assetName, 'Pump 1 (Room A)');
+    });
+
+    test('AttentionItem keeps asset fields null for a station row', () {
+      final item = AttentionItem.fromJson(const {
+        'id': 22,
+        'master_name': 'Station Monthly',
+        'station_name': 'VRI',
+        'due_date': '2026-09-01',
+      });
+
+      expect(item.assetId, isNull);
+      expect(item.assetName, isNull);
+    });
   });
 }

@@ -12,6 +12,7 @@ import 'package:gssms_mobile/features/complaints/presentation/screens/complaint_
 import 'package:gssms_mobile/features/deficiencies/domain/models/deficiency.dart';
 import 'package:gssms_mobile/features/inspections/domain/models/inspection.dart';
 import 'package:gssms_mobile/features/inspections/presentation/screens/inspection_detail_screen.dart';
+import 'package:gssms_mobile/features/maintenance_schedules/domain/models/maintenance_schedule.dart';
 import 'package:gssms_mobile/features/pending_actions/presentation/controllers/pending_actions_controllers.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/pending_action_status_labels.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/screens/work_order_detail_screen.dart';
@@ -395,6 +396,12 @@ class _SchedulesTab extends ConsumerWidget {
       itemBuilder: (context, index) {
         final s = schedules[index];
         final selected = state.selectedScheduleIds.contains(s.id);
+        // C1: a terminated (SKIPPED) asset occurrence names its reason
+        // instead of showing a bare "Skipped" chip with no context.
+        final statusLabel =
+            s.status == ScheduleStatus.skipped && s.terminationLabel != null
+                ? '${s.status.displayName} — ${s.terminationLabel}'
+                : s.status.displayName;
         return Card(
           key: Key('schedule_pending_card_${s.id}'),
           margin: const EdgeInsets.only(bottom: 10),
@@ -415,6 +422,9 @@ class _SchedulesTab extends ConsumerWidget {
                 style: const TextStyle(fontWeight: FontWeight.bold)),
             subtitle: Text([
               s.stationName ?? s.depotName ?? 'Station General',
+              // C1: asset occurrences name their asset so two assets at one
+              // station are distinguishable; station rows render as before.
+              if (s.assetName != null) s.assetName!,
               if (s.dueDate != null) 'Due ${dateFormat.format(s.dueDate!)}',
             ].join(' • ')),
             trailing: s.isConverted
@@ -422,7 +432,7 @@ class _SchedulesTab extends ConsumerWidget {
                     Icon(Icons.link,
                         color: context.gssms.success.foreground, size: 18))
                 : Chip(
-                    label: Text(s.status.displayName,
+                    label: Text(statusLabel,
                         style: const TextStyle(fontSize: 11)),
                     visualDensity: VisualDensity.compact,
                   ),

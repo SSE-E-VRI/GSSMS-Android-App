@@ -634,6 +634,8 @@ class WorkOrderRepository implements IWorkOrderRepository {
           entityId: workOrderId,
           payload: {
             'status': status,
+            if (status == 'TECH_COMPLETED')
+              'device_completed_at': DateTime.now().toIso8601String(),
             if (remarks != null) 'remarks': remarks,
             if (checklist != null) 'checklist': checklist,
             if (evidence != null) 'evidence': evidence,

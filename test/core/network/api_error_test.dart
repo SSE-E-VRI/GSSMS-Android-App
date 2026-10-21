@@ -116,4 +116,87 @@ void main() {
     expect(userFacingError(Exception('A technician must be assigned')),
         'A technician must be assigned');
   });
+
+  group('S2 §24.1 standard conflict bodies', () {
+    test('PM_PENDING_EXISTS names the blocking ticket', () {
+      final e = _response(409, {
+        'error': 'Another PM Job Work for this obligation is still open.',
+        'code': 'PM_PENDING_EXISTS',
+        'existing_ticket': 'WO-2026-0142',
+        'blocking_work_order': {
+          'id': 812,
+          'ticket_number': 'WO-2026-0142',
+          'status': 'IN_PROGRESS',
+          'schedule_id': 311,
+        },
+        'pending_request': null,
+      });
+      expect(
+        userFacingError(e),
+        'Another PM Job Work for this obligation is still open. (WO-2026-0142)',
+      );
+      expect(conflictCode(e.response?.data), 'PM_PENDING_EXISTS');
+      expect(blockingTicket(e.response?.data), 'WO-2026-0142');
+    });
+
+    test('blocking ticket falls back to existing_ticket', () {
+      expect(
+        blockingTicket({
+          'code': 'PM_PENDING_EXISTS',
+          'existing_ticket': 'WO-2026-0042',
+          'blocking_work_order': null,
+          'pending_request': null,
+        }),
+        'WO-2026-0042',
+      );
+    });
+
+    test('PM_USE_SCHEDULE_CONVERSION code parses', () {
+      final data = {
+        'error': 'Preventive maintenance for an assigned template must be '
+            'created by converting its schedule.',
+        'code': 'PM_USE_SCHEDULE_CONVERSION',
+        'blocking_work_order': null,
+        'pending_request': null,
+      };
+      expect(conflictCode(data), 'PM_USE_SCHEDULE_CONVERSION');
+      expect(blockingTicket(data), isNull);
+      expect(userFacingError(_response(409, data)),
+          contains('converting its schedule'));
+    });
+
+    test('structured fields never leak as field messages', () {
+      // Without the _nonFieldKeys guard, serverMessage would render
+      // "Blocking Work Order: ..." from the nested map when `error` is
+      // absent; it must fall back to the generic conflict text instead.
+      final e = _response(409, {
+        'code': 'PM_PENDING_EXISTS',
+        'blocking_work_order': {'ticket_number': 'WO-1'},
+        'pending_request': null,
+      });
+      expect(userFacingError(e), isNot(contains('Blocking Work Order')));
+    });
+
+    test('conflictCode handles legacy and absent codes', () {
+      expect(conflictCode({'error': 'x'}), isNull);
+      expect(conflictCode(null), isNull);
+      expect(conflictCode({'code': ['PM_PENDING_EXISTS']}), 'PM_PENDING_EXISTS');
+    });
+
+    test('409 APPROVAL_PENDING includes approval request type or request_type', () {
+      final e1 = _response(409, {
+        'error': 'An approval request is pending for this occurrence.',
+        'code': 'APPROVAL_PENDING',
+        'pending_request': {'type': 'SKIP'},
+      });
+      expect(userFacingError(e1), contains('(approval: SKIP)'));
+
+      final e2 = _response(409, {
+        'error': 'An approval request is pending for this occurrence.',
+        'code': 'APPROVAL_PENDING',
+        'pending_request': {'request_type': 'SKIP'},
+      });
+      expect(userFacingError(e2), contains('(approval: SKIP)'));
+    });
+  });
 }

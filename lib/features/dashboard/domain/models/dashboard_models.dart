@@ -10,6 +10,10 @@ class AttentionItem extends Equatable {
     this.dueDate,
     this.daysOverdue,
     this.priority,
+    // C1 asset scope: present only for asset occurrences; null for
+    // station rows (and for cached payloads predating the backend keys).
+    this.assetId,
+    this.assetName,
   });
 
   final int id;
@@ -19,6 +23,8 @@ class AttentionItem extends Equatable {
   final DateTime? dueDate;
   final int? daysOverdue;
   final String? priority;
+  final int? assetId;
+  final String? assetName;
 
   factory AttentionItem.fromJson(Map<String, dynamic> json) {
     return AttentionItem(
@@ -29,6 +35,8 @@ class AttentionItem extends Equatable {
       dueDate: json['due_date'] != null ? asJsonDateTime(json['due_date']) : null,
       daysOverdue: asJsonInt(json['days_overdue']) ?? asJsonInt(json['days_pending']),
       priority: asJsonString(json['priority']),
+      assetId: asJsonInt(json['asset_id']),
+      assetName: asJsonString(json['asset_name']),
     );
   }
 
@@ -41,6 +49,8 @@ class AttentionItem extends Equatable {
         dueDate,
         daysOverdue,
         priority,
+        assetId,
+        assetName,
       ];
 }
 

@@ -26,9 +26,49 @@ enum ScheduleStatus {
   }
 }
 
+/// Eligibility result from `SchedulingService.check_occurrence_eligibility`.
+class ScheduleEligibility {
+  const ScheduleEligibility({
+    required this.eligible,
+    this.reason,
+    this.code,
+  });
+
+  final bool eligible;
+  final String? reason;
+  final String? code;
+
+  factory ScheduleEligibility.fromJson(Map<String, dynamic> json) {
+    return ScheduleEligibility(
+      eligible: json['eligible'] == true,
+      reason: asJsonString(json['reason']),
+      code: asJsonString(json['code']),
+    );
+  }
+}
+
+/// Template summary returned in upcoming/conversion-context payloads.
+class TemplateRef {
+  const TemplateRef({required this.id, required this.name, this.source});
+  final int id;
+  final String name;
+  final String? source;
+
+  factory TemplateRef.fromJson(Map<String, dynamic> json) {
+    return TemplateRef(
+      id: asJsonInt(json['id']) ?? 0,
+      name: asJsonString(json['name']) ?? '',
+      source: asJsonString(json['source']),
+    );
+  }
+}
+
 /// One row from `GET /api/v1/maintenance/schedules/pending/`
 /// (`MaintenanceScheduleSerializer`) — a scheduled preventive-maintenance
 /// task awaiting conversion into (or completion of) a Job Work.
+///
+/// Also used for Endpoint L (`upcoming`) which adds [periodStart],
+/// [templateSource], [eligibility], and [defaultTemplate].
 class MaintenanceSchedule extends Equatable {
   const MaintenanceSchedule({
     required this.id,
@@ -42,6 +82,18 @@ class MaintenanceSchedule extends Equatable {
     this.workOrderTicket,
     this.workOrderStatus,
     this.isBreakdown = false,
+    // S7 fields
+    this.periodStart,
+    this.templateSource,
+    this.eligibility,
+    this.defaultTemplate,
+    // C1 asset scope: present only for asset occurrences; null for
+    // station/infrastructure occurrences (and for cached payloads that
+    // predate these keys — parsing stays null-safe).
+    this.assetId,
+    this.assetName,
+    this.assetUniqueId,
+    this.terminationReason,
   });
 
   final int id;
@@ -62,8 +114,34 @@ class MaintenanceSchedule extends Equatable {
 
   /// Backing row of a breakdown (corrective) job, not a scheduled task.
   final bool isBreakdown;
+  // S7: present only when fetched via Endpoint L (upcoming).
+  final DateTime? periodStart;
+  final String? templateSource;
+  final ScheduleEligibility? eligibility;
+  final TemplateRef? defaultTemplate;
+
+  // C1: the occurrence's asset when it has one (raw `asset` id on the wire),
+  // its display name / unique id, and why a SKIPPED row was closed early.
+  final int? assetId;
+  final String? assetName;
+  final String? assetUniqueId;
+  final String? terminationReason;
 
   bool get isConverted => workOrderId != null;
+  bool get isEligible => eligibility?.eligible ?? false;
+
+  /// Human label for [terminationReason] (`ASSET_TRANSFERRED` →
+  /// 'Asset Transferred'); null when there is no reason.
+  String? get terminationLabel {
+    final raw = terminationReason;
+    if (raw == null || raw.trim().isEmpty) return null;
+    return raw
+        .split('_')
+        .where((part) => part.isNotEmpty)
+        .map((part) =>
+            part[0].toUpperCase() + part.substring(1).toLowerCase())
+        .join(' ');
+  }
 
   /// A skipped occurrence (owner/DIV_ADMIN-approved) must never be offered
   /// for batch conversion - the backend refuses it with 400 regardless, so
@@ -71,6 +149,16 @@ class MaintenanceSchedule extends Equatable {
   bool get isSkipped => status == ScheduleStatus.skipped;
 
   factory MaintenanceSchedule.fromJson(Map<String, dynamic> json) {
+    ScheduleEligibility? eligibility;
+    if (json['eligibility'] is Map) {
+      eligibility = ScheduleEligibility.fromJson(
+          Map<String, dynamic>.from(json['eligibility'] as Map));
+    }
+    TemplateRef? defaultTemplate;
+    if (json['default_template'] is Map) {
+      defaultTemplate = TemplateRef.fromJson(
+          Map<String, dynamic>.from(json['default_template'] as Map));
+    }
     return MaintenanceSchedule(
       id: asJsonInt(json['id']) ?? 0,
       templateName: asJsonString(json['template_name']) ??
@@ -87,6 +175,16 @@ class MaintenanceSchedule extends Equatable {
       workOrderTicket: asJsonString(json['work_order_ticket']),
       workOrderStatus: asJsonString(json['work_order_status']),
       isBreakdown: asJsonBool(json['is_breakdown']) ?? false,
+      periodStart: asJsonString(json['period_start']) != null
+          ? asJsonDateTime(json['period_start'])
+          : null,
+      templateSource: asJsonString(json['template_source']),
+      eligibility: eligibility,
+      defaultTemplate: defaultTemplate,
+      assetId: asJsonInt(json['asset']),
+      assetName: asJsonString(json['asset_name']),
+      assetUniqueId: asJsonString(json['asset_unique_id']),
+      terminationReason: asJsonString(json['termination_reason']),
     );
   }
 
@@ -103,5 +201,11 @@ class MaintenanceSchedule extends Equatable {
         workOrderTicket,
         workOrderStatus,
         isBreakdown,
+        periodStart,
+        templateSource,
+        assetId,
+        assetName,
+        assetUniqueId,
+        terminationReason,
       ];
 }

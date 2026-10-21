@@ -1,9 +1,11 @@
 import 'dart:async';
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gssms_mobile/core/data/org_scope_options_service.dart';
 import 'package:gssms_mobile/core/domain/org_option.dart';
+import 'package:gssms_mobile/core/network/api_error.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
 import 'package:gssms_mobile/features/assets/data/asset_api_service.dart';
 import 'package:gssms_mobile/features/assets/domain/models/asset.dart';
@@ -303,13 +305,27 @@ class _WorkOrderCreateScreenState
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(
-                'Failed to create Job Work: ${workOrderReadableError(e)}'),
+            content: Text(_submitErrorMessage(e)),
             backgroundColor: context.gssms.danger.solid));
       }
     } finally {
       if (mounted) setState(() => _isSubmitting = false);
     }
+  }
+
+  /// S2: a coded 409 names the conflict instead of a blind resubmit. In
+  /// particular PM_USE_SCHEDULE_CONVERSION directs preventive work to schedule
+  /// conversion (a web flow until S7 brings conversion to mobile) rather than
+  /// letting the user retry a create the server will always refuse.
+  String _submitErrorMessage(Object e) {
+    if (e is DioException && e.response?.statusCode == 409) {
+      final reason = userFacingError(e);
+      if (conflictCode(e.response?.data) == 'PM_USE_SCHEDULE_CONVERSION') {
+        return 'Blocked: $reason Convert the due schedule to create this job work.';
+      }
+      return 'Conflict: $reason';
+    }
+    return 'Failed to create Job Work: ${workOrderReadableError(e)}';
   }
 
   @override

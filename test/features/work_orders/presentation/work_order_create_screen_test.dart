@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -375,5 +376,76 @@ void main() {
     expect(find.byKey(const Key('submit_wo_button')), findsOneWidget);
     expect(caughtDetails, isNull);
     expect(tester.takeException(), isNull);
+  });
+  testWidgets('S2: coded 409 directs preventive creates to schedule conversion',
+      (tester) async {
+    final mockRepo = MockWorkOrderRepository();
+    final mockOrg = MockOrgScopeOptionsService();
+    final mockInfra = MockInfraOptionsService();
+    final mockAssets = MockAssetApiService();
+
+    when(() => mockInfra.fetchOptions(any(), depotId: any(named: 'depotId')))
+        .thenAnswer((_) async => const []);
+    const conflictMaster = MaintenanceMaster(id: 5, name: 'Basic Checklist', scheduleType: MaintenanceScheduleType.monthly, templateKind: MaintenanceTemplateKind.assetTemplate);
+    when(() => mockRepo.fetchMaintenanceMasters()).thenAnswer((_) async => const [conflictMaster]);
+    DioException conflict409() {
+      final options = RequestOptions(path: '/api/maintenance/work-orders/');
+      return DioException(
+        requestOptions: options,
+        type: DioExceptionType.badResponse,
+        response: Response(
+          requestOptions: options,
+          statusCode: 409,
+          data: {
+            'error':
+                'Preventive maintenance for an assigned template must be created by converting its schedule.',
+            'code': 'PM_USE_SCHEDULE_CONVERSION',
+            'blocking_work_order': null,
+            'pending_request': null,
+          },
+        ),
+      );
+    }
+
+    when(() => mockRepo.createWorkOrder(
+          title: any(named: 'title'),
+          description: any(named: 'description'),
+          type: any(named: 'type'),
+          priority: any(named: 'priority'),
+          depotId: any(named: 'depotId'),
+          stationId: any(named: 'stationId'),
+          infrastructureId: any(named: 'infrastructureId'),
+          assetId: any(named: 'assetId'),
+          scheduledDate: any(named: 'scheduledDate'),
+          maintenanceMasterId: any(named: 'maintenanceMasterId'),
+        )).thenThrow(conflict409());
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          workOrderRepositoryProvider.overrideWithValue(mockRepo),
+          authControllerProvider.overrideWith(() => _FakeAuth(_session)),
+          orgScopeOptionsServiceProvider.overrideWithValue(mockOrg),
+          infrastructureOptionsServiceProvider.overrideWithValue(mockInfra),
+          assetApiServiceProvider.overrideWithValue(mockAssets),
+        ],
+        child: const MaterialApp(home: WorkOrderCreateScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+        find.byKey(const Key('wo_title_field')), 'Station monthly maintenance');
+    await tester.ensureVisible(find.byKey(const Key('wo_template_dropdown')));
+    await tester.tap(find.byKey(const Key('wo_template_dropdown')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Basic Checklist (Monthly)').last);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const Key('submit_wo_button')));
+    await tester.tap(find.byKey(const Key('submit_wo_button')));
+    await tester.pumpAndSettle();
+
+    // No blind resubmit wording: the snackbar names the conversion path.
+    expect(find.textContaining('Convert the due schedule'), findsOneWidget);
   });
 }
