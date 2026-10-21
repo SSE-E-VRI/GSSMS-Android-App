@@ -1,0 +1,1007 @@
+00:00 +0: loading D:/GSSMS-Android-APP/test/core/app_config_test.dart
+00:00 +0: D:/GSSMS-Android-APP/test/core/app_version_test.dart: appVersion matches the version: line in pubspec.yaml
+00:00 +1: D:/GSSMS-Android-APP/test/core/app_config_test.dart: AppEnvironment fromString parses dev, staging, prod and handles fallbacks
+00:00 +2: D:/GSSMS-Android-APP/test/core/app_config_test.dart: AppEnvironment defaultBaseUrl returns correct URL per environment
+00:00 +3: D:/GSSMS-Android-APP/test/core/app_config_test.dart: AppEnvironment enableVerboseLogging is true for dev/staging and false for prod
+00:00 +4: D:/GSSMS-Android-APP/test/core/app_config_test.dart: AppEnvironment enableCertPinning is true only for prod
+00:00 +5: D:/GSSMS-Android-APP/test/core/app_config_test.dart: AppConfig uses injected baseUrl and environment correctly
+00:00 +6: D:/GSSMS-Android-APP/test/core/app_config_test.dart: AppConfig fromEnvironment returns default production configuration when unconfigured
+00:00 +7: D:/GSSMS-Android-APP/test/core/app_config_test.dart: AppConfig constructs apiUri accurately with or without leading slash
+00:00 +8: D:/GSSMS-Android-APP/test/core/app_config_test.dart: AppConfig constructs wsUri correctly deriving wss from https
+00:00 +9: D:/GSSMS-Android-APP/test/core/app_config_test.dart: AppConfig constructs wsUri allowing ws only for localhost or loopback
+00:00 +10: D:/GSSMS-Android-APP/test/core/app_config_test.dart: AppConfig upgrades non-loopback http URL to wss for security
+00:01 +11: D:/GSSMS-Android-APP/test/core/auth_interceptor_retry_body_test.dart: AuthInterceptor retry payload replays the request body when retrying a POST after refresh
+[HTTP REQ] POST https://gssms.share.zrok.io/api/v1/work-orders/7/change-status/
+[HTTP ERR] 401 https://gssms.share.zrok.io/api/v1/work-orders/7/change-status/ (DioExceptionType.badResponse)
+00:01 +12: D:/GSSMS-Android-APP/test/core/auth_interceptor_retry_body_test.dart: AuthInterceptor retry payload surfaces a non-401 failure from the retried request
+[HTTP REQ] POST https://gssms.share.zrok.io/api/v1/work-orders/7/change-status/
+[HTTP ERR] 401 https://gssms.share.zrok.io/api/v1/work-orders/7/change-status/ (DioExceptionType.badResponse)
+00:01 +13: D:/GSSMS-Android-APP/test/core/auth_interceptor_test.dart: AuthInterceptor Wire & Adapter Tests intercepts 401, refreshes token once, and successfully retries request
+[HTTP REQ] GET https://gssms.share.zrok.io/api/v1/work-orders/
+[HTTP ERR] 401 https://gssms.share.zrok.io/api/v1/work-orders/ (DioExceptionType.badResponse)
+00:01 +14: D:/GSSMS-Android-APP/test/core/auth_interceptor_test.dart: AuthInterceptor Wire & Adapter Tests retries only once on second 401 and calls onSessionExpired without loop
+[HTTP REQ] GET https://gssms.share.zrok.io/api/v1/work-orders/
+[HTTP ERR] 401 https://gssms.share.zrok.io/api/v1/work-orders/ (DioExceptionType.badResponse)
+00:01 +15: D:/GSSMS-Android-APP/test/core/auth_interceptor_test.dart: AuthInterceptor Wire & Adapter Tests does not attempt token refresh for auth endpoints on 401
+[HTTP REQ] POST https://gssms.share.zrok.io/api/v1/auth/refresh/
+[HTTP ERR] 401 https://gssms.share.zrok.io/api/v1/auth/refresh/ (DioExceptionType.badResponse)
+00:01 +16: D:/GSSMS-Android-APP/test/core/auth_interceptor_test.dart: AuthInterceptor Wire & Adapter Tests coalesces multiple concurrent 401 requests to a single refresh call
+[HTTP REQ] GET https://gssms.share.zrok.io/api/v1/work-orders/1
+[HTTP REQ] GET https://gssms.share.zrok.io/api/v1/work-orders/2
+[HTTP ERR] 401 https://gssms.share.zrok.io/api/v1/work-orders/1 (DioExceptionType.badResponse)
+[HTTP ERR] 401 https://gssms.share.zrok.io/api/v1/work-orders/2 (DioExceptionType.badResponse)
+00:01 +17: D:/GSSMS-Android-APP/test/core/auth_interceptor_test.dart: AuthInterceptor retry body + identity (H1/H3 audit fixes) re-sends a consumed FormData on retry after refresh (multipart survives 401)
+[HTTP REQ] PATCH https://gssms.share.zrok.io/api/v1/users/7/
+[HTTP ERR] 401 https://gssms.share.zrok.io/api/v1/users/7/ (DioExceptionType.badResponse)
+00:01 +18: D:/GSSMS-Android-APP/test/core/auth_interceptor_test.dart: AuthInterceptor retry body + identity (H1/H3 audit fixes) a 401 from a superseded identity is dropped — not replayed, no session teardown (H3)
+[HTTP REQ] GET https://gssms.share.zrok.io/api/v1/work-orders/
+[HTTP ERR] 401 https://gssms.share.zrok.io/api/v1/work-orders/ (DioExceptionType.badResponse)
+00:01 +19: D:/GSSMS-Android-APP/test/core/auth_interceptor_test.dart: AuthInterceptor retry body + identity (H1/H3 audit fixes) a stale 401 that already retried once must not fire onSessionExpired across identities (H3)
+[HTTP REQ] GET https://gssms.share.zrok.io/api/v1/work-orders/
+[HTTP ERR] 401 https://gssms.share.zrok.io/api/v1/work-orders/ (DioExceptionType.badResponse)
+00:24 +20: D:/GSSMS-Android-APP/test/core/data/org_scope_options_service_test.dart: fetchZones GETs /api/v1/zones/ with no params
+00:24 +21: D:/GSSMS-Android-APP/test/core/data/org_scope_options_service_test.dart: fetchDivisions GETs /api/v1/divisions/?zone=<id>
+00:24 +22: D:/GSSMS-Android-APP/test/core/data/org_scope_options_service_test.dart: fetchDepots prefers division over zone (matches DepotViewSet.get_queryset)
+00:24 +23: D:/GSSMS-Android-APP/test/core/data/org_scope_options_service_test.dart: fetchDepots falls back to zone when no division is given
+00:24 +24: D:/GSSMS-Android-APP/test/core/data/org_scope_options_service_test.dart: fetchStations GETs /api/v1/stations/?depot=<id>
+00:24 +25: D:/GSSMS-Android-APP/test/core/data/org_scope_options_service_test.dart: drops rows with a non-positive id
+00:24 +26: D:/GSSMS-Android-APP/test/core/network/api_error_test.dart: userFacingError never leaks technical detail connection error
+00:24 +27: D:/GSSMS-Android-APP/test/core/network/api_error_test.dart: userFacingError never leaks technical detail timeout
+00:24 +28: D:/GSSMS-Android-APP/test/core/network/api_error_test.dart: userFacingError never leaks technical detail 500 HTML page
+00:24 +29: D:/GSSMS-Android-APP/test/core/network/api_error_test.dart: userFacingError never leaks technical detail 500 JSON
+00:24 +30: D:/GSSMS-Android-APP/test/core/network/api_error_test.dart: userFacingError never leaks technical detail unknown without response
+00:24 +31: D:/GSSMS-Android-APP/test/core/network/api_error_test.dart: userFacingError never leaks technical detail type error from malformed payload
+00:24 +32: D:/GSSMS-Android-APP/test/core/network/api_error_test.dart: userFacingError never leaks technical detail format exception
+00:24 +33: D:/GSSMS-Android-APP/test/core/network/api_error_test.dart: network and timeout failures get connection guidance
+00:24 +34: D:/GSSMS-Android-APP/test/core/network/api_error_test.dart: 400 surfaces the DRF field message with a readable field name
+00:24 +35: D:/GSSMS-Android-APP/test/core/network/api_error_test.dart: 400 prefers detail / error / non_field_errors
+00:24 +36: D:/GSSMS-Android-APP/test/core/network/api_error_test.dart: 400 without a readable body falls back to the validation message
+00:24 +37: D:/GSSMS-Android-APP/test/core/network/api_error_test.dart: 401 is a session message, not the token error text
+00:25 +38: D:/GSSMS-Android-APP/test/core/network/api_error_test.dart: 403 keeps the server permission detail when present
+00:25 +39: D:/GSSMS-Android-APP/test/core/network/api_error_test.dart: 404 uses the scope-aware message
+00:25 +40: D:/GSSMS-Android-APP/test/core/network/api_error_test.dart: 409 conflict includes the existing ticket
+00:25 +41: D:/GSSMS-Android-APP/test/core/network/api_error_test.dart: 429 and 5xx use fixed messages
+00:25 +42: D:/GSSMS-Android-APP/test/core/network/api_error_test.dart: business exceptions keep their text without the Dart prefix
+00:25 +43: D:/GSSMS-Android-APP/test/core/sync/local_cache_service_large_list_test.dart: round-trips 500 work orders through isolate encode/decode
+00:25 +44: D:/GSSMS-Android-APP/test/core/sync/local_cache_service_owner_test.dart: LocalCacheService clearAllCache + outbox resurrection clearAllCache resets the in-memory last-good outbox
+00:26 +45: D:/GSSMS-Android-APP/test/core/sync/local_cache_service_owner_test.dart: LocalCacheService clearAllCache + outbox resurrection last-good fallback is withheld when it belongs to another owner
+00:26 +46: D:/GSSMS-Android-APP/test/core/sync/local_cache_service_owner_test.dart: LocalCacheService clearAllCache + outbox resurrection persisted owner=none with ownerless memory commands is withheld
+00:27 +47: D:/GSSMS-Android-APP/test/core/sync/local_cache_service_test.dart: LocalCacheService Tests caches and retrieves work orders list
+00:27 +48: D:/GSSMS-Android-APP/test/core/sync/local_cache_service_test.dart: LocalCacheService Tests caches and retrieves single work order detail
+00:27 +49: D:/GSSMS-Android-APP/test/core/sync/local_cache_service_test.dart: LocalCacheService Tests caches and retrieves maintenance record
+00:27 +50: D:/GSSMS-Android-APP/test/core/sync/local_cache_service_test.dart: LocalCacheService Tests saves and retrieves outbox commands
+00:27 +51: D:/GSSMS-Android-APP/test/core/sync/local_cache_service_test.dart: LocalCacheService Tests stores cache owner user id
+00:27 +52: D:/GSSMS-Android-APP/test/core/sync/local_cache_service_test.dart: LocalCacheService Tests clearAllCache removes all stored data
+00:28 +53: D:/GSSMS-Android-APP/test/core/sync/sync_manager_audit_group2_test.dart: (setUpAll)
+00:28 +53: D:/GSSMS-Android-APP/test/core/sync/sync_manager_audit_group2_test.dart: H4 — enqueueDeduped atomic dedup (audit 2026-10-20) two near-simultaneous deduped enqueues land exactly one command
+00:28 +54: D:/GSSMS-Android-APP/test/core/sync/sync_manager_audit_group2_test.dart: H4 — enqueueDeduped atomic dedup (audit 2026-10-20) verified H6: evidence without proof_path dedups on remarks+staff, distinct no-photo submissions are both kept
+00:28 +55: D:/GSSMS-Android-APP/test/core/sync/sync_manager_audit_group2_test.dart: M6/M7 — retry budget and resume backoff (audit 2026-10-20) offline drain enters resume backoff; user retry allocates a fresh budget
+00:28 +56: D:/GSSMS-Android-APP/test/core/sync/sync_manager_audit_group2_test.dart: M8 — completion must not overtake unsynced line work completeRecord waits while a submitLine for the record is unsynced
+00:28 +57: D:/GSSMS-Android-APP/test/core/sync/sync_manager_audit_group2_test.dart: M8 — completion must not overtake unsynced line work tech-completed transition waits for unsynced line work too
+00:28 +58: D:/GSSMS-Android-APP/test/core/sync/sync_manager_audit_group2_test.dart: Low 5 / Low 8 — outbox status parsing and badge counts unknown status code is parked as FAILED, never replayed
+00:28 +59: D:/GSSMS-Android-APP/test/core/sync/sync_manager_audit_group2_test.dart: Low 5 / Low 8 — outbox status parsing and badge counts attention counts include other users’ commands present on disk
+00:28 +60: D:/GSSMS-Android-APP/test/core/sync/sync_manager_audit_group2_test.dart: M4 — fetchAllPages truncation honesty malformed `next` reports truncated: true
+00:28 +61: D:/GSSMS-Android-APP/test/core/sync/sync_manager_audit_group2_test.dart: M4 — fetchAllPages truncation honesty repeating `next` reports truncated: true
+00:28 +62: D:/GSSMS-Android-APP/test/core/sync/sync_manager_audit_group2_test.dart: M4 — fetchAllPages truncation honesty clean end of pagination reports truncated: false
+00:28 +63: D:/GSSMS-Android-APP/test/core/sync/sync_manager_audit_group2_test.dart: (tearDownAll)
+00:31 +63: D:/GSSMS-Android-APP/test/core/sync/sync_manager_line_attachment_test.dart: SyncManager line attachment ordering guard & discard attachment command does NOT execute if submitLine for same line fails
+00:31 +64: D:/GSSMS-Android-APP/test/core/sync/sync_manager_line_attachment_test.dart: SyncManager line attachment ordering guard & discard attachment executes and discards local file once submitLine succeeds
+00:32 +65: D:/GSSMS-Android-APP/test/core/sync/sync_manager_offline_queue_test.dart: SyncManager outbox durability keeps commands queued behind the one that hit the network error
+00:32 +66: D:/GSSMS-Android-APP/test/core/sync/sync_manager_offline_queue_test.dart: SyncManager outbox durability a failed command stays visible as attention, not as queued work
+00:32 +67: D:/GSSMS-Android-APP/test/core/sync/sync_manager_offline_queue_test.dart: SyncManager outbox durability retryAllFailed returns failed commands to the queue and drains them
+00:33 +68: D:/GSSMS-Android-APP/test/core/sync/sync_manager_test.dart: SyncManager Unit Tests enqueueCommand writes command to cache and updates pending count
+00:33 +69: D:/GSSMS-Android-APP/test/core/sync/sync_manager_test.dart: SyncManager Unit Tests drainOutbox handles network error gracefully and flags offline mode
+00:33 +70: D:/GSSMS-Android-APP/test/core/sync/sync_manager_test.dart: SyncManager Unit Tests drainOutbox flags 409 conflict appropriately without blocking queue
+00:33 +71: D:/GSSMS-Android-APP/test/core/sync/sync_manager_test.dart: SyncManager Unit Tests invalidateSessionBoundWork prevents an in-flight drain from rewriting the outbox
+00:34 +72: D:/GSSMS-Android-APP/test/core/sync/sync_status_badge_test.dart: SyncStatusBadge Widget Tests renders nothing when online and all items are synced
+00:34 +73: D:/GSSMS-Android-APP/test/core/sync/sync_status_badge_test.dart: SyncStatusBadge Widget Tests renders nothing when online and all items are synced
+00:34 +74: D:/GSSMS-Android-APP/test/core/sync/sync_status_badge_test.dart: SyncStatusBadge Widget Tests renders nothing when online and all items are synced
+00:34 +75: D:/GSSMS-Android-APP/test/core/sync/sync_status_badge_test.dart: SyncStatusBadge Widget Tests renders nothing when online and all items are synced
+00:34 +76: D:/GSSMS-Android-APP/test/core/sync/sync_status_badge_test.dart: SyncStatusBadge Widget Tests renders nothing when online and all items are synced
+00:34 +77: D:/GSSMS-Android-APP/test/core/sync/sync_status_badge_test.dart: SyncStatusBadge Widget Tests renders nothing when online and all items are synced
+00:34 +78: D:/GSSMS-Android-APP/test/core/sync/sync_status_badge_test.dart: SyncStatusBadge Widget Tests renders nothing when online and all items are synced
+00:35 +79: D:/GSSMS-Android-APP/test/core/sync/sync_status_badge_test.dart: SyncStatusBadge Widget Tests renders nothing when online and all items are synced
+00:35 +80: D:/GSSMS-Android-APP/test/core/sync/sync_status_badge_test.dart: SyncStatusBadge Widget Tests renders nothing when online and all items are synced
+00:35 +81: D:/GSSMS-Android-APP/test/core/sync/sync_status_badge_test.dart: SyncStatusBadge Widget Tests renders nothing when online and all items are synced
+00:35 +82: D:/GSSMS-Android-APP/test/core/sync/sync_status_badge_test.dart: SyncStatusBadge Widget Tests renders nothing when online and all items are synced
+00:35 +83: D:/GSSMS-Android-APP/test/core/sync/sync_status_badge_test.dart: SyncStatusBadge Widget Tests renders nothing when online and all items are synced
+00:35 +84: D:/GSSMS-Android-APP/test/core/sync/sync_status_badge_test.dart: SyncStatusBadge Widget Tests renders nothing when online and all items are synced
+00:35 +85: D:/GSSMS-Android-APP/test/core/sync/sync_status_badge_test.dart: SyncStatusBadge Widget Tests renders nothing when online and all items are synced
+00:35 +86: D:/GSSMS-Android-APP/test/core/sync/sync_status_badge_test.dart: SyncStatusBadge Widget Tests renders nothing when online and all items are synced
+00:35 +87: D:/GSSMS-Android-APP/test/core/sync/sync_status_badge_test.dart: SyncStatusBadge Widget Tests renders nothing when online and all items are synced
+00:35 +88: D:/GSSMS-Android-APP/test/core/sync/sync_status_badge_test.dart: SyncStatusBadge Widget Tests renders nothing when online and all items are synced
+00:35 +89: D:/GSSMS-Android-APP/test/core/sync/sync_status_badge_test.dart: SyncStatusBadge Widget Tests renders nothing when online and all items are synced
+00:35 +90: D:/GSSMS-Android-APP/test/core/sync/sync_status_badge_test.dart: SyncStatusBadge Widget Tests renders nothing when online and all items are synced
+00:35 +91: D:/GSSMS-Android-APP/test/core/sync/sync_status_badge_test.dart: SyncStatusBadge Widget Tests renders nothing when online and all items are synced
+00:35 +92: D:/GSSMS-Android-APP/test/core/sync/sync_status_badge_test.dart: SyncStatusBadge Widget Tests renders nothing when online and all items are synced
+00:35 +93: D:/GSSMS-Android-APP/test/core/sync/sync_status_badge_test.dart: SyncStatusBadge Widget Tests renders nothing when online and all items are synced
+00:35 +94: D:/GSSMS-Android-APP/test/core/sync/sync_status_badge_test.dart: SyncStatusBadge Widget Tests renders nothing when online and all items are synced
+00:35 +95: D:/GSSMS-Android-APP/test/core/sync/sync_status_badge_test.dart: SyncStatusBadge Widget Tests renders nothing when online and all items are synced
+00:35 +96: D:/GSSMS-Android-APP/test/core/sync/sync_status_badge_test.dart: SyncStatusBadge Widget Tests renders nothing when online and all items are synced
+00:35 +97: D:/GSSMS-Android-APP/test/core/sync/sync_status_badge_test.dart: SyncStatusBadge Widget Tests renders nothing when online and all items are synced
+00:35 +98: D:/GSSMS-Android-APP/test/core/theme/app_theme_test.dart: mutedText resolves to textMuted in the light theme
+00:35 +99: D:/GSSMS-Android-APP/test/core/theme/app_theme_test.dart: mutedText resolves to textMuted in the light theme
+00:35 +100: D:/GSSMS-Android-APP/test/core/theme/app_theme_test.dart: mutedText resolves to textMuted in the light theme
+00:35 +101: D:/GSSMS-Android-APP/test/core/theme/app_theme_test.dart: mutedText resolves to textMuted in the light theme
+00:35 +102: D:/GSSMS-Android-APP/test/core/theme/app_theme_test.dart: mutedText resolves to textMuted in the light theme
+00:35 +103: D:/GSSMS-Android-APP/test/core/theme/app_theme_test.dart: mutedText resolves to textMuted in the light theme
+00:35 +104: D:/GSSMS-Android-APP/test/core/theme/app_theme_test.dart: mutedText resolves to textMuted in the light theme
+00:35 +105: D:/GSSMS-Android-APP/test/core/theme/app_theme_test.dart: mutedText resolves to textMuted in the light theme
+00:35 +106: D:/GSSMS-Android-APP/test/core/theme/app_theme_test.dart: mutedText resolves to textMuted in the light theme
+00:35 +107: D:/GSSMS-Android-APP/test/core/theme/app_theme_test.dart: mutedText resolves to textMuted in the light theme
+00:35 +108: D:/GSSMS-Android-APP/test/core/theme/app_theme_test.dart: mutedText resolves to textMuted in the light theme
+00:35 +109: D:/GSSMS-Android-APP/test/core/theme/app_theme_test.dart: mutedText resolves to textMuted in the light theme
+00:35 +110: D:/GSSMS-Android-APP/test/core/theme/app_theme_test.dart: mutedText resolves to textMuted in the light theme
+00:35 +111: D:/GSSMS-Android-APP/test/core/theme/app_theme_test.dart: mutedText resolves to textMuted in the light theme
+00:35 +112: D:/GSSMS-Android-APP/test/core/theme/app_theme_test.dart: mutedText resolves to textMuted in the light theme
+00:35 +113: D:/GSSMS-Android-APP/test/core/theme/app_theme_test.dart: mutedText resolves to textMuted in the light theme
+00:36 +114: D:/GSSMS-Android-APP/test/core/theme/app_theme_test.dart: mutedText resolves to textMuted in the light theme
+00:36 +115: D:/GSSMS-Android-APP/test/core/theme/app_theme_test.dart: mutedText resolves to textMuted in the light theme
+00:36 +116: D:/GSSMS-Android-APP/test/core/theme/app_theme_test.dart: mutedText resolves to textMuted in the light theme
+00:36 +117: D:/GSSMS-Android-APP/test/core/theme/app_theme_test.dart: mutedText resolves to textMuted in the light theme
+00:36 +118: D:/GSSMS-Android-APP/test/core/theme/app_theme_test.dart: mutedText resolves to textMuted in the light theme
+00:36 +119: D:/GSSMS-Android-APP/test/core/theme/app_theme_test.dart: mutedText resolves to textMuted in the light theme
+00:36 +120: D:/GSSMS-Android-APP/test/core/theme/app_theme_test.dart: mutedText resolves to textMuted in the light theme
+00:36 +121: D:/GSSMS-Android-APP/test/core/theme/app_theme_test.dart: mutedText resolves to textMuted in the light theme
+00:36 +122: D:/GSSMS-Android-APP/test/core/theme/app_theme_test.dart: mutedText resolves to textMuted in the light theme
+00:36 +123: D:/GSSMS-Android-APP/test/core/theme/app_theme_test.dart: mutedText resolves to textMuted in the light theme
+00:36 +124: D:/GSSMS-Android-APP/test/core/theme/app_theme_test.dart: mutedText resolves to textMuted in the light theme
+00:36 +125: D:/GSSMS-Android-APP/test/core/theme/gssms_colors_test.dart: context.gssms resolves per active theme
+00:36 +126: D:/GSSMS-Android-APP/test/core/theme/gssms_colors_test.dart: context.gssms resolves per active theme
+00:36 +127: D:/GSSMS-Android-APP/test/core/theme/gssms_colors_test.dart: context.gssms resolves per active theme
+00:37 +128: D:/GSSMS-Android-APP/test/core/widgets/authenticated_image_thumbnail_test.dart: renders placeholder when url is null
+00:37 +129: D:/GSSMS-Android-APP/test/core/widgets/authenticated_image_thumbnail_test.dart: renders placeholder when url is null
+00:38 +130: D:/GSSMS-Android-APP/test/core/widgets/empty_state_view_test.dart: EmptyStateView shows icon, title, body and action
+00:38 +131: D:/GSSMS-Android-APP/test/core/widgets/empty_state_view_test.dart: EmptyStateView shows icon, title, body and action
+00:39 +132: D:/GSSMS-Android-APP/test/core/widgets/empty_state_view_test.dart: EmptyStateView shows icon, title, body and action
+00:39 +133: D:/GSSMS-Android-APP/test/core/widgets/error_banner_test.dart: ErrorBanner shows message and Retry (stale-data-with-banner pattern)
+00:39 +134: D:/GSSMS-Android-APP/test/core/widgets/error_banner_test.dart: ErrorBanner shows message and Retry (stale-data-with-banner pattern)
+00:39 +135: D:/GSSMS-Android-APP/test/core/widgets/org_scope_app_bar_filter_test.dart: OrgScopeAppBarFilter Widget Tests collapses to nothing when user is depot-scoped and enableStation is false
+00:39 +136: D:/GSSMS-Android-APP/test/core/widgets/org_scope_filter_bar_test.dart: OrgScopeFilterBar visibility per session.scope.level GLOBAL scope shows Zone, Division and Depot
+00:40 +137: D:/GSSMS-Android-APP/test/core/widgets/org_scope_filter_bar_test.dart: OrgScopeFilterBar visibility per session.scope.level GLOBAL scope shows Zone, Division and Depot
+00:40 +138: D:/GSSMS-Android-APP/test/core/widgets/org_scope_filter_bar_test.dart: OrgScopeFilterBar visibility per session.scope.level GLOBAL scope shows Zone, Division and Depot
+00:40 +139: D:/GSSMS-Android-APP/test/core/widgets/org_scope_filter_bar_test.dart: OrgScopeFilterBar visibility per session.scope.level GLOBAL scope shows Zone, Division and Depot
+00:40 +140: D:/GSSMS-Android-APP/test/core/widgets/org_scope_app_bar_filter_test.dart: OrgScopeAppBarFilter Widget Tests tapping filter icon opens bottom sheet with Done and Clear buttons
+00:41 +141: D:/GSSMS-Android-APP/test/core/widgets/org_scope_app_bar_filter_test.dart: OrgScopeAppBarFilter Widget Tests tapping filter icon opens bottom sheet with Done and Clear buttons
+00:41 +142: D:/GSSMS-Android-APP/test/core/widgets/org_scope_app_bar_filter_test.dart: OrgScopeAppBarFilter Widget Tests tapping filter icon opens bottom sheet with Done and Clear buttons
+00:41 +143: D:/GSSMS-Android-APP/test/core/widgets/org_scope_app_bar_filter_test.dart: OrgScopeAppBarFilter Widget Tests tapping filter icon opens bottom sheet with Done and Clear buttons
+00:41 +144: D:/GSSMS-Android-APP/test/core/widgets/org_scope_app_bar_filter_test.dart: OrgScopeAppBarFilter Widget Tests tapping filter icon opens bottom sheet with Done and Clear buttons
+00:41 +145: D:/GSSMS-Android-APP/test/core/widgets/profile_avatar_test.dart: ProfileAvatar Widget Tests renders initials when photoUrl is null
+00:41 +146: D:/GSSMS-Android-APP/test/core/widgets/profile_avatar_test.dart: ProfileAvatar Widget Tests renders initials when photoUrl is null
+00:41 +147: D:/GSSMS-Android-APP/test/core/widgets/profile_avatar_test.dart: ProfileAvatar Widget Tests renders initials when photoUrl is null
+00:41 +148: D:/GSSMS-Android-APP/test/core/widgets/profile_avatar_test.dart: ProfileAvatar Widget Tests renders initials when photoUrl is null
+00:41 +149: D:/GSSMS-Android-APP/test/core/widgets/profile_avatar_test.dart: ProfileAvatar Widget Tests renders initials when photoUrl is null
+00:41 +150: D:/GSSMS-Android-APP/test/core/widgets/repeatable_text_list_test.dart: add and remove entries
+00:41 +151: D:/GSSMS-Android-APP/test/core/widgets/repeatable_text_list_test.dart: add and remove entries
+00:41 +152: D:/GSSMS-Android-APP/test/core/widgets/repeatable_text_list_test.dart: add and remove entries
+00:41 +153: D:/GSSMS-Android-APP/test/core/widgets/repeatable_text_list_test.dart: add and remove entries
+00:42 +154: D:/GSSMS-Android-APP/test/core/widgets/repeatable_text_list_test.dart: add and remove entries
+00:42 +155: D:/GSSMS-Android-APP/test/core/widgets/repeatable_text_list_test.dart: add and remove entries
+00:42 +156: D:/GSSMS-Android-APP/test/core/widgets/repeatable_text_list_test.dart: add and remove entries
+00:42 +157: D:/GSSMS-Android-APP/test/core/widgets/repeatable_text_list_test.dart: add and remove entries
+00:42 +158: D:/GSSMS-Android-APP/test/core/widgets/repeatable_text_list_test.dart: add and remove entries
+00:42 +159: D:/GSSMS-Android-APP/test/core/widgets/repeatable_text_list_test.dart: add and remove entries
+00:42 +160: D:/GSSMS-Android-APP/test/core/widgets/repeatable_text_list_test.dart: add and remove entries
+00:42 +161: D:/GSSMS-Android-APP/test/core/widgets/repeatable_text_list_test.dart: add and remove entries
+00:42 +162: D:/GSSMS-Android-APP/test/core/widgets/repeatable_text_list_test.dart: add and remove entries
+00:42 +163: D:/GSSMS-Android-APP/test/core/widgets/repeatable_text_list_test.dart: add and remove entries
+00:42 +163: D:/GSSMS-Android-APP/test/core/widgets/profile_avatar_test.dart: ProfilePhotoCache storage hygiene refuses to cache non-image responses (no cache poisoning)
+ProfilePhotoCache: refusing non-image response (text/html)
+00:42 +164: D:/GSSMS-Android-APP/test/core/widgets/repeatable_text_list_test.dart: add and remove entries
+00:43 +165: D:/GSSMS-Android-APP/test/core/widgets/repeatable_text_list_test.dart: add and remove entries
+00:43 +166: D:/GSSMS-Android-APP/test/core/widgets/severity_chip_test.dart: SeverityChip maps Critical to the danger tone with an icon
+00:44 +167: D:/GSSMS-Android-APP/test/core/widgets/severity_chip_test.dart: SeverityChip maps Critical to the danger tone with an icon
+00:44 +168: D:/GSSMS-Android-APP/test/core/widgets/severity_chip_test.dart: SeverityChip maps Critical to the danger tone with an icon
+00:44 +169: D:/GSSMS-Android-APP/test/core/widgets/status_chip_test.dart: StatusChip uses the success tone foreground in light theme
+00:45 +170: D:/GSSMS-Android-APP/test/core/widgets/status_chip_test.dart: StatusChip uses the success tone foreground in light theme
+00:45 +171: D:/GSSMS-Android-APP/test/core/widgets/status_chip_test.dart: StatusChip uses the success tone foreground in light theme
+00:45 +172: D:/GSSMS-Android-APP/test/core/widgets/status_chip_test.dart: StatusChip uses the success tone foreground in light theme
+00:45 +173: D:/GSSMS-Android-APP/test/core/widgets/status_chip_test.dart: StatusChip uses the success tone foreground in light theme
+00:45 +174: D:/GSSMS-Android-APP/test/core/widgets/status_chip_test.dart: StatusChip uses the success tone foreground in light theme
+00:45 +175: D:/GSSMS-Android-APP/test/core/widgets/status_chip_test.dart: StatusChip uses the success tone foreground in light theme
+00:45 +176: D:/GSSMS-Android-APP/test/core/widgets/status_chip_test.dart: StatusChip uses the success tone foreground in light theme
+00:45 +177: D:/GSSMS-Android-APP/test/core/widgets/status_chip_test.dart: StatusChip resolves tone colours for the dark theme
+00:45 +178: D:/GSSMS-Android-APP/test/core/widgets/status_chip_test.dart: StatusChip shows its icon so meaning is not colour-only
+00:45 +179: D:/GSSMS-Android-APP/test/features/assets/domain/asset_test.dart: Asset Domain Model Tests parses the asset payload the server actually returns
+00:45 +180: D:/GSSMS-Android-APP/test/core/widgets/status_chip_test.dart: filled StatusChip uses the solid/onSolid pair
+00:45 +181: D:/GSSMS-Android-APP/test/core/widgets/status_chip_test.dart: filled StatusChip uses the solid/onSolid pair
+00:45 +182: D:/GSSMS-Android-APP/test/core/widgets/status_chip_test.dart: filled StatusChip uses the solid/onSolid pair
+00:46 +183: D:/GSSMS-Android-APP/test/core/widgets/status_chip_test.dart: filled StatusChip uses the solid/onSolid pair
+00:46 +184: D:/GSSMS-Android-APP/test/core/widgets/status_chip_test.dart: filled StatusChip uses the solid/onSolid pair
+00:46 +185: D:/GSSMS-Android-APP/test/core/widgets/status_chip_test.dart: filled StatusChip uses the solid/onSolid pair
+00:46 +186: D:/GSSMS-Android-APP/test/features/assets/domain/asset_test.dart: Asset Domain Model Tests AssetWarrantyStatus.fromString parses safely
+00:46 +187: D:/GSSMS-Android-APP/test/features/assets/presentation/asset_screens_test.dart: Asset Screens Widget Tests AssetListScreen renders asset card and QR action
+00:47 +188: D:/GSSMS-Android-APP/test/features/assets/presentation/asset_screens_test.dart: Asset Screens Widget Tests AssetListScreen renders asset card and QR action
+00:47 +189: D:/GSSMS-Android-APP/test/features/assets/presentation/asset_screens_test.dart: Asset Screens Widget Tests AssetListScreen renders asset card and QR action
+00:47 +190: D:/GSSMS-Android-APP/test/features/assets/presentation/asset_screens_test.dart: Asset Screens Widget Tests AssetListScreen renders asset card and QR action
+00:47 +191: D:/GSSMS-Android-APP/test/features/assets/presentation/asset_screens_test.dart: Asset Screens Widget Tests AssetListScreen renders asset card and QR action
+00:47 +192: D:/GSSMS-Android-APP/test/features/assets/presentation/asset_screens_test.dart: Asset Screens Widget Tests AssetListScreen renders asset card and QR action
+00:47 +193: D:/GSSMS-Android-APP/test/features/assets/presentation/asset_screens_test.dart: Asset Screens Widget Tests AssetListScreen renders asset card and QR action
+00:47 +194: D:/GSSMS-Android-APP/test/features/assets/presentation/asset_screens_test.dart: Asset Screens Widget Tests AssetListScreen renders asset card and QR action
+00:47 +195: D:/GSSMS-Android-APP/test/features/assets/presentation/asset_screens_test.dart: Asset Screens Widget Tests AssetListScreen renders asset card and QR action
+00:47 +196: D:/GSSMS-Android-APP/test/features/assets/presentation/asset_screens_test.dart: Asset Screens Widget Tests AssetListScreen renders asset card and QR action
+00:47 +197: D:/GSSMS-Android-APP/test/features/assets/presentation/asset_screens_test.dart: Asset Screens Widget Tests AssetListScreen renders asset card and QR action
+00:47 +198: D:/GSSMS-Android-APP/test/features/assets/presentation/asset_screens_test.dart: Asset Screens Widget Tests AssetListScreen renders asset card and QR action
+00:47 +199: D:/GSSMS-Android-APP/test/features/assets/presentation/asset_screens_test.dart: Asset Screens Widget Tests AssetListScreen renders asset card and QR action
+00:47 +200: D:/GSSMS-Android-APP/test/features/assets/presentation/asset_screens_test.dart: Asset Screens Widget Tests AssetListScreen renders asset card and QR action
+00:47 +201: D:/GSSMS-Android-APP/test/features/assets/presentation/asset_screens_test.dart: Asset Screens Widget Tests AssetListScreen renders asset card and QR action
+00:47 +202: D:/GSSMS-Android-APP/test/features/assets/presentation/asset_screens_test.dart: Asset Screens Widget Tests AssetListScreen renders asset card and QR action
+00:47 +203: D:/GSSMS-Android-APP/test/features/assets/presentation/asset_screens_test.dart: Asset Screens Widget Tests AssetListScreen renders asset card and QR action
+00:47 +204: D:/GSSMS-Android-APP/test/features/assets/presentation/asset_screens_test.dart: Asset Screens Widget Tests AssetListScreen renders asset card and QR action
+00:47 +205: D:/GSSMS-Android-APP/test/features/assets/presentation/asset_screens_test.dart: Asset Screens Widget Tests AssetListScreen renders asset card and QR action
+00:47 +206: D:/GSSMS-Android-APP/test/features/assets/presentation/asset_screens_test.dart: Asset Screens Widget Tests AssetListScreen renders asset card and QR action
+00:47 +207: D:/GSSMS-Android-APP/test/features/assets/presentation/asset_screens_test.dart: Asset Screens Widget Tests AssetListScreen renders asset card and QR action
+00:47 +208: D:/GSSMS-Android-APP/test/features/assets/presentation/asset_screens_test.dart: Asset Screens Widget Tests AssetListScreen renders asset card and QR action
+00:47 +209: D:/GSSMS-Android-APP/test/features/assets/presentation/asset_screens_test.dart: Asset Screens Widget Tests AssetListScreen renders asset card and QR action
+00:47 +210: D:/GSSMS-Android-APP/test/features/assets/presentation/asset_screens_test.dart: Asset Screens Widget Tests AssetListScreen renders asset card and QR action
+00:47 +211: D:/GSSMS-Android-APP/test/features/assets/presentation/asset_screens_test.dart: Asset Screens Widget Tests AssetListScreen renders asset card and QR action
+00:48 +212: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests cancels dialog returning null when close button tapped
+00:48 +213: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests cancels dialog returning null when close button tapped
+00:49 +214: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests cancels dialog returning null when close button tapped
+00:49 +215: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests cancels dialog returning null when close button tapped
+00:49 +216: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests cancels dialog returning null when close button tapped
+00:49 +217: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests cancels dialog returning null when close button tapped
+00:49 +218: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests cancels dialog returning null when close button tapped
+00:49 +219: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests cancels dialog returning null when close button tapped
+00:49 +220: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests cancels dialog returning null when close button tapped
+00:49 +221: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests cancels dialog returning null when close button tapped
+00:49 +222: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests cancels dialog returning null when close button tapped
+00:49 +223: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests cancels dialog returning null when close button tapped
+00:49 +224: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests cancels dialog returning null when close button tapped
+00:49 +225: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests cancels dialog returning null when close button tapped
+00:49 +226: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests cancels dialog returning null when close button tapped
+00:49 +227: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests cancels dialog returning null when close button tapped
+00:49 +228: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests cancels dialog returning null when close button tapped
+00:49 +229: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests cancels dialog returning null when close button tapped
+00:49 +230: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests cancels dialog returning null when close button tapped
+00:49 +231: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests cancels dialog returning null when close button tapped
+00:49 +232: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests cancels dialog returning null when close button tapped
+00:49 +233: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests cancels dialog returning null when close button tapped
+00:49 +234: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests cancels dialog returning null when close button tapped
+00:49 +235: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests cancels dialog returning null when close button tapped
+00:49 +236: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests cancels dialog returning null when close button tapped
+00:49 +237: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests cancels dialog returning null when close button tapped
+00:49 +238: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests cancels dialog returning null when close button tapped
+00:49 +239: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests cancels dialog returning null when close button tapped
+00:49 +240: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests cancels dialog returning null when close button tapped
+00:49 +241: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests cancels dialog returning null when close button tapped
+00:49 +242: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests cancels dialog returning null when close button tapped
+00:49 +243: D:/GSSMS-Android-APP/test/features/assets/presentation/asset_screens_test.dart: Asset Screens Widget Tests AssetDetailScreen renders technical details without the complaint log button
+00:49 +244: D:/GSSMS-Android-APP/test/features/auth/domain/user_profile_test.dart: UserProfile UserProfile.fromJson handles null profile_picture
+00:49 +245: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests manual mode accepts typed asset code and returns it on confirm
+00:49 +246: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests manual mode accepts typed asset code and returns it on confirm
+00:49 +247: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests manual mode accepts typed asset code and returns it on confirm
+00:49 +248: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests manual mode accepts typed asset code and returns it on confirm
+00:49 +249: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests manual mode accepts typed asset code and returns it on confirm
+00:49 +250: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests manual mode accepts typed asset code and returns it on confirm
+00:49 +251: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests toggles between manual entry and camera modes
+00:50 +252: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests toggles between manual entry and camera modes
+00:50 +253: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests toggles between manual entry and camera modes
+00:50 +254: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests toggles between manual entry and camera modes
+00:50 +255: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests toggles between manual entry and camera modes
+00:50 +256: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests toggles between manual entry and camera modes
+00:50 +257: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests toggles between manual entry and camera modes
+00:50 +258: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests toggles between manual entry and camera modes
+00:50 +259: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests toggles between manual entry and camera modes
+00:50 +260: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests toggles between manual entry and camera modes
+00:50 +261: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests toggles between manual entry and camera modes
+00:50 +262: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests toggles between manual entry and camera modes
+00:50 +263: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests toggles between manual entry and camera modes
+00:50 +264: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests toggles between manual entry and camera modes
+00:50 +265: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests toggles between manual entry and camera modes
+00:50 +266: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests toggles between manual entry and camera modes
+00:50 +267: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests toggles between manual entry and camera modes
+00:50 +268: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests toggles between manual entry and camera modes
+00:50 +269: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests toggles between manual entry and camera modes
+00:50 +270: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests toggles between manual entry and camera modes
+00:50 +271: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests toggles between manual entry and camera modes
+00:50 +272: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests toggles between manual entry and camera modes
+00:50 +273: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests toggles between manual entry and camera modes
+00:50 +274: D:/GSSMS-Android-APP/test/features/assets/presentation/qr_scanner_dialog_test.dart: QrScannerDialog Widget Tests toggles between manual entry and camera modes
+00:50 +275: D:/GSSMS-Android-APP/test/features/auth/presentation/auth_controller_test.dart: AuthController login success sets Authenticated state
+00:50 +276: D:/GSSMS-Android-APP/test/features/auth/domain/user_session_test.dart: UserSession and AuthRole expired valid_until throws GuestExpiredException
+00:50 +277: D:/GSSMS-Android-APP/test/features/auth/presentation/auth_controller_test.dart: AuthController login with 2FA requirement sets OtpRequired state and excludes password from props and toString
+00:50 +278: D:/GSSMS-Android-APP/test/features/auth/domain/user_session_test.dart: UserSession and AuthRole fromJwt expiry parsing (M5 audit fix) throws UnauthorizedException when exp is missing (fail closed)
+00:50 +279: D:/GSSMS-Android-APP/test/features/auth/presentation/auth_controller_test.dart: AuthController submitOtp success sets Authenticated state without state drop
+00:50 +280: D:/GSSMS-Android-APP/test/features/auth/presentation/auth_controller_test.dart: AuthController submitOtp success sets Authenticated state without state drop
+00:50 +281: D:/GSSMS-Android-APP/test/features/auth/domain/user_session_test.dart: UserSession and AuthRole fromJwt expiry parsing (M5 audit fix) accepts a valid future exp
+00:50 +282: D:/GSSMS-Android-APP/test/features/auth/presentation/auth_controller_test.dart: AuthController login with unknown exception maps to sanitized generic message without leaking internals
+00:50 +283: D:/GSSMS-Android-APP/test/features/auth/presentation/auth_controller_test.dart: AuthController restoreSession restores Authenticated when session available
+00:50 +284: D:/GSSMS-Android-APP/test/features/auth/presentation/auth_controller_test.dart: AuthController logout clears session and sets Unauthenticated
+00:50 +285: D:/GSSMS-Android-APP/test/features/auth/presentation/auth_controller_test.dart: AuthController onAccessTokenRefreshed updates Authenticated session claims
+00:50 +286: D:/GSSMS-Android-APP/test/features/auth/presentation/login_screen_test.dart: LoginScreen Widget Tests renders username, password, and sign in button with autofill hints
+00:53 +287: D:/GSSMS-Android-APP/test/features/auth/presentation/login_screen_test.dart: LoginScreen Widget Tests renders username, password, and sign in button with autofill hints
+00:53 +288: D:/GSSMS-Android-APP/test/features/auth/presentation/login_screen_test.dart: LoginScreen Widget Tests renders username, password, and sign in button with autofill hints
+00:53 +289: D:/GSSMS-Android-APP/test/features/auth/presentation/login_screen_test.dart: LoginScreen Widget Tests renders username, password, and sign in button with autofill hints
+00:53 +290: D:/GSSMS-Android-APP/test/features/auth/presentation/otp_flow_test.dart: OTP Flow Tests OtpEmailScreen validates email field on submit
+00:53 +291: D:/GSSMS-Android-APP/test/features/auth/presentation/otp_flow_test.dart: OTP Flow Tests OtpEmailScreen validates email field on submit
+00:53 +292: D:/GSSMS-Android-APP/test/features/auth/presentation/otp_flow_test.dart: OTP Flow Tests OtpEmailScreen validates email field on submit
+00:53 +293: D:/GSSMS-Android-APP/test/features/auth/presentation/otp_flow_test.dart: OTP Flow Tests OtpEmailScreen validates email field on submit
+00:53 +294: D:/GSSMS-Android-APP/test/features/auth/presentation/otp_flow_test.dart: OTP Flow Tests OtpEmailScreen validates email field on submit
+00:53 +295: D:/GSSMS-Android-APP/test/features/auth/presentation/otp_flow_test.dart: OTP Flow Tests OtpEmailScreen validates email field on submit
+00:53 +296: D:/GSSMS-Android-APP/test/features/auth/presentation/otp_flow_test.dart: OTP Flow Tests OtpEmailScreen validates email field on submit
+00:53 +297: D:/GSSMS-Android-APP/test/features/auth/presentation/otp_flow_test.dart: OTP Flow Tests OtpEmailScreen validates email field on submit
+00:54 +298: D:/GSSMS-Android-APP/test/features/auth/presentation/otp_flow_test.dart: OTP Flow Tests OtpEmailScreen validates email field on submit
+00:54 +299: D:/GSSMS-Android-APP/test/features/auth/presentation/otp_flow_test.dart: OTP Flow Tests OtpEmailScreen validates email field on submit
+00:54 +300: D:/GSSMS-Android-APP/test/features/auth/presentation/otp_flow_test.dart: OTP Flow Tests OtpEmailScreen validates email field on submit
+00:54 +301: D:/GSSMS-Android-APP/test/features/auth/presentation/user_profile_screen_test.dart: renders email, phone, designation and password fields only
+00:54 +302: D:/GSSMS-Android-APP/test/features/auth/presentation/login_screen_test.dart: LoginScreen Widget Tests switches to OTP challenge view on TwoFactorRequiredException and stays on OTP view during submission
+00:55 +303: D:/GSSMS-Android-APP/test/features/auth/presentation/otp_flow_test.dart: OTP Flow Tests OtpEmailScreen requests OTP for login and navigates to verification screen
+00:55 +304: D:/GSSMS-Android-APP/test/features/auth/presentation/otp_flow_test.dart: OTP Flow Tests OtpEmailScreen requests OTP for login and navigates to verification screen
+00:55 +305: D:/GSSMS-Android-APP/test/features/auth/presentation/user_profile_screen_test.dart: Save Changes PATCHes email, phone_number and designation
+00:56 +306: D:/GSSMS-Android-APP/test/features/complaints/presentation/complaint_detail_busy_bid_test.dart: Close button is disabled while a convert is in flight
+00:56 +307: D:/GSSMS-Android-APP/test/features/complaints/presentation/complaint_detail_busy_bid_test.dart: Close button is disabled while a convert is in flight
+00:56 +308: D:/GSSMS-Android-APP/test/features/complaints/presentation/complaint_detail_busy_bid_test.dart: Close button is disabled while a convert is in flight
+00:56 +309: D:/GSSMS-Android-APP/test/features/complaints/presentation/complaint_detail_busy_bid_test.dart: Close button is disabled while a convert is in flight
+00:56 +310: D:/GSSMS-Android-APP/test/features/complaints/presentation/complaint_detail_busy_bid_test.dart: Close button is disabled while a convert is in flight
+00:56 +311: D:/GSSMS-Android-APP/test/features/complaints/presentation/complaint_detail_busy_bid_test.dart: Close button is disabled while a convert is in flight
+00:57 +312: D:/GSSMS-Android-APP/test/features/complaints/presentation/complaint_detail_busy_bid_test.dart: Close button is disabled while a convert is in flight
+00:57 +313: D:/GSSMS-Android-APP/test/features/complaints/presentation/complaint_detail_busy_bid_test.dart: Close button is disabled while a convert is in flight
+00:57 +314: D:/GSSMS-Android-APP/test/features/complaints/presentation/complaint_detail_busy_bid_test.dart: Close button is disabled while a convert is in flight
+00:57 +315: D:/GSSMS-Android-APP/test/features/complaints/presentation/complaint_detail_busy_bid_test.dart: Close button is disabled while a convert is in flight
+00:57 +316: D:/GSSMS-Android-APP/test/features/complaints/presentation/complaint_detail_busy_bid_test.dart: Close button is disabled while a convert is in flight
+00:58 +317: D:/GSSMS-Android-APP/test/features/complaints/presentation/complaint_list_refresh_bid_test.dart: back from detail refetches the complaint list
+00:58 +318: D:/GSSMS-Android-APP/test/features/complaints/presentation/complaint_list_refresh_bid_test.dart: back from detail refetches the complaint list
+00:58 +319: D:/GSSMS-Android-APP/test/features/complaints/presentation/complaint_list_refresh_bid_test.dart: back from detail refetches the complaint list
+00:58 +320: D:/GSSMS-Android-APP/test/features/complaints/presentation/complaint_list_refresh_bid_test.dart: back from detail refetches the complaint list
+00:58 +321: D:/GSSMS-Android-APP/test/features/complaints/presentation/complaint_list_refresh_bid_test.dart: back from detail refetches the complaint list
+00:58 +322: D:/GSSMS-Android-APP/test/features/complaints/presentation/complaint_list_refresh_bid_test.dart: back from detail refetches the complaint list
+00:58 +323: D:/GSSMS-Android-APP/test/features/complaints/presentation/complaint_list_refresh_bid_test.dart: back from detail refetches the complaint list
+00:58 +324: D:/GSSMS-Android-APP/test/features/complaints/presentation/complaint_list_refresh_bid_test.dart: back from detail refetches the complaint list
+00:58 +325: D:/GSSMS-Android-APP/test/features/complaints/presentation/complaint_list_refresh_bid_test.dart: back from detail refetches the complaint list
+00:58 +326: D:/GSSMS-Android-APP/test/features/complaints/presentation/complaint_list_refresh_bid_test.dart: back from detail refetches the complaint list
+00:58 +327: D:/GSSMS-Android-APP/test/features/complaints/presentation/complaint_list_refresh_bid_test.dart: back from detail refetches the complaint list
+00:58 +328: D:/GSSMS-Android-APP/test/features/complaints/presentation/complaint_list_refresh_bid_test.dart: back from detail refetches the complaint list
+00:58 +329: D:/GSSMS-Android-APP/test/features/complaints/presentation/complaint_list_refresh_bid_test.dart: back from detail refetches the complaint list
+00:58 +329: D:/GSSMS-Android-APP/test/features/auth/presentation/user_profile_screen_test.dart: bottom sheet includes Remove option when photo is present and removes photo on tap
+ProfilePhotoCache: download failed (DioException [bad response]: This exception was thrown because the response has a status code of 400 and RequestOptions.validateStatus was configured to throw for this status code.
+The status code of 400 has the following meaning: "Client error - the request contains bad syntax or cannot be fulfilled"
+Read more about status codes at https://developer.mozilla.org/en-US/docs/Web/HTTP/Status
+In order to resolve this exception you typically have either to verify and fix your request code or you have to fix the server code.
+)
+00:58 +330: D:/GSSMS-Android-APP/test/features/complaints/presentation/complaint_list_refresh_bid_test.dart: back from detail refetches the complaint list
+00:58 +331: D:/GSSMS-Android-APP/test/features/complaints/presentation/complaint_list_refresh_bid_test.dart: back from detail refetches the complaint list
+00:59 +332: D:/GSSMS-Android-APP/test/features/complaints/presentation/complaint_screens_test.dart: Complaint Screens Widget Tests ComplaintListScreen renders complaints and log button
+00:59 +333: D:/GSSMS-Android-APP/test/features/complaints/presentation/complaint_screens_test.dart: Complaint Screens Widget Tests ComplaintListScreen renders complaints and log button
+00:59 +334: D:/GSSMS-Android-APP/test/features/complaints/presentation/complaint_screens_test.dart: Complaint Screens Widget Tests ComplaintListScreen displays converted breakdown with linked Job Work line
+01:00 +335: D:/GSSMS-Android-APP/test/features/complaints/presentation/complaint_screens_test.dart: Complaint Screens Widget Tests tapping a logged complaint opens its detail screen
+01:00 +336: D:/GSSMS-Android-APP/test/features/complaints/presentation/complaint_screens_test.dart: Complaint Screens Widget Tests detail has no delete icon (recorded breakdowns are immutable) is hidden for DEPOT_INCHARGE even with complaints.delete
+01:01 +337: D:/GSSMS-Android-APP/test/features/complaints/presentation/complaint_screens_test.dart: Complaint Screens Widget Tests detail has no delete icon (recorded breakdowns are immutable) is hidden for SUPER_ADMIN even with complaints.delete
+01:01 +338: D:/GSSMS-Android-APP/test/features/complaints/presentation/complaint_screens_test.dart: Complaint Screens Widget Tests detail has no delete icon (recorded breakdowns are immutable) stays hidden for a closed complaint
+01:01 +339: D:/GSSMS-Android-APP/test/features/complaints/presentation/complaint_screens_test.dart: Complaint Screens Widget Tests ComplaintCreateScreen validates inputs and submits
+01:04 +340: D:/GSSMS-Android-APP/test/features/complaints/presentation/complaint_screens_test.dart: Complaint Screens Widget Tests convert coerces string work_order_id and refetches full record with ticket
+01:04 +341: D:/GSSMS-Android-APP/test/features/complaints/presentation/complaint_screens_test.dart: (tearDownAll)
+01:30 +341: D:/GSSMS-Android-APP/test/features/inspections/data/inspection_api_service_test.dart: InspectionApiService REST Contract Tests getInspections calls GET /api/v1/inspections/ with filters
+01:32 +342: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_controller_test.dart: DashboardController Unit Tests initial state is DashboardLoading
+01:32 +343: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_controller_test.dart: DashboardController Unit Tests initial state is DashboardLoading
+01:32 +344: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_controller_test.dart: DashboardController Unit Tests initial state is DashboardLoading
+01:32 +345: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_controller_test.dart: DashboardController Unit Tests initial state is DashboardLoading
+01:33 +346: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_controller_test.dart: DashboardController Unit Tests initial state is DashboardLoading
+01:33 +347: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_controller_test.dart: DashboardController Unit Tests initial state is DashboardLoading
+01:33 +348: D:/GSSMS-Android-APP/test/features/deficiencies/data/deficiency_api_service_test.dart: DeficiencyApiService REST Contract Tests getPendingDeficiencies queries /api/v1/deficiencies/pending/
+01:33 +349: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_controller_test.dart: DashboardController Unit Tests loadDashboard transitions to DashboardLoaded on success
+01:34 +350: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_controller_test.dart: DashboardController Unit Tests loadDashboard transitions to DashboardLoaded on success
+01:34 +351: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_controller_test.dart: DashboardController Unit Tests loadDashboard transitions to DashboardLoaded on success
+01:34 +352: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_screen_test.dart: DashboardScreen Widget Tests renders Dashboard header, attention section and KPI metrics under AppTheme
+01:34 +353: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_screen_test.dart: DashboardScreen Widget Tests renders Dashboard header, attention section and KPI metrics under AppTheme
+01:34 +354: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_screen_test.dart: DashboardScreen Widget Tests renders Dashboard header, attention section and KPI metrics under AppTheme
+01:37 +355: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_screen_test.dart: DashboardScreen Widget Tests renders Dashboard header, attention section and KPI metrics under AppTheme
+01:37 +356: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_screen_test.dart: DashboardScreen Widget Tests renders Dashboard header, attention section and KPI metrics under AppTheme
+01:37 +357: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_screen_test.dart: DashboardScreen Widget Tests renders Dashboard header, attention section and KPI metrics under AppTheme
+01:37 +358: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_screen_test.dart: DashboardScreen Widget Tests renders Dashboard header, attention section and KPI metrics under AppTheme
+01:37 +359: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_screen_test.dart: DashboardScreen Widget Tests renders Dashboard header, attention section and KPI metrics under AppTheme
+01:37 +360: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_screen_test.dart: DashboardScreen Widget Tests renders Dashboard header, attention section and KPI metrics under AppTheme
+01:39 +361: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_screen_test.dart: DashboardScreen Widget Tests renders Dashboard header, attention section and KPI metrics under AppTheme
+01:39 +362: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_screen_test.dart: DashboardScreen Widget Tests renders Dashboard header, attention section and KPI metrics under AppTheme
+01:43 +363: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_screen_test.dart: DashboardScreen Widget Tests renders Dashboard header, attention section and KPI metrics under AppTheme
+01:49 +364: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_screen_test.dart: DashboardScreen Widget Tests renders Dashboard header, attention section and KPI metrics under AppTheme
+01:49 +365: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_screen_test.dart: DashboardScreen Widget Tests renders Dashboard header, attention section and KPI metrics under AppTheme
+01:49 +366: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_screen_test.dart: DashboardScreen Widget Tests renders Dashboard header, attention section and KPI metrics under AppTheme
+01:49 +367: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_screen_test.dart: DashboardScreen Widget Tests renders Dashboard header, attention section and KPI metrics under AppTheme
+01:49 +368: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_screen_test.dart: DashboardScreen Widget Tests renders Dashboard header, attention section and KPI metrics under AppTheme
+01:49 +369: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_screen_test.dart: DashboardScreen Widget Tests renders Dashboard header, attention section and KPI metrics under AppTheme
+01:49 +370: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_screen_test.dart: DashboardScreen Widget Tests renders Dashboard header, attention section and KPI metrics under AppTheme
+01:49 +371: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_screen_test.dart: DashboardScreen Widget Tests renders Dashboard header, attention section and KPI metrics under AppTheme
+01:49 +372: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_screen_test.dart: DashboardScreen Widget Tests renders Dashboard header, attention section and KPI metrics under AppTheme
+01:49 +373: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_screen_test.dart: DashboardScreen Widget Tests renders Dashboard header, attention section and KPI metrics under AppTheme
+01:49 +374: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_screen_test.dart: DashboardScreen Widget Tests renders Dashboard header, attention section and KPI metrics under AppTheme
+01:50 +375: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_screen_test.dart: DashboardScreen Widget Tests renders Dashboard header, attention section and KPI metrics under AppTheme
+01:50 +376: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_screen_test.dart: DashboardScreen Widget Tests renders Dashboard header, attention section and KPI metrics under AppTheme
+01:50 +377: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_screen_test.dart: DashboardScreen Widget Tests renders Dashboard header, attention section and KPI metrics under AppTheme
+01:50 +378: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_screen_test.dart: DashboardScreen Widget Tests renders Dashboard header, attention section and KPI metrics under AppTheme
+01:50 +379: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_screen_test.dart: DashboardScreen Widget Tests renders Dashboard header, attention section and KPI metrics under AppTheme
+02:00 +380: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_screen_test.dart: DashboardScreen Widget Tests renders Dashboard header, attention section and KPI metrics under AppTheme
+02:03 +381: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_screen_test.dart: DashboardScreen Widget Tests renders Dashboard header, attention section and KPI metrics under AppTheme
+02:04 +382: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_screen_test.dart: DashboardScreen Widget Tests renders Dashboard header, attention section and KPI metrics under AppTheme
+02:06 +383: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_screen_test.dart: DashboardScreen Widget Tests renders Dashboard header, attention section and KPI metrics under AppTheme
+02:06 +384: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_screen_test.dart: DashboardScreen Widget Tests renders Dashboard header, attention section and KPI metrics under AppTheme
+02:06 +385: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_screen_test.dart: DashboardScreen Widget Tests renders Dashboard header, attention section and KPI metrics under AppTheme
+02:06 +386: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_screen_test.dart: DashboardScreen Widget Tests renders Dashboard header, attention section and KPI metrics under AppTheme
+02:06 +387: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_screen_test.dart: DashboardScreen Widget Tests renders Dashboard header, attention section and KPI metrics under AppTheme
+02:08 +388: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_screen_test.dart: DashboardScreen Widget Tests renders Dashboard header, attention section and KPI metrics under AppTheme
+02:10 +389: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests renders Super Admin profile with wildcard permissions and all permitted modules
+02:10 +390: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests renders Super Admin profile with wildcard permissions and all permitted modules
+02:14 +391: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests renders Super Admin profile with wildcard permissions and all permitted modules
+02:14 +392: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests renders Super Admin profile with wildcard permissions and all permitted modules
+02:15 +393: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests renders Super Admin profile with wildcard permissions and all permitted modules
+02:16 +394: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests renders Super Admin profile with wildcard permissions and all permitted modules
+02:17 +395: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests renders Super Admin profile with wildcard permissions and all permitted modules
+02:18 +396: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests renders Super Admin profile with wildcard permissions and all permitted modules
+02:18 +397: D:/GSSMS-Android-APP/test/features/notifications/presentation/notifications_screen_test.dart: NotificationsScreen Widget Tests mark all as read updates every alert
+02:19 +398: D:/GSSMS-Android-APP/test/features/notifications/presentation/notifications_screen_test.dart: NotificationsScreen Widget Tests mark all as read updates every alert
+02:20 +399: D:/GSSMS-Android-APP/test/features/deficiencies/presentation/deficiency_list_screen_test.dart: DeficiencyListScreen Widget Tests bucket chips filter the list and show appropriate cards
+02:21 +400: D:/GSSMS-Android-APP/test/features/deficiencies/presentation/deficiency_list_screen_test.dart: DeficiencyListScreen Widget Tests bucket chips filter the list and show appropriate cards
+02:21 +401: D:/GSSMS-Android-APP/test/features/deficiencies/presentation/deficiency_list_screen_test.dart: DeficiencyListScreen Widget Tests bucket chips filter the list and show appropriate cards
+02:22 +402: D:/GSSMS-Android-APP/test/features/deficiencies/presentation/deficiency_list_screen_test.dart: DeficiencyListScreen Widget Tests bucket chips filter the list and show appropriate cards
+02:24 +403: D:/GSSMS-Android-APP/test/features/deficiencies/presentation/deficiency_list_screen_test.dart: DeficiencyListScreen Widget Tests bucket chips filter the list and show appropriate cards
+02:24 +404: D:/GSSMS-Android-APP/test/features/deficiencies/presentation/deficiency_list_screen_test.dart: DeficiencyListScreen Widget Tests bucket chips filter the list and show appropriate cards
+02:25 +405: D:/GSSMS-Android-APP/test/features/deficiencies/presentation/deficiency_list_screen_test.dart: DeficiencyListScreen Widget Tests bucket chips filter the list and show appropriate cards
+02:26 +406: D:/GSSMS-Android-APP/test/features/deficiencies/presentation/deficiency_list_screen_test.dart: DeficiencyListScreen Widget Tests bucket chips filter the list and show appropriate cards
+02:26 +407: D:/GSSMS-Android-APP/test/features/deficiencies/presentation/deficiency_list_screen_test.dart: DeficiencyListScreen Widget Tests bucket chips filter the list and show appropriate cards
+02:26 +408: D:/GSSMS-Android-APP/test/features/deficiencies/presentation/deficiency_list_screen_test.dart: DeficiencyListScreen Widget Tests bucket chips filter the list and show appropriate cards
+02:26 +409: D:/GSSMS-Android-APP/test/features/deficiencies/presentation/deficiency_list_screen_test.dart: DeficiencyListScreen Widget Tests bucket chips filter the list and show appropriate cards
+02:26 +410: D:/GSSMS-Android-APP/test/features/deficiencies/presentation/deficiency_list_screen_test.dart: DeficiencyListScreen Widget Tests bucket chips filter the list and show appropriate cards
+02:26 +411: D:/GSSMS-Android-APP/test/features/deficiencies/presentation/deficiency_list_screen_test.dart: DeficiencyListScreen Widget Tests bucket chips filter the list and show appropriate cards
+02:28 +412: D:/GSSMS-Android-APP/test/features/deficiencies/presentation/deficiency_list_screen_test.dart: DeficiencyListScreen Widget Tests bucket chips filter the list and show appropriate cards
+02:29 +413: D:/GSSMS-Android-APP/test/features/deficiencies/presentation/deficiency_list_screen_test.dart: DeficiencyListScreen Widget Tests bucket chips filter the list and show appropriate cards
+02:29 +414: D:/GSSMS-Android-APP/test/features/deficiencies/presentation/deficiency_list_screen_test.dart: DeficiencyListScreen Widget Tests bucket chips filter the list and show appropriate cards
+02:29 +415: D:/GSSMS-Android-APP/test/features/deficiencies/presentation/deficiency_list_screen_test.dart: DeficiencyListScreen Widget Tests bucket chips filter the list and show appropriate cards
+02:29 +416: D:/GSSMS-Android-APP/test/features/deficiencies/presentation/deficiency_list_screen_test.dart: DeficiencyListScreen Widget Tests bucket chips filter the list and show appropriate cards
+02:29 +417: D:/GSSMS-Android-APP/test/features/deficiencies/presentation/deficiency_list_screen_test.dart: DeficiencyListScreen Widget Tests bucket chips filter the list and show appropriate cards
+02:29 +418: D:/GSSMS-Android-APP/test/features/deficiencies/presentation/deficiency_list_screen_test.dart: DeficiencyListScreen Widget Tests bucket chips filter the list and show appropriate cards
+02:29 +419: D:/GSSMS-Android-APP/test/features/deficiencies/presentation/deficiency_list_screen_test.dart: DeficiencyListScreen Widget Tests bucket chips filter the list and show appropriate cards
+02:31 +420: D:/GSSMS-Android-APP/test/features/deficiencies/presentation/deficiency_list_screen_test.dart: DeficiencyListScreen Widget Tests bucket chips filter the list and show appropriate cards
+02:32 +421: D:/GSSMS-Android-APP/test/features/deficiencies/presentation/deficiency_list_screen_test.dart: DeficiencyListScreen Widget Tests bucket chips filter the list and show appropriate cards
+02:32 +422: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_screen_test.dart: DashboardScreen Widget Tests dashboard.view without maintenance.view does not open Job Work detail
+02:33 +423: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_screen_test.dart: DashboardScreen Widget Tests dashboard.view without maintenance.view does not open Job Work detail
+02:33 +424: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_screen_test.dart: DashboardScreen Widget Tests dashboard.view without maintenance.view does not open Job Work detail
+02:33 +425: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_screen_test.dart: DashboardScreen Widget Tests dashboard.view without maintenance.view does not open Job Work detail
+02:33 +426: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_screen_test.dart: DashboardScreen Widget Tests dashboard.view without maintenance.view does not open Job Work detail
+02:33 +427: D:/GSSMS-Android-APP/test/features/pending_actions/presentation/pending_actions_screen_test.dart: Pending Actions assignee chips converted complaint without a name keeps the old label
+02:34 +428: D:/GSSMS-Android-APP/test/features/inspections/presentation/inspection_screens_test.dart: Inspection Screens Widget Tests InspectionDetailScreen shows a link to the Work Order for an already-converted inspection
+02:36 +429: D:/GSSMS-Android-APP/test/features/inspections/presentation/inspection_screens_test.dart: Inspection Screens Widget Tests InspectionDetailScreen shows a link to the Work Order for an already-converted inspection
+02:36 +430: D:/GSSMS-Android-APP/test/features/deficiencies/presentation/deficiency_list_screen_test.dart: DeficiencyListScreen Widget Tests Depot Incharge sees Create Job Work buttons and checkboxes on Needs Action
+02:36 +431: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_screen_test.dart: DashboardScreen Widget Tests shows tappable "+X more in the work queues" button and navigates to WorkOrderListScreen
+02:38 +432: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_screen_test.dart: DashboardScreen Widget Tests shows tappable "+X more in the work queues" button and navigates to WorkOrderListScreen
+02:39 +433: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_screen_test.dart: DashboardScreen Widget Tests shows tappable "+X more in the work queues" button and navigates to WorkOrderListScreen
+02:41 +434: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_screen_test.dart: DashboardScreen Widget Tests shows tappable "+X more in the work queues" button and navigates to WorkOrderListScreen
+02:42 +435: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_screen_test.dart: DashboardScreen Widget Tests shows tappable "+X more in the work queues" button and navigates to WorkOrderListScreen
+02:43 +436: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_screen_test.dart: DashboardScreen Widget Tests shows tappable "+X more in the work queues" button and navigates to WorkOrderListScreen
+02:44 +437: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_screen_test.dart: DashboardScreen Widget Tests shows tappable "+X more in the work queues" button and navigates to WorkOrderListScreen
+02:46 +438: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_screen_test.dart: DashboardScreen Widget Tests shows tappable "+X more in the work queues" button and navigates to WorkOrderListScreen
+02:46 +439: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_screen_test.dart: DashboardScreen Widget Tests shows tappable "+X more in the work queues" button and navigates to WorkOrderListScreen
+02:47 +440: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_screen_test.dart: DashboardScreen Widget Tests shows tappable "+X more in the work queues" button and navigates to WorkOrderListScreen
+02:47 +441: D:/GSSMS-Android-APP/test/features/dashboard/presentation/dashboard_screen_test.dart: DashboardScreen Widget Tests shows tappable "+X more in the work queues" button and navigates to WorkOrderListScreen
+02:48 +442: D:/GSSMS-Android-APP/test/features/inspections/presentation/inspection_screens_test.dart: Inspection Screens Widget Tests InspectionCreateScreen validates inputs and submits (web-parity form)
+02:51 +443: D:/GSSMS-Android-APP/test/features/inspections/presentation/inspection_screens_test.dart: Inspection Screens Widget Tests InspectionCreateScreen validates inputs and submits (web-parity form)
+02:51 +444: D:/GSSMS-Android-APP/test/features/inspections/presentation/inspection_screens_test.dart: Inspection Screens Widget Tests InspectionCreateScreen validates inputs and submits (web-parity form)
+02:52 +445: D:/GSSMS-Android-APP/test/features/inspections/presentation/inspection_screens_test.dart: Inspection Screens Widget Tests InspectionCreateScreen validates inputs and submits (web-parity form)
+02:52 +446: D:/GSSMS-Android-APP/test/features/deficiencies/presentation/deficiency_list_screen_test.dart: DeficiencyListScreen Widget Tests bulk selection shows bottom bar and creates grouped Job Works
+02:52 +447: D:/GSSMS-Android-APP/test/features/work/presentation/work_screen_test.dart: WorkScreen Widget Tests shows tabs Job Works / Breakdowns / Inspections / Deficiencies for Depot Incharge with all 4 permissions
+02:53 +448: D:/GSSMS-Android-APP/test/features/work/presentation/work_screen_test.dart: WorkScreen Widget Tests shows tabs Job Works / Breakdowns / Inspections / Deficiencies for Depot Incharge with all 4 permissions
+02:53 +449: D:/GSSMS-Android-APP/test/features/work/presentation/work_screen_test.dart: WorkScreen Widget Tests shows tabs Job Works / Breakdowns / Inspections / Deficiencies for Depot Incharge with all 4 permissions
+02:53 +450: D:/GSSMS-Android-APP/test/features/work/presentation/work_screen_test.dart: WorkScreen Widget Tests shows tabs Job Works / Breakdowns / Inspections / Deficiencies for Depot Incharge with all 4 permissions
+02:53 +451: D:/GSSMS-Android-APP/test/features/work/presentation/work_screen_test.dart: WorkScreen Widget Tests shows tabs Job Works / Breakdowns / Inspections / Deficiencies for Depot Incharge with all 4 permissions
+02:53 +452: D:/GSSMS-Android-APP/test/features/work/presentation/work_screen_test.dart: WorkScreen Widget Tests shows tabs Job Works / Breakdowns / Inspections / Deficiencies for Depot Incharge with all 4 permissions
+02:53 +453: D:/GSSMS-Android-APP/test/features/work/presentation/work_screen_test.dart: WorkScreen Widget Tests shows tabs Job Works / Breakdowns / Inspections / Deficiencies for Depot Incharge with all 4 permissions
+02:53 +454: D:/GSSMS-Android-APP/test/features/work/presentation/work_screen_test.dart: WorkScreen Widget Tests shows tabs Job Works / Breakdowns / Inspections / Deficiencies for Depot Incharge with all 4 permissions
+02:53 +455: D:/GSSMS-Android-APP/test/features/work/presentation/work_screen_test.dart: WorkScreen Widget Tests shows tabs Job Works / Breakdowns / Inspections / Deficiencies for Depot Incharge with all 4 permissions
+02:53 +456: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests cancelling the sign-out dialog keeps the session
+02:53 +457: D:/GSSMS-Android-APP/test/features/inspections/presentation/inspection_screens_test.dart: Inspection Screens Widget Tests InspectionCreateScreen mirrors web Add Inspection Note layout
+02:54 +458: D:/GSSMS-Android-APP/test/features/inspections/presentation/inspection_screens_test.dart: Inspection Screens Widget Tests InspectionCreateScreen mirrors web Add Inspection Note layout
+02:54 +459: D:/GSSMS-Android-APP/test/features/inspections/presentation/inspection_screens_test.dart: Inspection Screens Widget Tests InspectionCreateScreen mirrors web Add Inspection Note layout
+02:54 +460: D:/GSSMS-Android-APP/test/features/inspections/presentation/inspection_screens_test.dart: Inspection Screens Widget Tests InspectionCreateScreen mirrors web Add Inspection Note layout
+02:54 +461: D:/GSSMS-Android-APP/test/features/inspections/presentation/inspection_screens_test.dart: Inspection Screens Widget Tests InspectionCreateScreen mirrors web Add Inspection Note layout
+02:54 +462: D:/GSSMS-Android-APP/test/features/inspections/presentation/inspection_screens_test.dart: Inspection Screens Widget Tests InspectionCreateScreen mirrors web Add Inspection Note layout
+02:54 +463: D:/GSSMS-Android-APP/test/features/inspections/presentation/inspection_screens_test.dart: Inspection Screens Widget Tests InspectionCreateScreen mirrors web Add Inspection Note layout
+02:54 +464: D:/GSSMS-Android-APP/test/features/inspections/presentation/inspection_screens_test.dart: Inspection Screens Widget Tests InspectionCreateScreen mirrors web Add Inspection Note layout
+02:55 +465: D:/GSSMS-Android-APP/test/features/inspections/presentation/inspection_screens_test.dart: Inspection Screens Widget Tests InspectionCreateScreen mirrors web Add Inspection Note layout
+02:55 +466: D:/GSSMS-Android-APP/test/features/inspections/presentation/inspection_screens_test.dart: Inspection Screens Widget Tests InspectionCreateScreen mirrors web Add Inspection Note layout
+02:55 +467: D:/GSSMS-Android-APP/test/features/inspections/presentation/inspection_screens_test.dart: Inspection Screens Widget Tests InspectionCreateScreen mirrors web Add Inspection Note layout
+02:55 +468: D:/GSSMS-Android-APP/test/features/inspections/presentation/inspection_screens_test.dart: Inspection Screens Widget Tests InspectionCreateScreen mirrors web Add Inspection Note layout
+02:55 +469: D:/GSSMS-Android-APP/test/features/inspections/presentation/inspection_screens_test.dart: Inspection Screens Widget Tests InspectionCreateScreen mirrors web Add Inspection Note layout
+02:55 +470: D:/GSSMS-Android-APP/test/features/inspections/presentation/inspection_screens_test.dart: Inspection Screens Widget Tests InspectionCreateScreen mirrors web Add Inspection Note layout
+02:55 +471: D:/GSSMS-Android-APP/test/features/inspections/presentation/inspection_screens_test.dart: Inspection Screens Widget Tests InspectionCreateScreen mirrors web Add Inspection Note layout
+02:56 +472: D:/GSSMS-Android-APP/test/features/inspections/presentation/inspection_screens_test.dart: Inspection Screens Widget Tests InspectionCreateScreen mirrors web Add Inspection Note layout
+02:56 +473: D:/GSSMS-Android-APP/test/features/inspections/presentation/inspection_screens_test.dart: Inspection Screens Widget Tests InspectionCreateScreen mirrors web Add Inspection Note layout
+02:57 +474: D:/GSSMS-Android-APP/test/features/inspections/presentation/inspection_screens_test.dart: Inspection Screens Widget Tests InspectionCreateScreen mirrors web Add Inspection Note layout
+02:57 +475: D:/GSSMS-Android-APP/test/features/inspections/presentation/inspection_screens_test.dart: Inspection Screens Widget Tests InspectionCreateScreen mirrors web Add Inspection Note layout
+02:57 +476: D:/GSSMS-Android-APP/test/features/inspections/presentation/inspection_screens_test.dart: Inspection Screens Widget Tests InspectionCreateScreen mirrors web Add Inspection Note layout
+02:57 +477: D:/GSSMS-Android-APP/test/features/inspections/presentation/inspection_screens_test.dart: Inspection Screens Widget Tests InspectionCreateScreen mirrors web Add Inspection Note layout
+02:57 +478: D:/GSSMS-Android-APP/test/features/inspections/presentation/inspection_screens_test.dart: Inspection Screens Widget Tests InspectionCreateScreen mirrors web Add Inspection Note layout
+02:57 +479: D:/GSSMS-Android-APP/test/features/inspections/presentation/inspection_screens_test.dart: Inspection Screens Widget Tests InspectionCreateScreen mirrors web Add Inspection Note layout
+02:57 +480: D:/GSSMS-Android-APP/test/features/inspections/presentation/inspection_screens_test.dart: Inspection Screens Widget Tests InspectionCreateScreen mirrors web Add Inspection Note layout
+02:57 +481: D:/GSSMS-Android-APP/test/features/inspections/presentation/inspection_screens_test.dart: Inspection Screens Widget Tests InspectionCreateScreen mirrors web Add Inspection Note layout
+02:57 +482: D:/GSSMS-Android-APP/test/features/inspections/presentation/inspection_screens_test.dart: Inspection Screens Widget Tests InspectionCreateScreen mirrors web Add Inspection Note layout
+02:57 +483: D:/GSSMS-Android-APP/test/features/inspections/presentation/inspection_screens_test.dart: Inspection Screens Widget Tests InspectionCreateScreen mirrors web Add Inspection Note layout
+02:58 +484: D:/GSSMS-Android-APP/test/features/deficiencies/presentation/deficiency_list_screen_test.dart: DeficiencyListScreen Widget Tests tapping card with assetId deep-links to AssetDetailScreen
+02:58 +485: D:/GSSMS-Android-APP/test/features/deficiencies/presentation/deficiency_list_screen_test.dart: DeficiencyListScreen Widget Tests tapping card with assetId deep-links to AssetDetailScreen
+[HTTP REQ] GET https://gssms.share.zrok.io/api/v1/assets/101/
+[HTTP ERR] 400 https://gssms.share.zrok.io/api/v1/assets/101/ (DioExceptionType.badResponse)
+02:58 +486: D:/GSSMS-Android-APP/test/features/work/presentation/work_screen_test.dart: WorkScreen Widget Tests no layout overflow at 360dp width and text scale 1.3
+02:59 +487: D:/GSSMS-Android-APP/test/features/work/presentation/work_screen_test.dart: WorkScreen Widget Tests no layout overflow at 360dp width and text scale 1.3
+02:59 +488: D:/GSSMS-Android-APP/test/features/work/presentation/work_screen_test.dart: WorkScreen Widget Tests no layout overflow at 360dp width and text scale 1.3
+02:59 +489: D:/GSSMS-Android-APP/test/features/work/presentation/work_screen_test.dart: WorkScreen Widget Tests no layout overflow at 360dp width and text scale 1.3
+02:59 +490: D:/GSSMS-Android-APP/test/features/work/presentation/work_screen_test.dart: WorkScreen Widget Tests no layout overflow at 360dp width and text scale 1.3
+02:59 +491: D:/GSSMS-Android-APP/test/features/work/presentation/work_screen_test.dart: WorkScreen Widget Tests no layout overflow at 360dp width and text scale 1.3
+02:59 +492: D:/GSSMS-Android-APP/test/features/work/presentation/work_screen_test.dart: WorkScreen Widget Tests no layout overflow at 360dp width and text scale 1.3
+02:59 +493: D:/GSSMS-Android-APP/test/features/work/presentation/work_screen_test.dart: WorkScreen Widget Tests no layout overflow at 360dp width and text scale 1.3
+02:59 +494: D:/GSSMS-Android-APP/test/features/work/presentation/work_screen_test.dart: WorkScreen Widget Tests no layout overflow at 360dp width and text scale 1.3
+02:59 +495: D:/GSSMS-Android-APP/test/features/work/presentation/work_screen_test.dart: WorkScreen Widget Tests no layout overflow at 360dp width and text scale 1.3
+02:59 +496: D:/GSSMS-Android-APP/test/features/work/presentation/work_screen_test.dart: WorkScreen Widget Tests no layout overflow at 360dp width and text scale 1.3
+02:59 +497: D:/GSSMS-Android-APP/test/features/work/presentation/work_screen_test.dart: WorkScreen Widget Tests no layout overflow at 360dp width and text scale 1.3
+02:59 +498: D:/GSSMS-Android-APP/test/features/work/presentation/work_screen_test.dart: WorkScreen Widget Tests no layout overflow at 360dp width and text scale 1.3
+02:59 +499: D:/GSSMS-Android-APP/test/features/deficiencies/presentation/deficiency_list_screen_test.dart: DeficiencyListScreen Widget Tests selection clears when switching bucket chips
+03:00 +500: D:/GSSMS-Android-APP/test/features/deficiencies/presentation/deficiency_list_screen_test.dart: DeficiencyListScreen Widget Tests selection clears when switching bucket chips
+03:00 +501: D:/GSSMS-Android-APP/test/features/deficiencies/presentation/deficiency_list_screen_test.dart: DeficiencyListScreen Widget Tests selection clears when switching bucket chips
+03:00 +502: D:/GSSMS-Android-APP/test/features/deficiencies/presentation/deficiency_list_screen_test.dart: DeficiencyListScreen Widget Tests selection clears when switching bucket chips
+03:00 +503: D:/GSSMS-Android-APP/test/features/deficiencies/presentation/deficiency_list_screen_test.dart: DeficiencyListScreen Widget Tests selection clears when switching bucket chips
+03:00 +504: D:/GSSMS-Android-APP/test/features/deficiencies/presentation/deficiency_list_screen_test.dart: DeficiencyListScreen Widget Tests selection clears when switching bucket chips
+03:00 +505: D:/GSSMS-Android-APP/test/features/deficiencies/presentation/deficiency_list_screen_test.dart: DeficiencyListScreen Widget Tests selection clears when switching bucket chips
+03:00 +506: D:/GSSMS-Android-APP/test/features/deficiencies/presentation/deficiency_list_screen_test.dart: DeficiencyListScreen Widget Tests selection clears when switching bucket chips
+03:00 +507: D:/GSSMS-Android-APP/test/features/deficiencies/presentation/deficiency_list_screen_test.dart: DeficiencyListScreen Widget Tests selection clears when switching bucket chips
+03:00 +508: D:/GSSMS-Android-APP/test/features/deficiencies/presentation/deficiency_list_screen_test.dart: DeficiencyListScreen Widget Tests selection clears when switching bucket chips
+03:00 +509: D:/GSSMS-Android-APP/test/features/deficiencies/presentation/deficiency_list_screen_test.dart: DeficiencyListScreen Widget Tests selection clears when switching bucket chips
+03:00 +510: D:/GSSMS-Android-APP/test/features/deficiencies/presentation/deficiency_list_screen_test.dart: DeficiencyListScreen Widget Tests selection clears when switching bucket chips
+03:00 +511: D:/GSSMS-Android-APP/test/features/deficiencies/presentation/deficiency_list_screen_test.dart: DeficiencyListScreen Widget Tests selection clears when switching bucket chips
+03:00 +512: D:/GSSMS-Android-APP/test/features/deficiencies/presentation/deficiency_list_screen_test.dart: DeficiencyListScreen Widget Tests selection clears when switching bucket chips
+03:00 +513: D:/GSSMS-Android-APP/test/features/deficiencies/presentation/deficiency_list_screen_test.dart: DeficiencyListScreen Widget Tests selection clears when switching bucket chips
+03:00 +514: D:/GSSMS-Android-APP/test/features/deficiencies/presentation/deficiency_list_screen_test.dart: DeficiencyListScreen Widget Tests selection clears when switching bucket chips
+03:00 +515: D:/GSSMS-Android-APP/test/features/deficiencies/presentation/deficiency_list_screen_test.dart: DeficiencyListScreen Widget Tests selection clears when switching bucket chips
+03:00 +516: D:/GSSMS-Android-APP/test/features/deficiencies/presentation/deficiency_list_screen_test.dart: DeficiencyListScreen Widget Tests selection clears when switching bucket chips
+03:00 +517: D:/GSSMS-Android-APP/test/features/deficiencies/presentation/deficiency_list_screen_test.dart: DeficiencyListScreen Widget Tests selection clears when switching bucket chips
+03:00 +518: D:/GSSMS-Android-APP/test/features/deficiencies/presentation/deficiency_list_screen_test.dart: DeficiencyListScreen Widget Tests selection clears when switching bucket chips
+03:00 +519: D:/GSSMS-Android-APP/test/features/deficiencies/presentation/deficiency_list_screen_test.dart: DeficiencyListScreen Widget Tests selection clears when switching bucket chips
+03:00 +520: D:/GSSMS-Android-APP/test/features/deficiencies/presentation/deficiency_list_screen_test.dart: DeficiencyListScreen Widget Tests selection clears when switching bucket chips
+03:00 +521: D:/GSSMS-Android-APP/test/features/deficiencies/presentation/deficiency_list_screen_test.dart: DeficiencyListScreen Widget Tests selection clears when switching bucket chips
+03:00 +522: D:/GSSMS-Android-APP/test/features/deficiencies/presentation/deficiency_list_screen_test.dart: DeficiencyListScreen Widget Tests selection clears when switching bucket chips
+03:00 +523: D:/GSSMS-Android-APP/test/features/deficiencies/presentation/deficiency_list_screen_test.dart: DeficiencyListScreen Widget Tests selection clears when switching bucket chips
+03:00 +524: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests NavigationBar destinations resolved per role permissions
+03:00 +525: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests NavigationBar destinations resolved per role permissions
+03:00 +526: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests NavigationBar destinations resolved per role permissions
+03:00 +527: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests NavigationBar destinations resolved per role permissions
+03:00 +528: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests NavigationBar destinations resolved per role permissions
+03:00 +529: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests NavigationBar destinations resolved per role permissions
+03:00 +530: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests NavigationBar destinations resolved per role permissions
+03:00 +531: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests NavigationBar destinations resolved per role permissions
+03:01 +532: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests NavigationBar destinations resolved per role permissions
+03:01 +533: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests NavigationBar destinations resolved per role permissions
+03:01 +534: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests NavigationBar destinations resolved per role permissions
+03:01 +535: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests NavigationBar destinations resolved per role permissions
+03:01 +536: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests NavigationBar destinations resolved per role permissions
+03:01 +537: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests NavigationBar destinations resolved per role permissions
+03:01 +538: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests NavigationBar destinations resolved per role permissions
+03:01 +539: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests NavigationBar destinations resolved per role permissions
+03:01 +540: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests NavigationBar destinations resolved per role permissions
+03:02 +541: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests NavigationBar destinations resolved per role permissions
+03:02 +542: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests switching tab to More displays MoreScreen profile card
+03:02 +543: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests switching tab to More displays MoreScreen profile card
+03:02 +544: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests switching tab to More displays MoreScreen profile card
+03:02 +545: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests switching tab to More displays MoreScreen profile card
+03:02 +546: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests switching tab to More displays MoreScreen profile card
+03:02 +547: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests switching tab to More displays MoreScreen profile card
+03:02 +548: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests switching tab to More displays MoreScreen profile card
+03:02 +549: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests switching tab to More displays MoreScreen profile card
+03:02 +550: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests switching tab to More displays MoreScreen profile card
+03:02 +551: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests switching tab to More displays MoreScreen profile card
+03:02 +552: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests switching tab to More displays MoreScreen profile card
+03:02 +553: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests switching tab to More displays MoreScreen profile card
+03:02 +554: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests switching tab to More displays MoreScreen profile card
+03:02 +555: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests switching tab to More displays MoreScreen profile card
+03:02 +556: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests switching tab to More displays MoreScreen profile card
+03:02 +557: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests switching tab to More displays MoreScreen profile card
+03:02 +558: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests switching tab to More displays MoreScreen profile card
+03:02 +559: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests switching tab to More displays MoreScreen profile card
+03:02 +560: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests switching tab to More displays MoreScreen profile card
+03:02 +561: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests switching tab to More displays MoreScreen profile card
+03:02 +562: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests switching tab to More displays MoreScreen profile card
+03:02 +563: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests switching tab to More displays MoreScreen profile card
+03:02 +564: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests switching tab to More displays MoreScreen profile card
+03:02 +565: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests switching tab to More displays MoreScreen profile card
+03:02 +566: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests switching tab to More displays MoreScreen profile card
+03:02 +567: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests switching tab to More displays MoreScreen profile card
+03:02 +568: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests switching tab to More displays MoreScreen profile card
+03:03 +569: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests switching tab to More displays MoreScreen profile card
+03:03 +570: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests switching tab to More displays MoreScreen profile card
+03:03 +571: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests switching tab to More displays MoreScreen profile card
+03:03 +572: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests switching tab to More displays MoreScreen profile card
+03:03 +573: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests switching tab to More displays MoreScreen profile card
+03:03 +574: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests switching tab to More displays MoreScreen profile card
+03:03 +575: D:/GSSMS-Android-APP/test/features/work_orders/domain/maintenance_record_groups_test.dart: MaintenanceRecord.activeLines excludes checked_out:false and excluded, keeps legacy null
+03:03 +576: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests Quick Actions row respects permissions
+03:03 +577: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests Quick Actions row respects permissions
+03:03 +578: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests Quick Actions row respects permissions
+03:03 +579: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests Quick Actions row respects permissions
+03:03 +580: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests Quick Actions row respects permissions
+03:04 +581: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests Quick Actions row respects permissions
+03:04 +582: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests Quick Actions row respects permissions
+03:04 +583: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests Quick Actions row respects permissions
+03:04 +584: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests Quick Actions row respects permissions
+03:04 +585: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests Quick Actions row respects permissions
+03:04 +586: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests Quick Actions row respects permissions
+03:04 +587: D:/GSSMS-Android-APP/test/features/work_orders/domain/mode_execution_test.dart: executionRouteFor routes by execution mode, mirroring web jobWorkType order
+03:04 +588: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests My Work card shows in-progress work order with CONTINUE button
+03:04 +589: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests My Work card shows in-progress work order with CONTINUE button
+03:04 +590: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests My Work card shows in-progress work order with CONTINUE button
+03:04 +591: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests My Work card shows in-progress work order with CONTINUE button
+03:04 +592: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests My Work card shows in-progress work order with CONTINUE button
+03:04 +593: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests My Work card shows in-progress work order with CONTINUE button
+03:04 +594: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests My Work card shows in-progress work order with CONTINUE button
+03:04 +595: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests My Work card shows in-progress work order with CONTINUE button
+03:04 +596: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests My Work card shows in-progress work order with CONTINUE button
+03:05 +597: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests My Work card shows in-progress work order with CONTINUE button
+03:05 +598: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests My Work card shows in-progress work order with CONTINUE button
+03:05 +599: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests My Work card shows assigned work order with START button
+03:05 +600: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests My Work card shows assigned work order with START button
+03:05 +601: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests My Work card shows assigned work order with START button
+03:05 +602: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests My Work card shows assigned work order with START button
+03:06 +603: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests My Work shows empty ready state when no active work orders
+03:06 +604: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests My Work shows empty ready state when no active work orders
+03:06 +605: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests My Work shows empty ready state when no active work orders
+03:06 +606: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests My Work shows empty ready state when no active work orders
+03:06 +607: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests My Work shows empty ready state when no active work orders
+03:06 +608: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests My Work shows empty ready state when no active work orders
+03:06 +609: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests My Work is hidden for Depot Incharge even with an active work order
+03:07 +610: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests My Work is hidden for Depot Incharge even with an active work order
+03:07 +611: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests My Work is hidden for Depot Incharge even with an active work order
+03:07 +612: D:/GSSMS-Android-APP/test/features/work_orders/domain/work_order_audit_test.dart: WorkOrderAuditEvent.fromJson details absent or null details leaves users null
+03:07 +613: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests My Work is hidden for every other role in the RBAC hierarchy
+03:08 +614: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests My Work is hidden for every other role in the RBAC hierarchy
+03:08 +615: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests My Work is hidden for every other role in the RBAC hierarchy
+03:08 +616: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests My Work is hidden for every other role in the RBAC hierarchy
+03:08 +617: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests My Work is hidden for every other role in the RBAC hierarchy
+03:08 +618: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests My Work is hidden for every other role in the RBAC hierarchy
+03:08 +619: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests My Work is hidden for every other role in the RBAC hierarchy
+03:08 +620: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests My Work is hidden for every other role in the RBAC hierarchy
+03:08 +621: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests My Work is hidden for every other role in the RBAC hierarchy
+03:08 +622: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests My Work is hidden for every other role in the RBAC hierarchy
+03:08 +623: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests My Work is hidden for every other role in the RBAC hierarchy
+03:08 +624: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests My Work is hidden for every other role in the RBAC hierarchy
+03:08 +625: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests My Work is hidden for every other role in the RBAC hierarchy
+03:08 +626: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests My Work is hidden for every other role in the RBAC hierarchy
+03:08 +627: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests My Work is hidden for every other role in the RBAC hierarchy
+03:08 +628: D:/GSSMS-Android-APP/test/features/home/home_screen_test.dart: HomeScreen Widget Tests My Work is hidden for every other role in the RBAC hierarchy
+03:09 +629: D:/GSSMS-Android-APP/test/features/work_orders/presentation/assign_and_verify_screens_test.dart: Assign technician dialog opens a technician dropdown for ASSIGNED
+03:09 +630: D:/GSSMS-Android-APP/test/features/work_orders/presentation/checklist_action_bar_test.dart: ChecklistLoaded.firstIncompleteRequiredLine returns first incomplete required line in display order
+03:10 +631: D:/GSSMS-Android-APP/test/features/work_orders/presentation/assign_and_verify_screens_test.dart: Assign technician dialog shows the users.view error instead of an empty dropdown
+03:10 +632: D:/GSSMS-Android-APP/test/features/work_orders/presentation/assign_and_verify_screens_test.dart: Assign technician dialog shows the users.view error instead of an empty dropdown
+03:10 +633: D:/GSSMS-Android-APP/test/features/work_orders/presentation/assign_and_verify_screens_test.dart: Assign technician dialog shows the users.view error instead of an empty dropdown
+03:10 +634: D:/GSSMS-Android-APP/test/features/work_orders/presentation/assign_and_verify_screens_test.dart: Assign technician dialog shows the users.view error instead of an empty dropdown
+03:10 +635: D:/GSSMS-Android-APP/test/features/work_orders/presentation/assign_and_verify_screens_test.dart: Assign technician dialog shows the users.view error instead of an empty dropdown
+03:10 +636: D:/GSSMS-Android-APP/test/features/work_orders/presentation/checklist_action_bar_test.dart: ChecklistActionBar widget unit tests shows Sign & Submit and remaining hint when incomplete
+03:10 +637: D:/GSSMS-Android-APP/test/features/work_orders/presentation/checklist_action_bar_test.dart: ChecklistActionBar widget unit tests shows Sign & Submit and remaining hint when incomplete
+03:10 +638: D:/GSSMS-Android-APP/test/features/work_orders/presentation/assign_and_verify_screens_test.dart: VerificationWorkspaceScreen Return to Technician still uses generic REWORK_REQUIRED
+03:10 +639: D:/GSSMS-Android-APP/test/features/work_orders/presentation/checklist_debounce_test.dart: ChecklistScreen line submission typing a reading submits once after the pause, not per keystroke
+03:10 +640: D:/GSSMS-Android-APP/test/features/work_orders/presentation/checklist_debounce_test.dart: ChecklistScreen line submission typing a reading submits once after the pause, not per keystroke
+03:11 +641: D:/GSSMS-Android-APP/test/features/work_orders/presentation/checklist_debounce_test.dart: ChecklistScreen line submission typing a reading submits once after the pause, not per keystroke
+03:11 +642: D:/GSSMS-Android-APP/test/features/work_orders/presentation/checklist_debounce_test.dart: ChecklistScreen line submission typing a reading submits once after the pause, not per keystroke
+03:11 +643: D:/GSSMS-Android-APP/test/features/work_orders/presentation/checklist_debounce_test.dart: ChecklistScreen line submission typing a reading submits once after the pause, not per keystroke
+03:11 +644: D:/GSSMS-Android-APP/test/features/work_orders/presentation/checklist_debounce_test.dart: ChecklistScreen line submission typing a reading submits once after the pause, not per keystroke
+03:12 +645: D:/GSSMS-Android-APP/test/features/work_orders/presentation/checklist_debounce_test.dart: ChecklistScreen line submission typing a reading submits once after the pause, not per keystroke
+03:12 +646: D:/GSSMS-Android-APP/test/features/work_orders/presentation/checklist_groups_test.dart: unchecked group hides its lines and explains why
+03:12 +647: D:/GSSMS-Android-APP/test/features/work_orders/presentation/assign_and_verify_screens_test.dart: VerificationWorkspaceScreen severity, groups and modes changing severity sends expectedVersion
+03:13 +648: D:/GSSMS-Android-APP/test/features/work_orders/presentation/assign_and_verify_screens_test.dart: VerificationWorkspaceScreen severity, groups and modes changing severity sends expectedVersion
+03:13 +649: D:/GSSMS-Android-APP/test/features/work_orders/presentation/assign_and_verify_screens_test.dart: VerificationWorkspaceScreen severity, groups and modes changing severity sends expectedVersion
+03:13 +650: D:/GSSMS-Android-APP/test/features/work_orders/presentation/assign_and_verify_screens_test.dart: VerificationWorkspaceScreen severity, groups and modes changing severity sends expectedVersion
+03:13 +651: D:/GSSMS-Android-APP/test/features/work_orders/presentation/assign_and_verify_screens_test.dart: VerificationWorkspaceScreen severity, groups and modes changing severity sends expectedVersion
+03:13 +652: D:/GSSMS-Android-APP/test/features/work_orders/presentation/assign_and_verify_screens_test.dart: VerificationWorkspaceScreen severity, groups and modes changing severity sends expectedVersion
+03:13 +653: D:/GSSMS-Android-APP/test/features/work_orders/presentation/checklist_action_bar_test.dart: ChecklistScreen completion button interaction clears subsystem filter that hides first incomplete line when tapped
+03:13 +654: D:/GSSMS-Android-APP/test/features/work_orders/presentation/checklist_action_bar_test.dart: ChecklistScreen completion button interaction clears subsystem filter that hides first incomplete line when tapped
+03:13 +655: D:/GSSMS-Android-APP/test/features/work_orders/presentation/checklist_action_bar_test.dart: ChecklistScreen completion button interaction clears subsystem filter that hides first incomplete line when tapped
+03:14 +656: D:/GSSMS-Android-APP/test/features/work_orders/presentation/checklist_action_bar_test.dart: ChecklistScreen completion button interaction clears subsystem filter that hides first incomplete line when tapped
+03:14 +657: D:/GSSMS-Android-APP/test/features/work_orders/presentation/checklist_action_bar_test.dart: ChecklistScreen completion button interaction clears subsystem filter that hides first incomplete line when tapped
+03:14 +658: D:/GSSMS-Android-APP/test/features/work_orders/presentation/checklist_action_bar_test.dart: ChecklistScreen completion button interaction clears subsystem filter that hides first incomplete line when tapped
+03:14 +659: D:/GSSMS-Android-APP/test/features/work_orders/presentation/checklist_action_bar_test.dart: ChecklistScreen completion button interaction clears subsystem filter that hides first incomplete line when tapped
+03:14 +660: D:/GSSMS-Android-APP/test/features/work_orders/presentation/checklist_action_bar_test.dart: ChecklistScreen completion button interaction clears subsystem filter that hides first incomplete line when tapped
+03:15 +661: D:/GSSMS-Android-APP/test/features/work_orders/presentation/checklist_action_bar_test.dart: ChecklistScreen completion button interaction clears subsystem filter that hides first incomplete line when tapped
+03:15 +662: D:/GSSMS-Android-APP/test/features/work_orders/presentation/checklist_groups_test.dart: group photo strip shows (0/5) and uploads to the first line
+03:15 +663: D:/GSSMS-Android-APP/test/features/work_orders/presentation/checklist_groups_test.dart: group photo strip shows (0/5) and uploads to the first line
+03:15 +664: D:/GSSMS-Android-APP/test/features/work_orders/presentation/checklist_groups_test.dart: group photo strip shows (0/5) and uploads to the first line
+03:15 +665: D:/GSSMS-Android-APP/test/features/work_orders/presentation/checklist_groups_test.dart: group photo strip shows (0/5) and uploads to the first line
+03:15 +666: D:/GSSMS-Android-APP/test/features/work_orders/presentation/checklist_groups_test.dart: group photo strip shows (0/5) and uploads to the first line
+03:16 +667: D:/GSSMS-Android-APP/test/features/work_orders/presentation/checklist_groups_test.dart: group photo strip shows (0/5) and uploads to the first line
+03:16 +668: D:/GSSMS-Android-APP/test/features/work_orders/presentation/checklist_action_bar_test.dart: ChecklistScreen completion button interaction at 0 required items left, tapping opens completion sheet
+03:16 +669: D:/GSSMS-Android-APP/test/features/work_orders/presentation/checklist_action_bar_test.dart: ChecklistScreen completion button interaction at 0 required items left, tapping opens completion sheet
+03:17 +670: D:/GSSMS-Android-APP/test/features/work_orders/presentation/checklist_action_bar_test.dart: ChecklistScreen completion button interaction at 0 required items left, tapping opens completion sheet
+03:17 +671: D:/GSSMS-Android-APP/test/features/work_orders/presentation/assign_and_verify_screens_test.dart: VerificationWorkspaceScreen severity, groups and modes Un-check asks for a reason then calls setGroupInclusion
+03:17 +672: D:/GSSMS-Android-APP/test/features/work_orders/presentation/checklist_screen_theme_test.dart: bottom action bar lays out under the real app theme without an infinite-width crash
+03:17 +673: D:/GSSMS-Android-APP/test/features/work_orders/presentation/checklist_screen_theme_test.dart: bottom action bar lays out under the real app theme without an infinite-width crash
+03:17 +674: D:/GSSMS-Android-APP/test/features/work_orders/presentation/checklist_screen_theme_test.dart: bottom action bar lays out under the real app theme without an infinite-width crash
+03:17 +675: D:/GSSMS-Android-APP/test/features/work_orders/presentation/checklist_groups_test.dart: completion sends remarks as a numbered list
+03:18 +676: D:/GSSMS-Android-APP/test/features/work_orders/presentation/checklist_groups_test.dart: completion sends remarks as a numbered list
+03:18 +677: D:/GSSMS-Android-APP/test/features/work_orders/presentation/checklist_groups_test.dart: completion sends remarks as a numbered list
+03:18 +678: D:/GSSMS-Android-APP/test/features/work_orders/presentation/checklist_groups_test.dart: completion sends remarks as a numbered list
+03:18 +679: D:/GSSMS-Android-APP/test/features/work_orders/presentation/checklist_groups_test.dart: completion sends remarks as a numbered list
+03:19 +680: D:/GSSMS-Android-APP/test/features/work_orders/presentation/checklist_groups_test.dart: completion sends remarks as a numbered list
+03:19 +681: D:/GSSMS-Android-APP/test/features/work_orders/presentation/checklist_groups_test.dart: completion sends remarks as a numbered list
+03:19 +682: D:/GSSMS-Android-APP/test/features/work_orders/presentation/checklist_groups_test.dart: completion sends remarks as a numbered list
+03:19 +683: D:/GSSMS-Android-APP/test/features/work_orders/presentation/checklist_groups_test.dart: completion sends remarks as a numbered list
+03:19 +684: D:/GSSMS-Android-APP/test/features/work_orders/presentation/execution_screens_test.dart: Execution screens ComplaintExecutionScreen fills fields from the server
+03:20 +685: D:/GSSMS-Android-APP/test/features/work_orders/presentation/job_work_report_screen_test.dart: checklist: loading then loaded, actions enabled after load
+03:21 +686: D:/GSSMS-Android-APP/test/features/work_orders/presentation/job_work_report_screen_test.dart: checklist: loading then loaded, actions enabled after load
+03:21 +687: D:/GSSMS-Android-APP/test/features/work_orders/presentation/line_attachment_failure_test.dart: Failed attachment renders warning badge and inline retry button triggering retry callback
+03:21 +688: D:/GSSMS-Android-APP/test/features/work_orders/presentation/line_attachment_failure_test.dart: Failed attachment renders warning badge and inline retry button triggering retry callback
+03:21 +689: D:/GSSMS-Android-APP/test/features/work_orders/presentation/line_attachment_failure_test.dart: Failed attachment renders warning badge and inline retry button triggering retry callback
+03:22 +690: D:/GSSMS-Android-APP/test/features/work_orders/presentation/line_attachment_failure_test.dart: Failed attachment renders warning badge and inline retry button triggering retry callback
+03:22 +691: D:/GSSMS-Android-APP/test/features/work_orders/presentation/line_attachment_failure_test.dart: Failed attachment renders warning badge and inline retry button triggering retry callback
+03:22 +692: D:/GSSMS-Android-APP/test/features/work_orders/presentation/execution_screens_test.dart: Execution screens Sign & Submit without Before/After photos is blocked
+03:22 +693: D:/GSSMS-Android-APP/test/features/work_orders/presentation/execution_screens_test.dart: Execution screens Sign & Submit without Before/After photos is blocked
+03:22 +694: D:/GSSMS-Android-APP/test/features/work_orders/presentation/line_attachment_metadata_ui_test.dart: camera row with a fix shows source and coordinates in viewer
+03:22 +695: D:/GSSMS-Android-APP/test/features/work_orders/presentation/line_attachment_metadata_ui_test.dart: camera row with a fix shows source and coordinates in viewer
+03:22 +696: D:/GSSMS-Android-APP/test/features/work_orders/presentation/line_attachment_metadata_ui_test.dart: camera row with a fix shows source and coordinates in viewer
+03:22 +697: D:/GSSMS-Android-APP/test/features/work_orders/presentation/line_attachment_metadata_ui_test.dart: camera row with a fix shows source and coordinates in viewer
+03:22 +698: D:/GSSMS-Android-APP/test/features/work_orders/presentation/line_attachment_metadata_ui_test.dart: camera row with a fix shows source and coordinates in viewer
+03:22 +699: D:/GSSMS-Android-APP/test/features/work_orders/presentation/line_attachment_metadata_ui_test.dart: camera row with a fix shows source and coordinates in viewer
+03:22 +700: D:/GSSMS-Android-APP/test/features/work_orders/presentation/line_attachment_metadata_ui_test.dart: camera row with a fix shows source and coordinates in viewer
+03:22 +701: D:/GSSMS-Android-APP/test/features/work_orders/presentation/line_attachment_metadata_ui_test.dart: camera row with a fix shows source and coordinates in viewer
+03:22 +702: D:/GSSMS-Android-APP/test/features/work_orders/presentation/line_attachment_metadata_ui_test.dart: camera row with a fix shows source and coordinates in viewer
+03:22 +703: D:/GSSMS-Android-APP/test/features/work_orders/presentation/line_attachment_metadata_ui_test.dart: camera row with a fix shows source and coordinates in viewer
+03:23 +704: D:/GSSMS-Android-APP/test/features/work_orders/presentation/execution_screens_test.dart: Execution screens InspectionExecutionScreen renders one card per point
+03:23 +705: D:/GSSMS-Android-APP/test/features/work_orders/presentation/execution_screens_test.dart: Execution screens InspectionExecutionScreen renders one card per point
+03:23 +706: D:/GSSMS-Android-APP/test/features/work_orders/presentation/execution_screens_test.dart: Execution screens InspectionExecutionScreen renders one card per point
+03:23 +707: D:/GSSMS-Android-APP/test/features/work_orders/presentation/execution_screens_test.dart: Execution screens InspectionExecutionScreen renders one card per point
+03:23 +708: D:/GSSMS-Android-APP/test/features/work_orders/presentation/execution_screens_test.dart: Execution screens InspectionExecutionScreen renders one card per point
+03:24 +709: D:/GSSMS-Android-APP/test/features/work_orders/presentation/execution_screens_test.dart: Execution screens InspectionExecutionScreen renders one card per point
+03:24 +710: D:/GSSMS-Android-APP/test/features/work_orders/presentation/execution_screens_test.dart: Execution screens InspectionExecutionScreen renders one card per point
+03:24 +711: D:/GSSMS-Android-APP/test/features/work_orders/presentation/job_work_report_screen_test.dart: preview builder passes loaded data, filename and non-empty pdf bytes
+03:24 +712: D:/GSSMS-Android-APP/test/features/work_orders/presentation/job_work_report_screen_test.dart: preview builder passes loaded data, filename and non-empty pdf bytes
+03:24 +713: D:/GSSMS-Android-APP/test/features/work_orders/presentation/job_work_report_screen_test.dart: preview builder passes loaded data, filename and non-empty pdf bytes
+03:24 +714: D:/GSSMS-Android-APP/test/features/work_orders/presentation/job_work_report_screen_test.dart: preview builder passes loaded data, filename and non-empty pdf bytes
+03:24 +715: D:/GSSMS-Android-APP/test/features/work_orders/presentation/job_work_report_screen_test.dart: preview builder passes loaded data, filename and non-empty pdf bytes
+03:24 +716: D:/GSSMS-Android-APP/test/features/work_orders/presentation/job_work_report_screen_test.dart: preview builder passes loaded data, filename and non-empty pdf bytes
+03:24 +717: D:/GSSMS-Android-APP/test/features/work_orders/presentation/job_work_report_screen_test.dart: preview builder passes loaded data, filename and non-empty pdf bytes
+03:24 +718: D:/GSSMS-Android-APP/test/features/work_orders/presentation/job_work_report_screen_test.dart: preview builder passes loaded data, filename and non-empty pdf bytes
+03:24 +719: D:/GSSMS-Android-APP/test/features/work_orders/presentation/job_work_report_screen_test.dart: preview builder passes loaded data, filename and non-empty pdf bytes
+03:24 +720: D:/GSSMS-Android-APP/test/features/work_orders/presentation/job_work_report_screen_test.dart: preview builder passes loaded data, filename and non-empty pdf bytes
+03:24 +721: D:/GSSMS-Android-APP/test/features/work_orders/presentation/job_work_report_screen_test.dart: preview builder passes loaded data, filename and non-empty pdf bytes
+03:24 +722: D:/GSSMS-Android-APP/test/features/work_orders/presentation/job_work_report_screen_test.dart: preview builder passes loaded data, filename and non-empty pdf bytes
+03:24 +723: D:/GSSMS-Android-APP/test/features/work_orders/presentation/job_work_report_screen_test.dart: preview builder passes loaded data, filename and non-empty pdf bytes
+03:24 +724: D:/GSSMS-Android-APP/test/features/work_orders/presentation/job_work_report_screen_test.dart: preview builder passes loaded data, filename and non-empty pdf bytes
+03:24 +725: D:/GSSMS-Android-APP/test/features/work_orders/presentation/job_work_report_screen_test.dart: preview builder passes loaded data, filename and non-empty pdf bytes
+03:24 +726: D:/GSSMS-Android-APP/test/features/work_orders/presentation/job_work_report_screen_test.dart: preview builder passes loaded data, filename and non-empty pdf bytes
+03:24 +727: D:/GSSMS-Android-APP/test/features/work_orders/presentation/job_work_report_screen_test.dart: preview builder passes loaded data, filename and non-empty pdf bytes
+03:24 +728: D:/GSSMS-Android-APP/test/features/work_orders/presentation/job_work_report_screen_test.dart: preview builder passes loaded data, filename and non-empty pdf bytes
+03:24 +729: D:/GSSMS-Android-APP/test/features/work_orders/presentation/job_work_report_screen_test.dart: preview builder passes loaded data, filename and non-empty pdf bytes
+03:24 +730: D:/GSSMS-Android-APP/test/features/work_orders/presentation/execution_screens_test.dart: Execution screens RectificationExecutionScreen renders an item per deficiency
+03:24 +731: D:/GSSMS-Android-APP/test/features/work_orders/presentation/execution_screens_test.dart: Execution screens RectificationExecutionScreen renders an item per deficiency
+03:24 +732: D:/GSSMS-Android-APP/test/features/work_orders/presentation/execution_screens_test.dart: Execution screens RectificationExecutionScreen renders an item per deficiency
+03:24 +733: D:/GSSMS-Android-APP/test/features/work_orders/presentation/execution_screens_test.dart: Execution screens RectificationExecutionScreen renders an item per deficiency
+03:24 +734: D:/GSSMS-Android-APP/test/features/work_orders/presentation/execution_screens_test.dart: Execution screens RectificationExecutionScreen renders an item per deficiency
+03:24 +735: D:/GSSMS-Android-APP/test/features/work_orders/presentation/execution_screens_test.dart: Execution screens RectificationExecutionScreen renders an item per deficiency
+03:24 +736: D:/GSSMS-Android-APP/test/features/work_orders/presentation/execution_screens_test.dart: Execution screens RectificationExecutionScreen renders an item per deficiency
+03:25 +737: D:/GSSMS-Android-APP/test/features/work_orders/presentation/execution_screens_test.dart: Execution screens RectificationExecutionScreen renders an item per deficiency
+03:25 +738: D:/GSSMS-Android-APP/test/features/work_orders/presentation/execution_screens_test.dart: Execution screens RectificationExecutionScreen renders an item per deficiency
+03:26 +739: D:/GSSMS-Android-APP/test/features/work_orders/presentation/execution_screens_test.dart: Execution screens users without maintenance.edit see PermissionDeniedView
+03:26 +740: D:/GSSMS-Android-APP/test/features/work_orders/presentation/execution_screens_test.dart: Execution screens users without maintenance.edit see PermissionDeniedView
+03:26 +741: D:/GSSMS-Android-APP/test/features/work_orders/presentation/pm_approval_request_sheet_test.dart: skip: OTHER needs 20 characters, then submits with args
+03:27 +742: D:/GSSMS-Android-APP/test/features/work_orders/presentation/execution_screens_test.dart: Execution screens ComplaintExecutionScreen enforces ISO 55000 fields for CRITICAL assets
+03:27 +743: D:/GSSMS-Android-APP/test/features/work_orders/presentation/execution_screens_test.dart: Execution screens ComplaintExecutionScreen enforces ISO 55000 fields for CRITICAL assets
+03:28 +744: D:/GSSMS-Android-APP/test/features/work_orders/presentation/execution_screens_test.dart: Execution screens ComplaintExecutionScreen enforces ISO 55000 fields for CRITICAL assets
+03:28 +745: D:/GSSMS-Android-APP/test/features/work_orders/presentation/execution_screens_test.dart: Execution screens ComplaintExecutionScreen enforces ISO 55000 fields for CRITICAL assets
+03:28 +746: D:/GSSMS-Android-APP/test/features/work_orders/presentation/execution_screens_test.dart: Execution screens ComplaintExecutionScreen enforces ISO 55000 fields for CRITICAL assets
+03:28 +747: D:/GSSMS-Android-APP/test/features/work_orders/presentation/execution_screens_test.dart: Execution screens ComplaintExecutionScreen enforces ISO 55000 fields for CRITICAL assets
+03:29 +748: D:/GSSMS-Android-APP/test/features/work_orders/presentation/execution_screens_test.dart: Execution screens ComplaintExecutionScreen enforces ISO 55000 fields for CRITICAL assets
+03:29 +749: D:/GSSMS-Android-APP/test/features/work_orders/presentation/execution_screens_test.dart: Execution screens ComplaintExecutionScreen enforces ISO 55000 fields for CRITICAL assets
+03:29 +750: D:/GSSMS-Android-APP/test/features/work_orders/presentation/execution_screens_test.dart: Execution screens ComplaintExecutionScreen enforces ISO 55000 fields for CRITICAL assets
+03:29 +751: D:/GSSMS-Android-APP/test/features/work_orders/presentation/execution_screens_test.dart: Execution screens ComplaintExecutionScreen enforces ISO 55000 fields for CRITICAL assets
+03:30 +752: D:/GSSMS-Android-APP/test/features/work_orders/presentation/execution_screens_test.dart: Execution screens ComplaintExecutionScreen enforces ISO 55000 fields for CRITICAL assets
+03:30 +753: D:/GSSMS-Android-APP/test/features/work_orders/presentation/execution_screens_test.dart: Execution screens ComplaintExecutionScreen enforces ISO 55000 fields for CRITICAL assets
+03:31 +754: D:/GSSMS-Android-APP/test/features/work_orders/presentation/execution_screens_test.dart: Execution screens ComplaintExecutionScreen enforces ISO 55000 fields for CRITICAL assets
+03:31 +755: D:/GSSMS-Android-APP/test/features/work_orders/presentation/execution_screens_test.dart: Execution screens ComplaintExecutionScreen enforces ISO 55000 fields for CRITICAL assets
+03:31 +756: D:/GSSMS-Android-APP/test/features/work_orders/presentation/execution_screens_test.dart: Execution screens ComplaintExecutionScreen enforces ISO 55000 fields for CRITICAL assets
+03:33 +757: D:/GSSMS-Android-APP/test/features/work_orders/presentation/execution_screens_test.dart: Execution screens ComplaintExecutionScreen enforces ISO 55000 fields for CRITICAL assets
+03:33 +758: D:/GSSMS-Android-APP/test/features/work_orders/presentation/execution_screens_test.dart: Execution screens ComplaintExecutionScreen enforces ISO 55000 fields for CRITICAL assets
+03:34 +759: D:/GSSMS-Android-APP/test/features/work_orders/presentation/execution_screens_test.dart: Execution screens ComplaintExecutionScreen enforces ISO 55000 fields for CRITICAL assets
+03:34 +760: D:/GSSMS-Android-APP/test/features/work_orders/presentation/execution_screens_test.dart: Execution screens ComplaintExecutionScreen enforces ISO 55000 fields for CRITICAL assets
+03:34 +761: D:/GSSMS-Android-APP/test/features/work_orders/presentation/execution_screens_test.dart: Execution screens ComplaintExecutionScreen enforces ISO 55000 fields for CRITICAL assets
+03:34 +762: D:/GSSMS-Android-APP/test/features/work_orders/presentation/execution_screens_test.dart: Execution screens ComplaintExecutionScreen enforces ISO 55000 fields for CRITICAL assets
+03:34 +763: D:/GSSMS-Android-APP/test/features/work_orders/presentation/execution_screens_test.dart: Execution screens ComplaintExecutionScreen enforces ISO 55000 fields for CRITICAL assets
+03:34 +764: D:/GSSMS-Android-APP/test/features/work_orders/presentation/execution_screens_test.dart: Execution screens ComplaintExecutionScreen enforces ISO 55000 fields for CRITICAL assets
+03:34 +765: D:/GSSMS-Android-APP/test/features/work_orders/presentation/execution_screens_test.dart: Execution screens ComplaintExecutionScreen enforces ISO 55000 fields for CRITICAL assets
+03:34 +766: D:/GSSMS-Android-APP/test/features/work_orders/presentation/execution_screens_test.dart: Execution screens ComplaintExecutionScreen enforces ISO 55000 fields for CRITICAL assets
+03:34 +767: D:/GSSMS-Android-APP/test/features/work_orders/presentation/replace_component_sheet_test.dart: non-registered path logs a Job Work replacement
+03:34 +768: D:/GSSMS-Android-APP/test/features/work_orders/presentation/replace_component_sheet_test.dart: non-registered path logs a Job Work replacement
+03:34 +769: D:/GSSMS-Android-APP/test/features/work_orders/presentation/replace_component_sheet_test.dart: non-registered path logs a Job Work replacement
+03:34 +770: D:/GSSMS-Android-APP/test/features/work_orders/presentation/replace_component_sheet_test.dart: non-registered path logs a Job Work replacement
+03:34 +771: D:/GSSMS-Android-APP/test/features/work_orders/presentation/replace_component_sheet_test.dart: non-registered path logs a Job Work replacement
+03:34 +772: D:/GSSMS-Android-APP/test/features/work_orders/presentation/replace_component_sheet_test.dart: non-registered path logs a Job Work replacement
+03:34 +773: D:/GSSMS-Android-APP/test/features/work_orders/presentation/replace_component_sheet_test.dart: non-registered path logs a Job Work replacement
+03:34 +774: D:/GSSMS-Android-APP/test/features/work_orders/presentation/replace_component_sheet_test.dart: non-registered path logs a Job Work replacement
+03:34 +775: D:/GSSMS-Android-APP/test/features/work_orders/presentation/replace_component_sheet_test.dart: non-registered path logs a Job Work replacement
+03:34 +776: D:/GSSMS-Android-APP/test/features/work_orders/presentation/replace_component_sheet_test.dart: non-registered path logs a Job Work replacement
+03:34 +777: D:/GSSMS-Android-APP/test/features/work_orders/presentation/replace_component_sheet_test.dart: non-registered path logs a Job Work replacement
+03:34 +778: D:/GSSMS-Android-APP/test/features/work_orders/presentation/replace_component_sheet_test.dart: non-registered path logs a Job Work replacement
+03:34 +779: D:/GSSMS-Android-APP/test/features/work_orders/presentation/replace_component_sheet_test.dart: non-registered path logs a Job Work replacement
+03:34 +780: D:/GSSMS-Android-APP/test/features/work_orders/presentation/replace_component_sheet_test.dart: non-registered path logs a Job Work replacement
+03:34 +781: D:/GSSMS-Android-APP/test/features/work_orders/presentation/replace_component_sheet_test.dart: non-registered path logs a Job Work replacement
+03:34 +782: D:/GSSMS-Android-APP/test/features/work_orders/presentation/replace_component_sheet_test.dart: non-registered path logs a Job Work replacement
+03:34 +783: D:/GSSMS-Android-APP/test/features/work_orders/presentation/replace_component_sheet_test.dart: non-registered path logs a Job Work replacement
+03:34 +784: D:/GSSMS-Android-APP/test/features/work_orders/presentation/replace_component_sheet_test.dart: non-registered path logs a Job Work replacement
+03:35 +785: D:/GSSMS-Android-APP/test/features/work_orders/presentation/replace_component_sheet_test.dart: non-registered path logs a Job Work replacement
+03:36 +786: D:/GSSMS-Android-APP/test/features/work_orders/presentation/replace_component_sheet_test.dart: non-registered path logs a Job Work replacement
+03:36 +787: D:/GSSMS-Android-APP/test/features/work_orders/presentation/replace_component_sheet_test.dart: non-registered path logs a Job Work replacement
+03:36 +788: D:/GSSMS-Android-APP/test/features/work_orders/presentation/replace_asset_sheet_test.dart: 403 scope denied shows mapped message and stays open
+03:39 +789: D:/GSSMS-Android-APP/test/features/work_orders/presentation/execution_screens_test.dart: Execution screens RectificationExecutionScreen enforces ISO 55000 fields for HIGH criticality assets
+03:40 +790: D:/GSSMS-Android-APP/test/features/work_orders/presentation/replace_component_sheet_test.dart: registered path pre-selects Job Work asset and replaces
+03:41 +791: D:/GSSMS-Android-APP/test/features/work_orders/presentation/replace_component_sheet_test.dart: registered path pre-selects Job Work asset and replaces
+03:42 +792: D:/GSSMS-Android-APP/test/features/work_orders/presentation/replace_component_sheet_test.dart: registered path pre-selects Job Work asset and replaces
+03:42 +793: D:/GSSMS-Android-APP/test/features/work_orders/presentation/replace_component_sheet_test.dart: registered path pre-selects Job Work asset and replaces
+03:42 +794: D:/GSSMS-Android-APP/test/features/work_orders/presentation/replace_component_sheet_test.dart: registered path pre-selects Job Work asset and replaces
+03:42 +795: D:/GSSMS-Android-APP/test/features/work_orders/presentation/replace_component_sheet_test.dart: registered path pre-selects Job Work asset and replaces
+03:42 +796: D:/GSSMS-Android-APP/test/features/work_orders/presentation/replace_component_sheet_test.dart: registered path pre-selects Job Work asset and replaces
+03:42 +797: D:/GSSMS-Android-APP/test/features/work_orders/presentation/replace_component_sheet_test.dart: registered path pre-selects Job Work asset and replaces
+03:43 +798: D:/GSSMS-Android-APP/test/features/work_orders/presentation/replace_component_sheet_test.dart: registered path pre-selects Job Work asset and replaces
+03:43 +799: D:/GSSMS-Android-APP/test/features/work_orders/presentation/replace_component_sheet_test.dart: registered path pre-selects Job Work asset and replaces
+03:43 +800: D:/GSSMS-Android-APP/test/features/work_orders/presentation/replace_component_sheet_test.dart: registered path pre-selects Job Work asset and replaces
+03:43 +801: D:/GSSMS-Android-APP/test/features/work_orders/presentation/replace_component_sheet_test.dart: registered path pre-selects Job Work asset and replaces
+03:43 +802: D:/GSSMS-Android-APP/test/features/work_orders/presentation/replace_component_sheet_test.dart: registered path pre-selects Job Work asset and replaces
+03:43 +803: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:45 +804: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:45 +805: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:46 +806: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:46 +807: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:46 +808: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:46 +809: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:46 +810: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:46 +811: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:47 +812: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:47 +813: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:47 +814: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:47 +815: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:47 +816: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:47 +817: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:47 +818: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:48 +819: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:48 +820: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:48 +821: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:48 +822: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:49 +823: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:49 +824: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:49 +825: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:51 +826: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:51 +827: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:51 +828: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:52 +829: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:52 +830: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:52 +831: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:52 +832: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:52 +833: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:52 +834: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:52 +835: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:53 +836: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:54 +837: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:55 +838: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:55 +839: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:55 +840: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:55 +841: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:55 +842: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:55 +843: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:55 +844: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:55 +845: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:55 +846: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:55 +847: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:55 +848: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:55 +849: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:55 +850: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:55 +851: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:55 +852: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:56 +853: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:56 +854: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:56 +855: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:56 +856: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:56 +857: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:56 +858: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:57 +859: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:57 +860: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:58 +861: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:58 +862: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:58 +863: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:58 +864: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:58 +865: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:58 +866: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:58 +867: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:58 +868: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:58 +869: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:59 +870: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+03:59 +871: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+04:00 +872: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+04:00 +873: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+04:00 +874: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+04:00 +875: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen validates title and submits with checklist
+04:01 +876: D:/GSSMS-Android-APP/test/features/work_orders/presentation/replace_component_sheet_test.dart: no station: warns, starts non-registered, never lists assets
+04:01 +877: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_screens_test.dart: WorkOrder Screens Widget Tests ChecklistScreen renders progress and line observation fields
+04:01 +878: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_screens_test.dart: WorkOrder Screens Widget Tests ChecklistScreen renders progress and line observation fields
+04:01 +879: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_screens_test.dart: WorkOrder Screens Widget Tests ChecklistScreen renders progress and line observation fields
+04:01 +880: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: AMC checklist renders under its own segment, not Asset
+04:01 +881: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: AMC checklist renders under its own segment, not Asset
+04:01 +882: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: AMC checklist renders under its own segment, not Asset
+04:01 +883: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: AMC checklist renders under its own segment, not Asset
+04:01 +884: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: AMC checklist renders under its own segment, not Asset
+04:01 +885: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: AMC checklist renders under its own segment, not Asset
+04:01 +886: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: AMC checklist renders under its own segment, not Asset
+04:01 +887: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: AMC checklist renders under its own segment, not Asset
+04:01 +888: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: AMC checklist renders under its own segment, not Asset
+04:02 +889: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: AMC checklist renders under its own segment, not Asset
+04:02 +890: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: AMC checklist renders under its own segment, not Asset
+04:02 +891: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: AMC checklist renders under its own segment, not Asset
+04:02 +892: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: AMC checklist renders under its own segment, not Asset
+04:02 +893: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: AMC checklist renders under its own segment, not Asset
+04:02 +894: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: AMC checklist renders under its own segment, not Asset
+04:02 +895: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: AMC checklist renders under its own segment, not Asset
+04:02 +896: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: AMC checklist renders under its own segment, not Asset
+04:02 +897: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: AMC checklist renders under its own segment, not Asset
+04:03 +898: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: AMC checklist renders under its own segment, not Asset
+04:11 +898: D:/GSSMS-Android-APP/test/golden/text_scale_golden_test.dart: light HomeScreen layout scaling home_screen textScaler 1.0
+[HTTP REQ] GET https://gssms.share.zrok.io/api/v1/complaints/?page_size=100
+[HTTP REQ] GET https://gssms.share.zrok.io/api/v1/inspections/?page_size=100
+[HTTP ERR] 400 https://gssms.share.zrok.io/api/v1/complaints/?page_size=100 (DioExceptionType.badResponse)
+[HTTP ERR] 400 https://gssms.share.zrok.io/api/v1/inspections/?page_size=100 (DioExceptionType.badResponse)
+04:11 +899: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: AMC checklist renders under its own segment, not Asset
+04:11 +900: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: AMC checklist renders under its own segment, not Asset
+04:11 +901: D:/GSSMS-Android-APP/test/golden/text_scale_golden_test.dart: light HomeScreen layout scaling home_screen textScaler 1.3
+04:11 +901: D:/GSSMS-Android-APP/test/report_parity/render_android_test.dart: render Android report PDFs for parity harness
+  Skip: REPORT_PARITY_OUT environment variable not set
+04:11 +901 ~1: D:/GSSMS-Android-APP/test/golden/text_scale_golden_test.dart: light HomeScreen layout scaling home_screen textScaler 1.3
+[HTTP REQ] GET https://gssms.share.zrok.io/api/v1/complaints/?page_size=100
+[HTTP REQ] GET https://gssms.share.zrok.io/api/v1/inspections/?page_size=100
+[HTTP ERR] 400 https://gssms.share.zrok.io/api/v1/complaints/?page_size=100 (DioExceptionType.badResponse)
+[HTTP ERR] 400 https://gssms.share.zrok.io/api/v1/inspections/?page_size=100 (DioExceptionType.badResponse)
+04:16 +902 ~1: D:/GSSMS-Android-APP/test/features/work_orders/presentation/work_order_create_screen_test.dart: WorkOrderCreateScreen restricts types, shows hints, and validates checklist for Preventive
+04:17 +903 ~1: D:/GSSMS-Android-APP/test/golden/text_scale_golden_test.dart: light HomeScreen layout scaling home_screen textScaler 1.5
+04:20 +904 ~1: D:/GSSMS-Android-APP/test/golden/text_scale_golden_test.dart: light HomeScreen layout scaling home_screen textScaler 1.5
+[HTTP REQ] GET https://gssms.share.zrok.io/api/v1/complaints/?page_size=100
+[HTTP REQ] GET https://gssms.share.zrok.io/api/v1/inspections/?page_size=100
+[HTTP ERR] 400 https://gssms.share.zrok.io/api/v1/complaints/?page_size=100 (DioExceptionType.badResponse)
+[HTTP ERR] 400 https://gssms.share.zrok.io/api/v1/inspections/?page_size=100 (DioExceptionType.badResponse)
+04:21 +905 ~1: D:/GSSMS-Android-APP/test/golden/text_scale_golden_test.dart: light ChecklistScreen layout scaling checklist_screen textScaler 1.0
+04:22 +906 ~1: D:/GSSMS-Android-APP/test/golden/text_scale_golden_test.dart: light ChecklistScreen layout scaling checklist_screen textScaler 1.3
+04:23 +907 ~1: D:/GSSMS-Android-APP/test/golden/text_scale_golden_test.dart: light ChecklistScreen layout scaling checklist_screen textScaler 1.5
+04:24 +908 ~1: D:/GSSMS-Android-APP/test/golden/text_scale_golden_test.dart: light WorkOrderListScreen layout scaling work_order_list_screen textScaler 1.0
+04:24 +909 ~1: D:/GSSMS-Android-APP/test/golden/text_scale_golden_test.dart: light WorkOrderListScreen layout scaling work_order_list_screen textScaler 1.3
+04:25 +910 ~1: D:/GSSMS-Android-APP/test/golden/text_scale_golden_test.dart: light WorkOrderListScreen layout scaling work_order_list_screen textScaler 1.5
+04:25 +911 ~1: D:/GSSMS-Android-APP/test/golden/text_scale_golden_test.dart: light WorkOrderDetailScreen layout scaling work_order_detail_screen textScaler 1.0
+04:26 +912 ~1: D:/GSSMS-Android-APP/test/golden/text_scale_golden_test.dart: light WorkOrderDetailScreen layout scaling work_order_detail_screen textScaler 1.3
+04:26 +913 ~1: D:/GSSMS-Android-APP/test/golden/text_scale_golden_test.dart: light WorkOrderDetailScreen layout scaling work_order_detail_screen textScaler 1.5
+04:26 +914 ~1: D:/GSSMS-Android-APP/test/golden/text_scale_golden_test.dart: light ComplaintListScreen layout scaling complaint_list_screen textScaler 1.0
+04:27 +915 ~1: D:/GSSMS-Android-APP/test/golden/text_scale_golden_test.dart: light ComplaintListScreen layout scaling complaint_list_screen textScaler 1.3
+04:28 +916 ~1: D:/GSSMS-Android-APP/test/golden/text_scale_golden_test.dart: light ComplaintListScreen layout scaling complaint_list_screen textScaler 1.5
+04:28 +917 ~1: D:/GSSMS-Android-APP/test/golden/text_scale_golden_test.dart: light InspectionListScreen layout scaling inspection_list_screen textScaler 1.0
+04:28 +918 ~1: D:/GSSMS-Android-APP/test/golden/text_scale_golden_test.dart: light InspectionListScreen layout scaling inspection_list_screen textScaler 1.3
+04:29 +919 ~1: D:/GSSMS-Android-APP/test/golden/text_scale_golden_test.dart: light InspectionListScreen layout scaling inspection_list_screen textScaler 1.5
+04:29 +920 ~1: D:/GSSMS-Android-APP/test/golden/text_scale_golden_test.dart: light AssetListScreen layout scaling asset_list_screen textScaler 1.0
+04:29 +921 ~1: D:/GSSMS-Android-APP/test/golden/text_scale_golden_test.dart: light AssetListScreen layout scaling asset_list_screen textScaler 1.3
+04:29 +922 ~1: D:/GSSMS-Android-APP/test/golden/text_scale_golden_test.dart: light AssetListScreen layout scaling asset_list_screen textScaler 1.5
+04:29 +923 ~1: D:/GSSMS-Android-APP/test/golden/text_scale_golden_test.dart: dark HomeScreen layout scaling home_screen textScaler 1.0
+[HTTP REQ] GET https://gssms.share.zrok.io/api/v1/complaints/?page_size=100
+[HTTP REQ] GET https://gssms.share.zrok.io/api/v1/inspections/?page_size=100
+[HTTP ERR] 400 https://gssms.share.zrok.io/api/v1/complaints/?page_size=100 (DioExceptionType.badResponse)
+[HTTP ERR] 400 https://gssms.share.zrok.io/api/v1/inspections/?page_size=100 (DioExceptionType.badResponse)
+04:30 +924 ~1: D:/GSSMS-Android-APP/test/golden/text_scale_golden_test.dart: dark HomeScreen layout scaling home_screen textScaler 1.3
+[HTTP REQ] GET https://gssms.share.zrok.io/api/v1/complaints/?page_size=100
+[HTTP REQ] GET https://gssms.share.zrok.io/api/v1/inspections/?page_size=100
+[HTTP ERR] 400 https://gssms.share.zrok.io/api/v1/complaints/?page_size=100 (DioExceptionType.badResponse)
+[HTTP ERR] 400 https://gssms.share.zrok.io/api/v1/inspections/?page_size=100 (DioExceptionType.badResponse)
+04:30 +925 ~1: D:/GSSMS-Android-APP/test/golden/text_scale_golden_test.dart: dark HomeScreen layout scaling home_screen textScaler 1.5
+[HTTP REQ] GET https://gssms.share.zrok.io/api/v1/complaints/?page_size=100
+[HTTP REQ] GET https://gssms.share.zrok.io/api/v1/inspections/?page_size=100
+[HTTP ERR] 400 https://gssms.share.zrok.io/api/v1/complaints/?page_size=100 (DioExceptionType.badResponse)
+[HTTP ERR] 400 https://gssms.share.zrok.io/api/v1/inspections/?page_size=100 (DioExceptionType.badResponse)
+04:31 +926 ~1: D:/GSSMS-Android-APP/test/golden/text_scale_golden_test.dart: dark ChecklistScreen layout scaling checklist_screen textScaler 1.0
+04:31 +927 ~1: D:/GSSMS-Android-APP/test/golden/text_scale_golden_test.dart: dark ChecklistScreen layout scaling checklist_screen textScaler 1.3
+04:31 +928 ~1: D:/GSSMS-Android-APP/test/golden/text_scale_golden_test.dart: dark ChecklistScreen layout scaling checklist_screen textScaler 1.5
+04:31 +929 ~1: D:/GSSMS-Android-APP/test/golden/text_scale_golden_test.dart: dark WorkOrderListScreen layout scaling work_order_list_screen textScaler 1.0
+04:31 +930 ~1: D:/GSSMS-Android-APP/test/golden/text_scale_golden_test.dart: dark WorkOrderListScreen layout scaling work_order_list_screen textScaler 1.3
+04:31 +931 ~1: D:/GSSMS-Android-APP/test/golden/text_scale_golden_test.dart: dark WorkOrderListScreen layout scaling work_order_list_screen textScaler 1.5
+04:31 +932 ~1: D:/GSSMS-Android-APP/test/golden/text_scale_golden_test.dart: dark WorkOrderDetailScreen layout scaling work_order_detail_screen textScaler 1.0
+04:31 +933 ~1: D:/GSSMS-Android-APP/test/golden/text_scale_golden_test.dart: dark WorkOrderDetailScreen layout scaling work_order_detail_screen textScaler 1.3
+04:31 +934 ~1: D:/GSSMS-Android-APP/test/golden/text_scale_golden_test.dart: dark WorkOrderDetailScreen layout scaling work_order_detail_screen textScaler 1.5
+04:31 +935 ~1: D:/GSSMS-Android-APP/test/golden/text_scale_golden_test.dart: dark ComplaintListScreen layout scaling complaint_list_screen textScaler 1.0
+04:32 +936 ~1: D:/GSSMS-Android-APP/test/golden/text_scale_golden_test.dart: dark ComplaintListScreen layout scaling complaint_list_screen textScaler 1.3
+04:32 +937 ~1: D:/GSSMS-Android-APP/test/golden/text_scale_golden_test.dart: dark ComplaintListScreen layout scaling complaint_list_screen textScaler 1.5
+04:32 +938 ~1: D:/GSSMS-Android-APP/test/golden/text_scale_golden_test.dart: dark InspectionListScreen layout scaling inspection_list_screen textScaler 1.0
+04:32 +939 ~1: D:/GSSMS-Android-APP/test/golden/text_scale_golden_test.dart: dark InspectionListScreen layout scaling inspection_list_screen textScaler 1.3
+04:32 +940 ~1: D:/GSSMS-Android-APP/test/golden/text_scale_golden_test.dart: dark InspectionListScreen layout scaling inspection_list_screen textScaler 1.5
+04:32 +941 ~1: D:/GSSMS-Android-APP/test/golden/text_scale_golden_test.dart: dark AssetListScreen layout scaling asset_list_screen textScaler 1.0
+04:32 +942 ~1: D:/GSSMS-Android-APP/test/golden/text_scale_golden_test.dart: dark AssetListScreen layout scaling asset_list_screen textScaler 1.3
+04:32 +943 ~1: D:/GSSMS-Android-APP/test/golden/text_scale_golden_test.dart: dark AssetListScreen layout scaling asset_list_screen textScaler 1.5
+04:32 +944 ~1: All tests passed!
