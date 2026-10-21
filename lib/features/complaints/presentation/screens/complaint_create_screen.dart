@@ -1236,11 +1236,6 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
   }
 
   Widget _actionRow() {
-    // NOTE: do NOT use full-width / expanded buttons here — AppTheme's
-    // elevatedButtonTheme sets minimumSize: Size.fromHeight(48) (infinite
-    // width), which inside a Row produces BoxConstraints(w=Infinity) and a
-    // blank screen (same crash fixed on InspectionCreateScreen). Explicit
-    // finite minimumSize + shrinkWrap keeps both buttons content-sized.
     return Row(
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
@@ -1253,8 +1248,6 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
                 const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8)),
-            minimumSize: const Size(0, 48),
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
           onPressed:
               _isSubmitting ? null : () => Navigator.of(context).pop(false),
@@ -1273,8 +1266,6 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8)),
             elevation: 2,
-            minimumSize: const Size(0, GssmsSize.touchTarget),
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
           onPressed: _isSubmitting ? null : _submitComplaint,
           icon: _isSubmitting

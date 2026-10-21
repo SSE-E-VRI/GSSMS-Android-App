@@ -1011,8 +1011,6 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
             side: BorderSide(color: context.gssms.border),
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            minimumSize: const Size(0, 48),
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
           onPressed: _isSubmitting ? null : () => Navigator.of(context).pop(false),
           icon: const Icon(Icons.close, size: 16),
@@ -1027,8 +1025,6 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             elevation: 2,
-            minimumSize: const Size(0, GssmsSize.touchTarget),
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
           onPressed: _isSubmitting ? null : _submit,
           icon: _isSubmitting
