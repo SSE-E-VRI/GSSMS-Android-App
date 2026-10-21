@@ -20,6 +20,7 @@ import 'package:gssms_mobile/features/auth/presentation/controllers/auth_control
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_state.dart';
 import 'package:gssms_mobile/features/auth/presentation/widgets/permission_denied_view.dart';
 import 'package:gssms_mobile/features/inspections/domain/models/inspection.dart';
+import 'package:gssms_mobile/core/widgets/authenticated_image_thumbnail.dart';
 import 'package:gssms_mobile/features/inspections/domain/models/inspection_evidence_photo.dart';
 import 'package:gssms_mobile/features/inspections/domain/models/inspection_point.dart';
 import 'package:gssms_mobile/features/inspections/presentation/controllers/inspection_controllers.dart';
@@ -1141,19 +1142,26 @@ class _EvidencePhotoRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final title = photo.caption?.isNotEmpty == true
+        ? photo.caption!
+        : 'Photo #${photo.id}';
     return Padding(
       key: Key('insp_photo_row_${photo.id}'),
       padding: const EdgeInsets.symmetric(vertical: GssmsSpacing.s4),
       child: Row(
         children: [
+          AuthenticatedImageThumbnail(
+            url: photo.imageUrl,
+            previewTitle: title,
+            tapKey: Key('preview_insp_photo_${photo.id}'),
+          ),
+          const SizedBox(width: GssmsSpacing.s8),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  photo.caption?.isNotEmpty == true
-                      ? photo.caption!
-                      : 'Photo #${photo.id}',
+                  title,
                   style: textTheme.bodyMedium
                       ?.copyWith(fontWeight: FontWeight.w500),
                 ),

@@ -9,6 +9,7 @@ import 'package:gssms_mobile/core/data/lookup_options_service.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
 import 'package:gssms_mobile/core/utils/gallery_permission.dart';
 import 'package:gssms_mobile/core/utils/json_parsing.dart';
+import 'package:gssms_mobile/core/widgets/authenticated_image_thumbnail.dart';
 import 'package:gssms_mobile/core/widgets/confirmation_dialog.dart';
 import 'package:gssms_mobile/core/widgets/section_card.dart';
 import 'package:gssms_mobile/core/widgets/status_chip.dart';
@@ -438,6 +439,12 @@ class _ComplaintDetailScreenState extends ConsumerState<ComplaintDetailScreen> {
                         const EdgeInsets.symmetric(vertical: GssmsSpacing.s6),
                     child: Row(
                       children: [
+                        AuthenticatedImageThumbnail(
+                          url: photo.url,
+                          previewTitle: 'Breakdown Photo #${photo.id}',
+                          tapKey: Key('preview_breakdown_photo_${photo.id}'),
+                        ),
+                        const SizedBox(width: GssmsSpacing.s8),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
