@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -19,8 +20,13 @@ import 'package:gssms_mobile/features/work_orders/presentation/screens/work_orde
 import 'package:mocktail/mocktail.dart';
 
 class MockWorkOrderRepository extends Mock implements IWorkOrderRepository {}
-class MockOrgScopeOptionsService extends Mock implements OrgScopeOptionsService {}
-class MockInfraOptionsService extends Mock implements InfrastructureOptionsService {}
+
+class MockOrgScopeOptionsService extends Mock
+    implements OrgScopeOptionsService {}
+
+class MockInfraOptionsService extends Mock
+    implements InfrastructureOptionsService {}
+
 class MockAssetApiService extends Mock implements AssetApiService {}
 
 class _FakeAuth extends AuthController {
@@ -38,7 +44,9 @@ const _session = UserSession(
   primaryRole: AuthRole.depotIncharge,
   roles: [AuthRole.depotIncharge],
   permissions: ['maintenance.view', 'maintenance.create'],
-  scope: OrgScope(level: OrgScopeLevel.depot, depot: OrgUnitInfo(id: 23, name: 'Vriddhachalam Depot')),
+  scope: OrgScope(
+      level: OrgScopeLevel.depot,
+      depot: OrgUnitInfo(id: 23, name: 'Vriddhachalam Depot')),
   depotId: 23,
   depotName: 'Vriddhachalam Depot',
 );
@@ -48,7 +56,9 @@ void main() {
     registerFallbackValue(InfraFilterType.station);
   });
 
-  testWidgets('WorkOrderCreateScreen validates title and submits with checklist', (tester) async {
+  testWidgets(
+      'WorkOrderCreateScreen validates title and submits with checklist',
+      (tester) async {
     final mockRepo = MockWorkOrderRepository();
     final mockOrg = MockOrgScopeOptionsService();
     final mockInfra = MockInfraOptionsService();
@@ -107,7 +117,8 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Please enter a title'), findsOneWidget);
 
-    await tester.enterText(find.byKey(const Key('wo_title_field')), 'Station monthly maintenance');
+    await tester.enterText(
+        find.byKey(const Key('wo_title_field')), 'Station monthly maintenance');
     // Need to select a checklist before submitting (required for Preventive)
     await tester.ensureVisible(find.byKey(const Key('wo_template_dropdown')));
     await tester.tap(find.byKey(const Key('wo_template_dropdown')));
@@ -202,8 +213,9 @@ void main() {
     expect(find.text('Panel Monthly (Monthly)'), findsNothing);
   });
 
-
-  testWidgets('WorkOrderCreateScreen restricts types, shows hints, and validates checklist for Preventive', (tester) async {
+  testWidgets(
+      'WorkOrderCreateScreen restricts types, shows hints, and validates checklist for Preventive',
+      (tester) async {
     final mockRepo = MockWorkOrderRepository();
     final mockOrg = MockOrgScopeOptionsService();
     final mockInfra = MockInfraOptionsService();
@@ -253,7 +265,8 @@ void main() {
     await tester.pumpAndSettle();
 
     // 1. General breakdown hint is visible
-    expect(find.text('Report breakdowns in the Breakdowns module.'), findsOneWidget);
+    expect(find.text('Report breakdowns in the Breakdowns module.'),
+        findsOneWidget);
 
     // 2. In PREVENTIVE mode: Checklist header is required with asterisk and web helper text
     expect(find.text('Checklist *'), findsOneWidget);
@@ -273,11 +286,13 @@ void main() {
     expect(find.text('Installation'), findsNothing);
 
     // 4. Attempt submit without checklist -> rejected with snackbar
-    await tester.enterText(find.byKey(const Key('wo_title_field')), 'Ad-hoc PM');
+    await tester.enterText(
+        find.byKey(const Key('wo_title_field')), 'Ad-hoc PM');
     await tester.ensureVisible(find.byKey(const Key('submit_wo_button')));
     await tester.tap(find.byKey(const Key('submit_wo_button')));
     await tester.pumpAndSettle();
-    expect(find.text('A Preventive Job Work needs a checklist.'), findsOneWidget);
+    expect(
+        find.text('A Preventive Job Work needs a checklist.'), findsOneWidget);
     // Verify createWorkOrder was never called
     verifyNever(() => mockRepo.createWorkOrder(
           title: any(named: 'title'),
@@ -317,7 +332,9 @@ void main() {
         )).called(1);
   });
 
-  testWidgets('WorkOrderCreateScreen action buttons fit without overflow at 360dp width and 1.3 text scale', (tester) async {
+  testWidgets(
+      'WorkOrderCreateScreen action buttons fit without overflow at 360dp width and 1.3 text scale',
+      (tester) async {
     final mockRepo = MockWorkOrderRepository();
     final mockOrg = MockOrgScopeOptionsService();
     final mockInfra = MockInfraOptionsService();
@@ -367,7 +384,10 @@ void main() {
     await tester.pumpAndSettle();
 
     // Verify AppBar title is 'New Job Work'
-    expect(find.descendant(of: find.byType(AppBar), matching: find.text('New Job Work')), findsOneWidget);
+    expect(
+        find.descendant(
+            of: find.byType(AppBar), matching: find.text('New Job Work')),
+        findsOneWidget);
 
     // Verify Action buttons are visible and did not overflow
     await tester.ensureVisible(find.byKey(const Key('submit_wo_button')));
@@ -375,5 +395,81 @@ void main() {
     expect(find.byKey(const Key('submit_wo_button')), findsOneWidget);
     expect(caughtDetails, isNull);
     expect(tester.takeException(), isNull);
+  });
+  testWidgets('S2: coded 409 directs preventive creates to schedule conversion',
+      (tester) async {
+    final mockRepo = MockWorkOrderRepository();
+    final mockOrg = MockOrgScopeOptionsService();
+    final mockInfra = MockInfraOptionsService();
+    final mockAssets = MockAssetApiService();
+
+    when(() => mockInfra.fetchOptions(any(), depotId: any(named: 'depotId')))
+        .thenAnswer((_) async => const []);
+    const conflictMaster = MaintenanceMaster(
+        id: 5,
+        name: 'Basic Checklist',
+        scheduleType: MaintenanceScheduleType.monthly,
+        templateKind: MaintenanceTemplateKind.assetTemplate);
+    when(() => mockRepo.fetchMaintenanceMasters())
+        .thenAnswer((_) async => const [conflictMaster]);
+    DioException conflict409() {
+      final options = RequestOptions(path: '/api/maintenance/work-orders/');
+      return DioException(
+        requestOptions: options,
+        type: DioExceptionType.badResponse,
+        response: Response(
+          requestOptions: options,
+          statusCode: 409,
+          data: {
+            'error':
+                'Preventive maintenance for an assigned template must be created by converting its schedule.',
+            'code': 'PM_USE_SCHEDULE_CONVERSION',
+            'blocking_work_order': null,
+            'pending_request': null,
+          },
+        ),
+      );
+    }
+
+    when(() => mockRepo.createWorkOrder(
+          title: any(named: 'title'),
+          description: any(named: 'description'),
+          type: any(named: 'type'),
+          priority: any(named: 'priority'),
+          depotId: any(named: 'depotId'),
+          stationId: any(named: 'stationId'),
+          infrastructureId: any(named: 'infrastructureId'),
+          assetId: any(named: 'assetId'),
+          scheduledDate: any(named: 'scheduledDate'),
+          maintenanceMasterId: any(named: 'maintenanceMasterId'),
+        )).thenThrow(conflict409());
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          workOrderRepositoryProvider.overrideWithValue(mockRepo),
+          authControllerProvider.overrideWith(() => _FakeAuth(_session)),
+          orgScopeOptionsServiceProvider.overrideWithValue(mockOrg),
+          infrastructureOptionsServiceProvider.overrideWithValue(mockInfra),
+          assetApiServiceProvider.overrideWithValue(mockAssets),
+        ],
+        child: const MaterialApp(home: WorkOrderCreateScreen()),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+        find.byKey(const Key('wo_title_field')), 'Station monthly maintenance');
+    await tester.ensureVisible(find.byKey(const Key('wo_template_dropdown')));
+    await tester.tap(find.byKey(const Key('wo_template_dropdown')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Basic Checklist (Monthly)').last);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.byKey(const Key('submit_wo_button')));
+    await tester.tap(find.byKey(const Key('submit_wo_button')));
+    await tester.pumpAndSettle();
+
+    // No blind resubmit wording: the snackbar names the conversion path.
+    expect(find.textContaining('Convert the due schedule'), findsOneWidget);
   });
 }

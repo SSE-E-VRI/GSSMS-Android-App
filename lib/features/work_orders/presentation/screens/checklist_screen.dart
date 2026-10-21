@@ -1,4 +1,8 @@
 import 'dart:async';
+import 'package:gssms_mobile/features/work_orders/data/narrative_execution_api_service.dart';
+import 'package:gssms_mobile/features/work_orders/domain/models/narrative_execution.dart';
+import 'package:gssms_mobile/features/work_orders/presentation/screens/narrative_execution_screen.dart';
+import 'package:gssms_mobile/features/work_orders/presentation/screens/record_rectification_execution_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
@@ -39,6 +43,58 @@ class ChecklistScreen extends ConsumerStatefulWidget {
 }
 
 class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
+  late final Future<NarrativeContext?> _context = _readContext();
+
+  Future<NarrativeContext?> _readContext() async {
+    try {
+      return await ref
+          .read(narrativeExecutionApiServiceProvider)
+          .getContext(widget.recordId);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!canWriteChecklist(sessionOf(ref))) {
+      return const Scaffold(body: PermissionDeniedView());
+    }
+    return FutureBuilder<NarrativeContext?>(
+      future: _context,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return Scaffold(
+            appBar: AppBar(title: Text('#${widget.recordId}')),
+            body: const Center(child: CircularProgressIndicator()),
+          );
+        }
+        final narrative = snapshot.data;
+        if (narrative != null && narrative.usesNarrativeForm) {
+          return NarrativeExecutionScreen(
+              recordId: widget.recordId, context: narrative);
+        }
+        if (narrative != null && narrative.usesRectificationForm) {
+          return RecordRectificationExecutionScreen(
+              recordId: widget.recordId, context: narrative);
+        }
+        return ChecklistFormScreen(recordId: widget.recordId);
+      },
+    );
+  }
+}
+
+class ChecklistFormScreen extends ConsumerStatefulWidget {
+  const ChecklistFormScreen({super.key, required this.recordId});
+
+  final int recordId;
+
+  @override
+  ConsumerState<ChecklistFormScreen> createState() =>
+      _ChecklistFormScreenState();
+}
+
+class _ChecklistFormScreenState extends ConsumerState<ChecklistFormScreen> {
   /// Scroll targets for line cards, by line id.
   final Map<int, GlobalKey> _lineScrollKeys = {};
 
@@ -113,7 +169,9 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
           sessionFromAuth(ref.read(authControllerProvider)))) {
         return;
       }
-      ref.read(checklistControllerProvider(widget.recordId).notifier).loadRecord();
+      ref
+          .read(checklistControllerProvider(widget.recordId).notifier)
+          .loadRecord();
     });
   }
 
@@ -281,9 +339,7 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
                 totalLines: allGroups.length,
                 lineCounts: {
                   for (final cat in categories)
-                    cat: allGroups
-                        .where((g) => g.categoryLabel == cat)
-                        .length,
+                    cat: allGroups.where((g) => g.categoryLabel == cat).length,
                 },
                 onSelected: (cat) => ref
                     .read(checklistControllerProvider(widget.recordId).notifier)
@@ -324,32 +380,33 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
                               Padding(
                                 padding: EdgeInsets.only(
                                     top: line == activeLines.first ? 0 : 12),
-                                child: _lineCard(line, record, showAttachments: true),
+                                child: _lineCard(line, record,
+                                    showAttachments: true),
                               )
                           else ...[
-                          ChecklistGroupHeader(
-                            group: group,
-                            canCheckOut: canCheckOut,
-                            canUncheck: canUncheck,
-                            saving: state.savingGroupKeys.contains(group.key),
-                            isPastTechCompleted: record.isPastTechCompleted,
-                            onToggle: (included) =>
-                                _toggleGroup(group, included),
-                          ),
-                          if (group.checkedOut) ...[
-                            const SizedBox(height: GssmsSpacing.s8),
-                            GroupEvidenceStrip(
-                              recordId: widget.recordId,
-                              holder: group.photoHolder,
+                            ChecklistGroupHeader(
+                              group: group,
+                              canCheckOut: canCheckOut,
+                              canUncheck: canUncheck,
+                              saving: state.savingGroupKeys.contains(group.key),
                               isPastTechCompleted: record.isPastTechCompleted,
+                              onToggle: (included) =>
+                                  _toggleGroup(group, included),
                             ),
-                            for (final line in activeLines)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 12),
-                                child: _lineCard(line, record,
-                                    showAttachments: false),
+                            if (group.checkedOut) ...[
+                              const SizedBox(height: GssmsSpacing.s8),
+                              GroupEvidenceStrip(
+                                recordId: widget.recordId,
+                                holder: group.photoHolder,
+                                isPastTechCompleted: record.isPastTechCompleted,
                               ),
-                          ],
+                              for (final line in activeLines)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 12),
+                                  child: _lineCard(line, record,
+                                      showAttachments: false),
+                                ),
+                            ],
                           ],
                         ],
                       ),
@@ -417,8 +474,7 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
       ok = await controller.setGroupIncluded(group, included, reason: reason);
     }
     if (!mounted || !ok) return;
-    final latest =
-        ref.read(checklistControllerProvider(widget.recordId));
+    final latest = ref.read(checklistControllerProvider(widget.recordId));
     if (latest is ChecklistLoaded && latest.successMessage != null) {
       showGssmsSnackBar(context, latest.successMessage!,
           tone: GssmsTone.success);
@@ -475,7 +531,8 @@ class _ChecklistScreenState extends ConsumerState<ChecklistScreen> {
           if (allowReplace && canReplaceAssets(session))
             item('component', Icons.build_circle_outlined,
                 tokens.accent.foreground, 'Enter Replaced Component'),
-          item('preview', Icons.remove_red_eye_outlined, tokens.link, 'Preview'),
+          item(
+              'preview', Icons.remove_red_eye_outlined, tokens.link, 'Preview'),
         ];
       },
     );
@@ -552,7 +609,8 @@ class _SubsystemChipsDelegate extends SliverPersistentHeaderDelegate {
   double get maxExtent => _height;
 
   @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+  Widget build(
+      BuildContext context, double shrinkOffset, bool overlapsContent) {
     return Container(
       color: Theme.of(context).scaffoldBackgroundColor,
       padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
@@ -619,7 +677,8 @@ class _CompletionSheetState extends ConsumerState<_CompletionSheet> {
     }
     final current = ref.read(checklistControllerProvider(widget.recordId));
     _initialRemarks = [
-      if (current is ChecklistLoaded) ...splitNumberedList(current.record.remarks),
+      if (current is ChecklistLoaded)
+        ...splitNumberedList(current.record.remarks),
     ];
   }
 
@@ -663,7 +722,6 @@ class _CompletionSheetState extends ConsumerState<_CompletionSheet> {
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(checklistControllerProvider(widget.recordId));
@@ -691,7 +749,8 @@ class _CompletionSheetState extends ConsumerState<_CompletionSheet> {
               Text(
                 'Submits this maintenance execution to the depot incharge for '
                 'verification. Checklist readings cannot be changed afterwards.',
-                style: textTheme.bodyMedium?.copyWith(color: tokens.textSecondary),
+                style:
+                    textTheme.bodyMedium?.copyWith(color: tokens.textSecondary),
               ),
               if (outstanding > 0) ...[
                 const SizedBox(height: GssmsSpacing.s12),
@@ -750,11 +809,13 @@ class _CompletionSheetState extends ConsumerState<_CompletionSheet> {
                 key: const Key('completion_checked_out_checkbox'),
                 value: _checkedOutBySupervisor,
                 onChanged: (val) {
-                  if (val != null) setState(() => _checkedOutBySupervisor = val);
+                  if (val != null)
+                    setState(() => _checkedOutBySupervisor = val);
                 },
                 title: Text(
                   'Checked out by supervisor',
-                  style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+                  style: textTheme.bodyMedium
+                      ?.copyWith(fontWeight: FontWeight.w500),
                 ),
                 contentPadding: EdgeInsets.zero,
                 controlAffinity: ListTileControlAffinity.leading,
@@ -776,11 +837,13 @@ class _CompletionSheetState extends ConsumerState<_CompletionSheet> {
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
                       : const Icon(Icons.verified_outlined),
-                  label: Text(isSubmitting ? 'Submitting…' : 'Confirm & Submit'),
+                  label:
+                      Text(isSubmitting ? 'Submitting…' : 'Confirm & Submit'),
                 ),
               ),
               TextButton(
-                onPressed: isSubmitting ? null : () => Navigator.of(context).pop(),
+                onPressed:
+                    isSubmitting ? null : () => Navigator.of(context).pop(),
                 child: const Text('Cancel'),
               ),
             ],
@@ -824,11 +887,13 @@ class _CompletionSheetState extends ConsumerState<_CompletionSheet> {
                         proof.fileName,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                        style: textTheme.bodyMedium
+                            ?.copyWith(fontWeight: FontWeight.w600),
                       ),
                       Text(
                         '${(proof.sizeBytes / 1024).toStringAsFixed(1)} KB',
-                        style: textTheme.labelSmall?.copyWith(color: tokens.textSecondary),
+                        style: textTheme.labelSmall
+                            ?.copyWith(color: tokens.textSecondary),
                       ),
                     ],
                   ),
@@ -847,7 +912,8 @@ class _CompletionSheetState extends ConsumerState<_CompletionSheet> {
               Expanded(
                 child: OutlinedButton.icon(
                   key: const Key('completion_take_photo'),
-                  onPressed: _capturing ? null : () => _capture(ImageSource.camera),
+                  onPressed:
+                      _capturing ? null : () => _capture(ImageSource.camera),
                   icon: _capturing
                       ? const SizedBox(
                           width: 16,
@@ -862,7 +928,8 @@ class _CompletionSheetState extends ConsumerState<_CompletionSheet> {
               Expanded(
                 child: OutlinedButton.icon(
                   key: const Key('completion_pick_photo'),
-                  onPressed: _capturing ? null : () => _capture(ImageSource.gallery),
+                  onPressed:
+                      _capturing ? null : () => _capture(ImageSource.gallery),
                   icon: const Icon(Icons.photo_library_outlined, size: 18),
                   label: const Text('Gallery'),
                 ),
@@ -885,9 +952,10 @@ class _CompletionSheetState extends ConsumerState<_CompletionSheet> {
     final entries = _remarksKey.currentState?.commitPending() ?? const [];
     final remarks = joinNumberedList(entries);
     if (entries.isEmpty ||
-        remarks.trim().length < ChecklistController.minCompletionRemarksLength) {
-      setState(() =>
-          _remarksError = 'Add at least one remark (10+ characters).');
+        remarks.trim().length <
+            ChecklistController.minCompletionRemarksLength) {
+      setState(
+          () => _remarksError = 'Add at least one remark (10+ characters).');
       return;
     }
     if (!formOk) return;
@@ -948,8 +1016,9 @@ class _ReasonDialogState extends State<_ReasonDialog> {
         ),
         FilledButton(
           key: const Key('group_uncheck_reason_confirm'),
-          onPressed:
-              empty ? null : () => Navigator.of(context).pop(_controller.text.trim()),
+          onPressed: empty
+              ? null
+              : () => Navigator.of(context).pop(_controller.text.trim()),
           child: const Text('Un-check'),
         ),
       ],
@@ -958,7 +1027,8 @@ class _ReasonDialogState extends State<_ReasonDialog> {
 }
 
 class _SheetNotice extends StatelessWidget {
-  const _SheetNotice({required this.tone, required this.icon, required this.text});
+  const _SheetNotice(
+      {required this.tone, required this.icon, required this.text});
 
   final GssmsTone tone;
   final IconData icon;
@@ -1015,7 +1085,8 @@ class _PreviewSheet extends StatelessWidget {
                 Icon(Icons.remove_red_eye_outlined, color: tokens.link),
                 const SizedBox(width: GssmsSpacing.s8),
                 Expanded(
-                  child: Text('Checklist Summary Preview', style: textTheme.titleMedium),
+                  child: Text('Checklist Summary Preview',
+                      style: textTheme.titleMedium),
                 ),
                 IconButton(
                   icon: const Icon(Icons.close),
@@ -1059,15 +1130,19 @@ class _PreviewSheet extends StatelessWidget {
                       line.valueType.isMultiPart
                           ? 'Readings: ${line.componentValues.entries.map((e) => "${e.key}: ${e.value}").join(", ")}'
                           : 'Status: ${line.status} ${line.scalarValue.isNotEmpty ? "(${line.scalarValue})" : ""}',
-                      style: textTheme.bodySmall?.copyWith(color: tokens.textSecondary),
+                      style: textTheme.bodySmall
+                          ?.copyWith(color: tokens.textSecondary),
                     ),
                     trailing: Icon(
-                      line.isCompleted ? Icons.check_circle : Icons.radio_button_unchecked,
+                      line.isCompleted
+                          ? Icons.check_circle
+                          : Icons.radio_button_unchecked,
                       color: line.isCompleted
                           ? tokens.success.foreground
                           : tokens.textTertiary,
                       size: GssmsSize.iconMd,
-                      semanticLabel: line.isCompleted ? 'Recorded' : 'Not recorded',
+                      semanticLabel:
+                          line.isCompleted ? 'Recorded' : 'Not recorded',
                     ),
                   );
                 },
