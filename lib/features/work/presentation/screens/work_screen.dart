@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/theme/app_theme.dart';
+import '../../../../core/theme/gssms_spacing.dart';
 import '../../../auth/domain/models/user_session.dart';
 import '../../../auth/domain/rbac.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
@@ -16,80 +16,125 @@ import '../../../work_orders/presentation/screens/work_order_list_screen.dart';
 /// - Inspections (`inspections.view`)
 /// - Deficiencies (`assets.view`)
 ///
-/// Uses a [TabBar] when multiple streams are permitted, or renders the single
-/// permitted stream directly without tab chrome.
-class WorkScreen extends ConsumerWidget {
+/// Uses an inline filter-pill row ([ChoiceChip]s) when multiple streams are permitted,
+/// or renders the single permitted stream directly without tab chrome.
+class WorkScreen extends ConsumerStatefulWidget {
   const WorkScreen({super.key, this.session});
 
   final UserSession? session;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final effectiveSession =
-        session ?? sessionFromAuth(ref.watch(authControllerProvider));
+  ConsumerState<WorkScreen> createState() => _WorkScreenState();
+}
 
-    final tabs = <Tab>[];
-    final views = <Widget>[];
+class _WorkScreenState extends ConsumerState<WorkScreen> {
+  int _selectedIndex = 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final effectiveSession =
+        widget.session ?? sessionFromAuth(ref.watch(authControllerProvider));
+
+    final items = <_WorkStreamItem>[];
 
     if (sessionAllows(effectiveSession, 'maintenance.view')) {
-      tabs.add(const Tab(
-        text: 'Job Works',
-        icon: Icon(Icons.assignment_outlined),
+      items.add(const _WorkStreamItem(
+        label: 'Job Works',
+        icon: Icons.assignment_outlined,
+        widget: WorkOrderListScreen(isEmbedded: true),
       ));
-      views.add(const WorkOrderListScreen(isEmbedded: true));
     }
     if (sessionAllows(effectiveSession, 'complaints.view')) {
-      tabs.add(const Tab(
-        text: 'Breakdowns',
-        icon: Icon(Icons.report_problem_outlined),
+      items.add(const _WorkStreamItem(
+        label: 'Breakdowns',
+        icon: Icons.report_problem_outlined,
+        widget: ComplaintListScreen(isEmbedded: true),
       ));
-      views.add(const ComplaintListScreen(isEmbedded: true));
     }
     if (sessionAllows(effectiveSession, 'inspections.view')) {
-      tabs.add(const Tab(
-        text: 'Inspections',
-        icon: Icon(Icons.fact_check_outlined),
+      items.add(const _WorkStreamItem(
+        label: 'Inspections',
+        icon: Icons.fact_check_outlined,
+        widget: InspectionListScreen(isEmbedded: true),
       ));
-      views.add(const InspectionListScreen(isEmbedded: true));
     }
     if (canViewDeficiencyModule(effectiveSession)) {
-      tabs.add(const Tab(
-        text: 'Deficiencies',
-        icon: Icon(Icons.rule_outlined),
+      items.add(const _WorkStreamItem(
+        label: 'Deficiencies',
+        icon: Icons.rule_outlined,
+        widget: DeficiencyListScreen(isEmbedded: true),
       ));
-      views.add(const DeficiencyListScreen(isEmbedded: true));
     }
 
-    if (tabs.isEmpty) {
+    if (items.isEmpty) {
       return Scaffold(
         appBar: AppBar(title: const Text('Work')),
         body: const PermissionDeniedView(),
       );
     }
 
-    if (tabs.length == 1) {
+    if (items.length == 1) {
       return Scaffold(
-        body: views.first,
+        body: items.first.widget,
       );
     }
 
-    return DefaultTabController(
-      length: tabs.length,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Work Hub'),
-          bottom: TabBar(
-            tabs: tabs,
-            isScrollable: tabs.length > 3,
-            indicatorColor: AppTheme.accentOrange,
-            labelColor: Colors.white,
-            unselectedLabelColor: Colors.white70,
+    final currentIndex = _selectedIndex.clamp(0, items.length - 1);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Work Hub'),
+      ),
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(
+              horizontal: GssmsSpacing.s16,
+              vertical: GssmsSpacing.s8,
+            ),
+            child: Row(
+              children: [
+                for (int i = 0; i < items.length; i++)
+                  Padding(
+                    padding: EdgeInsets.only(
+                      right: i < items.length - 1 ? GssmsSpacing.s8 : 0,
+                    ),
+                    child: ChoiceChip(
+                      avatar: Icon(items[i].icon, size: 18),
+                      label: Text(items[i].label),
+                      selected: currentIndex == i,
+                      onSelected: (selected) {
+                        if (selected) {
+                          setState(() => _selectedIndex = i);
+                        }
+                      },
+                    ),
+                  ),
+              ],
+            ),
           ),
-        ),
-        body: TabBarView(
-          children: views,
-        ),
+          Expanded(
+            child: IndexedStack(
+              index: currentIndex,
+              children: items.map((e) => e.widget).toList(),
+            ),
+          ),
+        ],
       ),
     );
   }
+}
+
+class _WorkStreamItem {
+  const _WorkStreamItem({
+    required this.label,
+    required this.icon,
+    required this.widget,
+  });
+
+  final String label;
+  final IconData icon;
+  final Widget widget;
 }

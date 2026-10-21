@@ -136,9 +136,8 @@ void main() {
       expect(find.text('Deficiencies'), findsOneWidget);
       expect(find.text('Complaints'), findsNothing);
 
-      final tabBar = tester.widget<TabBar>(find.byType(TabBar));
-      expect(tabBar.isScrollable, isTrue);
-      expect(tabBar.tabs.length, 4);
+      expect(find.byType(TabBar), findsNothing);
+      expect(find.byType(ChoiceChip), findsNWidgets(4));
     });
 
     testWidgets('hides Deficiencies tab without assets.view permission',
@@ -160,9 +159,8 @@ void main() {
       expect(find.text('Inspections'), findsOneWidget);
       expect(find.text('Deficiencies'), findsNothing);
 
-      final tabBar = tester.widget<TabBar>(find.byType(TabBar));
-      expect(tabBar.isScrollable, isFalse);
-      expect(tabBar.tabs.length, 3);
+      expect(find.byType(TabBar), findsNothing);
+      expect(find.byType(ChoiceChip), findsNWidgets(3));
     });
 
     testWidgets(
@@ -204,8 +202,8 @@ void main() {
       expect(find.text('Work Hub'), findsOneWidget);
       expect(find.text('Job Works'), findsOneWidget);
       expect(find.text('Deficiencies'), findsOneWidget);
-      final tabBar = tester.widget<TabBar>(find.byType(TabBar));
-      expect(tabBar.tabs.length, 2);
+      expect(find.byType(TabBar), findsNothing);
+      expect(find.byType(ChoiceChip), findsNWidgets(2));
     });
 
     testWidgets('single-tab rule: shows Deficiencies screen directly without TabBar when only assets.view',
