@@ -382,8 +382,23 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       if (tasks.length > 8) {
         rows.add(Padding(
           padding: const EdgeInsets.only(top: 4),
-          child: Text('+${tasks.length - 8} more in the work queues',
-              style: TextStyle(fontSize: 12, color: context.gssms.textSecondary)),
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              key: const Key('dashboard_pending_actions_more_button'),
+              onPressed: canWorkOrders
+                  ? () => openList(const WorkOrderListScreen())
+                  : null,
+              icon: const Icon(Icons.arrow_forward, size: 14),
+              label: Text(
+                '+${tasks.length - 8} more in the work queues',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: canWorkOrders ? context.gssms.link : context.gssms.textSecondary,
+                ),
+              ),
+            ),
+          ),
         ));
       }
     } else {

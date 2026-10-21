@@ -10,10 +10,15 @@ import 'package:gssms_mobile/features/dashboard/domain/models/dashboard_models.d
 import 'package:gssms_mobile/features/dashboard/presentation/controllers/dashboard_controller.dart';
 import 'package:gssms_mobile/features/dashboard/presentation/screens/dashboard_screen.dart';
 import 'package:gssms_mobile/features/dashboard/presentation/widgets/dashboard_skeleton.dart';
+import 'package:gssms_mobile/features/work_orders/data/work_order_repository.dart';
+import 'package:gssms_mobile/features/work_orders/domain/models/work_order.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/screens/work_order_detail_screen.dart';
+import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_order_controllers.dart';
+import 'package:gssms_mobile/features/work_orders/presentation/screens/work_order_list_screen.dart';
 import '../../../helpers/fake_auth.dart';
 
 class MockDashboardRepository extends Mock implements IDashboardRepository {}
+class MockWorkOrderRepository extends Mock implements IWorkOrderRepository {}
 
 void main() {
   late MockDashboardRepository mockRepo;
@@ -273,6 +278,58 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(WorkOrderDetailScreen), findsNothing);
+    });
+
+    testWidgets('shows tappable "+X more in the work queues" button and navigates to WorkOrderListScreen',
+        (tester) async {
+      final mockWoRepo = MockWorkOrderRepository();
+      when(() => mockWoRepo.fetchWorkOrders()).thenAnswer((_) async => const <WorkOrder>[]);
+      final tasks = List.generate(
+        10,
+        (i) => PendingAction(
+          id: i + 1,
+          kind: PendingActionKind.verification,
+          title: 'Action #$i',
+          workOrderId: 100 + i,
+        ),
+      );
+      when(() => mockRepo.fetchAttention())
+          .thenAnswer((_) async => const AttentionSummary());
+      when(() => mockRepo.fetchSummary()).thenAnswer(
+        (_) async => DashboardSummary(
+          stats: const DashboardStats(),
+          pendingTasks: tasks,
+        ),
+      );
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            dashboardRepositoryProvider.overrideWithValue(mockRepo),
+            workOrderRepositoryProvider.overrideWithValue(mockWoRepo),
+            authControllerProvider.overrideWith(
+              () => FakeAuthenticatedController(fakeSession(
+                permissions: const ['dashboard.view', 'maintenance.view'],
+              )),
+            ),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.lightTheme,
+            home: const DashboardScreen(),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final moreFinder = find.byKey(const Key('dashboard_pending_actions_more_button'));
+      await tester.scrollUntilVisible(moreFinder, 300,
+          scrollable: find.byType(Scrollable).first);
+      await tester.pumpAndSettle();
+
+      expect(moreFinder, findsOneWidget);
+      expect(find.text('+2 more in the work queues'), findsOneWidget);
+      await tester.tap(moreFinder);
+      await tester.pumpAndSettle();
+      expect(find.byType(WorkOrderListScreen), findsOneWidget);
     });
 
     testWidgets('DashboardLoading state renders DashboardSkeleton', (tester) async {
