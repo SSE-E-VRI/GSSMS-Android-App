@@ -32,8 +32,7 @@ class WorkOrderCreateScreen extends ConsumerStatefulWidget {
       _WorkOrderCreateScreenState();
 }
 
-class _WorkOrderCreateScreenState
-    extends ConsumerState<WorkOrderCreateScreen> {
+class _WorkOrderCreateScreenState extends ConsumerState<WorkOrderCreateScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
@@ -67,7 +66,8 @@ class _WorkOrderCreateScreenState
   List<MaintenanceMaster> _templates = const [];
   bool _loadingTemplates = false;
   MaintenanceScheduleType? _templateScheduleFilter;
-  MaintenanceTemplateKind _templateKindFilter = MaintenanceTemplateKind.assetTemplate;
+  MaintenanceTemplateKind _templateKindFilter =
+      MaintenanceTemplateKind.assetTemplate;
   int? _selectedMaintenanceMasterId;
   int _loadSeq = 0;
 
@@ -138,8 +138,8 @@ class _WorkOrderCreateScreenState
       _bootstrapped = true;
     });
     if (_canSelectDepot) {
-      unawaited(_loadDepots(
-          zoneId: scope.zone?.id, divisionId: scope.division?.id));
+      unawaited(
+          _loadDepots(zoneId: scope.zone?.id, divisionId: scope.division?.id));
     }
     unawaited(_loadLocations());
     unawaited(_loadTemplates());
@@ -257,7 +257,8 @@ class _WorkOrderCreateScreenState
   }
 
   Future<void> _submit() async {
-    if (!canCreateWorkOrder(sessionFromAuth(ref.read(authControllerProvider)))) {
+    if (!canCreateWorkOrder(
+        sessionFromAuth(ref.read(authControllerProvider)))) {
       if (mounted) {
         showPermissionDeniedSnackBar(context);
       }
@@ -416,17 +417,17 @@ class _WorkOrderCreateScreenState
                             const SizedBox(height: 14),
                             _label('Title / Subject',
                                 required: true,
-                                tooltip: 'A short summary of the work to be done.'),
+                                tooltip:
+                                    'A short summary of the work to be done.'),
                             const SizedBox(height: 6),
                             TextFormField(
                               key: const Key('wo_title_field'),
                               controller: _titleController,
-                              decoration: _input(
-                                  'e.g. Station monthly maintenance'),
-                              validator: (v) =>
-                                  v == null || v.trim().isEmpty
-                                      ? 'Please enter a title'
-                                      : null,
+                              decoration:
+                                  _input('e.g. Station monthly maintenance'),
+                              validator: (v) => v == null || v.trim().isEmpty
+                                  ? 'Please enter a title'
+                                  : null,
                             ),
                             const SizedBox(height: 14),
                             Row(
@@ -476,12 +477,12 @@ class _WorkOrderCreateScreenState
                                         CrossAxisAlignment.start,
                                     children: [
                                       _label('Priority',
-                                          tooltip: 'How urgently this Job Work should be actioned.'),
+                                          tooltip:
+                                              'How urgently this Job Work should be actioned.'),
                                       const SizedBox(height: 6),
                                       DropdownButtonFormField<
                                           WorkOrderPriority>(
-                                        key: const Key(
-                                            'wo_priority_dropdown'),
+                                        key: const Key('wo_priority_dropdown'),
                                         isExpanded: true,
                                         value: _priority,
                                         decoration: _input(),
@@ -494,8 +495,7 @@ class _WorkOrderCreateScreenState
                                             .toList(),
                                         onChanged: (p) {
                                           if (p != null) {
-                                            setState(
-                                                () => _priority = p);
+                                            setState(() => _priority = p);
                                           }
                                         },
                                       ),
@@ -510,7 +510,8 @@ class _WorkOrderCreateScreenState
                             _templateCard(),
                             const SizedBox(height: 14),
                             _label('Due Date (Optional)',
-                                tooltip: 'The date this work is scheduled to be completed by.'),
+                                tooltip:
+                                    'The date this work is scheduled to be completed by.'),
                             const SizedBox(height: 6),
                             InkWell(
                               key: const Key('wo_due_date_field'),
@@ -519,18 +520,16 @@ class _WorkOrderCreateScreenState
                               child: InputDecorator(
                                 decoration: _input().copyWith(
                                   suffixIcon: _dueDate == null
-                                      ? Icon(
-                                          Icons.calendar_today_outlined,
+                                      ? Icon(Icons.calendar_today_outlined,
                                           size: 18,
                                           color: context.gssms.textSecondary)
                                       : IconButton(
-                                          key: const Key(
-                                              'wo_due_date_clear'),
+                                          key: const Key('wo_due_date_clear'),
                                           tooltip: 'Clear due date',
-                                          icon: const Icon(Icons.clear,
-                                              size: 18),
-                                          onPressed: () => setState(
-                                              () => _dueDate = null),
+                                          icon:
+                                              const Icon(Icons.clear, size: 18),
+                                          onPressed: () =>
+                                              setState(() => _dueDate = null),
                                         ),
                                 ),
                                 child: Text(
@@ -613,8 +612,7 @@ class _WorkOrderCreateScreenState
 
   InputDecoration _input([String? hint]) => InputDecoration(
         hintText: hint,
-        hintStyle:
-            TextStyle(color: context.gssms.textSecondary, fontSize: 14),
+        hintStyle: TextStyle(color: context.gssms.textSecondary, fontSize: 14),
         filled: true,
         fillColor: Theme.of(context).inputDecorationTheme.fillColor,
         contentPadding:
@@ -673,8 +671,7 @@ class _WorkOrderCreateScreenState
         children: [
           Row(
             children: [
-              Icon(Icons.location_on,
-                  color: context.gssms.link, size: 16),
+              Icon(Icons.location_on, color: context.gssms.link, size: 16),
               const SizedBox(width: 6),
               Flexible(
                 child: Text('Location & Asset (Optional)',
@@ -714,7 +711,8 @@ class _WorkOrderCreateScreenState
             },
           ),
           const SizedBox(height: 12),
-          _label('Location Name', tooltip: 'The specific site this Job Work applies to.'),
+          _label('Location Name',
+              tooltip: 'The specific site this Job Work applies to.'),
           const SizedBox(height: 6),
           DropdownButtonFormField<int>(
             key: const Key('wo_location_dropdown'),
@@ -729,8 +727,7 @@ class _WorkOrderCreateScreenState
                       child: SizedBox(
                           width: 14,
                           height: 14,
-                          child:
-                              CircularProgressIndicator(strokeWidth: 2)))
+                          child: CircularProgressIndicator(strokeWidth: 2)))
                   : null,
             ),
             items: _locations
@@ -748,7 +745,8 @@ class _WorkOrderCreateScreenState
                   },
           ),
           const SizedBox(height: 12),
-          _label('Asset Category', tooltip: 'Filters the Specific Asset list below by category.'),
+          _label('Asset Category',
+              tooltip: 'Filters the Specific Asset list below by category.'),
           const SizedBox(height: 6),
           DropdownButtonFormField<String>(
             key: const Key('wo_asset_category_dropdown'),
@@ -760,8 +758,8 @@ class _WorkOrderCreateScreenState
             items: [
               const DropdownMenuItem<String>(
                   value: null, child: Text('-- All Categories --')),
-              ..._categories.map((c) => DropdownMenuItem(
-                  value: c, child: Text(c))),
+              ..._categories
+                  .map((c) => DropdownMenuItem(value: c, child: Text(c))),
             ],
             onChanged: (_selectedLocationId == null || _assets.isEmpty)
                 ? null
@@ -785,26 +783,22 @@ class _WorkOrderCreateScreenState
             value: _filteredAssets.any((a) => a.id == _selectedAssetId)
                 ? _selectedAssetId
                 : null,
-            decoration:
-                _input('-- Generic / Location Work --').copyWith(
+            decoration: _input('-- Generic / Location Work --').copyWith(
               suffixIcon: _loadingAssets
                   ? const Padding(
                       padding: EdgeInsets.all(10),
                       child: SizedBox(
                           width: 14,
                           height: 14,
-                          child:
-                              CircularProgressIndicator(strokeWidth: 2)))
+                          child: CircularProgressIndicator(strokeWidth: 2)))
                   : null,
             ),
             items: [
               const DropdownMenuItem<int>(
-                  value: null,
-                  child: Text('-- Generic / Location Work --')),
+                  value: null, child: Text('-- Generic / Location Work --')),
               ..._filteredAssets.map((a) => DropdownMenuItem(
                   value: a.id,
-                  child: Text(a.uniqueId,
-                      overflow: TextOverflow.ellipsis))),
+                  child: Text(a.uniqueId, overflow: TextOverflow.ellipsis))),
             ],
             onChanged: _selectedLocationId == null
                 ? null
@@ -898,7 +892,8 @@ class _WorkOrderCreateScreenState
             ),
           ),
           const SizedBox(height: 12),
-          _label('Filter by schedule type', tooltip: 'How often this checklist is meant to run.'),
+          _label('Filter by schedule type',
+              tooltip: 'How often this checklist is meant to run.'),
           const SizedBox(height: 6),
           DropdownButtonFormField<MaintenanceScheduleType?>(
             key: const Key('wo_template_schedule_dropdown'),
@@ -982,8 +977,7 @@ class _WorkOrderCreateScreenState
             style: OutlinedButton.styleFrom(
               foregroundColor: context.gssms.textSecondary,
               side: BorderSide(color: context.gssms.border),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8)),
               minimumSize: const Size(0, 48),
@@ -994,8 +988,8 @@ class _WorkOrderCreateScreenState
             icon: const Icon(Icons.close, size: 16),
             label: const FittedBox(
               fit: BoxFit.scaleDown,
-              child: Text('Cancel',
-                  style: TextStyle(fontWeight: FontWeight.w600)),
+              child:
+                  Text('Cancel', style: TextStyle(fontWeight: FontWeight.w600)),
             ),
           ),
         ),
@@ -1007,8 +1001,7 @@ class _WorkOrderCreateScreenState
             style: ElevatedButton.styleFrom(
               backgroundColor: _band,
               foregroundColor: _onBand,
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8)),
               elevation: 2,
@@ -1022,13 +1015,12 @@ class _WorkOrderCreateScreenState
                     height: 16,
                     child: CircularProgressIndicator(
                         color: _onBand, strokeWidth: 2))
-                : const Icon(Icons.add_task_outlined,
-                    size: 16),
+                : const Icon(Icons.add_task_outlined, size: 16),
             label: FittedBox(
               fit: BoxFit.scaleDown,
               child: Text(_isSubmitting ? 'Creating...' : 'Create Job Work',
-                  style:
-                      const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 14)),
             ),
           ),
         ),

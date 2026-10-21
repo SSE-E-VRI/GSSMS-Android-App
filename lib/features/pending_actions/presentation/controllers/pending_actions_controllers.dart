@@ -70,7 +70,9 @@ PendingBucket? scheduleBucket(MaintenanceSchedule s) {
 /// Work -> in progress; converted + VERIFIED Job Work -> awaiting closure.
 PendingBucket? complaintBucket(Complaint c) {
   if (!c.isConverted) {
-    return c.status != ComplaintStatus.closed ? PendingBucket.needsAction : null;
+    return c.status != ComplaintStatus.closed
+        ? PendingBucket.needsAction
+        : null;
   }
   if (_woStatusIs(c.workOrderStatus, 'VERIFIED')) {
     return PendingBucket.awaitingClosure;
@@ -108,7 +110,8 @@ PendingBucket inspectionBucket(Inspection i) {
 
 /// Web `utils/deficiencyBucket.js`.
 PendingBucket deficiencyBucket(Deficiency d) {
-  if (d.status == DeficiencyStatus.resolved) return PendingBucket.awaitingClosure;
+  if (d.status == DeficiencyStatus.resolved)
+    return PendingBucket.awaitingClosure;
   if (d.hasActiveRemedial || d.status == DeficiencyStatus.inProgress) {
     return PendingBucket.inProgress;
   }
@@ -137,7 +140,8 @@ List<Complaint> filterComplaints(
 List<Inspection> filterInspections(
         List<Inspection> inspections, PendingSubFilter f) =>
     inspections
-        .where((i) => inspectionIsActive(i) && _matchesSub(f, inspectionBucket(i)))
+        .where(
+            (i) => inspectionIsActive(i) && _matchesSub(f, inspectionBucket(i)))
         .toList();
 
 List<Deficiency> filterDeficiencies(
@@ -404,8 +408,7 @@ class PendingActionsController extends Notifier<PendingActionsState> {
       };
       state = state.copyWith(
         converting: false,
-        actionMessage:
-            _batchMessage(tab, result),
+        actionMessage: _batchMessage(tab, result),
       );
       await load();
       return true;
@@ -430,9 +433,7 @@ class PendingActionsController extends Notifier<PendingActionsState> {
     final first = failures.first;
     final reason = first.error ??
         (first.code != null ? 'refused (${first.code})' : 'skipped');
-    final extra = failures.length > 1
-        ? ' (+${failures.length - 1} more)'
-        : '';
+    final extra = failures.length > 1 ? ' (+${failures.length - 1} more)' : '';
     return '$created ${failures.length} skipped: $reason$extra';
   }
 }

@@ -64,7 +64,8 @@ void main() {
             'created': false,
             'work_order_id': null,
             'code': 'ASSET_NO_LONGER_ELIGIBLE',
-            'error': 'Asset VRI-PMP-CLS-TRN-001 is archived and can no longer receive preventive maintenance.',
+            'error':
+                'Asset VRI-PMP-CLS-TRN-001 is archived and can no longer receive preventive maintenance.',
             'existing_ticket': null,
           },
         ],

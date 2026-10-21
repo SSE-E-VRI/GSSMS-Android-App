@@ -170,6 +170,7 @@ class WorkOrder extends Equatable {
 
   /// Checklist version frozen at execution time (see above).
   final String? maintenanceMasterVersionSnapshot;
+
   /// S7: frozen template name as of WO creation (survives template rename).
   final String? maintenanceMasterNameSnapshot;
 
@@ -229,7 +230,8 @@ class WorkOrder extends Equatable {
 
   String get displayTitle {
     if (title != null && title!.trim().isNotEmpty) return title!;
-    if (maintenanceMasterName != null && maintenanceMasterName!.trim().isNotEmpty) {
+    if (maintenanceMasterName != null &&
+        maintenanceMasterName!.trim().isNotEmpty) {
       return maintenanceMasterName!;
     }
     final asset = assetName ?? infrastructureName ?? stationName ?? 'Asset';

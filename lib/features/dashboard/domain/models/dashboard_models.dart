@@ -29,11 +29,15 @@ class AttentionItem extends Equatable {
   factory AttentionItem.fromJson(Map<String, dynamic> json) {
     return AttentionItem(
       id: asJsonInt(json['id']) ?? 0,
-      masterName: asJsonString(json['master_name']) ?? asJsonString(json['name']) ?? 'Schedule Item',
+      masterName: asJsonString(json['master_name']) ??
+          asJsonString(json['name']) ??
+          'Schedule Item',
       stationName: asJsonString(json['station_name']),
       depotName: asJsonString(json['depot_name']),
-      dueDate: json['due_date'] != null ? asJsonDateTime(json['due_date']) : null,
-      daysOverdue: asJsonInt(json['days_overdue']) ?? asJsonInt(json['days_pending']),
+      dueDate:
+          json['due_date'] != null ? asJsonDateTime(json['due_date']) : null,
+      daysOverdue:
+          asJsonInt(json['days_overdue']) ?? asJsonInt(json['days_pending']),
       priority: asJsonString(json['priority']),
       assetId: asJsonInt(json['asset_id']),
       assetName: asJsonString(json['asset_name']),
@@ -67,13 +71,24 @@ class AttentionSummary extends Equatable {
 
   factory AttentionSummary.fromJson(Map<String, dynamic> json) {
     final rawOverdue = json['overdue'] as List<dynamic>? ?? const [];
-    final rawDueSoon = (json['due_within_7d'] ?? json['due_soon']) as List<dynamic>? ?? const [];
+    final rawDueSoon =
+        (json['due_within_7d'] ?? json['due_soon']) as List<dynamic>? ??
+            const [];
     final rawUpcoming = json['upcoming'] as List<dynamic>? ?? const [];
 
     return AttentionSummary(
-      overdue: rawOverdue.whereType<Map<String, dynamic>>().map(AttentionItem.fromJson).toList(),
-      dueSoon: rawDueSoon.whereType<Map<String, dynamic>>().map(AttentionItem.fromJson).toList(),
-      upcoming: rawUpcoming.whereType<Map<String, dynamic>>().map(AttentionItem.fromJson).toList(),
+      overdue: rawOverdue
+          .whereType<Map<String, dynamic>>()
+          .map(AttentionItem.fromJson)
+          .toList(),
+      dueSoon: rawDueSoon
+          .whereType<Map<String, dynamic>>()
+          .map(AttentionItem.fromJson)
+          .toList(),
+      upcoming: rawUpcoming
+          .whereType<Map<String, dynamic>>()
+          .map(AttentionItem.fromJson)
+          .toList(),
     );
   }
 
@@ -94,7 +109,9 @@ class WorkOrderStatusSegment extends Equatable {
 
   factory WorkOrderStatusSegment.fromJson(Map<String, dynamic> json) {
     return WorkOrderStatusSegment(
-      label: asJsonString(json['label']) ?? asJsonString(json['status']) ?? 'Unknown',
+      label: asJsonString(json['label']) ??
+          asJsonString(json['status']) ??
+          'Unknown',
       count: asJsonInt(json['count']) ?? asJsonInt(json['total']) ?? 0,
       colorHex: asJsonString(json['color']),
     );
@@ -117,7 +134,9 @@ class MaintenanceTypeStat extends Equatable {
 
   factory MaintenanceTypeStat.fromJson(Map<String, dynamic> json) {
     return MaintenanceTypeStat(
-      label: asJsonString(json['label']) ?? asJsonString(json['type']) ?? 'General',
+      label: asJsonString(json['label']) ??
+          asJsonString(json['type']) ??
+          'General',
       count: asJsonInt(json['count']) ?? 0,
       percentage: asJsonDouble(json['percentage']) ?? 0.0,
     );
@@ -158,15 +177,24 @@ class DashboardStats extends Equatable {
     final rawTypeStats = json['type_stats'] as List<dynamic>? ?? const [];
 
     return DashboardStats(
-      totalWorkOrders: asJsonInt(json['total_work_orders']) ?? asJsonInt(json['total_job_works']) ?? 0,
+      totalWorkOrders: asJsonInt(json['total_work_orders']) ??
+          asJsonInt(json['total_job_works']) ??
+          0,
       complianceRate: asJsonDouble(json['compliance_rate']) ?? 0.0,
-      pendingVerificationCount: asJsonInt(json['pending_verification_count']) ?? 0,
+      pendingVerificationCount:
+          asJsonInt(json['pending_verification_count']) ?? 0,
       pendingTaskCount: asJsonInt(json['pending_task_count']) ?? 0,
       scheduledTaskCount: asJsonInt(json['scheduled_task_count']),
       openComplaintCount: asJsonInt(json['open_complaint_count']) ?? 0,
       inspectionCount: asJsonInt(json['inspection_count']) ?? 0,
-      statusSegments: rawSegments.whereType<Map<String, dynamic>>().map(WorkOrderStatusSegment.fromJson).toList(),
-      typeStats: rawTypeStats.whereType<Map<String, dynamic>>().map(MaintenanceTypeStat.fromJson).toList(),
+      statusSegments: rawSegments
+          .whereType<Map<String, dynamic>>()
+          .map(WorkOrderStatusSegment.fromJson)
+          .toList(),
+      typeStats: rawTypeStats
+          .whereType<Map<String, dynamic>>()
+          .map(MaintenanceTypeStat.fromJson)
+          .toList(),
     );
   }
 
@@ -240,15 +268,13 @@ class PendingAction extends Equatable {
   /// Backing row of a breakdown (corrective) job, not a scheduled task.
   final bool isBreakdown;
 
-  static int? _fkId(dynamic v) =>
-      v is Map ? asJsonInt(v['id']) : asJsonInt(v);
+  static int? _fkId(dynamic v) => v is Map ? asJsonInt(v['id']) : asJsonInt(v);
 
   factory PendingAction.fromJson(Map<String, dynamic> json) {
     final workOrderId =
         _fkId(json['work_order_id'] ?? json['work_order'] ?? json['wo_id']);
     final complaintId = _fkId(json['complaint_id'] ?? json['complaint']);
-    final inspectionId =
-        _fkId(json['inspection_id'] ?? json['inspection']);
+    final inspectionId = _fkId(json['inspection_id'] ?? json['inspection']);
     return PendingAction(
       id: asJsonInt(json['id']) ??
           workOrderId ??
@@ -257,12 +283,11 @@ class PendingAction extends Equatable {
           0,
       kind: PendingActionKind.fromString(asJsonString(
           json['kind'] ?? json['type'] ?? json['action'] ?? json['category'])),
-      title: asJsonString(
-              json['title'] ??
-                  json['name'] ??
-                  json['label'] ??
-                  json['subject'] ??
-                  json['ticket_number']) ??
+      title: asJsonString(json['title'] ??
+              json['name'] ??
+              json['label'] ??
+              json['subject'] ??
+              json['ticket_number']) ??
           'Pending action',
       subtitle: asJsonString(json['subtitle'] ??
           json['description'] ??

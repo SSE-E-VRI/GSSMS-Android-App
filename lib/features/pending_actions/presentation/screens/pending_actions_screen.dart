@@ -37,8 +37,8 @@ class _PendingActionsScreenState extends ConsumerState<PendingActionsScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      if (!sessionAllows(
-          sessionFromAuth(ref.read(authControllerProvider)), 'maintenance.view')) {
+      if (!sessionAllows(sessionFromAuth(ref.read(authControllerProvider)),
+          'maintenance.view')) {
         return;
       }
       ref.read(pendingActionsControllerProvider.notifier).load();
@@ -99,13 +99,19 @@ class _PendingActionsScreenState extends ConsumerState<PendingActionsScreen> {
             unselectedLabelColor: Colors.white70,
             indicatorColor: Colors.white,
             indicatorWeight: 3,
-            labelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-            unselectedLabelStyle: const TextStyle(fontSize: 11, fontWeight: FontWeight.normal),
+            labelStyle:
+                const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+            unselectedLabelStyle:
+                const TextStyle(fontSize: 11, fontWeight: FontWeight.normal),
             tabs: [
-              _tab(Icons.event_repeat, 'Schedules', state.filteredSchedules.length),
-              _tab(Icons.campaign_outlined, 'Breakdowns', state.filteredComplaints.length),
-              _tab(Icons.note_add_outlined, 'Inspections', state.filteredInspections.length),
-              _tab(Icons.report_problem_outlined, 'Deficiencies', state.filteredDeficiencies.length),
+              _tab(Icons.event_repeat, 'Schedules',
+                  state.filteredSchedules.length),
+              _tab(Icons.campaign_outlined, 'Breakdowns',
+                  state.filteredComplaints.length),
+              _tab(Icons.note_add_outlined, 'Inspections',
+                  state.filteredInspections.length),
+              _tab(Icons.report_problem_outlined, 'Deficiencies',
+                  state.filteredDeficiencies.length),
             ],
           ),
         ),
@@ -150,7 +156,8 @@ class _PendingActionsScreenState extends ConsumerState<PendingActionsScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.error_outline, size: 48, color: context.gssms.danger.foreground),
+            Icon(Icons.error_outline,
+                size: 48, color: context.gssms.danger.foreground),
             const SizedBox(height: 12),
             Text(message, textAlign: TextAlign.center),
             const SizedBox(height: 16),
@@ -227,7 +234,8 @@ class _SubFilterBar extends ConsumerWidget {
         PendingSubFilter.all => 'pending_subfilter_all',
         PendingSubFilter.needsAction => 'pending_subfilter_needs_action',
         PendingSubFilter.inProgress => 'pending_subfilter_in_progress',
-        PendingSubFilter.awaitingClosure => 'pending_subfilter_awaiting_closure',
+        PendingSubFilter.awaitingClosure =>
+          'pending_subfilter_awaiting_closure',
       };
 }
 
@@ -264,17 +272,18 @@ class _ConvertibleListScaffold extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final converting =
-        ref.watch(pendingActionsControllerProvider).converting;
+    final converting = ref.watch(pendingActionsControllerProvider).converting;
 
     if (itemCount == 0) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.check_circle_outline, size: 56, color: context.gssms.success.foreground),
+            Icon(Icons.check_circle_outline,
+                size: 56, color: context.gssms.success.foreground),
             const SizedBox(height: 12),
-            Text(emptyLabel, style: TextStyle(color: context.gssms.textSecondary)),
+            Text(emptyLabel,
+                style: TextStyle(color: context.gssms.textSecondary)),
           ],
         ),
       );
@@ -336,41 +345,43 @@ class _ConvertibleListScaffold extends ConsumerWidget {
                                       .read(pendingActionsControllerProvider
                                           .notifier)
                                       .convertSelected(tab);
-                          final message = ref
-                              .read(pendingActionsControllerProvider)
-                              .actionMessage;
-                          if (context.mounted && message != null) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(message),
-                                backgroundColor:
-                                    ok ? context.gssms.success.foreground : context.gssms.danger.foreground,
-                              ),
-                            );
-                          }
-                        },
-                  icon: converting
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                              color: Colors.white, strokeWidth: 2))
-                      : const Icon(Icons.gpp_good_outlined, size: 18),
-                  label: Text(converting
-                      ? 'Creating...'
-                      : 'Create $selectedCount $actionNoun${selectedCount == 1 ? '' : 's'}'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Theme.of(context).colorScheme.primary,
-                    foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
+                              final message = ref
+                                  .read(pendingActionsControllerProvider)
+                                  .actionMessage;
+                              if (context.mounted && message != null) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(message),
+                                    backgroundColor: ok
+                                        ? context.gssms.success.foreground
+                                        : context.gssms.danger.foreground,
+                                  ),
+                                );
+                              }
+                            },
+                      icon: converting
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(
+                                  color: Colors.white, strokeWidth: 2))
+                          : const Icon(Icons.gpp_good_outlined, size: 18),
+                      label: Text(converting
+                          ? 'Creating...'
+                          : 'Create $selectedCount $actionNoun${selectedCount == 1 ? '' : 's'}'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Theme.of(context).colorScheme.primary,
+                        foregroundColor:
+                            Theme.of(context).colorScheme.onPrimary,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
-      ),
-    ],
+      ],
     );
   }
 }
@@ -391,8 +402,8 @@ class _SchedulesTab extends ConsumerWidget {
       itemCount: schedules.length,
       selectedCount: state.selectedScheduleIds.length,
       canConvert: canConvert,
-      emptyLabel: _emptyText('No pending scheduled tasks.',
-          'scheduled tasks', state.subFilter),
+      emptyLabel: _emptyText(
+          'No pending scheduled tasks.', 'scheduled tasks', state.subFilter),
       itemBuilder: (context, index) {
         final s = schedules[index];
         final selected = state.selectedScheduleIds.contains(s.id);
@@ -432,8 +443,8 @@ class _SchedulesTab extends ConsumerWidget {
                     Icon(Icons.link,
                         color: context.gssms.success.foreground, size: 18))
                 : Chip(
-                    label: Text(statusLabel,
-                        style: const TextStyle(fontSize: 11)),
+                    label:
+                        Text(statusLabel, style: const TextStyle(fontSize: 11)),
                     visualDensity: VisualDensity.compact,
                   ),
           ),
@@ -474,8 +485,10 @@ class _ComplaintsTab extends ConsumerWidget {
                         .read(pendingActionsControllerProvider.notifier)
                         .toggleSelection(PendingActionTab.complaints, c.id),
                   )
-                : Icon(Icons.campaign_outlined, color: context.gssms.danger.foreground),
-            title: Text(c.title, style: const TextStyle(fontWeight: FontWeight.bold)),
+                : Icon(Icons.campaign_outlined,
+                    color: context.gssms.danger.foreground),
+            title: Text(c.title,
+                style: const TextStyle(fontWeight: FontWeight.bold)),
             subtitle: Text(
                 '${c.reference} • ${c.locationLabel ?? c.depotName ?? 'Location not set'}'),
             trailing: c.isConverted
@@ -506,8 +519,8 @@ class _InspectionsTab extends ConsumerWidget {
       itemCount: inspections.length,
       selectedCount: state.selectedInspectionIds.length,
       canConvert: canConvert,
-      emptyLabel: _emptyText('No inspection notes pending.',
-          'inspection notes', state.subFilter),
+      emptyLabel: _emptyText(
+          'No inspection notes pending.', 'inspection notes', state.subFilter),
       itemBuilder: (context, index) {
         final Inspection insp = inspections[index];
         final selected = state.selectedInspectionIds.contains(insp.id);
@@ -526,8 +539,8 @@ class _InspectionsTab extends ConsumerWidget {
                         .toggleSelection(PendingActionTab.inspections, insp.id),
                   )
                 : Icon(Icons.note_add_outlined, color: context.gssms.link),
-            title:
-                Text(insp.title, style: const TextStyle(fontWeight: FontWeight.bold)),
+            title: Text(insp.title,
+                style: const TextStyle(fontWeight: FontWeight.bold)),
             subtitle: Text(
                 '${insp.reference} • ${insp.locationLabel ?? insp.depotName ?? 'Location not set'}'),
             trailing: insp.isConverted
@@ -603,8 +616,8 @@ class _DeficienciesTabState extends ConsumerState<_DeficienciesTab> {
               _onePerDeficiency
                   ? 'One Job Work per deficiency'
                   : 'One Job Work per location (grouped)',
-              style: TextStyle(
-                  fontSize: 13, color: context.gssms.textSecondary),
+              style:
+                  TextStyle(fontSize: 13, color: context.gssms.textSecondary),
             ),
           ),
           Switch(
@@ -614,12 +627,11 @@ class _DeficienciesTabState extends ConsumerState<_DeficienciesTab> {
           ),
         ],
       ),
-      onConvert: () => ref
-          .read(pendingActionsControllerProvider.notifier)
-          .convertSelected(
-            PendingActionTab.deficiencies,
-            onePerDeficiency: _onePerDeficiency,
-          ),
+      onConvert: () =>
+          ref.read(pendingActionsControllerProvider.notifier).convertSelected(
+                PendingActionTab.deficiencies,
+                onePerDeficiency: _onePerDeficiency,
+              ),
       confirmMessage: _onePerDeficiency
           ? 'Create one rectification Job Work for each of the ${state.selectedDeficiencyIds.length} selected deficiencies?'
           : 'Create rectification Job Work(s) for the ${state.selectedDeficiencyIds.length} selected deficiencies, grouped by location?',
@@ -644,7 +656,8 @@ class _DeficienciesTabState extends ConsumerState<_DeficienciesTab> {
         // equivalent screen mobile actually has), else the asset.
         final VoidCallback? onTap = d.workOrderId != null
             ? () => Navigator.of(context).push(MaterialPageRoute(
-                builder: (_) => WorkOrderDetailScreen(workOrderId: d.workOrderId!)))
+                builder: (_) =>
+                    WorkOrderDetailScreen(workOrderId: d.workOrderId!)))
             : d.assetId != null
                 ? () => Navigator.of(context).push(MaterialPageRoute(
                     builder: (_) => AssetDetailScreen(assetId: d.assetId!)))
@@ -674,13 +687,11 @@ class _DeficienciesTabState extends ConsumerState<_DeficienciesTab> {
                         Padding(
                           padding: const EdgeInsets.only(right: 4),
                           child: Checkbox(
-                            key: Key(
-                                'deficiency_pending_check_${d.id}'),
+                            key: Key('deficiency_pending_check_${d.id}'),
                             value: selected,
                             visualDensity: VisualDensity.compact,
                             onChanged: (_) => ref
-                                .read(pendingActionsControllerProvider
-                                    .notifier)
+                                .read(pendingActionsControllerProvider.notifier)
                                 .toggleSelection(
                                     PendingActionTab.deficiencies, d.id),
                           ),
@@ -732,7 +743,8 @@ class _DeficienciesTabState extends ConsumerState<_DeficienciesTab> {
                       Expanded(
                         child: Text(d.displayAssetEquipment,
                             style: TextStyle(
-                                fontSize: 13, color: context.gssms.textSecondary),
+                                fontSize: 13,
+                                color: context.gssms.textSecondary),
                             overflow: TextOverflow.ellipsis),
                       ),
                     ],
@@ -744,7 +756,8 @@ class _DeficienciesTabState extends ConsumerState<_DeficienciesTab> {
                   // unrelated "optional section" elsewhere in this app.
                   Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                     decoration: BoxDecoration(
                       color: context.gssms.danger.background,
                       borderRadius: BorderRadius.circular(8),

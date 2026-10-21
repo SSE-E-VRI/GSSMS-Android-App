@@ -8,7 +8,8 @@ void main() {
     });
 
     test('an unrecognized code still falls back to unknown', () {
-      expect(ScheduleStatus.fromString('SOME_FUTURE_STATUS'), ScheduleStatus.unknown);
+      expect(ScheduleStatus.fromString('SOME_FUTURE_STATUS'),
+          ScheduleStatus.unknown);
     });
 
     test('null falls back to unknown', () {
@@ -18,8 +19,12 @@ void main() {
 
   group('MaintenanceSchedule.isBreakdown', () {
     test('parses is_breakdown true', () {
-      final s = MaintenanceSchedule.fromJson(
-          {'id': 1, 'template_name': 'T', 'status': 'PENDING', 'is_breakdown': true});
+      final s = MaintenanceSchedule.fromJson({
+        'id': 1,
+        'template_name': 'T',
+        'status': 'PENDING',
+        'is_breakdown': true
+      });
       expect(s.isBreakdown, isTrue);
     });
 

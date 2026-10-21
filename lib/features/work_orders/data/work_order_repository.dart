@@ -754,22 +754,21 @@ class WorkOrderRepository implements IWorkOrderRepository {
                 if (otherStaff != null) 'other_staff': otherStaff,
               },
               createdAt: DateTime.now(),
-            ),
-            matches: (c) {
-              // H6: match on proof_path only when caller sent one. When no
-              // photo was attached, `null == null` would treat a *different*
-              // no-photo submission (different remarks/staff) as a duplicate
-              // and silently drop it — compare the other fields instead.
-              if (proofJpegPath != null) {
-                return c.payload['proof_path'] == proofJpegPath;
-              }
-              final existingProof = c.payload['proof_path'];
-              if (existingProof is String && existingProof.isNotEmpty) {
-                return false;
-              }
-              return c.payload['remarks'] == remarks &&
-                  c.payload['other_staff'] == otherStaff;
-            });
+            ), matches: (c) {
+          // H6: match on proof_path only when caller sent one. When no
+          // photo was attached, `null == null` would treat a *different*
+          // no-photo submission (different remarks/staff) as a duplicate
+          // and silently drop it — compare the other fields instead.
+          if (proofJpegPath != null) {
+            return c.payload['proof_path'] == proofJpegPath;
+          }
+          final existingProof = c.payload['proof_path'];
+          if (existingProof is String && existingProof.isNotEmpty) {
+            return false;
+          }
+          return c.payload['remarks'] == remarks &&
+              c.payload['other_staff'] == otherStaff;
+        });
         return MutationOutcome.queued;
       }
       rethrow;
@@ -864,13 +863,15 @@ class WorkOrderRepository implements IWorkOrderRepository {
             // Frozen provenance — replayed verbatim by SyncManager.
             'source': resolvedSource,
             if (capturedAt != null) 'captured_at': capturedAt.toIso8601String(),
-            if (latitude != null && longitude != null && locationAccuracyM != null && locationRecordedAt != null)
-              ...{
-                'latitude': latitude,
-                'longitude': longitude,
-                'location_accuracy_m': locationAccuracyM,
-                'location_recorded_at': locationRecordedAt.toIso8601String(),
-              },
+            if (latitude != null &&
+                longitude != null &&
+                locationAccuracyM != null &&
+                locationRecordedAt != null) ...{
+              'latitude': latitude,
+              'longitude': longitude,
+              'location_accuracy_m': locationAccuracyM,
+              'location_recorded_at': locationRecordedAt.toIso8601String(),
+            },
           },
           createdAt: DateTime.now(),
         );

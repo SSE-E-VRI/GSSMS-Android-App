@@ -80,7 +80,8 @@ String userFacingError(Object error) {
   // "Exception: " prefix so it reads as a sentence.
   final text = error.toString();
   const prefix = 'Exception: ';
-  final cleaned = text.startsWith(prefix) ? text.substring(prefix.length) : text;
+  final cleaned =
+      text.startsWith(prefix) ? text.substring(prefix.length) : text;
   return cleaned.trim().isEmpty ? kUnexpectedResponseMessage : cleaned.trim();
 }
 
@@ -224,7 +225,9 @@ String? _plain(Object? value) {
   final text = value.trim();
   if (text.isEmpty || text.length > 300) return null;
   // An HTML error page (proxy 502, Django debug page) is not a message.
-  if (text.startsWith('<') || text.contains('<html') || text.contains('Traceback')) {
+  if (text.startsWith('<') ||
+      text.contains('<html') ||
+      text.contains('Traceback')) {
     return null;
   }
   return text;

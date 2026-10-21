@@ -48,7 +48,8 @@ class MaintenanceScheduleApiService {
     } else if (zoneId != null) {
       query['zone_id'] = zoneId;
     }
-    final response = await _dio.get('$_schedules/pending/', queryParameters: query);
+    final response =
+        await _dio.get('$_schedules/pending/', queryParameters: query);
     return _asList(response.data)
         .whereType<Map>()
         .map((e) => MaintenanceSchedule.fromJson(Map<String, dynamic>.from(e)))
@@ -61,7 +62,8 @@ class MaintenanceScheduleApiService {
   /// offers no assignee picker in this flow (matches web's own
   /// `convertBatch`, which always passes `null`) — assignment stays a
   /// separate step on the created Work Order.
-  Future<BatchConvertResult> createBatchWorkOrders(List<int> scheduleIds) async {
+  Future<BatchConvertResult> createBatchWorkOrders(
+      List<int> scheduleIds) async {
     final response = await _dio.post(
       '$_schedules/create_batch_work_orders/',
       data: {'schedule_ids': scheduleIds},

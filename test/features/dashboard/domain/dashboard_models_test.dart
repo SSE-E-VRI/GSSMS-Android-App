@@ -8,7 +8,8 @@ void main() {
     // crashed the whole dashboard with a TypeError instead of degrading.
     // These fields aren't fixed by contract with the server, so the parser
     // must coerce rather than assume the type.
-    test('AttentionItem coerces non-string master_name/station_name/priority', () {
+    test('AttentionItem coerces non-string master_name/station_name/priority',
+        () {
       final item = AttentionItem.fromJson(const {
         'id': 7,
         'master_name': 2,
@@ -48,7 +49,9 @@ void main() {
       expect(stat.count, 8);
     });
 
-    test('DashboardSummary.fromJson does not throw when nested fields are type-mismatched', () {
+    test(
+        'DashboardSummary.fromJson does not throw when nested fields are type-mismatched',
+        () {
       final summary = DashboardSummary.fromJson(const {
         'stats': {
           'total_work_orders': 11,
@@ -103,7 +106,9 @@ void main() {
       expect(stats.pendingTaskCount, 5);
     });
 
-    test('scheduledTasksDisplay falls back to pending_task_count when key is absent or null', () {
+    test(
+        'scheduledTasksDisplay falls back to pending_task_count when key is absent or null',
+        () {
       final absent = DashboardStats.fromJson(const {'pending_task_count': 5});
       expect(absent.scheduledTaskCount, isNull);
       expect(absent.scheduledTasksDisplay, 5);
@@ -121,17 +126,18 @@ void main() {
 
     test('PendingAction.isBreakdown parses and defaults to false', () {
       expect(
-          PendingAction.fromJson(const {'id': 1, 'title': 'x', 'is_breakdown': true})
-              .isBreakdown,
+          PendingAction.fromJson(
+              const {'id': 1, 'title': 'x', 'is_breakdown': true}).isBreakdown,
           isTrue);
       expect(PendingAction.fromJson(const {'id': 1, 'title': 'x'}).isBreakdown,
           isFalse);
       expect(
-          PendingAction.fromJson(const {'id': 1, 'title': 'x', 'is_breakdown': null})
-              .isBreakdown,
+          PendingAction.fromJson(
+              const {'id': 1, 'title': 'x', 'is_breakdown': null}).isBreakdown,
           isFalse);
     });
-    test('AttentionItem coerces non-string master_name/station_name/priority', () {
+    test('AttentionItem coerces non-string master_name/station_name/priority',
+        () {
       final item = AttentionItem.fromJson(const {
         'id': 7,
         'master_name': 2,

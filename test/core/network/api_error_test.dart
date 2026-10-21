@@ -83,8 +83,8 @@ void main() {
 
   test('403 keeps the server permission detail when present', () {
     expect(
-      userFacingError(
-          _response(403, {'detail': 'You do not have permission to view users.'})),
+      userFacingError(_response(
+          403, {'detail': 'You do not have permission to view users.'})),
       'You do not have permission to view users.',
     );
     expect(userFacingError(_response(403, null)), kPermissionErrorMessage);
@@ -180,10 +180,15 @@ void main() {
     test('conflictCode handles legacy and absent codes', () {
       expect(conflictCode({'error': 'x'}), isNull);
       expect(conflictCode(null), isNull);
-      expect(conflictCode({'code': ['PM_PENDING_EXISTS']}), 'PM_PENDING_EXISTS');
+      expect(
+          conflictCode({
+            'code': ['PM_PENDING_EXISTS']
+          }),
+          'PM_PENDING_EXISTS');
     });
 
-    test('409 APPROVAL_PENDING includes approval request type or request_type', () {
+    test('409 APPROVAL_PENDING includes approval request type or request_type',
+        () {
       final e1 = _response(409, {
         'error': 'An approval request is pending for this occurrence.',
         'code': 'APPROVAL_PENDING',

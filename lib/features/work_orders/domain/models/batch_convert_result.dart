@@ -91,7 +91,13 @@ class BatchConvertResult extends Equatable {
             .toList()
         : <BatchConvertResultItem>[];
     final items = rawResults is List
-        ? rawResults.whereType<Map>().where((item) => item.containsKey("schedule_id") || item.containsKey("created")).map((item) => BatchItemResult.fromJson(Map<String, dynamic>.from(item))).toList()
+        ? rawResults
+            .whereType<Map>()
+            .where((item) =>
+                item.containsKey("schedule_id") || item.containsKey("created"))
+            .map((item) =>
+                BatchItemResult.fromJson(Map<String, dynamic>.from(item)))
+            .toList()
         : <BatchItemResult>[];
     return BatchConvertResult(
       workOrderIds: ids,
