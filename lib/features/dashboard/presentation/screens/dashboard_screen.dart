@@ -14,6 +14,7 @@ import 'package:gssms_mobile/features/complaints/presentation/screens/complaint_
 import 'package:gssms_mobile/features/dashboard/domain/models/dashboard_models.dart';
 import 'package:gssms_mobile/features/dashboard/presentation/controllers/dashboard_controller.dart';
 import 'package:gssms_mobile/features/dashboard/presentation/controllers/dashboard_state.dart';
+import 'package:gssms_mobile/features/dashboard/presentation/widgets/dashboard_skeleton.dart';
 import 'package:gssms_mobile/features/dashboard/presentation/widgets/status_donut_chart.dart';
 import 'package:gssms_mobile/features/inspections/presentation/screens/inspection_list_screen.dart';
 import 'package:gssms_mobile/features/pending_actions/presentation/screens/pending_actions_screen.dart';
@@ -90,7 +91,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   Widget _buildBody(DashboardState state, UserSession? session) {
     if (state is DashboardLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const DashboardSkeleton();
     }
 
     if (state is DashboardError) {
@@ -150,7 +151,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       );
     }
 
-    return const Center(child: CircularProgressIndicator());
+    return const DashboardSkeleton();
   }
 
   Widget _buildAttentionSection(AttentionSummary attention) {

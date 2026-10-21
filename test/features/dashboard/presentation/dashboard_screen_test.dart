@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
@@ -8,6 +9,7 @@ import 'package:gssms_mobile/features/dashboard/data/dashboard_repository.dart';
 import 'package:gssms_mobile/features/dashboard/domain/models/dashboard_models.dart';
 import 'package:gssms_mobile/features/dashboard/presentation/controllers/dashboard_controller.dart';
 import 'package:gssms_mobile/features/dashboard/presentation/screens/dashboard_screen.dart';
+import 'package:gssms_mobile/features/dashboard/presentation/widgets/dashboard_skeleton.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/screens/work_order_detail_screen.dart';
 import '../../../helpers/fake_auth.dart';
 
@@ -271,6 +273,32 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(WorkOrderDetailScreen), findsNothing);
+    });
+
+    testWidgets('DashboardLoading state renders DashboardSkeleton', (tester) async {
+      final completer = Completer<AttentionSummary>();
+      when(() => mockRepo.fetchAttention()).thenAnswer((_) => completer.future);
+      when(() => mockRepo.fetchSummary()).thenAnswer((_) => Completer<DashboardSummary>().future);
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            dashboardRepositoryProvider.overrideWithValue(mockRepo),
+            authControllerProvider.overrideWith(
+              () => FakeAuthenticatedController(fakeSession(
+                permissions: const ['dashboard.view'],
+              )),
+            ),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.lightTheme,
+            home: const DashboardScreen(),
+          ),
+        ),
+      );
+
+      await tester.pump();
+      expect(find.byType(DashboardSkeleton), findsOneWidget);
     });
   });
 }
