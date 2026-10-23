@@ -46,3 +46,10 @@ app.*.map.json
 android/.gradle/
 GSSMS/
 
+# Repository hygiene (untracked artifacts and local worktrees)
+/tool/report_parity/web/node_modules/
+/GSSMS-complaint/
+/GSSMS-release-verify-*/
+/*.tar
+/*.patch
+/Improvement/*.zip
