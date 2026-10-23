@@ -90,9 +90,9 @@ void main() {
 
     test('with pins installs an IOHttpClientAdapter with validation', () {
       final dio = DioClient.create(
-        config: AppConfig(
+        config: const AppConfig(
           baseUrl: 'https://example.test',
-          spkiPins: const [_expectedPin],
+          spkiPins: [_expectedPin],
         ),
         tokenProvider: () => null,
         refreshTokenHandler: () async => null,

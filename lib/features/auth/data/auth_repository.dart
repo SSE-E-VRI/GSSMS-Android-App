@@ -30,11 +30,6 @@ abstract class IAuthRepository {
   /// same user can sign in again and sync queued work.
   Future<void> expireSession();
 
-  /// Session expired (refresh failed): drop credentials, in-memory session and
-  /// stale read caches, but KEEP the offline outbox and cache owner so the
-  /// same user can sign in again and sync queued work.
-  Future<void> expireSession();
-
   // OTP / TOTP flows (§2.1) — exposed for Phase 2 UI
   Future<void> requestOtp({required String email, String purpose = 'LOGIN'});
   Future<UserSession> loginWithOtp(

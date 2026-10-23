@@ -203,13 +203,13 @@ void main() {
         await controller.onAccessTokenRefreshed(sameUser, before);
         expect(await cache.getOutboxCommands(), hasLength(1));
 
-        final otherUser = UserSession(
+        const otherUser = UserSession(
           accessToken: 'b',
           username: 'v',
           userId: 8,
           primaryRole: AuthRole.maintenanceStaff,
-          roles: const [AuthRole.maintenanceStaff],
-          permissions: const ['maintenance.view'],
+          roles: [AuthRole.maintenanceStaff],
+          permissions: ['maintenance.view'],
         );
         await controller.onAccessTokenRefreshed(otherUser, before);
         expect(await cache.getOutboxCommands(), isEmpty);
