@@ -8,7 +8,7 @@ visible feature or change in what the app shows; MAJOR is a breaking change or
 forced update. The app talks to the GSSMS web/backend; API changes are additive,
 so older app builds keep working.
 
-## [0.3.5-rc1+9] - 2026-10-23
+## [0.3.5+10] - 2026-10-23
 
 ### Fixed
 - One checkout switch per backend template group across physical assets; keep each asset's labels and evidence accessible.
