@@ -363,7 +363,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           title: t.title,
           subtitle: [
             if ((t.subtitle ?? '').isNotEmpty) t.subtitle!,
-            t.kind.displayName,
+            if (t.kind != PendingActionKind.unknown) t.kind.displayName,
           ].join(' • '),
           onTap: () {
             if (t.workOrderId != null && t.workOrderId! > 0) {
@@ -625,11 +625,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 Icon(icon, size: 20, color: color),
                 const Spacer(),
                 Flexible(
-                  child: Text(
-                    value,
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerRight,
+                    child: Text(
+                      value,
+                      style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color),
+                      maxLines: 1,
+                    ),
                   ),
                 ),
               ],

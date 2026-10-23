@@ -287,7 +287,11 @@ class PendingAction extends Equatable {
               json['name'] ??
               json['label'] ??
               json['subject'] ??
-              json['ticket_number']) ??
+              json['ticket_number'] ??
+              json['work_order_number'] ??
+              json['job_number'] ??
+              json['wo_number'] ??
+              json['number']) ??
           'Pending action',
       subtitle: asJsonString(json['subtitle'] ??
           json['description'] ??
