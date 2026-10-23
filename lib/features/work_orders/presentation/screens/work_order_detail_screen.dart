@@ -317,7 +317,13 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
           InfoRow(label: 'Due Date', value: _dateFormat.format(wo.dueDate!)),
         if (wo.createdAt != null)
           InfoRow(label: 'Created', value: _dateTimeFormat.format(wo.createdAt!)),
-        if (wo.reportCompletedAt != null)
+        if (wo.reportCompletedAt != null &&
+            const {
+              WorkOrderStatus.techCompleted,
+              WorkOrderStatus.verified,
+              WorkOrderStatus.reworkRequired,
+              WorkOrderStatus.closed,
+            }.contains(wo.status))
           InfoRow(
             label: 'Technician Completed',
             value: _dateTimeFormat.format(wo.reportCompletedAt!),
@@ -939,7 +945,7 @@ class _AuditRow extends StatelessWidget {
                 Text(
                   [
                     if (event.actor != null) event.actor,
-                    if (event.actorRole != null) '(${event.actorRole})',
+                    if (event.actorRole != null) '(${_humanizeRole(event.actorRole!)})',
                     if (event.timestamp != null) dateFormat.format(event.timestamp!),
                   ].whereType<String>().join(' · '),
                   style: textTheme.bodySmall?.copyWith(color: tokens.textSecondary),
@@ -1025,4 +1031,12 @@ class _Notice extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Turns a raw role code such as `MAINTENANCE_STAFF` into `Maintenance Staff`.
+String _humanizeRole(String code) {
+  final words = code.trim().split(RegExp(r'[_\s]+')).where((w) => w.isNotEmpty);
+  return words
+      .map((w) => '${w[0].toUpperCase()}${w.substring(1).toLowerCase()}')
+      .join(' ');
 }

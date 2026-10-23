@@ -190,7 +190,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         titleSpacing: GssmsSpacing.s16,
-        title: const Text('GSSMS Operations'),
+        title: const Text('GSSMS', overflow: TextOverflow.ellipsis),
         actions: [
           _buildHeaderProfile(context, currentSession),
           if (currentSession.hasPermission('maintenance.view'))
