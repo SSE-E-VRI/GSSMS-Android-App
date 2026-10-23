@@ -660,7 +660,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
         subtitle: Text(subtitle,
             style: TextStyle(fontSize: 12, color: context.gssms.textSecondary),
-            maxLines: 2,
+            maxLines: 3,
             overflow: TextOverflow.ellipsis),
         trailing: const Icon(Icons.arrow_forward_ios, size: 14),
         onTap: onTap,
