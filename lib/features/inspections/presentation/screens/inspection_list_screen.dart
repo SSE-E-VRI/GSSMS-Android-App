@@ -197,6 +197,10 @@ class _InspectionListScreenState extends ConsumerState<InspectionListScreen> {
       // no "add" action, so the FAB is gated on `inspections.create`.
       floatingActionButton: sessionAllows(session, 'inspections.create')
           ? FloatingActionButton.extended(
+              // Several list screens stay mounted at once (Home tabs +
+              // pushed routes); the shared default hero tag made Flutter
+              // assert "multiple heroes share the same tag" on navigation.
+              heroTag: null,
               key: const Key('fab_create_inspection'),
               icon: const Icon(Icons.add_task_outlined),
               label: const Text('Log Inspection'),

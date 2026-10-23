@@ -199,6 +199,10 @@ class _ComplaintListScreenState extends ConsumerState<ComplaintListScreen> {
       // `{module}.{action}` from CRUD = ["view", "create", "edit", "delete"].
       floatingActionButton: sessionAllows(session, 'complaints.create')
           ? FloatingActionButton.extended(
+              // Several list screens stay mounted at once (Home tabs +
+              // pushed routes); the shared default hero tag made Flutter
+              // assert "multiple heroes share the same tag" on navigation.
+              heroTag: null,
               key: const Key('fab_create_complaint'),
               icon: const Icon(Icons.add_comment_outlined),
               label: const Text('Report Breakdown'),
