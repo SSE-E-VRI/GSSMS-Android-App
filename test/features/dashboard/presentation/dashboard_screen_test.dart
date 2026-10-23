@@ -14,7 +14,6 @@ import 'package:gssms_mobile/features/work_orders/data/work_order_repository.dar
 import 'package:gssms_mobile/features/work_orders/domain/models/work_order.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/screens/work_order_detail_screen.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_order_controllers.dart';
-import 'package:gssms_mobile/features/work_orders/presentation/screens/work_order_list_screen.dart';
 import '../../../helpers/fake_auth.dart';
 
 class MockDashboardRepository extends Mock implements IDashboardRepository {}
@@ -285,7 +284,7 @@ void main() {
       expect(find.byType(WorkOrderDetailScreen), findsNothing);
     });
 
-    testWidgets('shows tappable "+X more in the work queues" button and navigates to WorkOrderListScreen',
+    testWidgets('Pending Actions shows 2 rows and a uniform "View all (N)" link',
         (tester) async {
       final mockWoRepo = MockWorkOrderRepository();
       when(() => mockWoRepo.fetchWorkOrders()).thenAnswer((_) async => const <WorkOrder>[]);
@@ -325,16 +324,57 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final moreFinder = find.byKey(const Key('dashboard_pending_actions_more_button'));
-      await tester.scrollUntilVisible(moreFinder, 300,
+      final viewAll = find.byKey(const Key('open_pending_actions_button'));
+      await tester.scrollUntilVisible(viewAll, 300,
           scrollable: find.byType(Scrollable).first);
       await tester.pumpAndSettle();
 
-      expect(moreFinder, findsOneWidget);
-      expect(find.text('+2 more in the work queues'), findsOneWidget);
-      await tester.tap(moreFinder);
+      expect(viewAll, findsOneWidget);
+      expect(find.text('View all (10)'), findsOneWidget);
+      expect(find.text('Action #0'), findsOneWidget);
+      expect(find.text('Action #1'), findsOneWidget);
+      expect(find.text('Action #2', skipOffstage: false), findsNothing);
+    });
+
+    testWidgets('Attention Required shows 2 rows and the same "View all (N)" link',
+        (tester) async {
+      when(() => mockRepo.fetchAttention()).thenAnswer((_) async =>
+          const AttentionSummary(
+            overdue: [
+              AttentionItem(id: 1, masterName: 'M', stationName: 'Alpha', daysOverdue: 3),
+              AttentionItem(id: 2, masterName: 'M', stationName: 'Bravo', daysOverdue: 2),
+            ],
+            dueSoon: [
+              AttentionItem(id: 3, masterName: 'M', stationName: 'Charlie'),
+            ],
+          ));
+      when(() => mockRepo.fetchSummary()).thenAnswer(
+          (_) async => const DashboardSummary(stats: DashboardStats()));
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            dashboardRepositoryProvider.overrideWithValue(mockRepo),
+            authControllerProvider.overrideWith(
+              () => FakeAuthenticatedController(fakeSession(
+                permissions: const ['dashboard.view', 'maintenance.view'],
+              )),
+            ),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.lightTheme,
+            home: const DashboardScreen(),
+          ),
+        ),
+      );
       await tester.pumpAndSettle();
-      expect(find.byType(WorkOrderListScreen), findsOneWidget);
+      final viewAll = find.byKey(const Key('dashboard_attention_view_all'));
+      await tester.scrollUntilVisible(viewAll, 300,
+          scrollable: find.byType(Scrollable).first);
+      await tester.pumpAndSettle();
+      expect(find.text('Alpha'), findsOneWidget);
+      expect(find.text('Bravo'), findsOneWidget);
+      expect(find.text('Charlie', skipOffstage: false), findsNothing);
+      expect(find.text('View all (3)'), findsOneWidget);
     });
 
     testWidgets('DashboardLoading state renders DashboardSkeleton', (tester) async {

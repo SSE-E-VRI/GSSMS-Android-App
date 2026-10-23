@@ -29,9 +29,11 @@ class DashboardScreen extends ConsumerStatefulWidget {
 }
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
-  static const _attentionPreview = 5;
-  bool _showAllOverdue = false;
-  bool _showAllDueSoon = false;
+  /// Both summary cards (Attention Required, Pending Actions) show this many
+  /// rows and end with the same "View all (N)" link, so the dashboard stays a
+  /// glance and every card behaves the same way.
+  static const _cardPreview = 2;
+  bool _attentionExpanded = false;
   @override
   void initState() {
     super.initState();
@@ -210,6 +212,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
   Widget _buildAttentionSection(AttentionSummary attention, UserSession? session) {
     final canOpen = sessionAllows(session, 'maintenance.view');
+    final total = attention.overdue.length + attention.dueSoon.length;
+    final limit = (!canOpen && _attentionExpanded) ? total : _cardPreview;
+    final shownOverdue = attention.overdue.take(limit).toList();
+    final shownDueSoon =
+        attention.dueSoon.take(limit - shownOverdue.length).toList();
     final hasOverdue = attention.overdue.isNotEmpty;
     final hasDueSoon = attention.dueSoon.isNotEmpty;
 
@@ -283,21 +290,30 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 ),
               )
             else ...[
-              if (hasOverdue) ...[
+              if (shownOverdue.isNotEmpty) ...[
                 Text('Overdue Schedules', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: context.gssms.danger.foreground)),
                 const SizedBox(height: 6),
-                ..._attentionTiles(attention.overdue, isOverdue: true, canOpen: canOpen,
-                    expanded: _showAllOverdue,
-                    onToggle: () => setState(() => _showAllOverdue = !_showAllOverdue)),
-                const SizedBox(height: 10),
+                ...shownOverdue.map((item) =>
+                    _buildAttentionTile(item, isOverdue: true, canOpen: canOpen)),
               ],
-              if (hasDueSoon) ...[
+              if (shownDueSoon.isNotEmpty) ...[
+                if (shownOverdue.isNotEmpty) const SizedBox(height: 10),
                 Text('Due in 7 Days', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: context.gssms.warning.foreground)),
                 const SizedBox(height: 6),
-                ..._attentionTiles(attention.dueSoon, isOverdue: false, canOpen: canOpen,
-                    expanded: _showAllDueSoon,
-                    onToggle: () => setState(() => _showAllDueSoon = !_showAllDueSoon)),
+                ...shownDueSoon.map((item) =>
+                    _buildAttentionTile(item, isOverdue: false, canOpen: canOpen)),
               ],
+              if (total > _cardPreview)
+                _viewAllButton(
+                  key: const Key('dashboard_attention_view_all'),
+                  count: total,
+                  // Users who can open the scheduled-task list go there;
+                  // others expand the card in place.
+                  expanded: !canOpen && _attentionExpanded,
+                  onPressed: canOpen
+                      ? () => _push(const PendingActionsScreen())
+                      : () => setState(() => _attentionExpanded = !_attentionExpanded),
+                ),
             ],
           ],
         ),
@@ -305,29 +321,23 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     );
   }
 
-  /// Shows the first few rows and a toggle for the rest, so a long backlog
-  /// does not push every other dashboard card off-screen.
-  List<Widget> _attentionTiles(
-    List<AttentionItem> items, {
-    required bool isOverdue,
-    required bool canOpen,
-    required bool expanded,
-    required VoidCallback onToggle,
+  /// The one "View all (N)" link both summary cards end with.
+  Widget _viewAllButton({
+    required Key key,
+    required int count,
+    required VoidCallback? onPressed,
+    bool expanded = false,
   }) {
-    final shown = expanded ? items : items.take(_attentionPreview).toList();
-    return [
-      ...shown.map((item) => _buildAttentionTile(item, isOverdue: isOverdue, canOpen: canOpen)),
-      if (items.length > _attentionPreview)
-        Align(
-          alignment: Alignment.centerLeft,
-          child: TextButton(
-            onPressed: onToggle,
-            child: Text(expanded
-                ? 'Show fewer'
-                : 'Show all ${items.length}'),
-          ),
-        ),
-    ];
+    return Align(
+      alignment: Alignment.centerRight,
+      child: TextButton.icon(
+        key: key,
+        onPressed: onPressed,
+        iconAlignment: IconAlignment.end,
+        icon: Icon(expanded ? Icons.expand_less : Icons.arrow_forward, size: 18),
+        label: Text(expanded ? 'Show fewer' : 'View all ($count)'),
+      ),
+    );
   }
 
   Widget _buildAttentionTile(AttentionItem item,
@@ -472,7 +482,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
 
     final rows = <Widget>[];
     if (tasks.isNotEmpty) {
-      for (final t in tasks.take(8)) {
+      for (final t in tasks.take(_cardPreview)) {
         rows.add(_pendingRow(
           icon: _pendingIcon(t.kind),
           color: _pendingColor(t.kind),
@@ -498,28 +508,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               openList(const WorkOrderListScreen());
             }
           },
-        ));
-      }
-      if (tasks.length > 8) {
-        rows.add(Padding(
-          padding: const EdgeInsets.only(top: 4),
-          child: Align(
-            alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              key: const Key('dashboard_pending_actions_more_button'),
-              onPressed: canWorkOrders
-                  ? () => openList(const WorkOrderListScreen())
-                  : null,
-              icon: const Icon(Icons.arrow_forward, size: 14),
-              label: Text(
-                '+${tasks.length - 8} more in the work queues',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: canWorkOrders ? context.gssms.link : context.gssms.textSecondary,
-                ),
-              ),
-            ),
-          ),
         ));
       }
     } else {
@@ -590,13 +578,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                 // card only ever shows a flat glance-summary, same reasoning
                 // as web keeping its own tabbed section below the KPI cards
                 // rather than cramming all four lists in here at once.
-                if (sessionAllows(session, 'maintenance.view'))
-                  TextButton(
-                    key: const Key('open_pending_actions_button'),
-                    onPressed: () => Navigator.of(context).push(MaterialPageRoute(
-                        builder: (_) => const PendingActionsScreen())),
-                    child: const Text('View All'),
-                  ),
               ],
             ),
             const SizedBox(height: 12),
@@ -604,7 +585,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               Text('All clear — nothing needs your action.',
                   style: TextStyle(fontSize: 13, color: context.gssms.textSecondary))
             else
-              ...rows,
+              ...rows.take(_cardPreview),
+            if (canWorkOrders && (tasks.length > _cardPreview || rows.length > _cardPreview))
+              _viewAllButton(
+                key: const Key('open_pending_actions_button'),
+                count: tasks.isNotEmpty ? tasks.length : rows.length,
+                onPressed: () => _push(const PendingActionsScreen()),
+              ),
           ],
         ),
       ),
