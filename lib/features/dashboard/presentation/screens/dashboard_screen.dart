@@ -29,6 +29,9 @@ class DashboardScreen extends ConsumerStatefulWidget {
 }
 
 class _DashboardScreenState extends ConsumerState<DashboardScreen> {
+  static const _attentionPreview = 5;
+  bool _showAllOverdue = false;
+  bool _showAllDueSoon = false;
   @override
   void initState() {
     super.initState();
@@ -221,13 +224,17 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               if (hasOverdue) ...[
                 Text('Overdue Schedules', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: context.gssms.danger.foreground)),
                 const SizedBox(height: 6),
-                ...attention.overdue.map((item) => _buildAttentionTile(item, isOverdue: true)),
+                ..._attentionTiles(attention.overdue, isOverdue: true,
+                    expanded: _showAllOverdue,
+                    onToggle: () => setState(() => _showAllOverdue = !_showAllOverdue)),
                 const SizedBox(height: 10),
               ],
               if (hasDueSoon) ...[
                 Text('Due in 7 Days', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: context.gssms.warning.foreground)),
                 const SizedBox(height: 6),
-                ...attention.dueSoon.map((item) => _buildAttentionTile(item, isOverdue: false)),
+                ..._attentionTiles(attention.dueSoon, isOverdue: false,
+                    expanded: _showAllDueSoon,
+                    onToggle: () => setState(() => _showAllDueSoon = !_showAllDueSoon)),
               ],
             ],
           ],
@@ -236,7 +243,43 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     );
   }
 
+  /// Shows the first few rows and a toggle for the rest, so a long backlog
+  /// does not push every other dashboard card off-screen.
+  List<Widget> _attentionTiles(
+    List<AttentionItem> items, {
+    required bool isOverdue,
+    required bool expanded,
+    required VoidCallback onToggle,
+  }) {
+    final shown = expanded ? items : items.take(_attentionPreview).toList();
+    return [
+      ...shown.map((item) => _buildAttentionTile(item, isOverdue: isOverdue)),
+      if (items.length > _attentionPreview)
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton(
+            onPressed: onToggle,
+            child: Text(expanded
+                ? 'Show fewer'
+                : 'Show all ${items.length}'),
+          ),
+        ),
+    ];
+  }
+
   Widget _buildAttentionTile(AttentionItem item, {required bool isOverdue}) {
+    final days = item.daysOverdue ??
+        (item.dueDate != null
+            ? DateTime.now().difference(item.dueDate!).inDays
+            : null);
+    final overdueLabel = (days != null && days > 0) ? '${days}d Overdue' : 'Overdue';
+    final where = [
+      if ((item.assetName ?? '').isNotEmpty) item.assetName!,
+      if ((item.stationName ?? '').isNotEmpty)
+        item.stationName!
+      else if ((item.depotName ?? '').isNotEmpty)
+        item.depotName!,
+    ].join(' • ');
     final palette = isOverdue ? context.gssms.danger : context.gssms.warning;
     final dateStr = item.dueDate != null ? DateFormat('dd/MM/yyyy').format(item.dueDate!) : 'Pending';
 
@@ -258,9 +301,9 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   item.masterName,
                   style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                 ),
-                if (item.stationName != null && item.stationName!.isNotEmpty)
+                if (where.isNotEmpty)
                   Text(
-                    item.stationName!,
+                    where,
                     style: TextStyle(fontSize: 11, color: context.gssms.textSecondary),
                   ),
               ],
@@ -274,9 +317,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               borderRadius: BorderRadius.circular(GssmsRadius.r4),
             ),
             child: Text(
-              isOverdue
-                  ? '${item.daysOverdue ?? 1}d Overdue'
-                  : 'Due: $dateStr',
+              isOverdue ? overdueLabel : 'Due: $dateStr',
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
                     color: palette.onSolid,
                     fontWeight: FontWeight.bold,
