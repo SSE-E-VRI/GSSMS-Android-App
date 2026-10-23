@@ -116,12 +116,19 @@ const int kEvidenceJpegQuality = 80;
 /// included — MOBILE_APP_SSOT.md §12 keeps location in columns, never in the
 /// image), scales the long edge to [kEvidenceMaxEdge] and re-encodes as JPEG.
 ///
-/// Returns null when the bytes cannot be decoded, so the caller can fall back
-/// to storing the original.
+/// Returns null when decoding fails; the caller rejects unsanitized originals.
 ///
 /// Top-level and synchronous so it can be handed to `compute`.
 Uint8List? normalizeEvidenceJpeg(Uint8List rawBytes) {
-  final decoded = img.decodeImage(rawBytes);
+  final decoder = img.findDecoderForData(rawBytes);
+  final info = decoder?.startDecode(rawBytes);
+  // Bound decoded allocation as well as compressed file size. A small crafted
+  // file can advertise dimensions large enough to exhaust the app process.
+  if (info == null ||
+      info.width <= 0 ||
+      info.height <= 0 ||
+      info.width * info.height > 24000000) { return null; }
+  final decoded = decoder!.decode(rawBytes);
   if (decoded == null) return null;
 
   final oriented = img.bakeOrientation(decoded);
@@ -137,6 +144,8 @@ Uint8List? normalizeEvidenceJpeg(Uint8List rawBytes) {
     }
   }
 
+  // bakeOrientation removes orientation, but other EXIF must also be cleared.
+  resized.exif.clear();
   return img.encodeJpg(resized, quality: kEvidenceJpegQuality);
 }
 
@@ -369,20 +378,15 @@ class EvidenceService {
 
       if (processedBytes != null) {
         final targetFile = File(target);
-        await targetFile.writeAsBytes(processedBytes);
+        await targetFile.writeAsBytes(processedBytes, flush: true);
         return EvidenceFile(
           path: targetFile.path,
           sizeBytes: processedBytes.length,
           kind: kind,
         );
       } else {
-        // Fallback to direct copy if image decode fails
-        final copied = await source.copy(target);
-        return EvidenceFile(
-          path: copied.path,
-          sizeBytes: await copied.length(),
-          kind: kind,
-        );
+        throw const FileSystemException(
+            'Photo could not be safely processed. Please retake it.');
       }
     } on FileSystemException catch (e) {
       throw FileSystemException(
@@ -401,7 +405,7 @@ class EvidenceService {
     try {
       return await compute(normalizeEvidenceJpeg, rawBytes);
     } catch (_) {
-      // OOM or isolate failure on huge images: caller falls back to copy.
+      // OOM or isolate failure on huge images: caller rejects the photo safely.
       return null;
     }
   }

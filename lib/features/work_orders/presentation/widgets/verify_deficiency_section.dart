@@ -81,7 +81,7 @@ class VerifyDeficiencySection extends StatelessWidget {
       severityWidget = DropdownButtonFormField<int>(
         key: Key('severity_dropdown_${row.rowKey}'),
         isExpanded: true,
-        value: selected,
+        initialValue: selected,
         decoration: const InputDecoration(labelText: 'Severity'),
         items: [
           for (final s in severities)

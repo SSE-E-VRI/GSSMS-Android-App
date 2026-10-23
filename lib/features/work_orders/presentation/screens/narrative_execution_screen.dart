@@ -1,3 +1,4 @@
+import 'package:gssms_mobile/core/widgets/protected_network_image.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -217,8 +218,9 @@ class _NarrativeExecutionScreenState
         _photos = [..._photos.where((p) => p.id != photo.id), photo];
       });
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         showGssmsSnackBar(context, userFacingError(e), tone: GssmsTone.danger);
+      }
     } finally {
       if (mounted) setState(() => _uploading = false);
     }
@@ -231,8 +233,9 @@ class _NarrativeExecutionScreenState
       if (!mounted) return;
       setState(() => _photos = _photos.where((p) => p.id != photo.id).toList());
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         showGssmsSnackBar(context, userFacingError(e), tone: GssmsTone.danger);
+      }
     }
   }
 
@@ -241,8 +244,9 @@ class _NarrativeExecutionScreenState
   /// What still blocks Sign & Submit, in the order the form shows it.
   List<String> _blockers() {
     final blockers = <String>[];
-    if (_findings.text.trim().isEmpty)
+    if (_findings.text.trim().isEmpty) {
       blockers.add('Write the initial assessment and findings.');
+    }
     if (_action.text.trim().isEmpty) blockers.add('Write the action taken.');
     if (!_photos.any((p) => p.kind == NarrativePhotoKind.before.code)) {
       blockers.add('Add at least one Before photo.');
@@ -597,7 +601,7 @@ class _NarrativeExecutionScreenState
                         height: 84,
                         child: p.url.isEmpty
                             ? const Icon(Icons.image_not_supported)
-                            : Image.network(
+                            : ProtectedNetworkImage(
                                 p.url,
                                 headers: headers,
                                 fit: BoxFit.cover,

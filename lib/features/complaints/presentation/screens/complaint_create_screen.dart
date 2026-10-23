@@ -648,7 +648,7 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
         DropdownButtonFormField<int>(
           key: const Key('complaint_depot_dropdown'),
           isExpanded: true,
-          value: safeValue,
+          initialValue: safeValue,
           decoration: _webInput(
             hint: '-- Select Depot --',
             suffixIcon: _loadingDepots
@@ -698,7 +698,7 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
         DropdownButtonFormField<String>(
           key: const Key('complaint_department_dropdown'),
           isExpanded: true,
-          value: safeValue,
+          initialValue: safeValue,
           decoration: _webInput(
             hint: '-- Select Department --',
             errorText: _departmentError,
@@ -1057,7 +1057,7 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
         DropdownButtonFormField<InfraFilterType>(
           key: const Key('complaint_infra_type_dropdown'),
           isExpanded: true,
-          value: _infraType,
+          initialValue: _infraType,
           decoration: _webInput().copyWith(
             fillColor: context.gssms.surfaceInset,
             contentPadding:
@@ -1093,7 +1093,7 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
         DropdownButtonFormField<int>(
           key: const Key('complaint_location_dropdown'),
           isExpanded: true,
-          value: safeValue,
+          initialValue: safeValue,
           decoration: _webInput(
             hint: '-- Select ${_infraType.label} --',
             suffixIcon: _loadingLocations
@@ -1139,7 +1139,7 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
         DropdownButtonFormField<String>(
           key: const Key('complaint_asset_category_dropdown'),
           isExpanded: true,
-          value: safeValue,
+          initialValue: safeValue,
           decoration: _webInput(hint: '-- All Categories --').copyWith(
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
@@ -1185,7 +1185,7 @@ class _ComplaintCreateScreenState extends ConsumerState<ComplaintCreateScreen> {
         DropdownButtonFormField<int>(
           key: const Key('complaint_asset_dropdown'),
           isExpanded: true,
-          value: safeValue,
+          initialValue: safeValue,
           decoration: _webInput(
             hint: '-- Generic / Location Issue --',
             suffixIcon: _loadingAssets

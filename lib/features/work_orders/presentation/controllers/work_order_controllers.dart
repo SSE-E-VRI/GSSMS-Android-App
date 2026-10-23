@@ -1,3 +1,5 @@
+import 'package:gssms_mobile/features/auth/domain/rbac.dart';
+import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import 'dart:async';
 import 'package:dio/dio.dart' show DioException;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -249,8 +251,8 @@ class WorkOrderListController extends Notifier<WorkOrderListState> {
 // --- Work Order Detail Controller ---
 // H7: autoDispose so per-id detail controllers (incl. full audit history)
 // don't accumulate for the whole app session — the screen re-fetches on open.
-final workOrderDetailControllerProvider = NotifierProvider.autoDispose.family<
-    WorkOrderDetailController, WorkOrderDetailState, int>((arg) {
+final workOrderDetailControllerProvider = NotifierProvider.autoDispose
+    .family<WorkOrderDetailController, WorkOrderDetailState, int>((arg) {
   return WorkOrderDetailController(arg);
 });
 
@@ -493,8 +495,8 @@ class WorkOrderDetailController extends Notifier<WorkOrderDetailState> {
 // --- Checklist Controller ---
 // H7: autoDispose — per-record checklist state (all lines, attachments,
 // responses) must not be retained for visited records for the app lifetime.
-final checklistControllerProvider =
-    NotifierProvider.autoDispose.family<ChecklistController, ChecklistState, int>((arg) {
+final checklistControllerProvider = NotifierProvider.autoDispose
+    .family<ChecklistController, ChecklistState, int>((arg) {
   return ChecklistController(arg);
 });
 
@@ -772,6 +774,31 @@ class ChecklistController extends Notifier<ChecklistState> {
   EvidenceService get _evidenceService => ref.read(evidenceServiceProvider);
   SyncManager get _syncManager => ref.read(syncManagerProvider.notifier);
 
+  bool _attachmentAllowed({required bool deleting, int? lineId}) {
+    final current = state;
+    if (current is! ChecklistLoaded) return false;
+    if (current.record.id != arg ||
+        (lineId != null &&
+            !current.record.lines.any((line) => line.id == lineId))) {
+      state = current.copyWith(
+          errorMessage:
+              'This photo does not belong to the open checklist. Refresh and try again.');
+      return false;
+    }
+    final session = sessionFromAuth(ref.read(authControllerProvider));
+    final allowed = deleting
+        ? canDeleteChecklistAttachment(session)
+        : canAddChecklistAttachment(session);
+    if (!allowed || current.record.isPastTechCompleted) {
+      state = current.copyWith(
+          errorMessage: current.record.isPastTechCompleted
+              ? 'Photos cannot be changed after technician completion.'
+              : 'Photo ${deleting ? 'deletion' : 'upload'} is unavailable with your current access.');
+      return false;
+    }
+    return true;
+  }
+
   Future<bool> uploadLineAttachment({
     required int lineId,
     required String kind,
@@ -785,6 +812,8 @@ class ChecklistController extends Notifier<ChecklistState> {
   }) async {
     final current = state;
     if (current is! ChecklistLoaded) return false;
+
+    if (!_attachmentAllowed(deleting: false, lineId: lineId)) return false;
 
     try {
       final attachment = await _repository.uploadLineAttachment(
@@ -829,7 +858,9 @@ class ChecklistController extends Notifier<ChecklistState> {
       final latest = state;
       if (latest is! ChecklistLoaded) return false;
       state = latest.copyWith(
-          errorMessage: 'Failed to upload photo: ${_readableError(e)}');
+          errorMessage: classifyApiFailure(e) == ApiFailureKind.permission
+              ? 'Photo upload was denied. Your photo permission or job assignment may have changed. Sign in again to refresh access, or contact your administrator.'
+              : 'Failed to upload photo: ${_readableError(e)}');
       return false;
     }
   }
@@ -843,7 +874,16 @@ class ChecklistController extends Notifier<ChecklistState> {
     final current = state;
     if (current is! ChecklistLoaded) return false;
 
+    if (!_attachmentAllowed(deleting: true, lineId: lineId)) return false;
+
     try {
+      if (attachmentId > 0) {
+        await _repository.deleteLineAttachment(
+          arg,
+          lineId: lineId,
+          attachmentId: attachmentId,
+        );
+      }
       if (idempotencyKey != null) {
         await _syncManager.removeCommand(idempotencyKey);
       }
@@ -851,13 +891,6 @@ class ChecklistController extends Notifier<ChecklistState> {
         try {
           await _evidenceService.discard(localPath);
         } catch (_) {}
-      }
-      if (attachmentId > 0) {
-        await _repository.deleteLineAttachment(
-          arg,
-          lineId: lineId,
-          attachmentId: attachmentId,
-        );
       }
 
       final latest = state;
@@ -935,6 +968,13 @@ class ChecklistController extends Notifier<ChecklistState> {
   }
 
   Future<void> retryAttachment(LineAttachment attachment) async {
+    if (!_attachmentAllowed(deleting: false)) return;
+    final current = state as ChecklistLoaded;
+    if (!current.record.lines.any((line) => line.attachments.any((a) =>
+        a.id == attachment.id &&
+        a.idempotencyKey == attachment.idempotencyKey))) {
+      return;
+    }
     if (attachment.idempotencyKey != null) {
       await _syncManager.retryCommand(attachment.idempotencyKey!);
       final latest = state;

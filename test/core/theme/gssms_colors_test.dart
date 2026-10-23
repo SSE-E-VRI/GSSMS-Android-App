@@ -9,9 +9,9 @@ double contrast(Color a, Color b) {
   double channel(double c) =>
       c <= 0.03928 ? c / 12.92 : math.pow((c + 0.055) / 1.055, 2.4).toDouble();
   double luminance(Color c) =>
-      0.2126 * channel(c.red / 255) +
-      0.7152 * channel(c.green / 255) +
-      0.0722 * channel(c.blue / 255);
+      0.2126 * channel(c.r) +
+      0.7152 * channel(c.g) +
+      0.0722 * channel(c.b);
   final la = luminance(a);
   final lb = luminance(b);
   final hi = math.max(la, lb);

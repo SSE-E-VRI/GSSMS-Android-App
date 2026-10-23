@@ -143,7 +143,7 @@ class FailureDetailsSection extends StatelessWidget {
         // Failure Code Dropdown
         DropdownButtonFormField<int?>(
           key: const Key('failure_code_dropdown'),
-          value: selectedCode,
+          initialValue: selectedCode,
           isExpanded: true,
           decoration: InputDecoration(
             labelText: requiresFailureDetails

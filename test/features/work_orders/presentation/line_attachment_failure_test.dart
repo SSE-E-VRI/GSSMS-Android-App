@@ -1,3 +1,5 @@
+import '../../../helpers/fake_auth.dart';
+import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -9,7 +11,8 @@ import 'package:gssms_mobile/features/work_orders/presentation/widgets/checklist
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  testWidgets('Failed attachment renders warning badge and inline retry button triggering retry callback',
+  testWidgets(
+      'Failed attachment renders warning badge and inline retry button triggering retry callback',
       (tester) async {
     LineAttachment? retriedAttachment;
 
@@ -32,6 +35,15 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
+        overrides: [
+          authControllerProvider.overrideWith(() => FakeAuthenticatedController(
+                fakeSession(permissions: const [
+                  'maintenance.view',
+                  'maintenance.attachment_add',
+                  'maintenance.attachment_delete'
+                ]),
+              ))
+        ],
         child: MaterialApp(
           theme: AppTheme.lightTheme,
           home: Scaffold(
@@ -55,11 +67,13 @@ void main() {
     await tester.pumpAndSettle();
 
     // Thumbnail and failed badge are displayed
-    expect(find.byKey(const Key('line_attachment_thumb_key_line_att_fail_42')), findsOneWidget);
+    expect(find.byKey(const Key('line_attachment_thumb_key_line_att_fail_42')),
+        findsOneWidget);
     expect(find.byTooltip('failed'), findsOneWidget);
 
     // Inline Retry button is rendered
-    final retryFinder = find.byKey(const Key('retry_attachment_key_line_att_fail_42'));
+    final retryFinder =
+        find.byKey(const Key('retry_attachment_key_line_att_fail_42'));
     expect(retryFinder, findsOneWidget);
     expect(find.text('Retry'), findsOneWidget);
 

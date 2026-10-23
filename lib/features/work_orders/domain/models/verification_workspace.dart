@@ -193,7 +193,7 @@ class VerificationWorkspace extends Equatable {
   final bool canVerify;
   final List<String> disabledReasons;
 
-  /// Human-readable "<count> <severity>" summaries, e.g. "2 CRITICAL".
+  /// Human-readable `count severity` summaries, e.g. "2 CRITICAL".
   final List<String> deficiencies;
 
   /// Total deficiency count across all severities — the server returns one

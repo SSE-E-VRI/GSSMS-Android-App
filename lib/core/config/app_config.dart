@@ -1,3 +1,7 @@
+import 'dart:convert' show base64;
+
+import 'package:flutter/services.dart' show appFlavor;
+
 /// The deployment / runtime environment of the mobile application.
 enum AppEnvironment {
   dev,
@@ -60,6 +64,7 @@ class AppConfig {
   const AppConfig({
     required this.baseUrl,
     this.environment = AppEnvironment.prod,
+    this.spkiPins = const [],
   });
 
   /// The runtime environment flavour.
@@ -67,6 +72,10 @@ class AppConfig {
 
   /// The backend base URL (e.g. 'https://gssms.share.zrok.io').
   final String baseUrl;
+
+  /// Optional base64 SHA-256 SubjectPublicKeyInfo pins, supplied at build time
+  /// via `--dart-define=GSSMS_SPKI_PINS=pin1,pin2`. Empty means no pinning.
+  final List<String> spkiPins;
 
   /// Default production URL fallback if not provided via --dart-define.
   static const String defaultBaseUrl = 'https://gssms.share.zrok.io';
@@ -81,31 +90,78 @@ class AppConfig {
   factory AppConfig.fromEnvironment() {
     const envString = String.fromEnvironment('APP_ENV', defaultValue: '');
     final fallbackEnv = envString.isEmpty
-        ? const String.fromEnvironment('ENVIRONMENT', defaultValue: 'prod')
+        ? const String.fromEnvironment('ENVIRONMENT', defaultValue: '')
         : envString;
-    final environment = AppEnvironment.fromString(fallbackEnv);
+    final environment = AppEnvironment.fromString(
+        fallbackEnv.isEmpty ? appFlavor : fallbackEnv);
+    validateFlavor(appFlavor, environment);
 
     const explicitBaseUrl = String.fromEnvironment('GSSMS_BASE_URL');
     final baseUrl = explicitBaseUrl.isNotEmpty
         ? explicitBaseUrl
-        : (environment == AppEnvironment.prod ? defaultBaseUrl : environment.defaultBaseUrl);
+        : (environment == AppEnvironment.prod
+            ? defaultBaseUrl
+            : environment.defaultBaseUrl);
 
-    final uri = Uri.tryParse(baseUrl);
-    assert(
-      uri != null &&
-          (uri.scheme == 'https' ||
-              environment != AppEnvironment.prod ||
-              uri.host == 'localhost' ||
-              uri.host == '127.0.0.1' ||
-              uri.host == '10.0.2.2'),
-      'Prod/staging base URL must be https (got $baseUrl). '
-      'Pass --dart-define=GSSMS_BASE_URL=https://…',
-    );
+    validateBaseUrl(baseUrl, environment);
+
+    const rawPins = String.fromEnvironment('GSSMS_SPKI_PINS');
 
     return AppConfig(
       baseUrl: baseUrl,
       environment: environment,
+      spkiPins: parseSpkiPins(rawPins),
     );
+  }
+
+  /// Parses a comma separated list of base64 SHA-256 SPKI hashes.
+  /// Entries are trimmed and empties dropped. Throws [ArgumentError] if an
+  /// entry is not valid base64 or does not decode to exactly 32 bytes.
+  static List<String> parseSpkiPins(String raw) {
+    final pins = <String>[];
+    for (final part in raw.split(',')) {
+      final pin = part.trim();
+      if (pin.isEmpty) continue;
+      List<int> bytes;
+      try {
+        bytes = base64.decode(pin);
+      } on FormatException {
+        throw ArgumentError('GSSMS_SPKI_PINS contains an invalid base64 pin.');
+      }
+      if (bytes.length != 32) {
+        throw ArgumentError(
+            'GSSMS_SPKI_PINS pins must be base64 SHA-256 hashes (32 bytes).');
+      }
+      pins.add(pin);
+    }
+    return List.unmodifiable(pins);
+  }
+
+  static void validateFlavor(String? flavor, AppEnvironment environment) {
+    if (flavor != null && flavor != environment.name) {
+      throw ArgumentError('Android flavor and APP_ENV must match.');
+    }
+  }
+
+  static void validateBaseUrl(String baseUrl, AppEnvironment environment) {
+    final uri = Uri.tryParse(baseUrl);
+    final local = uri != null &&
+        (uri.host == 'localhost' ||
+            uri.host == '127.0.0.1' ||
+            uri.host == '::1' ||
+            uri.host == '10.0.2.2');
+    if (uri == null ||
+        !uri.hasAuthority ||
+        uri.host.isEmpty ||
+        uri.userInfo.isNotEmpty ||
+        uri.hasQuery ||
+        uri.hasFragment ||
+        (uri.scheme != 'https' &&
+            !(environment == AppEnvironment.dev && uri.scheme == 'http')) ||
+        (environment != AppEnvironment.dev && local)) {
+      throw ArgumentError(
+          'Invalid backend URL for ${environment.name}. HTTPS is required outside development.');
+    }
   }
 
   /// Construct an API v1 Uri for a given relative path.

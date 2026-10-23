@@ -5,9 +5,9 @@ import 'app/app.dart';
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   runApp(
-    ProviderScope(
+    const ProviderScope(
       retry: _noRetry,
-      child: const GssmsApp(),
+      child: GssmsApp(),
     ),
   );
 }

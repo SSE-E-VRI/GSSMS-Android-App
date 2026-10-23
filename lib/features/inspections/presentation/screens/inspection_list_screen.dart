@@ -461,7 +461,7 @@ class _InspectionFilterSheet extends StatelessWidget {
               DropdownButtonFormField<InspectionStatus?>(
                 key: const Key('inspection_status_filter_dropdown'),
                 isExpanded: true,
-                value: state?.selectedStatus,
+                initialValue: state?.selectedStatus,
                 decoration: const InputDecoration(
                   labelText: 'Status',
                   isDense: true,

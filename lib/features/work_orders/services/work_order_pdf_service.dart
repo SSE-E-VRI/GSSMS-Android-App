@@ -4,7 +4,6 @@ import 'package:pdf/widgets.dart' as pw;
 import 'package:gssms_mobile/features/work_orders/domain/models/work_order.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/work_order_audit.dart';
 import 'package:gssms_mobile/features/work_orders/services/job_work_report_pdf_primitives.dart';
-import 'package:gssms_mobile/features/work_orders/services/report_pdf/report_fonts.dart';
 
 /// Printable Job Work sheet for one work order — mirrors web's per-row PDF
 /// action on Job Works (Manage/Audit/PDF): header meta + asset/location +
@@ -88,7 +87,7 @@ class WorkOrderPdfService {
         crossAxisAlignment: pw.CrossAxisAlignment.center,
         children: [
           pw.Text('JOB WORK ${wo.displayReference}',
-              style: pw.TextStyle(
+              style: const pw.TextStyle(
                   fontSize: 16, fontWeight: pw.FontWeight.bold)),
           pw.SizedBox(height: 2),
           pw.Text(pdfSafe(wo.displayTitle),
@@ -104,7 +103,7 @@ class WorkOrderPdfService {
             pw.Padding(
               padding: const pw.EdgeInsets.only(top: 2),
               child: pw.Text('SLA ${wo.slaStatus ?? 'AT RISK'}',
-                  style: pw.TextStyle(
+                  style: const pw.TextStyle(
                       fontSize: 9,
                       fontWeight: pw.FontWeight.bold,
                       color: PdfColors.red800)),
@@ -117,7 +116,7 @@ class WorkOrderPdfService {
   static pw.Widget _sectionTitle(String t) => pw.Padding(
         padding: const pw.EdgeInsets.only(bottom: 6),
         child: pw.Text(t,
-            style: pw.TextStyle(
+            style: const pw.TextStyle(
                 fontSize: 12, fontWeight: pw.FontWeight.bold)),
       );
 
@@ -128,7 +127,7 @@ class WorkOrderPdfService {
                   const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4),
               color: PdfColors.grey200,
               child: pw.Text(k,
-                  style: pw.TextStyle(
+                  style: const pw.TextStyle(
                       fontSize: 9, fontWeight: pw.FontWeight.bold))),
           pw.Container(
               padding:
@@ -171,7 +170,7 @@ class WorkOrderPdfService {
           padding:
               const pw.EdgeInsets.symmetric(horizontal: 4, vertical: 5),
           child: pw.Text(t,
-              style: pw.TextStyle(
+              style: const pw.TextStyle(
                   fontWeight: pw.FontWeight.bold,
                   fontSize: 9,
                   color: PdfColors.white)),

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:gssms_mobile/core/database/local_cache_service.dart';
 import 'package:gssms_mobile/core/storage/secure_storage_service.dart';
 import 'package:gssms_mobile/features/auth/data/auth_api_service.dart';
@@ -24,9 +25,20 @@ abstract class IAuthRepository {
   Future<String?> refreshToken();
   Future<void> logout();
 
+  /// Session expired (refresh failed): drop credentials, in-memory session and
+  /// stale read caches, but KEEP the offline outbox and cache owner so the
+  /// same user can sign in again and sync queued work.
+  Future<void> expireSession();
+
+  /// Session expired (refresh failed): drop credentials, in-memory session and
+  /// stale read caches, but KEEP the offline outbox and cache owner so the
+  /// same user can sign in again and sync queued work.
+  Future<void> expireSession();
+
   // OTP / TOTP flows (§2.1) — exposed for Phase 2 UI
   Future<void> requestOtp({required String email, String purpose = 'LOGIN'});
-  Future<UserSession> loginWithOtp({required String email, required String otp});
+  Future<UserSession> loginWithOtp(
+      {required String email, required String otp});
   Future<void> resetPasswordWithOtp({
     required String email,
     required String otp,
@@ -73,72 +85,76 @@ class AuthRepository implements IAuthRepository {
   Future<String?>? _inFlightRefresh;
   int _opGeneration = 0;
 
+  Future<void> _sessionTail = Future<void>.value();
+  Future<T> _serializeSession<T>(Future<T> Function() action) async {
+    final previous = _sessionTail;
+    final done = Completer<void>();
+    _sessionTail = done.future;
+    await previous;
+    try {
+      return await action();
+    } finally {
+      done.complete();
+    }
+  }
+
+  Future<UserSession?> _commitSession(
+          int generation, String accessToken, String? refreshToken,
+          {bool replaceRefresh = false, bool notify = false}) =>
+      _serializeSession(() async {
+        if (generation != _opGeneration) return null;
+        final session = UserSession.fromJwt(accessToken);
+        final previous = _currentSession;
+        if (refreshToken != null && refreshToken.isNotEmpty) {
+          await _secureStorage.saveRefreshToken(refreshToken);
+        } else if (replaceRefresh) {
+          await _secureStorage.clearTokens();
+        }
+        if (generation != _opGeneration) return null;
+        await _bindCacheToSession(session, previous: previous);
+        if (generation != _opGeneration) return null;
+        _currentAccessToken = accessToken;
+        _currentSession = session;
+        if (notify) await _onSessionRefreshed?.call(session, previous);
+        return generation == _opGeneration ? session : null;
+      });
+
   @override
   Future<UserSession> login({
     required String username,
     required String password,
     String? otp,
   }) async {
-    final gen = _opGeneration;
+    final gen = ++_opGeneration;
     final tokens = await _apiService.login(
-      username: username,
-      password: password,
-      otp: otp,
-    );
-    if (gen != _opGeneration) {
-      throw const UnauthorizedException('Login superseded by sign-out.');
+        username: username, password: password, otp: otp);
+    final session = await _commitSession(
+        gen, tokens.accessToken, tokens.refreshToken,
+        replaceRefresh: true);
+    if (session == null) {
+      throw const UnauthorizedException(
+          'Login superseded by another session operation.');
     }
-
-    final newSession = UserSession.fromJwt(tokens.accessToken);
-    if (tokens.refreshToken != null && tokens.refreshToken!.isNotEmpty) {
-      await _secureStorage.saveRefreshToken(tokens.refreshToken!);
-    } else {
-      await _secureStorage.clearTokens();
-    }
-    if (gen != _opGeneration) {
-      // A concurrent logout cleared the tokens while we were persisting — do
-      // not repopulate the session of a signed-out user.
-      throw const UnauthorizedException('Login superseded by sign-out.');
-    }
-
-    _currentAccessToken = tokens.accessToken;
-    _currentSession = newSession;
-    await _bindCacheToSession(newSession, previous: null);
-    if (gen != _opGeneration) {
-      throw const UnauthorizedException('Login superseded by sign-out.');
-    }
-    return _currentSession!;
+    return session;
   }
 
   @override
   Future<UserSession?> restoreSession() async {
+    final gen = _opGeneration;
     final storedRefreshToken = await _secureStorage.getRefreshToken();
-    if (storedRefreshToken == null || storedRefreshToken.isEmpty) {
-      _currentSession = null;
-      _currentAccessToken = null;
-      return null;
-    }
-
+    if (gen != _opGeneration) return null;
+    if (storedRefreshToken == null || storedRefreshToken.isEmpty) return null;
     try {
       final tokens = await _apiService.refreshToken(storedRefreshToken);
-      final newSession = UserSession.fromJwt(tokens.accessToken);
-
-      if (tokens.refreshToken != null && tokens.refreshToken != storedRefreshToken) {
-        await _secureStorage.saveRefreshToken(tokens.refreshToken!);
-      }
-
-      _currentAccessToken = tokens.accessToken;
-      _currentSession = newSession;
-      await _bindCacheToSession(newSession, previous: null);
-      return _currentSession;
+      return await _commitSession(gen, tokens.accessToken, tokens.refreshToken);
     } on GuestExpiredException {
+      if (gen != _opGeneration) return null;
       await logout();
       rethrow;
     } on UnauthorizedException {
-      await logout();
+      if (gen == _opGeneration) await expireSession();
       return null;
     } catch (_) {
-      // Network/IO transient failure: do NOT erase credentials or call logout.
       return null;
     }
   }
@@ -153,7 +169,7 @@ class AuthRepository implements IAuthRepository {
     try {
       return await refreshFuture;
     } finally {
-      _inFlightRefresh = null;
+      if (identical(_inFlightRefresh, refreshFuture)) _inFlightRefresh = null;
     }
   }
 
@@ -162,34 +178,27 @@ class AuthRepository implements IAuthRepository {
     final storedRefreshToken = await _secureStorage.getRefreshToken();
     if (gen != _opGeneration) return null;
     if (storedRefreshToken == null || storedRefreshToken.isEmpty) {
-      await logout();
+      await expireSession();
       return null;
     }
 
     try {
       final tokens = await _apiService.refreshToken(storedRefreshToken);
       if (gen != _opGeneration) return null;
-      final newSession = UserSession.fromJwt(tokens.accessToken);
-
-      if (tokens.refreshToken != null && tokens.refreshToken != storedRefreshToken) {
-        await _secureStorage.saveRefreshToken(tokens.refreshToken!);
-      }
-
-      final previous = _currentSession;
-      _currentAccessToken = tokens.accessToken;
-      _currentSession = newSession;
-      await _bindCacheToSession(newSession, previous: previous);
-      await _onSessionRefreshed?.call(newSession, previous);
-      return _currentAccessToken;
+      final session = await _commitSession(
+          gen, tokens.accessToken, tokens.refreshToken,
+          notify: true);
+      return session?.accessToken;
     } on UnauthorizedException {
-      if (gen == _opGeneration) await logout();
+      if (gen == _opGeneration) await expireSession();
       return null;
     } on GuestExpiredException {
       if (gen == _opGeneration) await logout();
       return null;
     } catch (_) {
-      // Transient error: do NOT logout. Return null so request retry can handle standard error.
-      return null;
+      // Only explicit invalid credentials return null. A transient failure
+      // must remain distinct so the interceptor preserves the saved session.
+      rethrow;
     }
   }
 
@@ -202,26 +211,16 @@ class AuthRepository implements IAuthRepository {
     required String email,
     required String otp,
   }) async {
-    final gen = _opGeneration;
+    final gen = ++_opGeneration;
     final tokens = await _apiService.loginWithOtp(email: email, otp: otp);
-    if (gen != _opGeneration) {
-      throw const UnauthorizedException('Login superseded by sign-out.');
+    final session = await _commitSession(
+        gen, tokens.accessToken, tokens.refreshToken,
+        replaceRefresh: true);
+    if (session == null) {
+      throw const UnauthorizedException(
+          'Login superseded by another session operation.');
     }
-    if (tokens.refreshToken != null && tokens.refreshToken!.isNotEmpty) {
-      await _secureStorage.saveRefreshToken(tokens.refreshToken!);
-    } else {
-      await _secureStorage.clearTokens();
-    }
-    if (gen != _opGeneration) {
-      throw const UnauthorizedException('Login superseded by sign-out.');
-    }
-    _currentAccessToken = tokens.accessToken;
-    _currentSession = UserSession.fromJwt(tokens.accessToken);
-    await _bindCacheToSession(_currentSession!, previous: null);
-    if (gen != _opGeneration) {
-      throw const UnauthorizedException('Login superseded by sign-out.');
-    }
-    return _currentSession!;
+    return session;
   }
 
   @override
@@ -257,22 +256,24 @@ class AuthRepository implements IAuthRepository {
     final cache = _cacheService;
     if (cache == null) return;
 
-    // Cache I/O must never fail login/restore: tokens are already valid.
-    try {
+    // Fail closed if a previous user's cache cannot be cleared.
+    {
       final owner = await cache.getCacheOwnerUserId();
-      final userChanged = session.userId != null &&
-          owner != null &&
-          owner != session.userId;
+      final userChanged = session.userId != null && owner != session.userId;
       final authChanged =
           previous != null && session.authorizationChangedFrom(previous);
 
-      if (userChanged || authChanged) {
+      if (userChanged) {
         await cache.clearAllCache();
+      } else if (authChanged) {
+        // Same user, changed permissions/scope: drop stale read caches but
+        // keep the offline outbox.
+        await cache.clearReadCache();
       }
       if (session.userId != null) {
         await cache.setCacheOwnerUserId(session.userId!);
       }
-    } catch (_) {}
+    }
   }
 
   @override
@@ -330,9 +331,29 @@ class AuthRepository implements IAuthRepository {
     _inFlightRefresh = null;
     _currentSession = null;
     _currentAccessToken = null;
-    await _secureStorage.clearTokens();
-    try {
-      await _cacheService?.clearAllCache();
-    } catch (_) {}
+    await _serializeSession(() async {
+      try {
+        await _secureStorage.clearTokens();
+      } finally {
+        await _cacheService?.clearAllCache();
+      }
+    });
+  }
+
+  @override
+  Future<void> expireSession() async {
+    _opGeneration++;
+    _inFlightRefresh = null;
+    _currentSession = null;
+    _currentAccessToken = null;
+    await _serializeSession(() async {
+      try {
+        await _secureStorage.clearTokens();
+      } finally {
+        // Keep the outbox and cache owner: only the same user signing in again
+        // can reach (and sync) the queued work.
+        await _cacheService?.clearReadCache();
+      }
+    });
   }
 }

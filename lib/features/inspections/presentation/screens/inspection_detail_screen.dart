@@ -513,7 +513,7 @@ class _InspectionDetailScreenState
                 children: [
                   DropdownButtonFormField<String>(
                     key: Key(reasonKey),
-                    value: reason,
+                    initialValue: reason,
                     isExpanded: true,
                     decoration:
                         const InputDecoration(labelText: 'Reason *'),
@@ -602,7 +602,7 @@ class _InspectionDetailScreenState
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   DropdownButtonFormField<String>(
-                    value: priority,
+                    initialValue: priority,
                     isExpanded: true,
                     decoration:
                         const InputDecoration(labelText: 'Priority *'),
@@ -711,7 +711,7 @@ class _InspectionDetailScreenState
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   DropdownButtonFormField<String>(
-                    value: type,
+                    initialValue: type,
                     isExpanded: true,
                     decoration:
                         const InputDecoration(labelText: 'Work order type'),
@@ -727,7 +727,7 @@ class _InspectionDetailScreenState
                   ),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
-                    value: priority,
+                    initialValue: priority,
                     isExpanded: true,
                     decoration:
                         const InputDecoration(labelText: 'Priority'),

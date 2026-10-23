@@ -7,7 +7,14 @@ allprojects {
 
 rootProject.buildDir = "../build"
 subprojects {
-    project.buildDir = "${rootProject.buildDir}/${project.name}"
+    // AGP GenerateTestConfig relativizes plugin paths. On Windows the Pub
+    // cache may live on another drive, so its build output must share that
+    // drive. Keep outputs in Gradle's cache rather than modifying Pub sources.
+    def separateDrive = System.getProperty("os.name").toLowerCase().contains("windows") &&
+        project.projectDir.toPath().root != rootProject.projectDir.toPath().root
+    project.buildDir = separateDrive
+        ? new File(gradle.gradleUserHomeDir, "caches/gssms-native/${Integer.toHexString(rootProject.projectDir.absolutePath.hashCode())}/${project.name}")
+        : "${rootProject.buildDir}/${project.name}"
 }
 // Some plugins pin an old compileSdk (image_picker_android 0.8.12 uses 34) while
 // their androidx deps need 35+, which fails checkReleaseAarMetadata. Align every

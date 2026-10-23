@@ -333,6 +333,6 @@ class AuthApiService {
       return AuthException(detail, code: code);
     }
 
-    return NetworkAuthException(e.message ?? 'Network error during authentication');
+    return const NetworkAuthException();
   }
 }

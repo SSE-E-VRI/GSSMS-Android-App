@@ -712,7 +712,7 @@ class _RectificationExecutionScreenState
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
             key: Key('rect_item_outcome_${item.id}'),
-            value: (draft?.outcome.isNotEmpty == true)
+            initialValue: (draft?.outcome.isNotEmpty == true)
                 ? draft!.outcome
                 : null,
             isExpanded: true,

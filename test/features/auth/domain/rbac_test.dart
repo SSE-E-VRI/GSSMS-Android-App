@@ -198,11 +198,11 @@ void main() {
       expect(canOperateJobWorksOnMobile(sess(AuthRole.divHqUser, edit)), isFalse);
       expect(canOperateJobWorksOnMobile(sess(AuthRole.depotIncharge, const [])), isFalse);
       // Role union: an admin who is also a depot incharge keeps field controls.
-      final multi = UserSession(
+      const multi = UserSession(
         accessToken: 't',
         username: 'u',
         primaryRole: AuthRole.divAdmin,
-        roles: const [AuthRole.divAdmin, AuthRole.depotIncharge],
+        roles: [AuthRole.divAdmin, AuthRole.depotIncharge],
         permissions: edit,
       );
       expect(canOperateJobWorksOnMobile(multi), isTrue);

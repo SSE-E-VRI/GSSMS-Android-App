@@ -465,7 +465,7 @@ class _ComplaintFilterSheet extends StatelessWidget {
               DropdownButtonFormField<ComplaintStatus?>(
                 key: const Key('complaint_status_filter_dropdown'),
                 isExpanded: true,
-                value: state?.selectedStatus,
+                initialValue: state?.selectedStatus,
                 decoration: const InputDecoration(
                   labelText: 'Status',
                   isDense: true,

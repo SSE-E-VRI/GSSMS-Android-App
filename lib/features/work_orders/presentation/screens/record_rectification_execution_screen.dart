@@ -1,3 +1,4 @@
+import 'package:gssms_mobile/core/widgets/protected_network_image.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -175,8 +176,9 @@ class _RecordRectificationExecutionScreenState
         _savedAt = DateTime.now();
         _dirty = changedMeanwhile;
       });
-      if (manual)
+      if (manual) {
         showGssmsSnackBar(context, 'Progress saved.', tone: GssmsTone.success);
+      }
       if (changedMeanwhile) {
         _autosaveTimer?.cancel();
         _autosaveTimer = Timer(Duration.zero, () => unawaited(_save()));
@@ -220,8 +222,9 @@ class _RecordRectificationExecutionScreenState
       setState(
           () => s.photos = [...s.photos.where((p) => p.id != photo.id), photo]);
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         showGssmsSnackBar(context, userFacingError(e), tone: GssmsTone.danger);
+      }
     } finally {
       if (mounted) setState(() => _uploading = false);
     }
@@ -237,8 +240,9 @@ class _RecordRectificationExecutionScreenState
       setState(
           () => s.photos = s.photos.where((p) => p.id != photo.id).toList());
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         showGssmsSnackBar(context, userFacingError(e), tone: GssmsTone.danger);
+      }
     }
   }
 
@@ -545,7 +549,7 @@ class _RecordRectificationExecutionScreenState
                       height: 84,
                       child: p.url.isEmpty
                           ? const Icon(Icons.image_not_supported)
-                          : Image.network(
+                          : ProtectedNetworkImage(
                               p.url,
                               headers: headers,
                               fit: BoxFit.cover,

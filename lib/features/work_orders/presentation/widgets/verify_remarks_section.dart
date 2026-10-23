@@ -170,7 +170,7 @@ class _FlagDialogState extends State<_FlagDialog> {
             DropdownButtonFormField<String?>(
               key: const Key('flag_asset_dropdown'),
               isExpanded: true,
-              value: _assetKey,
+              initialValue: _assetKey,
               decoration: const InputDecoration(labelText: 'Asset'),
               items: [
                 const DropdownMenuItem<String?>(
@@ -189,7 +189,7 @@ class _FlagDialogState extends State<_FlagDialog> {
             DropdownButtonFormField<int?>(
               key: const Key('flag_severity_dropdown'),
               isExpanded: true,
-              value: _severityId,
+              initialValue: _severityId,
               decoration: const InputDecoration(labelText: 'Severity'),
               items: [
                 for (final s in widget.severities)

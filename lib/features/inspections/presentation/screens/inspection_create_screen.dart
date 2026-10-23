@@ -546,7 +546,7 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
         DropdownButtonFormField<int>(
           key: const Key('inspection_depot_dropdown'),
           isExpanded: true,
-          value: safeValue,
+          initialValue: safeValue,
           decoration: InputDecoration(
             hintText: '-- Select Depot --',
             hintStyle: TextStyle(color: context.gssms.textSecondary, fontSize: 14),
@@ -708,7 +708,7 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
         DropdownButtonFormField<InfraFilterType>(
           key: const Key('inspection_infra_type_dropdown'),
           isExpanded: true,
-          value: _infraType,
+          initialValue: _infraType,
           decoration: InputDecoration(
             filled: true,
             fillColor: context.gssms.surfaceInset,
@@ -745,7 +745,7 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
         DropdownButtonFormField<int>(
           key: const Key('inspection_location_dropdown'),
           isExpanded: true,
-          value: safeValue,
+          initialValue: safeValue,
           decoration: InputDecoration(
             hintText: hint,
             hintStyle: TextStyle(color: context.gssms.textSecondary, fontSize: 13),
@@ -876,7 +876,7 @@ class _InspectionCreateScreenState extends ConsumerState<InspectionCreateScreen>
                         child: DropdownButtonFormField<String>(
                           key: Key('inspection_point_priority_$index'),
                           isExpanded: true,
-                          value: _pointPriorities[index],
+                          initialValue: _pointPriorities[index],
                           decoration: const InputDecoration(
                             labelText: 'Priority',
                             isDense: true,

@@ -22,6 +22,10 @@ abstract class ILocalCacheService {
   Future<void> setCacheOwnerUserId(int userId);
 
   Future<void> clearAllCache();
+
+  /// Removes every cached read-model entry (work-order lists, details,
+  /// records) but KEEPS the outbox, its backup and the cache-owner user id.
+  Future<void> clearReadCache();
 }
 
 class LocalCacheService implements ILocalCacheService {
@@ -44,7 +48,7 @@ class LocalCacheService implements ILocalCacheService {
   /// Last-good outbox decoded in this process. If the persisted JSON is
   /// corrupt at the top level, we return this instead of `[]` so a single
   /// bad write can never discard the entire queued-mutation backlog.
-  static List<OutboxCommand> _lastGoodOutbox = const [];
+  static List<OutboxCommand> _lastGoodOutbox = <OutboxCommand>[];
 
   @override
   Future<void> cacheWorkOrders(List<WorkOrder> workOrders) async {
@@ -66,7 +70,8 @@ class LocalCacheService implements ILocalCacheService {
           ? await compute(_decodeWorkOrders, raw)
           : _decodeWorkOrders(raw);
       if (decoded.corrupt > 0) {
-        debugPrint('getCachedWorkOrders: quarantined ${decoded.corrupt} corrupt entries');
+        debugPrint(
+            'getCachedWorkOrders: quarantined ${decoded.corrupt} corrupt entries');
       }
       return decoded.orders;
     } catch (e) {
@@ -112,11 +117,13 @@ class LocalCacheService implements ILocalCacheService {
         'latest_event_summary': {
           'event_type': workOrder.latestEventSummary!.eventType,
           'actor': workOrder.latestEventSummary!.actor,
-          'timestamp': workOrder.latestEventSummary!.createdAt?.toIso8601String(),
+          'timestamp':
+              workOrder.latestEventSummary!.createdAt?.toIso8601String(),
           'remarks': workOrder.latestEventSummary!.remarks,
         },
     };
-    await prefs.setString('$_kWorkOrderDetailPrefix${workOrder.id}', jsonEncode(jsonMap));
+    await prefs.setString(
+        '$_kWorkOrderDetailPrefix${workOrder.id}', jsonEncode(jsonMap));
   }
 
   @override
@@ -130,7 +137,8 @@ class LocalCacheService implements ILocalCacheService {
       if (decoded is! Map) return null;
       return WorkOrder.fromJson(Map<String, dynamic>.from(decoded));
     } catch (e) {
-      debugPrint('getCachedWorkOrderDetail($id): corrupt entry quarantined: $e');
+      debugPrint(
+          'getCachedWorkOrderDetail($id): corrupt entry quarantined: $e');
       return null;
     }
   }
@@ -158,7 +166,8 @@ class LocalCacheService implements ILocalCacheService {
       if (decoded is! Map) return null;
       return MaintenanceRecord.fromJson(Map<String, dynamic>.from(decoded));
     } catch (e) {
-      debugPrint('getCachedMaintenanceRecord($id): corrupt entry quarantined: $e');
+      debugPrint(
+          'getCachedMaintenanceRecord($id): corrupt entry quarantined: $e');
       return null;
     }
   }
@@ -168,9 +177,16 @@ class LocalCacheService implements ILocalCacheService {
     final prefs = await _getPrefs();
     final rawList = commands.map((c) => c.toJson()).toList();
     final encoded = jsonEncode(rawList);
-    final ok = await prefs.setString(_kOutboxCommandsKey, encoded);
-    if (!ok) debugPrint('saveOutboxCommands: setString failed for ${commands.length} commands');
-    // Keep a backup copy so a torn write can be recovered on next read.
+    try {
+      if (!await prefs.setString(_kOutboxCommandsKey, encoded)) {
+        throw StateError('Could not save offline work. Free device storage and retry.');
+      }
+    } catch (_) {
+      // Legacy SharedPreferences updates its in-process map before the platform
+      // write. Reload so a failed write cannot later be mistaken for queued work.
+      await prefs.reload();
+      rethrow;
+    }
     try {
       await prefs.setString(_kOutboxBackupKey, encoded);
     } catch (_) {}
@@ -184,7 +200,7 @@ class LocalCacheService implements ILocalCacheService {
     if (raw == null || raw.isEmpty) {
       final fallback = await _lastGoodOutboxForOwner(prefs);
       if (fallback != null) return fallback;
-      return const [];
+      return <OutboxCommand>[];
     }
 
     List<dynamic>? decoded;
@@ -208,7 +224,7 @@ class LocalCacheService implements ILocalCacheService {
       if (decoded == null) {
         final fallback = await _lastGoodOutboxForOwner(prefs);
         if (fallback != null) return fallback;
-        return const [];
+        return <OutboxCommand>[];
       }
     }
 
@@ -218,7 +234,8 @@ class LocalCacheService implements ILocalCacheService {
     for (final item in items) {
       if (item is Map) {
         try {
-          validCommands.add(OutboxCommand.fromJson(Map<String, dynamic>.from(item)));
+          validCommands
+              .add(OutboxCommand.fromJson(Map<String, dynamic>.from(item)));
         } catch (_) {
           corrupt++;
           // Skip corrupted command entry without dropping remaining valid outbox items
@@ -227,7 +244,9 @@ class LocalCacheService implements ILocalCacheService {
         corrupt++;
       }
     }
-    if (corrupt > 0) debugPrint('getOutboxCommands: quarantined $corrupt corrupt entries');
+    if (corrupt > 0) {
+      debugPrint('getOutboxCommands: quarantined $corrupt corrupt entries');
+    }
     _lastGoodOutbox = List<OutboxCommand>.from(validCommands);
     return validCommands;
   }
@@ -236,17 +255,19 @@ class LocalCacheService implements ILocalCacheService {
   /// must not be used (empty, or it belongs to a different user than the
   /// cache owner currently recorded in prefs — e.g. after an owner change
   /// without a full crash-free wipe).
-  Future<List<OutboxCommand>?> _lastGoodOutboxForOwner(SharedPreferences prefs) async {
+  Future<List<OutboxCommand>?> _lastGoodOutboxForOwner(
+      SharedPreferences prefs) async {
     final memory = _lastGoodOutbox;
-    if (memory.isEmpty) return const [];
+    if (memory.isEmpty) return <OutboxCommand>[];
     final owner = prefs.getInt(_kCacheOwnerUserIdKey);
     if (owner == null) {
       // No recorded owner: the memory copy predates owner tracking or belongs
       // to a signed-out session — do not resurrect it.
-      return const [];
+      return <OutboxCommand>[];
     }
-    final foreign = memory.any((c) => c.ownerUserId != null && c.ownerUserId != owner);
-    if (foreign) return const [];
+    final foreign =
+        memory.any((c) => c.ownerUserId != null && c.ownerUserId != owner);
+    if (foreign) return <OutboxCommand>[];
     return List<OutboxCommand>.from(memory);
   }
 
@@ -259,22 +280,58 @@ class LocalCacheService implements ILocalCacheService {
   @override
   Future<void> setCacheOwnerUserId(int userId) async {
     final prefs = await _getPrefs();
-    await prefs.setInt(_kCacheOwnerUserIdKey, userId);
+    if (!await prefs.setInt(_kCacheOwnerUserIdKey, userId)) {
+      throw StateError('Could not persist offline data owner.');
+    }
   }
 
   @override
   Future<void> clearAllCache() async {
     final prefs = await _getPrefs();
+    _lastGoodOutbox = <OutboxCommand>[];
+    var failed = false;
     final keys = prefs.getKeys();
     for (final key in keys) {
       if (key.startsWith('gssms_cache_')) {
-        await prefs.remove(key);
+        try {
+          if (!await prefs.remove(key)) failed = true;
+        } catch (_) {
+          failed = true;
+        }
       }
     }
     // The in-memory last-good copy must die with the persisted store: after a
     // sign-out wipe, getOutboxCommands() must never resurrect the previous
     // user's queued mutations from memory.
-    _lastGoodOutbox = const [];
+    _lastGoodOutbox = <OutboxCommand>[];
+    if (failed) {
+      await prefs.reload();
+      throw StateError('Could not clear offline data. Please retry sign-out.');
+    }
+  }
+
+  @override
+  Future<void> clearReadCache() async {
+    final prefs = await _getPrefs();
+    var failed = false;
+    final keys = prefs.getKeys().toList();
+    for (final key in keys) {
+      if (!key.startsWith('gssms_cache_')) continue;
+      if (key == _kOutboxCommandsKey ||
+          key == _kOutboxBackupKey ||
+          key == _kCacheOwnerUserIdKey) {
+        continue;
+      }
+      try {
+        if (!await prefs.remove(key)) failed = true;
+      } catch (_) {
+        failed = true;
+      }
+    }
+    if (failed) {
+      await prefs.reload();
+      throw StateError('Could not clear cached data. Please retry.');
+    }
   }
 }
 
@@ -339,6 +396,11 @@ class InMemoryLocalCacheService implements ILocalCacheService {
   Future<void> clearAllCache() async {
     _storage.clear();
   }
+
+  @override
+  Future<void> clearReadCache() async {
+    _storage.removeWhere((key, _) => key != 'outbox' && key != 'owner_user_id');
+  }
 }
 
 /// Result of [_decodeWorkOrders]: parsed rows plus the number of entries that
@@ -351,35 +413,37 @@ class _DecodedWorkOrders {
 
 /// Top-level so it can run via `compute()` for large lists.
 String _encodeWorkOrders(List<WorkOrder> workOrders) {
-  final jsonList = workOrders.map((wo) => {
-    'id': wo.id,
-    'status': wo.status.code,
-    'type': wo.type.code,
-    'title': wo.title,
-    'description': wo.description,
-    'priority': wo.priority.code,
-    'asset': wo.assetId,
-    'asset_name': wo.assetName,
-    'asset_criticality': wo.assetCriticality,
-    'depot': wo.depotId,
-    'depot_name': wo.depotName,
-    'station_name': wo.stationName,
-    'infrastructure_name': wo.infrastructureName,
-    'infrastructure_type': wo.infrastructureType,
-    'assigned_to': wo.assignedToId,
-    'assigned_to_name': wo.assignedToName,
-    'reported_by_name': wo.reportedByName,
-    'verified_by_name': wo.verifiedByName,
-    'due_date': wo.dueDate?.toIso8601String(),
-    'created_at': wo.createdAt?.toIso8601String(),
-    'report_completed_at': wo.reportCompletedAt?.toIso8601String(),
-    'linked_record_id': wo.linkedRecordId,
-    'ticket_number': wo.ticketNumber,
-    'maintenance_master_name': wo.maintenanceMasterName,
-    'sla_status': wo.slaStatus,
-    'escalation_level': wo.escalationLevel,
-    'station': wo.stationId,
-  }).toList();
+  final jsonList = workOrders
+      .map((wo) => {
+            'id': wo.id,
+            'status': wo.status.code,
+            'type': wo.type.code,
+            'title': wo.title,
+            'description': wo.description,
+            'priority': wo.priority.code,
+            'asset': wo.assetId,
+            'asset_name': wo.assetName,
+            'asset_criticality': wo.assetCriticality,
+            'depot': wo.depotId,
+            'depot_name': wo.depotName,
+            'station_name': wo.stationName,
+            'infrastructure_name': wo.infrastructureName,
+            'infrastructure_type': wo.infrastructureType,
+            'assigned_to': wo.assignedToId,
+            'assigned_to_name': wo.assignedToName,
+            'reported_by_name': wo.reportedByName,
+            'verified_by_name': wo.verifiedByName,
+            'due_date': wo.dueDate?.toIso8601String(),
+            'created_at': wo.createdAt?.toIso8601String(),
+            'report_completed_at': wo.reportCompletedAt?.toIso8601String(),
+            'linked_record_id': wo.linkedRecordId,
+            'ticket_number': wo.ticketNumber,
+            'maintenance_master_name': wo.maintenanceMasterName,
+            'sla_status': wo.slaStatus,
+            'escalation_level': wo.escalationLevel,
+            'station': wo.stationId,
+          })
+      .toList();
   return jsonEncode(jsonList);
 }
 

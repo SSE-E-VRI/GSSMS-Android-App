@@ -257,7 +257,7 @@ void main() {
         'ComplaintExecutionScreen enforces ISO 55000 fields for CRITICAL assets',
         (tester) async {
       final api = _FakeExecApi()
-        ..complaint = ComplaintExecution(
+        ..complaint = const ComplaintExecution(
           id: 10,
           initialFindings: 'Burnt terminal',
           actionTaken: 'Replaced terminal',
@@ -266,11 +266,11 @@ void main() {
           requiresFailureDetails: true,
           failureCode: null,
           restoredTime: null,
-          failureCodeOptions: const [
+          failureCodeOptions: [
             FailureCodeOption(
                 id: 42, code: 'ELEC-42', description: 'Terminal failure'),
           ],
-          photos: const [
+          photos: [
             ExecutionPhoto(id: 1, kind: 'BEFORE'),
             ExecutionPhoto(id: 2, kind: 'AFTER'),
           ],
@@ -331,19 +331,19 @@ void main() {
         'RectificationExecutionScreen enforces ISO 55000 fields for HIGH criticality assets',
         (tester) async {
       final api = _FakeExecApi()
-        ..rectification = RectificationPayload(
+        ..rectification = const RectificationPayload(
           editable: true,
           workOrderId: 20,
           assetCriticality: 'HIGH',
           requiresFailureDetails: true,
           failureCode: null,
           restoredTime: null,
-          failureCodeOptions: const [
+          failureCodeOptions: [
             FailureCodeOption(
                 id: 77, code: 'DEF-77', description: 'Deficiency code'),
           ],
           finalRemarks: 'Fixed all points',
-          items: const [
+          items: [
             RectificationItem(
               id: 31,
               asset: 'CB-01',

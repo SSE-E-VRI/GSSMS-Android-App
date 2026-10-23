@@ -1,3 +1,5 @@
+import '../../../helpers/fake_auth.dart';
+import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -16,6 +18,15 @@ void main() {
     Future<void> Function(LineAttachment)? onRetryPhoto,
   }) {
     return ProviderScope(
+      overrides: [
+        authControllerProvider.overrideWith(() => FakeAuthenticatedController(
+              fakeSession(permissions: const [
+                'maintenance.view',
+                'maintenance.attachment_add',
+                'maintenance.attachment_delete'
+              ]),
+            ))
+      ],
       child: MaterialApp(
         theme: AppTheme.lightTheme,
         home: Scaffold(
@@ -33,7 +44,8 @@ void main() {
     );
   }
 
-  testWidgets('ChecklistLineCard shows collapsed attachment row and expands on tap',
+  testWidgets(
+      'ChecklistLineCard shows collapsed attachment row and expands on tap',
       (tester) async {
     const line = MaintenanceRecordLine(
       id: 1,
@@ -103,7 +115,8 @@ void main() {
     expect(galAfterSize.height, greaterThanOrEqualTo(48.0));
   });
 
-  testWidgets('Renders thumbnails with sync badges and tap opens fullscreen dialog',
+  testWidgets(
+      'Renders thumbnails with sync badges and tap opens fullscreen dialog',
       (tester) async {
     const line = MaintenanceRecordLine(
       id: 1,
@@ -152,7 +165,8 @@ void main() {
     expect(find.byTooltip('failed'), findsOneWidget);
 
     // Verify inline retry button for the failed attachment
-    expect(find.byKey(const Key('retry_attachment_key_failed_1')), findsOneWidget);
+    expect(
+        find.byKey(const Key('retry_attachment_key_failed_1')), findsOneWidget);
 
     // Tap thumbnail -> opens fullscreen dialog
     final syncedThumb = find.byKey(const Key('line_attachment_thumb_101'));
@@ -169,7 +183,8 @@ void main() {
     expect(find.text('By: tech_alice'), findsNothing);
   });
 
-  testWidgets('Long-press on thumbnail triggers delete dialog when pre-TECH_COMPLETED',
+  testWidgets(
+      'Long-press on thumbnail triggers delete dialog when pre-TECH_COMPLETED',
       (tester) async {
     LineAttachment? deletedAttachment;
     const line = MaintenanceRecordLine(
@@ -214,7 +229,8 @@ void main() {
     expect(deletedAttachment?.id, 101);
   });
 
-  testWidgets('Long-press on thumbnail blocks deletion when isPastTechCompleted is true',
+  testWidgets(
+      'Long-press on thumbnail blocks deletion when isPastTechCompleted is true',
       (tester) async {
     var deleteCalled = false;
     const line = MaintenanceRecordLine(

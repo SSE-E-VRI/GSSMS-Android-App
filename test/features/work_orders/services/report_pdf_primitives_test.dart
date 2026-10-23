@@ -256,7 +256,7 @@ void main() {
           CssSpan(text, letterSpacingEm: ls),
           const CssSpan('Z'),
         ]);
-        final lsPt = ls * 10;
+        const lsPt = ls * 10;
         // Chrome: advance of every glyph (spaces included) + ls after each.
         final chrome = ReportFonts.advance(text, 10,
                 weight: 700, letterSpacingPt: lsPt) +

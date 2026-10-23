@@ -59,7 +59,12 @@ class _AlwaysGrantedGalleryPermission extends GalleryPermissionService {
 Future<void> _pump(
   WidgetTester tester,
   IWorkOrderRepository repo, {
-  List<String> permissions = const ['maintenance.view', 'maintenance.edit'],
+  List<String> permissions = const [
+    'maintenance.view',
+    'maintenance.edit',
+    'maintenance.attachment_add',
+    'maintenance.attachment_delete'
+  ],
   EvidenceService? evidence,
 }) async {
   tester.view.physicalSize = const Size(1080, 2412);

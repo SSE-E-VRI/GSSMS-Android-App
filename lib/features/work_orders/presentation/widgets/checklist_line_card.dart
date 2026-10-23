@@ -1,3 +1,4 @@
+import 'package:gssms_mobile/core/widgets/protected_network_image.dart';
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
@@ -67,6 +68,15 @@ class ChecklistLineCard extends ConsumerStatefulWidget {
 }
 
 class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
+  bool get _canUpload =>
+      !widget.isPastTechCompleted &&
+      canAddChecklistAttachment(
+          sessionFromAuth(ref.read(authControllerProvider)));
+  bool get _canDelete =>
+      !widget.isPastTechCompleted &&
+      canDeleteChecklistAttachment(
+          sessionFromAuth(ref.read(authControllerProvider)));
+
   /// How long typing must pause before the observation is pushed to the server.
   static const Duration _saveDebounce = Duration(milliseconds: 800);
 
@@ -253,6 +263,7 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(authControllerProvider);
     final line = _line;
     final isHighlighted = widget.isHighlighted;
 
@@ -587,7 +598,7 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
       const SizedBox(height: 10),
       DropdownButtonFormField<int>(
         key: Key('line_${line.id}_status_option'),
-        value: selectedStatus?.id,
+        initialValue: selectedStatus?.id,
         decoration: const InputDecoration(
           labelText: 'Status',
           isDense: true,
@@ -659,7 +670,7 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
         const SizedBox(height: 8),
         DropdownButtonFormField<int>(
           key: Key('line_${line.id}_action_option'),
-          value: actions.any((a) => a.id == _actionOptionId)
+          initialValue: actions.any((a) => a.id == _actionOptionId)
               ? _actionOptionId
               : null,
           decoration: const InputDecoration(
@@ -690,11 +701,12 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
   }
 
   Future<void> _handleCapture(EvidenceKind kind, ImageSource source) async {
+    if (!_canUpload) return;
     if (source == ImageSource.gallery &&
         !await ref.read(galleryPermissionServiceProvider).request(context)) {
       return;
     }
-    if (!mounted) return;
+    if (!mounted || !_canUpload) return;
     if (widget.onCapturePhoto != null) {
       try {
         await widget.onCapturePhoto!(kind, source);
@@ -771,6 +783,7 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
   }
 
   Future<void> _handleDelete(LineAttachment attachment) async {
+    if (!_canDelete) return;
     if (widget.isPastTechCompleted) {
       showGssmsSnackBar(
         context,
@@ -805,7 +818,7 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
       ),
     );
 
-    if (confirmed != true || !mounted) return;
+    if (confirmed != true || !mounted || !_canDelete) return;
 
     if (widget.onDeletePhoto != null) {
       await widget.onDeletePhoto!(attachment);
@@ -825,6 +838,7 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
   }
 
   Future<void> _handleRetry(LineAttachment attachment) async {
+    if (!_canUpload) return;
     if (widget.onRetryPhoto != null) {
       await widget.onRetryPhoto!(attachment);
       return;
@@ -978,6 +992,8 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
           ),
         ),
         if (_attachmentsExpanded) ...[
+          if (!_canUpload && !widget.isPastTechCompleted)
+            const Text('Photo upload is unavailable with your current access.'),
           const SizedBox(height: 10),
           _buildAttachmentStrip(
             kind: EvidenceKind.before,
@@ -1008,7 +1024,7 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
     required String title,
     required List<LineAttachment> attachments,
   }) {
-    final canAdd = attachments.length < 3 && !widget.isPastTechCompleted;
+    final canAdd = attachments.length < 3 && _canUpload;
 
     final tokens = context.gssms;
     return Container(
@@ -1128,9 +1144,7 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
           onTap: () => _showFullscreenImage(attachment),
           // Delete is hidden past TECH_COMPLETED (server rule); the dialog
           // handler keeps a refusal backstop for races.
-          onLongPress: widget.isPastTechCompleted
-              ? null
-              : () => _handleDelete(attachment),
+          onLongPress: !_canDelete ? null : () => _handleDelete(attachment),
           child: Stack(
             children: [
               ClipRRect(
@@ -1170,7 +1184,7 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
               ),
               // ME-07: visible delete in front of the long-press gesture.
               // Same confirmed handler; long press is retained.
-              if (!widget.isPastTechCompleted)
+              if (_canDelete)
                 Positioned(
                   right: 0,
                   bottom: 0,
@@ -1201,7 +1215,7 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
               padding: const EdgeInsets.symmetric(horizontal: GssmsSpacing.s8),
               minimumSize: const Size(76, GssmsSize.touchTarget),
             ),
-            onPressed: () => _handleRetry(attachment),
+            onPressed: _canUpload ? () => _handleRetry(attachment) : null,
           ),
         ],
       ],
@@ -1275,7 +1289,7 @@ class AttachmentImage extends StatelessWidget {
         Center(child: Icon(icon, size: placeholderSize, color: color));
 
     Widget network() => attachment.url.isNotEmpty
-        ? Image.network(
+        ? ProtectedNetworkImage(
             attachment.url,
             headers: headers,
             fit: fit,

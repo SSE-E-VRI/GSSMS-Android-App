@@ -80,7 +80,8 @@ void main() {
     });
 
     test('submitChecklistLine enqueues OutboxCommand and succeeds when offline', () async {
-      when(() => mockApiService.submitLine(55, any())).thenThrow(
+      when(() => mockApiService.submitLine(55, any(),
+          idempotencyKey: any(named: 'idempotencyKey'))).thenThrow(
         DioException(
           requestOptions: RequestOptions(path: '/'),
           type: DioExceptionType.connectionError,
@@ -118,7 +119,8 @@ void main() {
     // record id when queued offline, sending the caller to
     // ChecklistScreen(recordId: workOrderId) against the wrong entity.
     test('startExecution throws StartExecutionQueuedOffline instead of a fake record id', () async {
-      when(() => mockApiService.startExecution(101)).thenThrow(
+      when(() => mockApiService.startExecution(101,
+          idempotencyKey: any(named: 'idempotencyKey'))).thenThrow(
         DioException(
           requestOptions: RequestOptions(path: '/api/v1/staff-workorders/101/execute/'),
           type: DioExceptionType.connectionError,
@@ -151,6 +153,7 @@ void main() {
             remarks: 'Oil level was not topped up',
             checklist: any(named: 'checklist'),
             evidence: any(named: 'evidence'),
+            idempotencyKey: any(named: 'idempotencyKey'),
           )).thenThrow(
         DioException(
           requestOptions: RequestOptions(path: '/'),
@@ -184,6 +187,7 @@ void main() {
             remarks: any(named: 'remarks'),
             checklist: any(named: 'checklist'),
             evidence: any(named: 'evidence'),
+            idempotencyKey: any(named: 'idempotencyKey'),
           )).thenThrow(
         DioException(
           requestOptions: RequestOptions(path: '/'),

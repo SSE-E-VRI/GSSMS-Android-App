@@ -123,3 +123,31 @@ flutter {
     source = "../.."
 }
 
+
+// Fail before compiling a release when Dart configuration disagrees with the
+// native application identity. Never allow --flavor prod + APP_ENV=dev.
+afterEvaluate {
+    ["dev", "staging", "prod"].each { flavor ->
+        tasks.matching { it.name == "pre${flavor.capitalize()}ReleaseBuild" }.configureEach {
+            doFirst {
+                def defines = [:]
+                (project.findProperty('dart-defines') ?: '').split(',').findAll { it }.each { encoded ->
+                    def pair = new String(encoded.decodeBase64(), 'UTF-8').split('=', 2)
+                    if (pair.length == 2) defines[pair[0]] = pair[1]
+                }
+                def env = defines['APP_ENV'] ?: defines['ENVIRONMENT'] ?: flavor
+                def aliases = [development:'dev', stage:'staging', production:'prod']
+                env = aliases[env] ?: env
+                if (env != flavor) throw new GradleException('APP_ENV must match the Android release flavor.')
+                def endpoint = defines['GSSMS_BASE_URL']
+                if (endpoint && flavor != 'dev') {
+                    def uri = new URI(endpoint)
+                    if (uri.scheme != 'https' || !uri.host || uri.userInfo ||
+                        uri.host in ['localhost', '127.0.0.1', '::1', '10.0.2.2']) {
+                        throw new GradleException('Release backend must use a remote HTTPS endpoint.')
+                    }
+                }
+            }
+        }
+    }
+}

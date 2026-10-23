@@ -84,14 +84,16 @@ bool canConvertComplaint(UserSession? session) {
 /// plain "New Job Work" create action, so this is deliberately just
 /// [canCreateWorkOrder] under another name for callers in the Pending
 /// Actions screen, not a separate check.
-bool canBatchConvertToWorkOrder(UserSession? session) => canCreateWorkOrder(session);
+bool canBatchConvertToWorkOrder(UserSession? session) =>
+    canCreateWorkOrder(session);
 
 /// Deficiency → rectification Job Work creation (`create_rectification`)
 /// maps to `maintenance.create` server-side with the same in-body
 /// DEPOT_INCHARGE/DEPOT_USER converter-role gate as the complaint/inspection
 /// batch conversions above — deliberately the same check under a distinct
 /// name so the Deficiencies tab reads on its own terms.
-bool canCreateRectification(UserSession? session) => canCreateWorkOrder(session);
+bool canCreateRectification(UserSession? session) =>
+    canCreateWorkOrder(session);
 
 /// Roles `MaintenanceScheduleViewSet.create_batch_work_orders` accepts —
 /// gated server-side on `maintenance.edit` (not `.create`, unlike the other
@@ -195,7 +197,8 @@ bool canReplaceAssets(UserSession? s) => sessionAllows(s, 'assets.replace');
 
 /// replace_asset additionally requires the MAINTENANCE_STAFF role (assets/views.py:2277).
 bool canReplaceWholeAsset(UserSession? s) =>
-    canReplaceAssets(s) && (s?.roles.contains(AuthRole.maintenanceStaff) ?? false);
+    canReplaceAssets(s) &&
+    (s?.roles.contains(AuthRole.maintenanceStaff) ?? false);
 
 const _deficiencyModuleRoles = {AuthRole.depotIncharge, AuthRole.depotUser};
 
@@ -219,3 +222,23 @@ bool canViewDeficiencyModule(UserSession? s) {
   return s.roles.any(_deficiencyModuleRoles.contains) ||
       _deficiencyModuleRoles.contains(s.primaryRole);
 }
+
+/// Attachment actions have distinct server permissions; maintenance.edit is
+/// insufficient. Scope/technician assignment remain server-authoritative.
+const _attachmentRoles = {
+  AuthRole.superAdmin,
+  AuthRole.zrAdmin,
+  AuthRole.divAdmin,
+  AuthRole.depotIncharge,
+  AuthRole.depotUser,
+  AuthRole.divHqUser,
+  AuthRole.maintenanceStaff,
+};
+
+bool canAddChecklistAttachment(UserSession? session) =>
+    sessionAllows(session, 'maintenance.attachment_add') &&
+    session!.roles.any(_attachmentRoles.contains);
+
+bool canDeleteChecklistAttachment(UserSession? session) =>
+    sessionAllows(session, 'maintenance.attachment_delete') &&
+    session!.roles.any(_attachmentRoles.contains);

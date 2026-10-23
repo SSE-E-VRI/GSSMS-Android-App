@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gssms_mobile/core/config/app_config.dart';
 import 'package:gssms_mobile/core/network/auth_interceptor.dart';
+import 'package:gssms_mobile/core/network/certificate_pinning.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
 
 final authenticatedDioProvider = Provider<Dio>((ref) {
@@ -13,8 +14,15 @@ final authenticatedDioProvider = Provider<Dio>((ref) {
     tokenProvider: () => authRepo.currentAccessToken,
     refreshTokenHandler: () => authRepo.refreshToken(),
     onSessionExpired: () async {
-      await authRepo.logout();
-      await ref.read(authControllerProvider.notifier).handleSessionExpired();
+      var cleared = true;
+      try {
+        await authRepo.expireSession();
+      } catch (_) {
+        cleared = false;
+      }
+      await ref
+          .read(authControllerProvider.notifier)
+          .handleSessionExpired(null, cleared);
     },
   );
 });
@@ -41,6 +49,13 @@ class DioClient {
       ),
     );
 
+    // Optional SPKI pinning, enabled only when GSSMS_SPKI_PINS is supplied at
+    // build time. Installed before interceptors are attached so the auth
+    // retry client (which copies this adapter) is pinned as well.
+    if (config.spkiPins.isNotEmpty) {
+      dio.httpClientAdapter = buildPinnedAdapter(config.spkiPins.toSet());
+    }
+
     dio.interceptors.add(
       AuthInterceptor(
         dio: dio,
@@ -50,11 +65,10 @@ class DioClient {
       ),
     );
 
-    // HTTPS-only guard for prod flavour (§15.1 prep).
-    // This is TLS-enforcement only — it guarantees prod never falls back to
-    // plain HTTP. True SPKI certificate pinning (§15.1, §23) is still open:
-    // it requires a pinned SPKI hash set + rotation runbook to defend against
-    // a rogue/compromised CA, which plain HTTPS enforcement does not cover.
+    // HTTPS-only guard for the prod flavour (§15.1).
+    // This is TLS enforcement only: prod never falls back to plain HTTP.
+    // SPKI pinning is optional and active only when GSSMS_SPKI_PINS is
+    // supplied (see above); without pins, trust is the system CA store.
     if (config.environment.enableCertPinning) {
       dio.interceptors.add(
         InterceptorsWrapper(
@@ -64,7 +78,7 @@ class DioClient {
               return handler.reject(
                 DioException(
                   requestOptions: options,
-                  error: 'HTTPS required in prod (SPKI pinning not yet configured)',
+                  error: 'HTTPS required in prod',
                   type: DioExceptionType.badResponse,
                 ),
               );

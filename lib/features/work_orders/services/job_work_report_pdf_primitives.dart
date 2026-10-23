@@ -593,11 +593,11 @@ class _SnapBaseline extends pw.SingleChildWidget {
     super.paint(context);
     if (child == null) return;
     final snap = PxSnap.of(context);
-    final top = box!.y + box!.height;
+    final top = box!.bottom + box!.height;
     final base = snap.downFromTop(top) + baseline;
     final snapped = (base / _pxToPt).roundToDouble() * _pxToPt;
     final shift = snap._okY ? base - snapped : 0.0;
-    final mat = Matrix4.identity()..translate(box!.x, box!.y + shift);
+    final mat = Matrix4.identity()..translateByDouble(box!.left, box!.bottom + shift, 0, 1);
     context.canvas
       ..saveContext()
       ..setTransform(mat);
@@ -617,12 +617,12 @@ class _SnapRect extends pw.SingleChildWidget {
     if (child == null) return;
     final snap = PxSnap.of(context);
     final b = box!;
-    final r = snap.rect(b.x, b.y, b.width, b.height);
+    final r = snap.rect(b.left, b.bottom, b.width, b.height);
     final sx = b.width > 0 ? r.width / b.width : 1.0;
     final sy = b.height > 0 ? r.height / b.height : 1.0;
     final mat = Matrix4.identity()
-      ..translate(r.x, r.y)
-      ..scale(sx, sy, 1);
+      ..translateByDouble(r.left, r.bottom, 0, 1)
+      ..scaleByDouble(sx, sy, 1, 1);
     context.canvas
       ..saveContext()
       ..setTransform(mat);
@@ -639,20 +639,13 @@ class _SnapRect extends pw.SingleChildWidget {
 /// on the table box edges and on the cell edges, as pw.Table's strokes were.
 class CssTableBorder extends pw.TableBorder {
   const CssTableBorder({
-    pw.BorderSide left = pw.BorderSide.none,
-    pw.BorderSide top = pw.BorderSide.none,
-    pw.BorderSide right = pw.BorderSide.none,
-    pw.BorderSide bottom = pw.BorderSide.none,
-    pw.BorderSide horizontalInside = pw.BorderSide.none,
-    pw.BorderSide verticalInside = pw.BorderSide.none,
-  }) : super(
-          left: left,
-          top: top,
-          right: right,
-          bottom: bottom,
-          horizontalInside: horizontalInside,
-          verticalInside: verticalInside,
-        );
+    super.left,
+    super.top,
+    super.right,
+    super.bottom,
+    super.horizontalInside,
+    super.verticalInside,
+  });
 
   bool _on(pw.BorderSide s) => s.style.paint && s.width > 0;
 
@@ -672,13 +665,13 @@ class CssTableBorder extends pw.TableBorder {
         hs.add((y, horizontalInside));
       }
     }
-    if (_on(bottom)) hs.add((box.y, bottom));
+    if (_on(bottom)) hs.add((box.bottom, bottom));
 
     // Vertical lines (centre x, side), left to right.
     final vs = <(double, pw.BorderSide)>[];
-    if (_on(left)) vs.add((box.x, left));
+    if (_on(left)) vs.add((box.left, left));
     if (_on(verticalInside) && widths != null) {
-      var x = box.x;
+      var x = box.left;
       for (final w in widths.sublist(0, widths.length - 1)) {
         x += w!;
         vs.add((x, verticalInside));
@@ -690,12 +683,12 @@ class CssTableBorder extends pw.TableBorder {
       final r = snap.rect(x, y, w, h);
       canvas
         ..setFillColor(c)
-        ..drawRect(r.x, r.y, r.width, r.height)
+        ..drawRect(r.left, r.bottom, r.width, r.height)
         ..fillPath();
     }
 
     // Extent of the horizontals: out to the outer verticals' half widths.
-    final xl = box.x - (_on(left) ? left.width / 2 : 0);
+    final xl = box.left - (_on(left) ? left.width / 2 : 0);
     final xr = box.right + (_on(right) ? right.width / 2 : 0);
     for (final (y, side) in hs) {
       fill(side.color, xl, y - side.width / 2, xr - xl, side.width);
@@ -712,7 +705,7 @@ class CssTableBorder extends pw.TableBorder {
       if (edgeTop < gapTop) ys.add((gapTop, edgeTop));
       gapTop = y - side.width / 2;
     }
-    ys.add((gapTop, box.y + (_on(bottom) ? bottom.width / 2 : 0)));
+    ys.add((gapTop, box.bottom + (_on(bottom) ? bottom.width / 2 : 0)));
     for (final (x, side) in vs) {
       for (final (t, b) in ys) {
         if (t <= b) continue;
@@ -866,7 +859,7 @@ class CssBox extends pw.Widget {
       if (alignment != null) {
         final r = alignment!.inscribe(
             PdfPoint(cw, ch), PdfRect(0, 0, innerW, innerH));
-        _childOffset = PdfPoint(r.x, r.y);
+        _childOffset = PdfPoint(r.left, r.bottom);
       } else {
         // Top-left aligned: the child's top edge is at the content top.
         _childOffset = PdfPoint(0, innerH - ch);
@@ -878,8 +871,8 @@ class CssBox extends pw.Widget {
   void paint(pw.Context context) {
     super.paint(context);
     final canvas = context.canvas;
-    final x0 = box!.x + margin.left;
-    final y0 = box!.y + margin.bottom;
+    final x0 = box!.left + margin.left;
+    final y0 = box!.bottom + margin.bottom;
     final w = box!.width - margin.horizontal;
     final h = box!.height - margin.vertical;
     // Backgrounds and borders paint on the pixel-snapped box.
@@ -902,7 +895,7 @@ class CssBox extends pw.Widget {
       // full-bleed fill paints ~0.4pt of colour where Chrome has border ink
       // and costs vector precision, so inset here (layout is untouched).
       final il = _bl / 2, ir = _br / 2, it = _bt / 2, ib = _bb / 2;
-      final fx = sr.x + il, fy = sr.y + ib;
+      final fx = sr.left + il, fy = sr.bottom + ib;
       final fw = math.max(0.0, sr.width - il - ir);
       final fh = math.max(0.0, sr.height - it - ib);
       canvas.setFillColor(background!);
@@ -927,7 +920,7 @@ class CssBox extends pw.Widget {
       if (top!.dashed) canvas.setLineDashPattern([bw * 3, bw * 3], 0);
       pw.BorderRadius.all(pw.Radius.circular(math.max(0.0, radius - bw / 2)))
           .paint(context,
-              PdfRect(sr.x + bw / 2, sr.y + bw / 2, sr.width - bw, sr.height - bw));
+              PdfRect(sr.left + bw / 2, sr.bottom + bw / 2, sr.width - bw, sr.height - bw));
       canvas
         ..strokePath()
         ..restoreContext();
@@ -958,21 +951,19 @@ class CssBox extends pw.Widget {
           ..fillPath();
       }
 
-      edge(top, sr.x, sr.y + sr.height - _bt, sr.width, _bt, horizontal: true);
-      edge(bottom, sr.x, sr.y, sr.width, _bb, horizontal: true);
-      edge(left, sr.x, sr.y + _bb, _bl, sr.height - _bt - _bb,
+      edge(top, sr.left, sr.bottom + sr.height - _bt, sr.width, _bt, horizontal: true);
+      edge(bottom, sr.left, sr.bottom, sr.width, _bb, horizontal: true);
+      edge(left, sr.left, sr.bottom + _bb, _bl, sr.height - _bt - _bb,
           horizontal: false);
-      edge(right, sr.x + sr.width - _br, sr.y + _bb, _br,
+      edge(right, sr.left + sr.width - _br, sr.bottom + _bb, _br,
           sr.height - _bt - _bb,
           horizontal: false);
     }
 
     if (child != null) {
       final mat = Matrix4.identity()
-        ..translate(
-          x0 + _bl + padding.left + _childOffset.x,
-          y0 + _bb + padding.bottom + _childOffset.y,
-        );
+        ..translateByDouble(x0 + _bl + padding.left + _childOffset.x,
+          y0 + _bb + padding.bottom + _childOffset.y, 0, 1);
       canvas
         ..saveContext()
         ..setTransform(mat);
@@ -1742,16 +1733,16 @@ class _CssTableRow extends pw.Widget {
     super.paint(context);
     final canvas = context.canvas;
     final b = box!;
-    // Local origin: the left grid line centre sits at b.x + _half; the
-    // bottom grid line centre at b.y + (last ? _half : 0).
-    final ox = b.x + _half;
-    final yBottom = b.y + (last ? _half : 0);
+    // Local origin: the left grid line centre sits at b.left + _half; the
+    // bottom grid line centre at b.bottom + (last ? _half : 0).
+    final ox = b.left + _half;
+    final yBottom = b.bottom + (last ? _half : 0);
     final yTop = yBottom + _pitch;
 
     final snap = PxSnap.of(context);
     void fillRect(double x, double y, double w, double h) {
       final r = snap.rect(x, y, w, h);
-      canvas.drawRect(r.x, r.y, r.width, r.height);
+      canvas.drawRect(r.left, r.bottom, r.width, r.height);
     }
 
     if (fill != null) {
@@ -1765,8 +1756,8 @@ class _CssTableRow extends pw.Widget {
 
     canvas.setFillColor(borderColor);
     // Horizontal grid lines: bottom always, top for the first row only.
-    fillRect(b.x, yBottom - _half, b.width, 2 * _half);
-    if (first) fillRect(b.x, yTop - _half, b.width, 2 * _half);
+    fillRect(b.left, yBottom - _half, b.width, 2 * _half);
+    if (first) fillRect(b.left, yTop - _half, b.width, 2 * _half);
     // Vertical grid lines between the horizontals.
     for (final x in xs) {
       fillRect(ox + x - _half, yBottom + _half, 2 * _half, _pitch - 2 * _half);
@@ -1777,10 +1768,8 @@ class _CssTableRow extends pw.Widget {
       final contentH = _pitch - 2 * _half - 2 * padV;
       final dy = (contentH - _childH[j]) / 2;
       final mat = Matrix4.identity()
-        ..translate(
-          ox + xs[j] + _half + padH,
-          yTop - _half - padV - dy - _childH[j],
-        );
+        ..translateByDouble(ox + xs[j] + _half + padH,
+          yTop - _half - padV - dy - _childH[j], 0, 1);
       canvas
         ..saveContext()
         ..setTransform(mat);

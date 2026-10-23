@@ -625,7 +625,7 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
                 key: const Key('assign_technician_dropdown'),
                 isExpanded: true,
                 decoration: const InputDecoration(labelText: 'Technician'),
-                value: selectedId,
+                initialValue: selectedId,
                 items: [
                   for (final t in technicians)
                     DropdownMenuItem(

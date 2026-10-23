@@ -33,7 +33,7 @@ jobs:
         run: dart format --output=none --set-exit-if-changed .
 
       - name: Static analysis
-        run: flutter analyze --no-fatal-infos
+        run: flutter analyze
 
       - name: Run unit & widget tests
         run: flutter test --coverage
@@ -43,3 +43,17 @@ jobs:
         # Gradle but flutter cannot find app-debug.apk and reports a false failure.
         run: flutter build apk --debug --flavor dev --dart-define=APP_ENV=dev
 
+
+      - name: Android lint
+        working-directory: android
+        run: ./gradlew :app:lintDevDebug --console=plain
+
+      - name: Check locked Dart package advisories
+        run: python3 tool/check_pub_advisories.py
+
+      - name: Export Android release dependencies
+        working-directory: android
+        run: ./gradlew :app:dependencies --configuration prodReleaseRuntimeClasspath --console=plain > ../build/production-maven-dependencies.txt
+
+      - name: Check Android Maven advisories
+        run: python3 tool/check_maven_advisories.py

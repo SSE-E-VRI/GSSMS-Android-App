@@ -1,3 +1,4 @@
+import 'package:gssms_mobile/core/widgets/protected_network_image.dart';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -312,7 +313,7 @@ class _ExecutionPhotoTile extends StatelessWidget {
                 width: 48,
                 height: 48,
                 child: hasUrl
-                    ? Image.network(
+                    ? ProtectedNetworkImage(
                         photo.url!,
                         headers: headers,
                         fit: BoxFit.cover,
@@ -383,7 +384,7 @@ class _ExecutionPhotoTile extends StatelessWidget {
         title: 'Photo #${photo.id}',
         image: (photo.url == null || photo.url!.isEmpty)
             ? null
-            : Image.network(
+            : ProtectedNetworkImage(
                 photo.url!,
                 headers: headers,
                 fit: BoxFit.contain,

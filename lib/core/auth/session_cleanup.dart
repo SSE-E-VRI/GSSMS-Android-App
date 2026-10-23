@@ -14,7 +14,12 @@ import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_
 /// so a later login on a shared device cannot read the previous user's data.
 /// Returns true when the wipe fully succeeded; false when cache clearing
 /// failed (caller should surface it — a failed wipe leaks prior user data).
-Future<bool> clearOperationalSession(Ref ref) async {
+///
+/// With [preserveOfflineQueue] only stale read caches are dropped; the offline
+/// outbox and cache owner are kept so the same user can sync after re-login.
+/// A different user's login still wipes everything (owner mismatch).
+Future<bool> clearOperationalSession(Ref ref,
+    {bool preserveOfflineQueue = false}) async {
   var ok = true;
   try {
     ref.read(syncManagerProvider.notifier).invalidateSessionBoundWork();
@@ -23,10 +28,15 @@ Future<bool> clearOperationalSession(Ref ref) async {
     ok = false;
   }
   try {
-    await ref.read(localCacheServiceProvider).clearAllCache();
+    final cache = ref.read(localCacheServiceProvider);
+    if (preserveOfflineQueue) {
+      await cache.clearReadCache();
+    } else {
+      await cache.clearAllCache();
+    }
   } catch (e) {
     // SharedPreferences may be unavailable in unit tests; still invalidate.
-    debugPrint('clearOperationalSession: clearAllCache failed: $e');
+    debugPrint('clearOperationalSession: cache clear failed: $e');
     ok = false;
   }
   for (final invalidate in _invalidates) {

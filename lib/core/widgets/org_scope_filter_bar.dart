@@ -340,7 +340,7 @@ class _OrgScopeFilterBarState extends ConsumerState<OrgScopeFilterBar> {
       key: Key(keyName),
       isExpanded: true,
       isDense: true,
-      value: safeValue,
+      initialValue: safeValue,
       decoration: InputDecoration(
         labelText: label,
         isDense: true,

@@ -184,6 +184,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         children: [
           if (authState is AuthError) ...[
             _buildErrorBanner(authState.message),
+            if (authState.code == 'SIGN_OUT_FAILED')
+              TextButton.icon(
+                key: const Key('retry_sign_out'),
+                onPressed: () => ref.read(authControllerProvider.notifier).logout(),
+                icon: const Icon(Icons.logout),
+                label: const Text('Retry sign-out'),
+              ),
             const SizedBox(height: 16),
           ],
           TextFormField(

@@ -40,7 +40,7 @@ class InspectionEvidencePhoto extends Equatable {
       inspectionId: _fkId(json['inspection']),
       inspectionPointId: _fkId(json['inspection_point']),
       caption: asJsonString(json['caption']),
-      imageUrl: rawImage == null ? null : rawImage.toString(),
+      imageUrl: rawImage?.toString(),
       uploadedByName: asJsonString(json['uploaded_by_name']) ??
           asJsonString(json['uploaded_by']),
       uploadedAt: asJsonDateTime(json['uploaded_at']),

@@ -157,7 +157,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                   key: const Key('reports_infra_type'),
                   isExpanded: true,
                   isDense: true,
-                  value: state.infraType,
+                  initialValue: state.infraType,
                   decoration: const InputDecoration(
                     labelText: 'Infrastructure Type',
                     isDense: true,
@@ -182,7 +182,7 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                   key: const Key('reports_infra_item'),
                   isExpanded: true,
                   isDense: true,
-                  value: state.infraId,
+                  initialValue: state.infraId,
                   decoration: const InputDecoration(
                     labelText: 'Infrastructure Item',
                     isDense: true,

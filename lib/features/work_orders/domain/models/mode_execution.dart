@@ -84,7 +84,7 @@ class ExecutionPhoto extends Equatable {
     return ExecutionPhoto(
       id: asJsonInt(json['id']) ?? 0,
       kind: asJsonString(json['kind']) ?? asJsonString(json['photo_type']),
-      url: rawUrl == null ? null : rawUrl.toString(),
+      url: rawUrl?.toString(),
       locked: asJsonBool(json['locked']) ??
           (lockedBy != null && lockedBy.toString().isNotEmpty),
       fromComplaint: asJsonBool(json['from_complaint']) ??

@@ -37,7 +37,8 @@ class AuthInterceptor extends QueuedInterceptor {
   /// rebuilt if the adapter is swapped (as tests and runtime reconfiguration do).
   Dio get _retryClient {
     final cached = _cachedRetryClient;
-    if (cached != null && identical(cached.httpClientAdapter, dio.httpClientAdapter)) {
+    if (cached != null &&
+        identical(cached.httpClientAdapter, dio.httpClientAdapter)) {
       return cached;
     }
     final client = Dio(dio.options.copyWith())
@@ -73,7 +74,8 @@ class AuthInterceptor extends QueuedInterceptor {
   /// request arrives). Such a request must not be replayed with the new user's
   /// token, and its failure must not tear down the new session.
   bool _identitySuperseded(RequestOptions options) {
-    final requestUser = _userIdClaim(options.headers['Authorization'] as String?);
+    final requestUser =
+        _userIdClaim(options.headers['Authorization'] as String?);
     final current = tokenProvider();
     final currentUser = _userIdClaim(current);
     if (requestUser == null || currentUser == null) return false;
@@ -103,8 +105,17 @@ class AuthInterceptor extends QueuedInterceptor {
     return handler.next(response);
   }
 
+  Future<void> _expireSession() async {
+    try {
+      await onSessionExpired();
+    } catch (_) {
+      debugPrint('Session cleanup failed; credentials require manual retry.');
+    }
+  }
+
   @override
-  Future<void> onError(DioException err, ErrorInterceptorHandler handler) async {
+  Future<void> onError(
+      DioException err, ErrorInterceptorHandler handler) async {
     _logError(err);
 
     final isAuth = _isAuthEndpoint(err.requestOptions.path);
@@ -117,7 +128,7 @@ class AuthInterceptor extends QueuedInterceptor {
         // Check the identity first: a stale request from a superseded session
         // must not tear down the newer session.
         if (!_identitySuperseded(err.requestOptions)) {
-          await onSessionExpired();
+          await _expireSession();
         }
         return handler.next(err);
       }
@@ -133,7 +144,7 @@ class AuthInterceptor extends QueuedInterceptor {
     // Check for GUEST_EXPIRED
     final responseData = err.response?.data;
     if (responseData is Map && responseData['code'] == 'GUEST_EXPIRED') {
-      await onSessionExpired();
+      await _expireSession();
       return handler.next(
         DioException(
           requestOptions: err.requestOptions,
@@ -144,14 +155,19 @@ class AuthInterceptor extends QueuedInterceptor {
     }
 
     try {
-      final requestToken = err.requestOptions.headers['Authorization'] as String?;
+      final requestToken =
+          err.requestOptions.headers['Authorization'] as String?;
       final latestToken = tokenProvider();
-      final latestBearer = (latestToken != null && latestToken.isNotEmpty) ? 'Bearer $latestToken' : null;
+      final latestBearer = (latestToken != null && latestToken.isNotEmpty)
+          ? 'Bearer $latestToken'
+          : null;
 
       String? targetAccessToken;
 
       // If token was already refreshed by another concurrent request, reuse the fresh token
-      if (latestBearer != null && requestToken != null && requestToken != latestBearer) {
+      if (latestBearer != null &&
+          requestToken != null &&
+          requestToken != latestBearer) {
         targetAccessToken = latestToken;
       } else {
         // Coalesce concurrent refresh requests into a single in-flight Future
@@ -163,7 +179,7 @@ class AuthInterceptor extends QueuedInterceptor {
       }
 
       if (targetAccessToken == null || targetAccessToken.isEmpty) {
-        await onSessionExpired();
+        await _expireSession();
         return handler.next(err);
       }
 
@@ -197,7 +213,7 @@ class AuthInterceptor extends QueuedInterceptor {
           !(retryUri.host == 'localhost' ||
               retryUri.host == '127.0.0.1' ||
               retryUri.host == '10.0.2.2')) {
-        await onSessionExpired();
+        await _expireSession();
         return handler.next(err);
       }
       try {
@@ -205,12 +221,13 @@ class AuthInterceptor extends QueuedInterceptor {
         return handler.resolve(response);
       } on DioException catch (retryErr) {
         if (retryErr.response?.statusCode == 401) {
-          await onSessionExpired();
+          await _expireSession();
         }
         return handler.reject(retryErr);
       }
     } catch (_) {
-      await onSessionExpired();
+      // A failed network/storage refresh is not an invalid refresh token.
+      // Preserve credentials and return the original request failure for retry.
       return handler.next(err);
     }
   }
@@ -218,7 +235,14 @@ class AuthInterceptor extends QueuedInterceptor {
   String _sanitizeUri(Uri uri) {
     if (!uri.hasQuery) return uri.toString();
     final sanitizedParams = Map<String, dynamic>.from(uri.queryParameters);
-    const sensitiveKeys = {'token', 'access', 'refresh', 'password', 'otp', 'code'};
+    const sensitiveKeys = {
+      'token',
+      'access',
+      'refresh',
+      'password',
+      'otp',
+      'code'
+    };
     for (final key in sensitiveKeys) {
       if (sanitizedParams.containsKey(key)) {
         sanitizedParams[key] = '[REDACTED]';
@@ -244,7 +268,8 @@ class AuthInterceptor extends QueuedInterceptor {
   void _logError(DioException err) {
     if (kDebugMode) {
       final sanitized = _sanitizeUri(err.requestOptions.uri);
-      debugPrint('[HTTP ERR] ${err.response?.statusCode} $sanitized (${err.type})');
+      debugPrint(
+          '[HTTP ERR] ${err.response?.statusCode} $sanitized (${err.type})');
     }
   }
 }

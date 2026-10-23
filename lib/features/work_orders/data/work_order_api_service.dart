@@ -28,6 +28,9 @@ class WorkOrderApiService {
 
   final Dio _dio;
 
+  /// Multipart photo uploads override the 15s global Dio timeouts.
+  static const Duration _uploadTimeout = Duration(seconds: 120);
+
   static const String _workOrders = '/api/v1/maintenance/work-orders';
   static const String _records = '/api/v1/maintenance/records';
   static const String _staffWorkOrders = '/api/v1/staff-workorders';
@@ -87,12 +90,14 @@ class WorkOrderApiService {
     // `created_at`. Sending the wrong names is silently ignored server-side,
     // so "My Work" date filters previously did nothing.
     if (assignedToMe) {
-      if (dateFrom != null && dateFrom.isNotEmpty)
+      if (dateFrom != null && dateFrom.isNotEmpty) {
         queryParams['start_date'] = dateFrom;
+      }
       if (dateTo != null && dateTo.isNotEmpty) queryParams['end_date'] = dateTo;
     } else {
-      if (dateFrom != null && dateFrom.isNotEmpty)
+      if (dateFrom != null && dateFrom.isNotEmpty) {
         queryParams['date_from'] = dateFrom;
+      }
       if (dateTo != null && dateTo.isNotEmpty) queryParams['date_to'] = dateTo;
     }
     if (updatedFrom != null && updatedFrom.isNotEmpty) {
@@ -337,12 +342,7 @@ class WorkOrderApiService {
   Future<int> startExecution(int workOrderId, {String? idempotencyKey}) async {
     final response = await _dio.post(
       '$_staffWorkOrders/$workOrderId/execute/',
-      options: idempotencyKey != null
-          ? Options(headers: {
-              'X-Idempotency-Key': idempotencyKey,
-              'Idempotency-Key': idempotencyKey
-            })
-          : null,
+      options: _writeOptions(idempotencyKey),
     );
     final data = response.data;
     if (data is Map) {
@@ -376,12 +376,7 @@ class WorkOrderApiService {
     final response = await _dio.post(
       '$_workOrders/$workOrderId/change-status/',
       data: payload,
-      options: idempotencyKey != null
-          ? Options(headers: {
-              'X-Idempotency-Key': idempotencyKey,
-              'Idempotency-Key': idempotencyKey
-            })
-          : null,
+      options: _writeOptions(idempotencyKey),
     );
 
     final data = response.data;
@@ -408,8 +403,8 @@ class WorkOrderApiService {
   }
 
   /// Raw maintenance-record rows for report resolution — `GET
-  /// /api/v1/maintenance/records/` with `?work_order=<id>` and/or
-  /// `?schedule=<id>` (same filters web's ReportsView uses to resolve a Job
+  /// /api/v1/maintenance/records/` with `?work_order=ID` and/or
+  /// `?schedule=ID` (same filters web's ReportsView uses to resolve a Job
   /// Work's record, including the verification context on work_order
   /// queries). Returns decoded maps (not [MaintenanceRecord]) because
   /// report shaping consumes the raw nested lines/options.
@@ -435,12 +430,7 @@ class WorkOrderApiService {
     await _dio.post(
       '$_records/$recordId/submit_line/',
       data: lineData,
-      options: idempotencyKey != null
-          ? Options(headers: {
-              'X-Idempotency-Key': idempotencyKey,
-              'Idempotency-Key': idempotencyKey
-            })
-          : null,
+      options: _writeOptions(idempotencyKey),
     );
   }
 
@@ -479,12 +469,7 @@ class WorkOrderApiService {
     await _dio.patch(
       '$_records/$recordId/',
       data: form,
-      options: idempotencyKey != null
-          ? Options(headers: {
-              'X-Idempotency-Key': idempotencyKey,
-              'Idempotency-Key': idempotencyKey
-            })
-          : null,
+      options: _writeOptions(idempotencyKey, upload: true),
     );
   }
 
@@ -515,12 +500,7 @@ class WorkOrderApiService {
         if (supervisorSignature != null)
           'supervisor_signature': supervisorSignature,
       },
-      options: idempotencyKey != null
-          ? Options(headers: {
-              'X-Idempotency-Key': idempotencyKey,
-              'Idempotency-Key': idempotencyKey
-            })
-          : null,
+      options: _writeOptions(idempotencyKey),
     );
   }
 
@@ -581,12 +561,7 @@ class WorkOrderApiService {
     final response = await _dio.post(
       '$_records/$recordId/lines/$lineId/attachments/',
       data: form,
-      options: idempotencyKey != null
-          ? Options(headers: {
-              'X-Idempotency-Key': idempotencyKey,
-              'Idempotency-Key': idempotencyKey
-            })
-          : null,
+      options: _writeOptions(idempotencyKey, upload: true),
     );
 
     if (response.data is Map<String, dynamic>) {
@@ -814,5 +789,20 @@ class WorkOrderApiService {
     final data = _asObject(response.data);
     if (data == null) _badPayload(response, 'template-change-request');
     return ApprovalRequestSummary.fromJson(data);
+  }
+
+  /// Per-request options for mutating calls: idempotency headers (when a key
+  /// is given) and, for multipart uploads, generous send/receive timeouts
+  /// (the global Dio receiveTimeout is 15s, too short for photo uploads on
+  /// slow rail-side connections).
+  Options? _writeOptions(String? key, {bool upload = false}) {
+    if (key == null && !upload) return null;
+    return Options(
+      headers: key == null
+          ? null
+          : {'X-Idempotency-Key': key, 'Idempotency-Key': key},
+      sendTimeout: upload ? _uploadTimeout : null,
+      receiveTimeout: upload ? _uploadTimeout : null,
+    );
   }
 }

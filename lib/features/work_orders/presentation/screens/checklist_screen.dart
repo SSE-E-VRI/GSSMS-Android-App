@@ -618,7 +618,7 @@ class _SubsystemChipsDelegate extends SliverPersistentHeaderDelegate {
       child: DropdownButtonFormField<String?>(
         key: const Key('checklist_subsystem_filter_dropdown'),
         isExpanded: true,
-        value: activeCategory,
+        initialValue: activeCategory,
         decoration: const InputDecoration(
           labelText: 'Subsystem',
           contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -809,8 +809,9 @@ class _CompletionSheetState extends ConsumerState<_CompletionSheet> {
                 key: const Key('completion_checked_out_checkbox'),
                 value: _checkedOutBySupervisor,
                 onChanged: (val) {
-                  if (val != null)
+                  if (val != null) {
                     setState(() => _checkedOutBySupervisor = val);
+                  }
                 },
                 title: Text(
                   'Checked out by supervisor',

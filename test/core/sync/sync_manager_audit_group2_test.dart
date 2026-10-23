@@ -100,7 +100,7 @@ void main() {
       final first = _command(
           'evidence_10_1', OutboxCommandType.uploadEvidence, 10,
           {'remarks': 'people A', 'other_staff': 'S1'});
-      final enqueue = (OutboxCommand c) => syncManager.enqueueDeduped(
+      Future<bool> enqueue(OutboxCommand c) => syncManager.enqueueDeduped(
             c,
             isDuplicate: (existing) {
               final proof = existing.payload['proof_path'];

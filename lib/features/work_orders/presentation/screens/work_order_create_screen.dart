@@ -444,7 +444,7 @@ class _WorkOrderCreateScreenState extends ConsumerState<WorkOrderCreateScreen> {
                                       DropdownButtonFormField<WorkOrderType>(
                                         key: const Key('wo_type_dropdown'),
                                         isExpanded: true,
-                                        value: _type,
+                                        initialValue: _type,
                                         decoration: _input(),
                                         items: const [
                                           WorkOrderType.preventive,
@@ -484,7 +484,7 @@ class _WorkOrderCreateScreenState extends ConsumerState<WorkOrderCreateScreen> {
                                           WorkOrderPriority>(
                                         key: const Key('wo_priority_dropdown'),
                                         isExpanded: true,
-                                        value: _priority,
+                                        initialValue: _priority,
                                         decoration: _input(),
                                         items: WorkOrderPriority.values
                                             .map((p) => DropdownMenuItem(
@@ -631,7 +631,7 @@ class _WorkOrderCreateScreenState extends ConsumerState<WorkOrderCreateScreen> {
     return DropdownButtonFormField<int>(
       key: const Key('wo_depot_dropdown'),
       isExpanded: true,
-      value: safe,
+      initialValue: safe,
       decoration: _input('-- Select Depot --').copyWith(
         suffixIcon: _loadingDepots
             ? const Padding(
@@ -690,7 +690,7 @@ class _WorkOrderCreateScreenState extends ConsumerState<WorkOrderCreateScreen> {
           DropdownButtonFormField<InfraFilterType>(
             key: const Key('wo_infra_type_dropdown'),
             isExpanded: true,
-            value: _infraType,
+            initialValue: _infraType,
             decoration: _input(),
             items: const [
               InfraFilterType.station,
@@ -717,7 +717,7 @@ class _WorkOrderCreateScreenState extends ConsumerState<WorkOrderCreateScreen> {
           DropdownButtonFormField<int>(
             key: const Key('wo_location_dropdown'),
             isExpanded: true,
-            value: _locations.any((l) => l.id == _selectedLocationId)
+            initialValue: _locations.any((l) => l.id == _selectedLocationId)
                 ? _selectedLocationId
                 : null,
             decoration: _input('-- Select ${_infraType.label} --').copyWith(
@@ -751,7 +751,7 @@ class _WorkOrderCreateScreenState extends ConsumerState<WorkOrderCreateScreen> {
           DropdownButtonFormField<String>(
             key: const Key('wo_asset_category_dropdown'),
             isExpanded: true,
-            value: _categories.contains(_selectedCategory)
+            initialValue: _categories.contains(_selectedCategory)
                 ? _selectedCategory
                 : null,
             decoration: _input('-- All Categories --'),
@@ -780,7 +780,7 @@ class _WorkOrderCreateScreenState extends ConsumerState<WorkOrderCreateScreen> {
           DropdownButtonFormField<int>(
             key: const Key('wo_asset_dropdown'),
             isExpanded: true,
-            value: _filteredAssets.any((a) => a.id == _selectedAssetId)
+            initialValue: _filteredAssets.any((a) => a.id == _selectedAssetId)
                 ? _selectedAssetId
                 : null,
             decoration: _input('-- Generic / Location Work --').copyWith(
@@ -898,7 +898,7 @@ class _WorkOrderCreateScreenState extends ConsumerState<WorkOrderCreateScreen> {
           DropdownButtonFormField<MaintenanceScheduleType?>(
             key: const Key('wo_template_schedule_dropdown'),
             isExpanded: true,
-            value: _templateScheduleFilter,
+            initialValue: _templateScheduleFilter,
             decoration: _input('-- All Schedule Types --'),
             items: [
               const DropdownMenuItem<MaintenanceScheduleType?>(
@@ -929,7 +929,7 @@ class _WorkOrderCreateScreenState extends ConsumerState<WorkOrderCreateScreen> {
           DropdownButtonFormField<int>(
             key: const Key('wo_template_dropdown'),
             isExpanded: true,
-            value: filtered.any((t) => t.id == _selectedMaintenanceMasterId)
+            initialValue: filtered.any((t) => t.id == _selectedMaintenanceMasterId)
                 ? _selectedMaintenanceMasterId
                 : null,
             decoration: _input('-- Select Checklist --').copyWith(

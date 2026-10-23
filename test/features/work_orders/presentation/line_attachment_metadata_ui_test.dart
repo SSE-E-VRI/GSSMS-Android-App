@@ -1,3 +1,5 @@
+import '../../../helpers/fake_auth.dart';
+import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -52,6 +54,15 @@ void main() {
     );
     await tester.pumpWidget(
       ProviderScope(
+        overrides: [
+          authControllerProvider.overrideWith(() => FakeAuthenticatedController(
+                fakeSession(permissions: const [
+                  'maintenance.view',
+                  'maintenance.attachment_add',
+                  'maintenance.attachment_delete'
+                ]),
+              ))
+        ],
         child: MaterialApp(
           theme: AppTheme.lightTheme,
           home: Scaffold(

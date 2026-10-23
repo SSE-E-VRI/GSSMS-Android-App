@@ -258,7 +258,7 @@ class _AssetListScreenState extends ConsumerState<AssetListScreen> {
       child: DropdownButtonFormField<String?>(
         key: const Key('asset_category_filter_dropdown'),
         isExpanded: true,
-        value: selected,
+        initialValue: selected,
         decoration: const InputDecoration(
           labelText: 'Category',
           contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),

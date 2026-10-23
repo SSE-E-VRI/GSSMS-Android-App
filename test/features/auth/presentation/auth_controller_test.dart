@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gssms_mobile/core/database/local_cache_service.dart';
+import 'package:gssms_mobile/core/sync/outbox_command.dart';
 import 'package:gssms_mobile/core/sync/sync_manager.dart';
 import 'package:gssms_mobile/features/auth/data/auth_repository.dart';
 import 'package:gssms_mobile/features/auth/domain/models/auth_exceptions.dart';
@@ -141,6 +142,86 @@ void main() {
 
       final state = container.read(authControllerProvider);
       expect(state, isA<Unauthenticated>());
+    });
+
+    group('offline queue retention', () {
+      late InMemoryLocalCacheService cache;
+      late ProviderContainer c;
+
+      setUp(() async {
+        cache = InMemoryLocalCacheService();
+        await cache.setCacheOwnerUserId(7);
+        await cache.saveOutboxCommands([
+          OutboxCommand(
+            idempotencyKey: 'k1',
+            type: OutboxCommandType.submitLine,
+            entityId: 1,
+            payload: const {},
+            createdAt: DateTime.utc(2026, 1, 1),
+            ownerUserId: 7,
+          ),
+        ]);
+        c = ProviderContainer(overrides: [
+          authRepositoryProvider.overrideWithValue(mockRepository),
+          localCacheServiceProvider.overrideWithValue(cache),
+        ]);
+      });
+
+      tearDown(() => c.dispose());
+
+      test('handleSessionExpired preserves the outbox and owner', () async {
+        await c.read(authControllerProvider.notifier).handleSessionExpired();
+
+        expect(await cache.getOutboxCommands(), hasLength(1));
+        expect(await cache.getCacheOwnerUserId(), 7);
+        expect((c.read(authControllerProvider) as AuthError).code,
+            'SESSION_EXPIRED');
+      });
+
+      test('logout wipes the outbox', () async {
+        when(() => mockRepository.logout()).thenAnswer((_) async {});
+
+        await c.read(authControllerProvider.notifier).logout();
+
+        expect(await cache.getOutboxCommands(), isEmpty);
+        expect(await cache.getCacheOwnerUserId(), isNull);
+      });
+
+      test('onAccessTokenRefreshed keeps outbox for same user, wipes for different user', () async {
+        const before = UserSession(
+          accessToken: 'a',
+          username: 'u',
+          userId: 7,
+          primaryRole: AuthRole.maintenanceStaff,
+          roles: [AuthRole.maintenanceStaff],
+          permissions: ['maintenance.view'],
+        );
+        final sameUser = before.copyWith(
+            permissions: const ['maintenance.view', 'maintenance.edit']);
+        final controller = c.read(authControllerProvider.notifier);
+
+        await controller.onAccessTokenRefreshed(sameUser, before);
+        expect(await cache.getOutboxCommands(), hasLength(1));
+
+        final otherUser = UserSession(
+          accessToken: 'b',
+          username: 'v',
+          userId: 8,
+          primaryRole: AuthRole.maintenanceStaff,
+          roles: const [AuthRole.maintenanceStaff],
+          permissions: const ['maintenance.view'],
+        );
+        await controller.onAccessTokenRefreshed(otherUser, before);
+        expect(await cache.getOutboxCommands(), isEmpty);
+      });
+    });
+
+    test('failed logout exposes retryable cleanup error', () async {
+      when(() => mockRepository.logout()).thenThrow(StateError('storage unavailable'));
+      await container.read(authControllerProvider.notifier).logout();
+      final state = container.read(authControllerProvider) as AuthError;
+      expect(state.code, 'SIGN_OUT_FAILED');
+      expect(state.message, contains('retry'));
     });
 
     test('onAccessTokenRefreshed updates Authenticated session claims', () async {

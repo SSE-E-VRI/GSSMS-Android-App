@@ -573,8 +573,17 @@ class WorkOrderRepository implements IWorkOrderRepository {
 
   @override
   Future<int> startExecution(int workOrderId) async {
+    // Key is created BEFORE the first attempt and reused for the queued
+    // command, so a request that reached the server but timed out client-side
+    // is deduplicated on replay. (If an existing pending duplicate is kept by
+    // enqueueDeduped, that older command's key is used instead - acceptable.)
+    final idempotencyKey =
+        'start_exec_${workOrderId}_${DateTime.now().millisecondsSinceEpoch}';
     try {
-      final recordId = await _apiService.startExecution(workOrderId);
+      final recordId = await _apiService.startExecution(
+        workOrderId,
+        idempotencyKey: idempotencyKey,
+      );
       return recordId;
     } catch (e) {
       if (_isNetworkException(e) && _syncManager != null) {
@@ -587,8 +596,7 @@ class WorkOrderRepository implements IWorkOrderRepository {
         // caller can tell "queued for later" apart from a genuine failure
         // and skip navigation rather than guess an id.
         final cmd = OutboxCommand(
-          idempotencyKey:
-              'start_exec_${workOrderId}_${DateTime.now().millisecondsSinceEpoch}',
+          idempotencyKey: idempotencyKey,
           type: OutboxCommandType.startExecution,
           entityId: workOrderId,
           payload: const {},
@@ -609,6 +617,12 @@ class WorkOrderRepository implements IWorkOrderRepository {
     Map<String, dynamic>? checklist,
     List<int>? evidence,
   }) async {
+    // Key is created BEFORE the first attempt and reused for the queued
+    // command, so a request that reached the server but timed out client-side
+    // is deduplicated on replay. (If an existing pending duplicate is kept by
+    // enqueueDeduped, that older command's key is used instead - acceptable.)
+    final idempotencyKey =
+        'trans_${workOrderId}_${status}_${DateTime.now().millisecondsSinceEpoch}';
     try {
       final order = await _apiService.changeStatus(
         workOrderId,
@@ -616,6 +630,7 @@ class WorkOrderRepository implements IWorkOrderRepository {
         remarks: remarks,
         checklist: checklist,
         evidence: evidence,
+        idempotencyKey: idempotencyKey,
       );
       await _cacheService.cacheWorkOrderDetail(order);
       return order;
@@ -628,8 +643,7 @@ class WorkOrderRepository implements IWorkOrderRepository {
           );
         }
         final cmd = OutboxCommand(
-          idempotencyKey:
-              'trans_${workOrderId}_${status}_${DateTime.now().millisecondsSinceEpoch}',
+          idempotencyKey: idempotencyKey,
           type: OutboxCommandType.transitionStatus,
           entityId: workOrderId,
           payload: {
@@ -696,15 +710,21 @@ class WorkOrderRepository implements IWorkOrderRepository {
   @override
   Future<MutationOutcome> submitChecklistLine(
       int recordId, Map<String, dynamic> lineData) async {
+    final lineId = lineData['line_id'] ?? 0;
+    // Key is created BEFORE the first attempt and reused for the queued
+    // command, so a request that reached the server but timed out client-side
+    // is deduplicated on replay. (If an existing pending duplicate is kept by
+    // enqueueDeduped, that older command's key is used instead - acceptable.)
+    final idempotencyKey =
+        'line_${recordId}_${lineId}_${DateTime.now().millisecondsSinceEpoch}';
     try {
-      await _apiService.submitLine(recordId, lineData);
+      await _apiService.submitLine(recordId, lineData,
+          idempotencyKey: idempotencyKey);
       return MutationOutcome.synced;
     } catch (e) {
       if (_isNetworkException(e) && _syncManager != null) {
-        final lineId = lineData['line_id'] ?? 0;
         final cmd = OutboxCommand(
-          idempotencyKey:
-              'line_${recordId}_${lineId}_${DateTime.now().millisecondsSinceEpoch}',
+          idempotencyKey: idempotencyKey,
           type: OutboxCommandType.submitLine,
           entityId: recordId,
           payload: lineData,
@@ -732,20 +752,26 @@ class WorkOrderRepository implements IWorkOrderRepository {
     String? remarks,
     String? otherStaff,
   }) async {
+    // Key is created BEFORE the first attempt and reused for the queued
+    // command, so a request that reached the server but timed out client-side
+    // is deduplicated on replay. (If an existing pending duplicate is kept by
+    // enqueueDeduped, that older command's key is used instead - acceptable.)
+    final idempotencyKey =
+        'evidence_${recordId}_${DateTime.now().millisecondsSinceEpoch}';
     try {
       await _apiService.uploadRecordEvidence(
         recordId,
         proofJpegPath: proofJpegPath,
         remarks: remarks,
         otherStaff: otherStaff,
+        idempotencyKey: idempotencyKey,
       );
       return MutationOutcome.synced;
     } catch (e) {
       if (_isNetworkException(e) && _syncManager != null) {
         await _enqueueDeduped(
             OutboxCommand(
-              idempotencyKey:
-                  'evidence_${recordId}_${DateTime.now().millisecondsSinceEpoch}',
+              idempotencyKey: idempotencyKey,
               type: OutboxCommandType.uploadEvidence,
               entityId: recordId,
               payload: {
@@ -784,10 +810,15 @@ class WorkOrderRepository implements IWorkOrderRepository {
     bool queueOnly = false,
   }) async {
     final syncManager = _syncManager;
+    // Key is created BEFORE the first attempt and reused for the queued
+    // command, so a request that reached the server but timed out client-side
+    // is deduplicated on replay. (If an existing pending duplicate is kept by
+    // enqueueDeduped, that older command's key is used instead - acceptable.)
+    final idempotencyKey =
+        'complete_${recordId}_${DateTime.now().millisecondsSinceEpoch}';
     Future<MutationOutcome> enqueue(SyncManager sync) async {
       await _enqueueDeduped(OutboxCommand(
-        idempotencyKey:
-            'complete_${recordId}_${DateTime.now().millisecondsSinceEpoch}',
+        idempotencyKey: idempotencyKey,
         type: OutboxCommandType.completeRecord,
         entityId: recordId,
         payload: {
@@ -807,11 +838,13 @@ class WorkOrderRepository implements IWorkOrderRepository {
         technicianName: technicianName,
         remarks: remarks,
         supervisorName: supervisorName,
+        idempotencyKey: idempotencyKey,
       );
       return MutationOutcome.synced;
     } catch (e) {
-      if (_isNetworkException(e) && syncManager != null)
+      if (_isNetworkException(e) && syncManager != null) {
         return enqueue(syncManager);
+      }
       rethrow;
     }
   }

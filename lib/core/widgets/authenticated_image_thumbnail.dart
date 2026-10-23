@@ -1,3 +1,4 @@
+import 'package:gssms_mobile/core/widgets/protected_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
@@ -71,7 +72,7 @@ class AuthenticatedImageThumbnail extends ConsumerWidget {
         fullscreenDialog: true,
         builder: (_) => PhotoPreviewScaffold(
           title: previewTitle ?? 'Photo',
-          image: Image.network(
+          image: ProtectedNetworkImage(
             imageUrl,
             headers: headers,
             fit: BoxFit.contain,
@@ -104,7 +105,7 @@ class AuthenticatedImageThumbnail extends ConsumerWidget {
           width: width,
           height: height,
           child: hasUrl
-              ? Image.network(
+              ? ProtectedNetworkImage(
                   url!.trim(),
                   headers: headers,
                   fit: BoxFit.cover,

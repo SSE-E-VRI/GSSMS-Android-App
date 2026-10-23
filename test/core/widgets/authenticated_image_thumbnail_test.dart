@@ -1,3 +1,4 @@
+import 'package:gssms_mobile/core/widgets/protected_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -56,10 +57,10 @@ void main() {
     expect(find.byIcon(Icons.image_outlined), findsOneWidget);
   });
 
-  testWidgets('renders Image.network with auth header and opens preview on tap', (tester) async {
+  testWidgets('renders protected image with current session and opens preview on tap', (tester) async {
     const tapKey = Key('test_photo_thumb');
     await tester.pumpWidget(buildFrame(
-      url: 'https://example.com/media/photos/photo_42.jpg',
+      url: 'https://gssms.share.zrok.io/media/photos/photo_42.jpg',
       token: 'jwt-auth-header-check',
       tapKey: tapKey,
     ));
@@ -68,9 +69,9 @@ void main() {
     expect(imageFinder, findsOneWidget);
 
     final imageWidget = tester.widget<Image>(imageFinder);
-    expect(imageWidget.image, isA<NetworkImage>());
-    final netImage = imageWidget.image as NetworkImage;
-    expect(netImage.headers?['Authorization'], 'Bearer jwt-auth-header-check');
+    expect(imageWidget.image, isA<ProtectedMediaImage>());
+    final netImage = imageWidget.image as ProtectedMediaImage;
+    expect(netImage.token, 'jwt-auth-header-check');
 
     // Tap to open preview
     await tester.tap(find.byKey(tapKey));

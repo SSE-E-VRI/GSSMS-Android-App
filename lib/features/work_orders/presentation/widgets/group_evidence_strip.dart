@@ -37,6 +37,15 @@ class GroupEvidenceStrip extends ConsumerStatefulWidget {
 }
 
 class _GroupEvidenceStripState extends ConsumerState<GroupEvidenceStrip> {
+  bool get _canUpload =>
+      !widget.isPastTechCompleted &&
+      canAddChecklistAttachment(
+          sessionFromAuth(ref.read(authControllerProvider)));
+  bool get _canDelete =>
+      !widget.isPastTechCompleted &&
+      canDeleteChecklistAttachment(
+          sessionFromAuth(ref.read(authControllerProvider)));
+
   late bool _expanded = widget.holder.attachments.isNotEmpty;
 
   Map<String, String>? _authHeaders() {
@@ -50,11 +59,12 @@ class _GroupEvidenceStripState extends ConsumerState<GroupEvidenceStrip> {
       ref.read(checklistControllerProvider(widget.recordId).notifier);
 
   Future<void> _capture(EvidenceKind kind, ImageSource source) async {
+    if (!_canUpload) return;
     if (source == ImageSource.gallery &&
         !await ref.read(galleryPermissionServiceProvider).request(context)) {
       return;
     }
-    if (!mounted) return;
+    if (!mounted || !_canUpload) return;
     // Read everything ref-derived before the camera hand-off (the State can
     // be disposed while the camera app is in the foreground).
     final evidenceService = ref.read(evidenceServiceProvider);
@@ -102,6 +112,7 @@ class _GroupEvidenceStripState extends ConsumerState<GroupEvidenceStrip> {
   }
 
   Future<void> _delete(LineAttachment attachment) async {
+    if (!_canDelete) return;
     if (widget.isPastTechCompleted) {
       showGssmsSnackBar(
         context,
@@ -119,7 +130,7 @@ class _GroupEvidenceStripState extends ConsumerState<GroupEvidenceStrip> {
       confirmLabel: 'Delete',
       destructive: true,
     );
-    if (!confirmed || !mounted) return;
+    if (!confirmed || !mounted || !_canDelete) return;
     await _controller.deleteLineAttachment(
       lineId: widget.holder.id,
       attachmentId: attachment.id,
@@ -210,6 +221,7 @@ class _GroupEvidenceStripState extends ConsumerState<GroupEvidenceStrip> {
 
   @override
   Widget build(BuildContext context) {
+    ref.watch(authControllerProvider);
     final holder = widget.holder;
     final tokens = context.gssms;
     final before = holder.attachments.where((a) => a.kind == 'BEFORE').toList();
@@ -266,6 +278,12 @@ class _GroupEvidenceStripState extends ConsumerState<GroupEvidenceStrip> {
           ),
         ),
         if (_expanded) ...[
+          if (!_canUpload && !widget.isPastTechCompleted)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child:
+                  Text('Photo upload is unavailable with your current access.'),
+            ),
           const SizedBox(height: GssmsSpacing.s8),
           _strip(EvidenceKind.before, 'Before Photos', before),
           if (during.isNotEmpty) ...[
@@ -284,8 +302,8 @@ class _GroupEvidenceStripState extends ConsumerState<GroupEvidenceStrip> {
     String title,
     List<LineAttachment> attachments,
   ) {
-    final canAdd = attachments.length < GroupEvidenceStrip.maxPerKind &&
-        !widget.isPastTechCompleted;
+    final canAdd =
+        attachments.length < GroupEvidenceStrip.maxPerKind && _canUpload;
     final tokens = context.gssms;
     final id = widget.holder.id;
 
@@ -391,8 +409,7 @@ class _GroupEvidenceStripState extends ConsumerState<GroupEvidenceStrip> {
         GestureDetector(
           key: Key('line_attachment_thumb_$thumbKey'),
           onTap: () => _showFullscreen(attachment),
-          onLongPress:
-              widget.isPastTechCompleted ? null : () => _delete(attachment),
+          onLongPress: !_canDelete ? null : () => _delete(attachment),
           child: Stack(
             children: [
               ClipRRect(
@@ -427,7 +444,7 @@ class _GroupEvidenceStripState extends ConsumerState<GroupEvidenceStrip> {
               ),
               // ME-07: visible delete in front of the long-press gesture.
               // Same confirmed handler; long press is retained below.
-              if (!widget.isPastTechCompleted)
+              if (_canDelete)
                 Positioned(
                   right: 0,
                   bottom: 0,
@@ -456,7 +473,9 @@ class _GroupEvidenceStripState extends ConsumerState<GroupEvidenceStrip> {
               padding: const EdgeInsets.symmetric(horizontal: GssmsSpacing.s8),
               minimumSize: const Size(76, GssmsSize.touchTarget),
             ),
-            onPressed: () => _controller.retryAttachment(attachment),
+            onPressed: _canUpload
+                ? () => _controller.retryAttachment(attachment)
+                : null,
           ),
         ],
       ],

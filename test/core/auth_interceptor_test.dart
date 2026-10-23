@@ -36,7 +36,43 @@ ResponseBody _jsonResponse(dynamic data, int statusCode) {
 
 void main() {
   group('AuthInterceptor Wire & Adapter Tests', () {
-    test('intercepts 401, refreshes token once, and successfully retries request', () async {
+    test('temporary refresh failure does not sign the user out', () async {
+      var expired = 0;
+      final dio = Dio(BaseOptions(baseUrl: 'https://gssms.share.zrok.io'));
+      dio.httpClientAdapter =
+          MockHttpClientAdapter((_) async => _jsonResponse({}, 401));
+      dio.interceptors.add(AuthInterceptor(
+        dio: dio,
+        tokenProvider: () => 'old_token',
+        refreshTokenHandler: () async =>
+            throw StateError('temporary storage failure'),
+        onSessionExpired: () async {
+          expired++;
+        },
+      ));
+      await expectLater(
+          dio.get('/api/v1/assets/'), throwsA(isA<DioException>()));
+      expect(expired, 0);
+    });
+
+    test('failed expiry cleanup cannot leave a request hanging', () async {
+      final dio = Dio(BaseOptions(baseUrl: 'https://gssms.share.zrok.io'));
+      dio.httpClientAdapter =
+          MockHttpClientAdapter((_) async => _jsonResponse({}, 401));
+      dio.interceptors.add(AuthInterceptor(
+        dio: dio,
+        tokenProvider: () => 'old_token',
+        refreshTokenHandler: () async => null,
+        onSessionExpired: () async => throw StateError('storage failure'),
+      ));
+      await expectLater(
+          dio.get('/api/v1/assets/').timeout(const Duration(seconds: 2)),
+          throwsA(isA<DioException>()));
+    });
+
+    test(
+        'intercepts 401, refreshes token once, and successfully retries request',
+        () async {
       int requestCount = 0;
       int refreshCount = 0;
       String? currentToken = 'old_token';
@@ -70,7 +106,9 @@ void main() {
       expect(requestCount, 2); // Initial 401 + retry 200
     });
 
-    test('retries only once on second 401 and calls onSessionExpired without loop', () async {
+    test(
+        'retries only once on second 401 and calls onSessionExpired without loop',
+        () async {
       int requestCount = 0;
       int refreshCount = 0;
       int sessionExpiredCount = 0;
@@ -137,7 +175,8 @@ void main() {
       expect(refreshCount, 0);
     });
 
-    test('coalesces multiple concurrent 401 requests to a single refresh call', () async {
+    test('coalesces multiple concurrent 401 requests to a single refresh call',
+        () async {
       int refreshCount = 0;
       String? currentToken = 'stale_token';
 
@@ -175,7 +214,9 @@ void main() {
   });
 
   group('AuthInterceptor retry body + identity (H1/H3 audit fixes)', () {
-    test('re-sends a consumed FormData on retry after refresh (multipart survives 401)', () async {
+    test(
+        're-sends a consumed FormData on retry after refresh (multipart survives 401)',
+        () async {
       int requestCount = 0;
       String? currentToken = 'old_token';
 
@@ -201,7 +242,7 @@ void main() {
 
       FormData buildForm() {
         final form = FormData();
-        form.fields.add(MapEntry('profile', 'minus'));
+        form.fields.add(const MapEntry('profile', 'minus'));
         form.files.add(MapEntry(
           'profile_picture',
           MultipartFile.fromBytes(Uint8List.fromList('jpeg-bytes'.codeUnits),
@@ -216,7 +257,9 @@ void main() {
       expect(requestCount, 2, reason: 'both attempts must have sent a body');
     });
 
-    test('a 401 from a superseded identity is dropped — not replayed, no session teardown (H3)', () async {
+    test(
+        'a 401 from a superseded identity is dropped — not replayed, no session teardown (H3)',
+        () async {
       int refreshCount = 0;
       int sessionExpiredCount = 0;
       // The request is launched under user 7's token; while it is in flight
@@ -248,11 +291,16 @@ void main() {
         throwsA(isA<DioException>()),
       );
 
-      expect(refreshCount, 0, reason: 'stale request must not trigger a refresh for the new session');
-      expect(sessionExpiredCount, 0, reason: 'stale request must not tear down the newer session');
+      expect(refreshCount, 0,
+          reason:
+              'stale request must not trigger a refresh for the new session');
+      expect(sessionExpiredCount, 0,
+          reason: 'stale request must not tear down the newer session');
     });
 
-    test('a stale 401 that already retried once must not fire onSessionExpired across identities (H3)', () async {
+    test(
+        'a stale 401 that already retried once must not fire onSessionExpired across identities (H3)',
+        () async {
       int sessionExpiredCount = 0;
       final staleUserToken = _jwtForUser(7);
       final currentUserToken = _jwtForUser(42);
@@ -273,9 +321,10 @@ void main() {
       );
 
       await expectLater(
-        dio.get('/api/v1/work-orders/', options: Options(
-          extra: {'k_auth_retried': true},
-        )),
+        dio.get('/api/v1/work-orders/',
+            options: Options(
+              extra: {'k_auth_retried': true},
+            )),
         throwsA(isA<DioException>()),
       );
 
@@ -289,6 +338,7 @@ String _jwtForUser(int userId) {
     final b = base64Url.encode(utf8.encode(raw));
     return b.replaceAll('=', '');
   }
+
   return '${enc('{"alg":"none","typ":"JWT"}')}.${enc(jsonEncode({
         'user_id': userId,
         'exp': (DateTime.now().toUtc().millisecondsSinceEpoch ~/ 1000) + 3600,

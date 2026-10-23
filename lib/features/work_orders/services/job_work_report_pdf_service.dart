@@ -8,7 +8,6 @@ import 'package:gssms_mobile/features/work_orders/services/report_pdf/complaint_
 import 'package:gssms_mobile/features/work_orders/services/report_pdf/inspection_report_pdf.dart';
 import 'package:gssms_mobile/features/work_orders/services/report_pdf/rectification_report_pdf.dart';
 import 'package:gssms_mobile/features/work_orders/services/job_work_report_pdf_primitives.dart';
-import 'package:gssms_mobile/features/work_orders/services/report_pdf/report_fonts.dart';
 
 /// Builds the printable Job Work report (technician "Report Preview") for the
 /// four Job Work kinds. Mirrors the web FormPreview,

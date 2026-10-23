@@ -32,13 +32,13 @@ class EnergyPlaceholderScreen extends StatelessWidget {
             ),
             const SizedBox(height: 24),
             Text(
-              'Energy Module — Coming Soon',
+              'Energy Module — Not in this release',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: context.gssms.textPrimary),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 12),
             Text(
-              'Meter photography, bill upload and consumption trends are planned for Phase 5. '
+              'Meter photography, bill upload and consumption trends are outside the current mobile release scope. '
               'They depend on backend work that has not yet shipped:',
               style: TextStyle(fontSize: 14, color: context.gssms.textSecondary),
               textAlign: TextAlign.center,

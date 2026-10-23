@@ -280,8 +280,9 @@ class RectificationItem extends Equatable {
     final out = <String>[];
     if (actionTaken.trim().isEmpty) out.add('$label: write the action taken.');
     if (outcome.isEmpty) out.add('$label: choose Rectified or Not rectified.');
-    if (photosOf(NarrativePhotoKind.before).isEmpty)
+    if (photosOf(NarrativePhotoKind.before).isEmpty) {
       out.add('$label: add a Before photo.');
+    }
     if (isRectified && photosOf(NarrativePhotoKind.after).isEmpty) {
       out.add('$label: add an After photo.');
     }

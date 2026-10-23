@@ -131,6 +131,24 @@ class SyncManager extends Notifier<SyncState> {
   /// it, so it read as a safety mechanism while enforcing nothing. If another
   /// command type ever needs ordering, add its rule below — and a test — so
   /// the guarantee stays visible in one place.
+  /// HTTP statuses that mean "try again later", not "this command is bad".
+  static bool _isTransientHttp(int? status) =>
+      status == 408 ||
+      status == 429 ||
+      status == 502 ||
+      status == 503 ||
+      status == 504;
+
+  /// Numeric `Retry-After` (seconds) on 429/503, capped at 480s.
+  static int? _retryAfterSeconds(DioException e) {
+    final status = e.response?.statusCode;
+    if (status != 429 && status != 503) return null;
+    final raw = e.response?.headers.value('retry-after');
+    final secs = int.tryParse(raw?.trim() ?? '');
+    if (secs == null || secs < 0) return null;
+    return secs > 480 ? 480 : secs;
+  }
+
   bool _hasUnsyncedDependency(
     OutboxCommand cmd,
     List<OutboxCommand> scopedCommands,
@@ -215,7 +233,7 @@ class SyncManager extends Notifier<SyncState> {
       final ownerId = command.ownerUserId ?? await _cacheOwnerUserId();
       final stamped =
           ownerId == null ? command : command.copyWith(ownerUserId: ownerId);
-      final commands = await _cacheService.getOutboxCommands();
+      final commands = [...await _cacheService.getOutboxCommands()];
       commands.add(stamped);
       await _cacheService.saveOutboxCommands(commands);
       await refreshPendingCount();
@@ -244,7 +262,7 @@ class SyncManager extends Notifier<SyncState> {
       final ownerId = command.ownerUserId ?? await _cacheOwnerUserId();
       final stamped =
           ownerId == null ? command : command.copyWith(ownerUserId: ownerId);
-      final commands = await _cacheService.getOutboxCommands();
+      final commands = [...await _cacheService.getOutboxCommands()];
       final isDup = commands.any((c) =>
           c.status == OutboxCommandStatus.pending && isDuplicate(c));
       if (isDup) return false;
@@ -315,6 +333,9 @@ class SyncManager extends Notifier<SyncState> {
 
         final remainingCommands = <OutboxCommand>[];
         final syncedKeys = <String>{};
+        // True only when the loop stopped on a network failure or a transient
+        // HTTP status (408/429/502/503/504).
+        var hitConnectivity = false;
 
         for (var i = 0; i < scopedCommands.length; i++) {
           // Epoch changed mid-drain: abort without persisting anything.
@@ -346,7 +367,11 @@ class SyncManager extends Notifier<SyncState> {
                     errStr.contains('socketexception') ||
                     errStr.contains('network is unreachable');
 
-            if (isNetwork) {
+            final statusCode = dioErr.response?.statusCode;
+            final isTransient = _isTransientHttp(statusCode);
+            if (isNetwork || isTransient) {
+              hitConnectivity = true;
+              final reason = isNetwork ? 'Network offline.' : 'Server busy.';
               // Keep command in pending state and pause outbox draining.
               // Cap retries so an always-offline queue cannot grow its
               // retryCount unboundedly; after the cap it parks as FAILED
@@ -357,24 +382,25 @@ class SyncManager extends Notifier<SyncState> {
               if (cmd.retryCount >= maxAutoRetries) {
                 remainingCommands.add(cmd.copyWith(
                   status: OutboxCommandStatus.failed,
-                  lastError:
-                      'Network offline. Retry limit reached — tap retry.',
+                  lastError: '$reason Retry limit reached — tap retry.',
                 ));
               } else {
                 remainingCommands.add(cmd.copyWith(
                   retryCount: cmd.retryCount + 1,
-                  lastError: 'Network offline. Will retry automatically.',
+                  lastError: '$reason Will retry automatically.',
                 ));
               }
               remainingCommands.addAll(scopedCommands.sublist(i + 1));
               state = state.copyWith(
                 mode: SyncConnectivityMode.offline,
-                lastError: 'Network offline. Queued for background sync.',
+                lastError: '$reason Queued for background sync.',
               );
               _offlineStrikes = (_offlineStrikes + 1).clamp(0, 4);
-              final backoffSeconds = 30 << _offlineStrikes;
+              final computed = 30 << _offlineStrikes;
+              final backoffSeconds = _retryAfterSeconds(dioErr) ??
+                  (computed > 480 ? 480 : computed);
               _offlineBackoffUntil = DateTime.now().add(
-                Duration(seconds: backoffSeconds > 480 ? 480 : backoffSeconds),
+                Duration(seconds: backoffSeconds),
               );
               break;
             }
@@ -382,7 +408,6 @@ class SyncManager extends Notifier<SyncState> {
             // lastError is shown to the user (per-photo sync badge), so it
             // gets the same user-facing text as every other error — never the
             // raw response body, which can be an HTML proxy page.
-            final statusCode = dioErr.response?.statusCode;
             if (statusCode == 409) {
               remainingCommands.add(cmd.copyWith(
                 status: OutboxCommandStatus.conflict,
@@ -433,7 +458,9 @@ class SyncManager extends Notifier<SyncState> {
         // are still queued for upload. Compare canonical absolute paths so
         // a symlink/relative mismatch cannot delete a queued photo.
         final queuedPaths = <String>{};
-        for (final cmd in prunedRemaining) {
+        // Include other owners' queued commands too: their files must never be
+        // swept by this session's retention pass.
+        for (final cmd in [...prunedRemaining, ...unscopedCommands]) {
           final filePath = cmd.payload['file_path']?.toString();
           if (filePath != null && filePath.isNotEmpty) {
             queuedPaths.add(_canonicalPath(filePath));
@@ -460,15 +487,19 @@ class SyncManager extends Notifier<SyncState> {
         // pass while stuck work is still on disk.
         final persistedAll = [...unscopedCommands, ...prunedRemaining];
         state = state.copyWith(
-          mode: _countQueued(persistedAll) == 0
-              ? SyncConnectivityMode.online
-              : SyncConnectivityMode.offline,
+          mode: hitConnectivity
+              ? SyncConnectivityMode.offline
+              : SyncConnectivityMode.online,
           pendingCount: _countQueued(persistedAll),
           attentionCount: _countNeedsAttention(persistedAll),
           lastSyncTime: DateTime.now(),
         );
       } finally {
         _isDraining = false;
+        if (epoch != _sessionEpoch &&
+            state.mode == SyncConnectivityMode.syncing) {
+          state = state.copyWith(mode: SyncConnectivityMode.online);
+        }
       }
     });
   }
@@ -551,7 +582,7 @@ class SyncManager extends Notifier<SyncState> {
   /// Removes a command permanently from the outbox cache (e.g. user dismissed or deleted it).
   Future<void> removeCommand(String idempotencyKey) async {
     await _synchronized(() async {
-      final commands = await _cacheService.getOutboxCommands();
+      final commands = [...await _cacheService.getOutboxCommands()];
       commands.removeWhere((c) => c.idempotencyKey == idempotencyKey);
       await _cacheService.saveOutboxCommands(commands);
       await refreshPendingCount();

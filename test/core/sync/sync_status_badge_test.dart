@@ -120,6 +120,30 @@ void main() {
       expect(find.byIcon(Icons.error_outline), findsOneWidget);
     });
 
+    testWidgets('online with queued work blocked behind a failure says needs attention',
+        (tester) async {
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            syncManagerProvider.overrideWith(() => _TestSyncManager(
+                  const SyncState(
+                    mode: SyncConnectivityMode.online,
+                    pendingCount: 1,
+                    attentionCount: 1,
+                  ),
+                )),
+          ],
+          child: const MaterialApp(
+            home: Scaffold(body: Center(child: SyncStatusBadge())),
+          ),
+        ),
+      );
+
+      expect(find.byKey(const Key('sync_status_badge_attention')), findsOneWidget);
+      expect(find.text('1 blocked — needs attention'), findsOneWidget);
+      expect(find.textContaining('waiting to sync'), findsNothing);
+    });
+
     testWidgets('singularises the count', (tester) async {
       await tester.pumpWidget(
         ProviderScope(

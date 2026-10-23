@@ -16,6 +16,19 @@ void main() {
       apiService = AuthApiService(mockDio);
     });
 
+    test('network failures show a safe message instead of transport internals', () async {
+      when(() => mockDio.post<Map<String, dynamic>>(
+        '/api/v1/auth/login/', data: {'username': 'test_user', 'password': 'password123'},
+      )).thenThrow(DioException(
+        requestOptions: RequestOptions(path: '/api/v1/auth/login/'),
+        type: DioExceptionType.connectionError,
+        message: 'private transport diagnostics',
+      ));
+      await expectLater(apiService.login(username: 'test_user', password: 'password123'),
+        throwsA(isA<NetworkAuthException>().having((e) => e.message, 'safe message',
+          'Network connection failed. Please check your connectivity.')));
+    });
+
     test('login returns AuthTokens on 200 response', () async {
       when(
         () => mockDio.post<Map<String, dynamic>>(

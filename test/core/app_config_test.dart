@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gssms_mobile/core/config/app_config.dart';
 
@@ -103,6 +105,38 @@ void main() {
         stagingHttpConfig.wsUri('ws/notifications/').toString(),
         'wss://staging.example.com/ws/notifications/',
       );
+    });
+  });
+
+  group('AppConfig.parseSpkiPins', () {
+    final pinA = base64.encode(List<int>.filled(32, 1));
+    final pinB = base64.encode(List<int>.filled(32, 2));
+
+    test('empty or blank input yields an empty list', () {
+      expect(AppConfig.parseSpkiPins(''), isEmpty);
+      expect(AppConfig.parseSpkiPins('  , ,'), isEmpty);
+    });
+
+    test('parses, trims and drops empties', () {
+      expect(AppConfig.parseSpkiPins(' $pinA ,, $pinB,'), [pinA, pinB]);
+    });
+
+    test('rejects non-base64 pins', () {
+      expect(() => AppConfig.parseSpkiPins('not*base64!'),
+          throwsA(isA<ArgumentError>()));
+    });
+
+    test('rejects pins that are not 32 bytes', () {
+      final short = base64.encode(List<int>.filled(31, 1));
+      final long = base64.encode(List<int>.filled(33, 1));
+      expect(() => AppConfig.parseSpkiPins(short),
+          throwsA(isA<ArgumentError>()));
+      expect(() => AppConfig.parseSpkiPins('$pinA,$long'),
+          throwsA(isA<ArgumentError>()));
+    });
+
+    test('AppConfig defaults to no pins', () {
+      expect(const AppConfig(baseUrl: 'https://x.test').spkiPins, isEmpty);
     });
   });
 }

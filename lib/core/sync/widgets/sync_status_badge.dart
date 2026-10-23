@@ -26,16 +26,24 @@ class SyncStatusBadge extends ConsumerWidget {
     final tokens = context.gssms;
 
     if (syncState.attentionCount > 0) {
+      // Online with queued work stuck behind a FAILED/CONFLICT line: the queue
+      // will not drain on its own, so say it is blocked rather than "waiting".
+      final blocked = syncState.mode == SyncConnectivityMode.online &&
+          syncState.pendingCount > 0;
       return _Strip(
         badgeKey: const Key('sync_status_badge_attention'),
         background: tokens.danger.solid,
         foreground: tokens.danger.onSolid,
         icon: Icons.error_outline,
-        message:
-            '${_changes(syncState.attentionCount)} need attention — tap to retry',
-        semanticLabel:
-            'Sync problem. ${_changes(syncState.attentionCount)} could not be sent. '
-            'Activate to retry.',
+        message: blocked
+            ? '${syncState.attentionCount} blocked — needs attention'
+            : '${_changes(syncState.attentionCount)} need attention — tap to retry',
+        semanticLabel: blocked
+            ? 'Sync blocked. ${syncState.attentionCount} blocked, '
+                '${_changes(syncState.pendingCount)} waiting behind. '
+                'Needs attention. Activate to retry.'
+            : 'Sync problem. ${_changes(syncState.attentionCount)} could not be sent. '
+                'Activate to retry.',
         onTap: () async {
           final messenger = ScaffoldMessenger.of(context);
           await ref.read(syncManagerProvider.notifier).retryAllFailed();

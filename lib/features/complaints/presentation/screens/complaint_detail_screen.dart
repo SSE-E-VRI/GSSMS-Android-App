@@ -190,7 +190,7 @@ class _ComplaintDetailScreenState extends ConsumerState<ComplaintDetailScreen> {
                 children: [
                   DropdownButtonFormField<String>(
                     key: const Key('close_reason_dropdown'),
-                    value: reason,
+                    initialValue: reason,
                     isExpanded: true,
                     decoration:
                         const InputDecoration(labelText: 'Reason *'),

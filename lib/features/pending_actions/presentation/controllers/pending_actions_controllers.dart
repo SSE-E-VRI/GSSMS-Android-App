@@ -110,8 +110,9 @@ PendingBucket inspectionBucket(Inspection i) {
 
 /// Web `utils/deficiencyBucket.js`.
 PendingBucket deficiencyBucket(Deficiency d) {
-  if (d.status == DeficiencyStatus.resolved)
+  if (d.status == DeficiencyStatus.resolved) {
     return PendingBucket.awaitingClosure;
+  }
   if (d.hasActiveRemedial || d.status == DeficiencyStatus.inProgress) {
     return PendingBucket.inProgress;
   }

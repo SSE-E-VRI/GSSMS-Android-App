@@ -557,7 +557,7 @@ class _WorkOrderFilterSheet extends StatelessWidget {
               DropdownButtonFormField<WorkOrderStatus?>(
                 key: const Key('wo_status_filter_dropdown'),
                 isExpanded: true,
-                value: s?.selectedStatusFilter,
+                initialValue: s?.selectedStatusFilter,
                 decoration: dense.copyWith(labelText: 'Status'),
                 items: [
                   const DropdownMenuItem(value: null, child: Text('All')),
@@ -576,7 +576,7 @@ class _WorkOrderFilterSheet extends StatelessWidget {
               DropdownButtonFormField<WorkOrderType?>(
                 key: const Key('wo_type_filter_dropdown'),
                 isExpanded: true,
-                value: s?.selectedTypeFilter,
+                initialValue: s?.selectedTypeFilter,
                 decoration: dense.copyWith(labelText: 'Job Work type'),
                 items: const [
                   DropdownMenuItem(value: null, child: Text('All Types')),
@@ -589,7 +589,7 @@ class _WorkOrderFilterSheet extends StatelessWidget {
               DropdownButtonFormField<InfraFilterType>(
                 key: const Key('wo_infra_type_dropdown'),
                 isExpanded: true,
-                value: infraType,
+                initialValue: infraType,
                 decoration: dense.copyWith(labelText: 'Infrastructure type'),
                 items: [
                   for (final t in _infraOptions)
@@ -610,7 +610,7 @@ class _WorkOrderFilterSheet extends StatelessWidget {
               DropdownButtonFormField<String>(
                 key: const Key('wo_infra_name_dropdown'),
                 isExpanded: true,
-                value: names.contains(infraName) ? infraName : null,
+                initialValue: names.contains(infraName) ? infraName : null,
                 decoration: dense.copyWith(labelText: 'Infrastructure'),
                 hint: const Text('All'),
                 items: [
