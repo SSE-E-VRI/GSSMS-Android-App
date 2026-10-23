@@ -134,10 +134,13 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('dashboard_type_stats')), findsOneWidget);
       expect(find.textContaining('Preventive'), findsOneWidget);
-      await tester.scrollUntilVisible(find.text('Verify TR-01 job'), 300,
+      // Pending rows lead with the place; the task name moves to the
+      // subtitle. Pending Actions now sits above the charts, so scroll up.
+      await tester.scrollUntilVisible(find.text('VRI'), -300,
           scrollable: find.byType(Scrollable).first);
       await tester.pumpAndSettle();
-      expect(find.text('Verify TR-01 job'), findsOneWidget);
+      expect(find.text('VRI'), findsOneWidget);
+      expect(find.textContaining('Verify TR-01 job'), findsOneWidget);
     });
 
     Future<void> pumpSummary(WidgetTester tester, DashboardSummary summary) async {

@@ -190,7 +190,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         titleSpacing: GssmsSpacing.s16,
-        title: const Text('GSSMS', overflow: TextOverflow.ellipsis),
+        // Profile + two icons leave little room at large font sizes; scale the
+        // short brand mark down rather than truncating it to "GSS…".
+        title: const FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text('GSSMS'),
+        ),
         actions: [
           _buildHeaderProfile(context, currentSession),
           if (currentSession.hasPermission('maintenance.view'))

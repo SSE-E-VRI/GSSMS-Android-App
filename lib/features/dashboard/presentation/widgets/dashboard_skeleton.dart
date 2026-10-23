@@ -4,7 +4,7 @@ import 'package:gssms_mobile/core/theme/app_theme.dart';
 /// Static placeholder layout shown while the dashboard loads.
 ///
 /// Follows the same philosophy as [SkeletonList]: static shapes that mirror
-/// the loaded dashboard structure (Attention card, Donut chart, Pending actions)
+/// the loaded dashboard structure (KPI grid, Attention card, Donut chart, Pending actions)
 /// to eliminate cumulative layout shift (CLS) without costly per-frame shimmers.
 class DashboardSkeleton extends StatelessWidget {
   const DashboardSkeleton({super.key});
@@ -18,6 +18,26 @@ class DashboardSkeleton extends StatelessWidget {
         child: ListView(
           padding: const EdgeInsets.all(GssmsSpacing.s16),
           children: [
+            // 0. KPI overview (2 x 2) — first on the loaded screen too.
+            for (var row = 0; row < 2; row++) ...[
+              Row(
+                children: [
+                  Expanded(child: _card(context, children: const [
+                    _SkeletonBar(widthFactor: 0.4, height: 20),
+                    SizedBox(height: GssmsSpacing.s12),
+                    _SkeletonBar(widthFactor: 0.7, height: 12),
+                  ])),
+                  const SizedBox(width: 10),
+                  Expanded(child: _card(context, children: const [
+                    _SkeletonBar(widthFactor: 0.4, height: 20),
+                    SizedBox(height: GssmsSpacing.s12),
+                    _SkeletonBar(widthFactor: 0.7, height: 12),
+                  ])),
+                ],
+              ),
+              const SizedBox(height: 10),
+            ],
+            const SizedBox(height: GssmsSpacing.s8),
             // 1. Attention Required Section
             _card(
               context,

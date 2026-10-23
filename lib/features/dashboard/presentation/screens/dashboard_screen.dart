@@ -476,9 +476,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         rows.add(_pendingRow(
           icon: _pendingIcon(t.kind),
           color: _pendingColor(t.kind),
-          title: t.title,
+          // Lead with the place (as the Attention rows do): most tasks share
+          // a schedule name, so the station/asset is what tells them apart.
+          title: (t.subtitle ?? '').isNotEmpty ? t.subtitle! : t.title,
           subtitle: [
-            if ((t.subtitle ?? '').isNotEmpty) t.subtitle!,
+            if ((t.subtitle ?? '').isNotEmpty) t.title,
             if (t.kind != PendingActionKind.unknown &&
                 t.kind != PendingActionKind.task)
               t.kind.displayName,
