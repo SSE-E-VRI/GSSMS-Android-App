@@ -328,8 +328,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               ConstrainedBox(
                 constraints: BoxConstraints(
                   maxWidth: MediaQuery.textScalerOf(context)
-                      .scale(160)
-                      .clamp(160.0, 220.0),
+                      .scale(112)
+                      .clamp(112.0, 160.0),
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
