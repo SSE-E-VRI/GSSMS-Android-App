@@ -232,7 +232,13 @@ void main() {
     });
 
     tearDown(() async {
-      await dir.delete(recursive: true);
+      // Windows keeps the multipart file handle open briefly; temp-dir cleanup
+      // must not fail the test.
+      try {
+        await dir.delete(recursive: true);
+      } on FileSystemException {
+        // Best effort: the OS temp cleaner removes it later.
+      }
     });
 
     test('uploadRecordEvidence', () async {
