@@ -92,7 +92,7 @@ void main() {
   });
 
   group('MaintenanceRecord.assetGroups', () {
-    test('groups by unique id, else category::name (case-insensitive)', () {
+    test('groups by category::name across physical assets (case-insensitive)', () {
       final r = _record([
         _line(1, item: 'UPS', uniqueId: 'AST-1'),
         _line(2, item: 'ups', uniqueId: 'AST-1'),
@@ -101,13 +101,14 @@ void main() {
         _line(5, item: ' panel '),
       ]);
       final groups = r.assetGroups;
-      expect(groups.length, 3);
-      expect(groups[0].key, 'AST-1');
-      expect(groups[0].lines.map((l) => l.id), [1, 2]);
+      expect(groups.length, 2);
+      expect(groups[0].key, '1::ups');
+      expect(groups[0].assetUniqueId, isNull); // No synthetic asset identity.
+      expect(groups[0].lines.map((l) => l.id), [1, 2, 3]);
       expect(groups[0].photoHolder.id, 1);
-      expect(groups[1].key, 'AST-2');
-      expect(groups[2].key, '1::panel');
-      expect(groups[2].lines.map((l) => l.id), [4, 5]);
+      expect(groups[0].photoHolders.map((line) => line.id), [1, 3]);
+      expect(groups[1].key, '1::panel');
+      expect(groups[1].lines.map((l) => l.id), [4, 5]);
     });
 
     test('displayTitle uses asset name only when category has several', () {
@@ -140,7 +141,7 @@ void main() {
       ]);
       final g = {for (final x in r.assetGroups) x.assetName: x};
       expect(g['A']!.checkedOut, isTrue);
-      expect(g['A']!.checkoutSource, 'TECHNICIAN');
+      expect(g['A']!.checkoutSource, ''); // Different line-level sources stay distinct.
       expect(g['A']!.applicability, 'REQUIRED');
       expect(g['B']!.checkedOut, isFalse);
       expect(g['C']!.checkedOut, isFalse);

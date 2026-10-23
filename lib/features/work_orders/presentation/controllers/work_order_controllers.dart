@@ -665,7 +665,8 @@ class ChecklistController extends Notifier<ChecklistState> {
       final name = g.assetName.trim().toLowerCase();
       final updatedLines = latest.record.lines.map((l) {
         if (l.assetCategoryId == g.assetCategoryId &&
-            l.itemName.trim().toLowerCase() == name) {
+            l.itemName.trim().toLowerCase() == name &&
+            (!included || !l.isCheckedOut || l.excluded)) {
           return l.copyWith(
             checkedOut: result.checkedOut,
             checkoutSource: result.checkoutSource,
@@ -693,6 +694,14 @@ class ChecklistController extends Notifier<ChecklistState> {
       String message = 'Could not change group: ${userFacingError(e)}';
       if (e is DioException && e.response?.statusCode == 400) {
         final data = e.response?.data;
+        // The server and this screen disagree about the group's state (it was
+        // checked out by the supervisor, another device, or an earlier request
+        // whose reply was lost). That is not a failure to report: re-read the
+        // record so the toggle shows the server's truth.
+        final conflict = _groupStateConflict(data, included);
+        if (conflict) {
+          return _resyncAfterGroupConflict(g, included, without);
+        }
         if (data is Map && data['reason'] != null) {
           groupReasonRequired = true;
           final r = data['reason'];
@@ -702,6 +711,62 @@ class ChecklistController extends Notifier<ChecklistState> {
       state = latest.copyWith(
         savingGroupKeys: without(latest),
         errorMessage: groupReasonRequired ? null : message,
+      );
+      return false;
+    }
+  }
+
+  /// True for the server's "already checked out" (check-out) and "not
+  /// currently checked out" (un-check) 400s.
+  static bool _groupStateConflict(Object? data, bool included) {
+    if (data is! Map) return false;
+    final err = '${data['error'] ?? ''}'.toLowerCase();
+    return included
+        ? err.contains('already checked out')
+        : err.contains('not currently checked out');
+  }
+
+  /// Reloads the record after a group-state conflict. If the group is now in
+  /// the requested state the request is treated as satisfied; otherwise the
+  /// server holds a partial checkout for the group that this screen cannot
+  /// resolve, and the user is told what to do instead of seeing a dead end.
+  Future<bool> _resyncAfterGroupConflict(
+    ChecklistAssetGroup g,
+    bool included,
+    Set<String> Function(ChecklistLoaded) without,
+  ) async {
+    try {
+      final fresh = await _repository.fetchMaintenanceRecord(arg);
+      final latest = state;
+      if (latest is! ChecklistLoaded) return false;
+      ChecklistAssetGroup? now;
+      for (final candidate in fresh.assetGroups) {
+        if (candidate.key == g.key) {
+          now = candidate;
+          break;
+        }
+      }
+      final satisfied = now != null && now.checkedOut == included;
+      state = latest.copyWith(
+        record: fresh,
+        savingGroupKeys: without(latest),
+        successMessage: satisfied
+            ? '${g.displayTitle}: ${included ? 'already checked out' : 'already un-checked'}'
+            : null,
+        errorMessage: satisfied
+            ? null
+            : '${g.displayTitle} is only partly checked out on the server, so '
+                'it cannot be checked out from the app. Ask your supervisor '
+                'to re-check it out, or report this to your administrator.',
+      );
+      return satisfied;
+    } catch (_) {
+      final latest = state;
+      if (latest is! ChecklistLoaded) return false;
+      state = latest.copyWith(
+        savingGroupKeys: without(latest),
+        errorMessage:
+            'Could not change group: its state changed on the server. Pull to refresh and try again.',
       );
       return false;
     }

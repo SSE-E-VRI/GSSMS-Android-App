@@ -8,6 +8,14 @@ visible feature or change in what the app shows; MAJOR is a breaking change or
 forced update. The app talks to the GSSMS web/backend; API changes are additive,
 so older app builds keep working.
 
+## [0.3.5-rc1+9] - 2026-10-23
+
+### Fixed
+- One checkout switch per backend template group across physical assets; keep each asset's labels and evidence accessible.
+- Preserve supervisor attribution when topping up a partial checkout and retain the legacy-server conflict refresh.
+- Save progress flushes pending edits, waits for active saves, and reports locally queued work distinctly from server-saved work.
+- Login version aligned with this candidate. This is a pre-release, not production approval.
+
 ## [0.3.4+8] - 2026-10-23
 
 ### Fixed

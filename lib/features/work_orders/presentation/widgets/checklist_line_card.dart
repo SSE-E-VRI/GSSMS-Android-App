@@ -45,6 +45,8 @@ class ChecklistLineCard extends ConsumerStatefulWidget {
     this.onRetryPhoto,
     this.showAttachments = true,
     this.isHighlighted = false,
+    this.showOptionalTag = false,
+    this.registerFlush,
   });
 
   final MaintenanceRecordLine line;
@@ -62,6 +64,16 @@ class ChecklistLineCard extends ConsumerStatefulWidget {
 
   /// True when this card was jumped to as the first incomplete required line.
   final bool isHighlighted;
+
+  /// True when the record marks some rows required and this one is not, so
+  /// it is worth saying so. Never shown when no row is explicitly required
+  /// (then every row counts, see ChecklistLoaded.remainingRequired).
+  final bool showOptionalTag;
+
+  /// Lets the screen ask this card to save a pending (debounced) edit right
+  /// now - used by Save progress. Called with a callback on mount and with
+  /// null on dispose.
+  final void Function(int lineId, VoidCallback? flush)? registerFlush;
 
   @override
   ConsumerState<ChecklistLineCard> createState() => _ChecklistLineCardState();
@@ -114,6 +126,7 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
     _valueController = TextEditingController(text: _line.scalarValue);
     _remarksController =
         TextEditingController(text: _line.observationAction ?? '');
+    widget.registerFlush?.call(_line.id, _flushPending);
     _valueFocus = FocusNode()..addListener(_onFocusChanged);
     _remarksFocus = FocusNode()..addListener(_onFocusChanged);
 
@@ -173,6 +186,7 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
 
   @override
   void dispose() {
+    widget.registerFlush?.call(_line.id, null);
     _debounceTimer?.cancel();
     _valueFocus.removeListener(_onFocusChanged);
     _remarksFocus.removeListener(_onFocusChanged);
@@ -201,6 +215,11 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
     if (!_anyFieldFocused && _debounceTimer?.isActive == true) {
       _triggerSave(immediate: true);
     }
+  }
+
+  /// Saves a debounced edit that has not fired yet; a no-op otherwise.
+  void _flushPending() {
+    if (_debounceTimer?.isActive == true) _triggerSave(immediate: true);
   }
 
   /// Text edits are debounced; discrete choices (chips, dropdowns) save at once.
@@ -322,6 +341,11 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
                 line.displayTitle,
                 style: textTheme.titleMedium,
               ),
+              if (line.assetUniqueId?.isNotEmpty ?? false)
+                Text(
+                  line.assetUniqueId!,
+                  style: textTheme.labelSmall?.copyWith(color: tokens.textSecondary),
+                ),
               if (hasPoint) ...[
                 const SizedBox(height: 2),
                 Text(
@@ -334,7 +358,11 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
             ],
           ),
         ),
-        if (line.isRequired)
+        // Most rows are required, so a label on each one is noise. Red
+        // "Required" appears only on the row the user was just sent to (the
+        // first unfilled required row after a blocked submit); rows that
+        // are the exception say "Optional" in a neutral colour.
+        if (widget.isHighlighted && line.isRequired && !line.isCompleted)
           Padding(
             padding: const EdgeInsets.only(right: 6),
             child: Text(
@@ -342,6 +370,16 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
               style: textTheme.labelSmall?.copyWith(
                 color: tokens.danger.foreground,
                 fontWeight: FontWeight.w600,
+              ),
+            ),
+          )
+        else if (widget.showOptionalTag && !line.isRequired)
+          Padding(
+            padding: const EdgeInsets.only(right: 6),
+            child: Text(
+              'Optional',
+              style: textTheme.labelSmall?.copyWith(
+                color: tokens.textSecondary,
               ),
             ),
           ),

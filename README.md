@@ -59,7 +59,7 @@ still require separate security review.
 
 ## Release candidate
 
-Current candidate: **0.3.4+8**. See [photo upload permission fix](docs/PHOTO_UPLOAD_PERMISSION_FIX_2026-10-23.md). See
+Current candidate: **0.3.5-rc1+9** ([GitHub pre-release](https://github.com/SSE-E-VRI/GSSMS-Android-App/releases/tag/v0.3.5-rc1)); staging/field approval is pending. See [photo upload permission fix](docs/PHOTO_UPLOAD_PERMISSION_FIX_2026-10-23.md). See
 [production readiness](docs/PRODUCTION_READINESS_2026-10-23.md) for verification
 results and remaining field-validation gates.
 

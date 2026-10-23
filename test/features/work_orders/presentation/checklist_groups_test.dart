@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -16,6 +17,7 @@ import 'package:gssms_mobile/features/work_orders/domain/models/maintenance_reco
 import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_order_controllers.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/screens/checklist_screen.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/widgets/checklist_line_card.dart';
+import 'package:gssms_mobile/features/work_orders/presentation/widgets/group_evidence_strip.dart';
 import 'package:mocktail/mocktail.dart';
 
 import '../../../helpers/fake_auth.dart';
@@ -30,6 +32,8 @@ MaintenanceRecordLine _line(
   String source = '',
   List<LineAttachment> attachments = const [],
   String? applicability,
+  bool isRequired = false,
+  String? uniqueId,
 }) =>
     MaintenanceRecordLine(
       id: id,
@@ -37,9 +41,11 @@ MaintenanceRecordLine _line(
       inspectionPoint: 'Point $id',
       assetCategory: 'Power',
       assetCategoryId: 7,
+      assetUniqueId: uniqueId,
       checkedOut: checkedOut,
       checkoutSource: source,
       applicability: applicability,
+      isRequired: isRequired,
       attachments: attachments,
     );
 
@@ -66,6 +72,7 @@ Future<void> _pump(
     'maintenance.attachment_delete'
   ],
   EvidenceService? evidence,
+  bool pushed = false,
 }) async {
   tester.view.physicalSize = const Size(1080, 2412);
   tester.view.devicePixelRatio = 2.625;
@@ -90,11 +97,31 @@ Future<void> _pump(
       ],
       child: MaterialApp(
         theme: AppTheme.lightTheme,
-        home: const ChecklistScreen(recordId: 55),
+        home: pushed
+            ? Builder(
+                builder: (context) => Scaffold(
+                  body: Center(
+                    child: TextButton(
+                      key: const Key('open_checklist'),
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const ChecklistScreen(recordId: 55),
+                        ),
+                      ),
+                      child: const Text('open'),
+                    ),
+                  ),
+                ),
+              )
+            : const ChecklistScreen(recordId: 55),
       ),
     ),
   );
   await tester.pumpAndSettle();
+  if (pushed) {
+    await tester.tap(find.byKey(const Key('open_checklist')));
+    await tester.pumpAndSettle();
+  }
 }
 
 void main() {
@@ -106,6 +133,33 @@ void main() {
   });
 
   const groupKey = '7::battery bank';
+
+  testWidgets('one switch covers physical assets and preserves line sources',
+      (tester) async {
+    final repo = _MockRepo();
+    when(() => repo.fetchMaintenanceRecord(55)).thenAnswer((_) async => _record([
+          _line(1, checkedOut: true, source: 'SUPERVISOR', uniqueId: 'LIFT-1'),
+          _line(2, checkedOut: false, uniqueId: 'LIFT-2'),
+        ]));
+    when(() => repo.setGroupInclusion(
+          55,
+          assetCategoryId: any(named: 'assetCategoryId'),
+          assetName: any(named: 'assetName'),
+          included: any(named: 'included'),
+          reason: any(named: 'reason'),
+        )).thenAnswer((_) async => const GroupInclusionResult(
+          included: true, checkedOut: true, checkoutSource: 'TECHNICIAN',
+        ));
+    await _pump(tester, repo);
+    expect(find.byKey(const Key('group_checkout_$groupKey')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('group_checkout_$groupKey')));
+    await tester.pumpAndSettle();
+    expect(find.text('Checked out'), findsOneWidget);
+    expect(find.byType(ChecklistLineCard), findsNWidgets(2));
+    expect(find.text('LIFT-1'), findsOneWidget);
+    expect(find.text('LIFT-2'), findsOneWidget);
+    expect(find.byType(GroupEvidenceStrip), findsNWidgets(2));
+  });
 
   testWidgets('unchecked group hides its lines and explains why',
       (tester) async {
@@ -152,6 +206,148 @@ void main() {
     // Photos are per group, not per line.
     expect(find.byKey(const Key('line_1_attachments_toggle')), findsNothing);
     expect(find.textContaining('Photo Evidence'), findsOneWidget);
+  });
+
+  DioException alreadyCheckedOut() => DioException(
+        requestOptions: RequestOptions(path: '/group-inclusion/'),
+        response: Response(
+          requestOptions: RequestOptions(path: '/group-inclusion/'),
+          statusCode: 400,
+          data: {'error': 'Asset group is already checked out.'},
+        ),
+        type: DioExceptionType.badResponse,
+      );
+
+  testWidgets(
+      '"already checked out" re-reads the record and shows the group checked out',
+      (tester) async {
+    final repo = _MockRepo();
+    var reads = 0;
+    when(() => repo.fetchMaintenanceRecord(55)).thenAnswer((_) async {
+      reads++;
+      return reads == 1
+          ? _record([_line(1, checkedOut: false)])
+          : _record([_line(1, checkedOut: true, source: 'SUPERVISOR')]);
+    });
+    when(() => repo.setGroupInclusion(
+          55,
+          assetCategoryId: any(named: 'assetCategoryId'),
+          assetName: any(named: 'assetName'),
+          included: any(named: 'included'),
+          reason: any(named: 'reason'),
+        )).thenThrow(alreadyCheckedOut());
+    await _pump(tester, repo);
+
+    await tester.tap(find.byKey(const Key('group_checkout_$groupKey')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ChecklistLineCard), findsOneWidget);
+    expect(find.textContaining('Could not change group'), findsNothing);
+  });
+
+  testWidgets(
+      'a partly checked-out group the server still rejects explains what to do',
+      (tester) async {
+    final repo = _MockRepo();
+    when(() => repo.fetchMaintenanceRecord(55)).thenAnswer((_) async =>
+        _record([_line(1, checkedOut: false), _line(2, checkedOut: false)]));
+    when(() => repo.setGroupInclusion(
+          55,
+          assetCategoryId: any(named: 'assetCategoryId'),
+          assetName: any(named: 'assetName'),
+          included: any(named: 'included'),
+          reason: any(named: 'reason'),
+        )).thenThrow(alreadyCheckedOut());
+    await _pump(tester, repo);
+
+    await tester.tap(find.byKey(const Key('group_checkout_$groupKey')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ChecklistLineCard), findsNothing);
+    expect(find.textContaining('only partly checked out'), findsOneWidget);
+  });
+
+  testWidgets('required rows carry no red label; only optional rows are tagged',
+      (tester) async {
+    final repo = _MockRepo();
+    when(() => repo.fetchMaintenanceRecord(55)).thenAnswer((_) async => _record([
+          _line(1, checkedOut: true, source: 'SUPERVISOR', isRequired: true),
+          _line(2, checkedOut: true, source: 'SUPERVISOR', isRequired: true),
+          _line(3, checkedOut: true, source: 'SUPERVISOR'),
+        ]));
+    await _pump(tester, repo);
+
+    expect(find.byType(ChecklistLineCard), findsNWidgets(3));
+    expect(find.text('Required'), findsNothing);
+    expect(find.text('Optional'), findsOneWidget);
+  });
+
+  testWidgets('no optional tag when no row is explicitly required',
+      (tester) async {
+    final repo = _MockRepo();
+    when(() => repo.fetchMaintenanceRecord(55)).thenAnswer((_) async => _record([
+          _line(1, checkedOut: true, source: 'SUPERVISOR'),
+          _line(2, checkedOut: true, source: 'SUPERVISOR'),
+        ]));
+    await _pump(tester, repo);
+
+    expect(find.text('Required'), findsNothing);
+    expect(find.text('Optional'), findsNothing);
+  });
+
+  testWidgets('Save progress confirms and leaves the checklist',
+      (tester) async {
+    final repo = _MockRepo();
+    when(() => repo.fetchMaintenanceRecord(55)).thenAnswer((_) async =>
+        _record([_line(1, checkedOut: true, source: 'SUPERVISOR')]));
+    await _pump(tester, repo, pushed: true);
+
+    expect(find.byKey(const Key('save_progress_button')), findsOneWidget);
+    expect(find.byKey(const Key('complete_checklist_button')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('save_progress_button')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ChecklistScreen), findsNothing);
+    expect(find.textContaining('Progress saved'), findsOneWidget);
+  });
+
+  testWidgets('Save progress saves a typed edit that is still debouncing',
+      (tester) async {
+    final repo = _MockRepo();
+    when(() => repo.fetchMaintenanceRecord(55)).thenAnswer((_) async =>
+        _record([_line(1, checkedOut: true, source: 'SUPERVISOR')]));
+    when(() => repo.submitChecklistLine(55, any()))
+        .thenAnswer((_) async => MutationOutcome.synced);
+    await _pump(tester, repo, pushed: true);
+
+    await tester.enterText(find.byType(TextField).first, 'typed note');
+    // Well inside the 800 ms typing delay: nothing saved yet.
+    await tester.pump(const Duration(milliseconds: 100));
+    verifyNever(() => repo.submitChecklistLine(55, any()));
+
+    await tester.tap(find.byKey(const Key('save_progress_button')));
+    await tester.pumpAndSettle();
+
+    verify(() => repo.submitChecklistLine(55, any())).called(1);
+    expect(find.byType(ChecklistScreen), findsNothing);
+  });
+
+  testWidgets('Save progress stays on the screen when a save fails',
+      (tester) async {
+    final repo = _MockRepo();
+    when(() => repo.fetchMaintenanceRecord(55)).thenAnswer((_) async =>
+        _record([_line(1, checkedOut: true, source: 'SUPERVISOR')]));
+    when(() => repo.submitChecklistLine(55, any()))
+        .thenThrow(Exception('boom'));
+    await _pump(tester, repo, pushed: true);
+
+    await tester.enterText(find.byType(TextField).first, 'typed note');
+    await tester.tap(find.byKey(const Key('save_progress_button')));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(ChecklistScreen), findsOneWidget);
+    expect(find.textContaining('could not be saved'), findsOneWidget);
   });
 
   testWidgets('un-check control is disabled without group_uncheckout',

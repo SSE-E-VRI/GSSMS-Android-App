@@ -103,10 +103,93 @@ class _ChecklistFormScreenState extends ConsumerState<ChecklistFormScreen> {
   int _highlightSeq = 0;
   Timer? _highlightTimer;
 
+  /// Line cards' "save a pending edit now" hooks, by line id.
+  final Map<int, VoidCallback> _flushers = {};
+
+  /// Line saves started from this screen that have not finished yet.
+  final Set<Future<bool>> _inFlightSaves = {};
+
+  bool _savingProgress = false;
+
   @override
   void dispose() {
     _highlightTimer?.cancel();
     super.dispose();
+  }
+
+  void _registerFlush(int lineId, VoidCallback? flush) {
+    if (flush == null) {
+      _flushers.remove(lineId);
+    } else {
+      _flushers[lineId] = flush;
+    }
+  }
+
+  Future<bool> _trackSave(Future<bool> save) {
+    _inFlightSaves.add(save);
+    return save.whenComplete(() => _inFlightSaves.remove(save));
+  }
+
+  /// Save progress: makes every entry durable, says exactly what happened and
+  /// leaves. Edits still waiting on their typing delay are saved first; then
+  /// every in-flight save is awaited. Entries that could not reach the server
+  /// are already queued on this device, which is reported rather than hidden.
+  Future<void> _saveProgress() async {
+    if (_savingProgress) return;
+    setState(() => _savingProgress = true);
+    try {
+      FocusManager.instance.primaryFocus?.unfocus();
+      for (final flush in List.of(_flushers.values)) {
+        flush();
+      }
+      var failed = 0;
+      // A flush starts a save synchronously, so one pass over the snapshot
+      // covers everything; loop in case a save triggers another.
+      for (var pass = 0; pass < 3 && _inFlightSaves.isNotEmpty; pass++) {
+        final results = await Future.wait(List.of(_inFlightSaves));
+        failed += results.where((ok) => !ok).length;
+      }
+
+      final sync = ref.read(syncManagerProvider.notifier);
+      if (ref.read(syncManagerProvider).mode !=
+          SyncConnectivityMode.offline) {
+        try {
+          await sync.drainOutbox().timeout(const Duration(seconds: 15));
+        } catch (_) {
+          // Whatever could not sync stays queued and is counted below.
+        }
+      }
+      if (!mounted) return;
+
+      final queued = ref.read(syncManagerProvider).pendingCount;
+      final loaded =
+          ref.read(checklistControllerProvider(widget.recordId));
+      final done = loaded is ChecklistLoaded
+          ? '${loaded.record.completedLines} of ${loaded.record.totalLines} items done'
+          : null;
+
+      if (failed > 0) {
+        showGssmsSnackBar(
+          context,
+          '$failed ${failed == 1 ? 'entry' : 'entries'} could not be saved. '
+          'Check the items marked "Saving" and try again.',
+          tone: GssmsTone.danger,
+        );
+        return;
+      }
+      showGssmsSnackBar(
+        context,
+        queued > 0
+            ? 'Progress saved on this device${done == null ? '' : ' ($done)'}. '
+                '$queued will sync when a connection is available.'
+            : 'Progress saved${done == null ? '' : ' ($done)'}.',
+        tone: queued > 0 ? GssmsTone.warning : GssmsTone.success,
+        duration: Duration(seconds: queued > 0 ? 6 : 3),
+      );
+      Navigator.of(context).pop();
+    } finally {
+      if (mounted) setState(() => _savingProgress = false);
+    }
   }
 
   void _highlightLine(int lineId) {
@@ -258,6 +341,8 @@ class _ChecklistFormScreenState extends ConsumerState<ChecklistFormScreen> {
               state: state,
               onSignAndSubmit: _showCompletionDialog,
               onIncompleteTap: () => _jumpToIncompleteLine(state),
+              onSaveProgress: _saveProgress,
+              isSavingProgress: _savingProgress,
             )
           : null,
     );
@@ -395,11 +480,15 @@ class _ChecklistFormScreenState extends ConsumerState<ChecklistFormScreen> {
                             ),
                             if (group.checkedOut) ...[
                               const SizedBox(height: GssmsSpacing.s8),
-                              GroupEvidenceStrip(
-                                recordId: widget.recordId,
-                                holder: group.photoHolder,
-                                isPastTechCompleted: record.isPastTechCompleted,
-                              ),
+                              for (final holder in group.photoHolders) ...[
+                                if (group.photoHolders.length > 1)
+                                  Text('Evidence: ${holder.assetUniqueId ?? holder.itemName}'),
+                                GroupEvidenceStrip(
+                                  recordId: widget.recordId,
+                                  holder: holder,
+                                  isPastTechCompleted: record.isPastTechCompleted,
+                                ),
+                              ],
                               for (final line in activeLines)
                                 Padding(
                                   padding: const EdgeInsets.only(top: 12),
@@ -432,11 +521,13 @@ class _ChecklistFormScreenState extends ConsumerState<ChecklistFormScreen> {
         key: ValueKey(line.id),
         line: line,
         isHighlighted: _highlightedLineId == line.id,
+        showOptionalTag: record.activeLines.any((l) => l.isRequired),
         recordId: widget.recordId,
         showAttachments: showAttachments,
         isPastTechCompleted: record.isPastTechCompleted,
+        registerFlush: _registerFlush,
         onSave: (edit) {
-          unawaited(ref
+          unawaited(_trackSave(ref
               .read(checklistControllerProvider(widget.recordId).notifier)
               .submitLineObservation(
                 lineId: line.id,
@@ -445,7 +536,7 @@ class _ChecklistFormScreenState extends ConsumerState<ChecklistFormScreen> {
                 statusOptionId: edit.statusOptionId,
                 actionOptionId: edit.actionOptionId,
                 remarks: edit.remarks,
-              ));
+              )));
         },
       ),
     );

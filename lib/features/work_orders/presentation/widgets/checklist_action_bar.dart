@@ -17,6 +17,8 @@ class ChecklistActionBar extends ConsumerWidget {
     required this.state,
     required this.onSignAndSubmit,
     required this.onIncompleteTap,
+    this.onSaveProgress,
+    this.isSavingProgress = false,
   });
 
   final ChecklistLoaded state;
@@ -25,6 +27,11 @@ class ChecklistActionBar extends ConsumerWidget {
   /// Tapped while [ChecklistLoaded.remainingRequired] > 0: the screen
   /// scrolls to and highlights the first incomplete required line.
   final VoidCallback onIncompleteTap;
+
+  /// Saves pending edits, confirms what is saved/queued and leaves the
+  /// screen. When null the button is not shown.
+  final VoidCallback? onSaveProgress;
+  final bool isSavingProgress;
 
   String? _formatLastSyncTime(DateTime? lastSync) {
     if (lastSync == null) return null;
@@ -86,38 +93,95 @@ class ChecklistActionBar extends ConsumerWidget {
                     textAlign: TextAlign.center,
                   ),
                 ),
-              Semantics(
-                liveRegion: true,
-                child: FilledButton.icon(
-                  key: const Key('complete_checklist_button'),
-                  style: FilledButton.styleFrom(
-                    backgroundColor: tokens.success.solid,
-                    foregroundColor: tokens.success.onSolid,
-                    disabledBackgroundColor: tokens.border,
-                    disabledForegroundColor: tokens.textSecondary,
-                    minimumSize: const Size.fromHeight(GssmsSize.primaryAction),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(GssmsRadius.r8),
+              Row(
+                children: [
+                  if (onSaveProgress != null) ...[
+                    Expanded(
+                      flex: 2,
+                      child: OutlinedButton.icon(
+                        key: const Key('save_progress_button'),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize:
+                              const Size.fromHeight(GssmsSize.primaryAction),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: GssmsSpacing.s8),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(GssmsRadius.r8),
+                          ),
+                        ),
+                        onPressed: (state.isSubmitting || isSavingProgress)
+                            ? null
+                            : onSaveProgress,
+                        icon: isSavingProgress
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.save_outlined,
+                                size: GssmsSize.iconMd),
+                        label: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            'Save progress',
+                            maxLines: 1,
+                            style: textTheme.labelLarge
+                                ?.copyWith(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: GssmsSpacing.s8),
+                  ],
+                  Expanded(
+                    flex: 3,
+                    child: Semantics(
+                      liveRegion: true,
+                      child: FilledButton.icon(
+                        key: const Key('complete_checklist_button'),
+                        style: FilledButton.styleFrom(
+                          backgroundColor: tokens.success.solid,
+                          foregroundColor: tokens.success.onSolid,
+                          disabledBackgroundColor: tokens.border,
+                          disabledForegroundColor: tokens.textSecondary,
+                          minimumSize:
+                              const Size.fromHeight(GssmsSize.primaryAction),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: GssmsSpacing.s8),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(GssmsRadius.r8),
+                          ),
+                        ),
+                        onPressed: (state.isSubmitting || isSavingProgress)
+                            ? null
+                            : (state.canSubmit
+                                ? onSignAndSubmit
+                                : onIncompleteTap),
+                        icon: state.isSubmitting
+                            ? SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: tokens.success.onSolid,
+                                ),
+                              )
+                            : const Icon(Icons.check_circle_outline,
+                                size: GssmsSize.iconMd),
+                        label: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            'Sign & Submit',
+                            maxLines: 1,
+                            style: textTheme.labelLarge
+                                ?.copyWith(fontWeight: FontWeight.bold),
+                          ),
+                        ),
+                      ),
                     ),
                   ),
-                  onPressed: state.isSubmitting
-                      ? null
-                      : (state.canSubmit ? onSignAndSubmit : onIncompleteTap),
-                  icon: state.isSubmitting
-                      ? SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: tokens.success.onSolid,
-                          ),
-                        )
-                      : const Icon(Icons.check_circle_outline, size: GssmsSize.iconMd),
-                  label: Text(
-                    'Sign & Submit',
-                    style: textTheme.labelLarge?.copyWith(fontWeight: FontWeight.bold),
-                  ),
-                ),
+                ],
               ),
             ],
           ),

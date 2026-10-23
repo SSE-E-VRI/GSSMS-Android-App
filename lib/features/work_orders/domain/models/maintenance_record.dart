@@ -801,7 +801,7 @@ class MaintenanceRecord extends Equatable {
     final byKey = <String, List<MaintenanceRecordLine>>{};
     for (final line in lines) {
       if (line.assetIsActive == false && !isPastTechCompleted) continue;
-      final key = line.assetUniqueId ??
+      final key =
           '${line.assetCategoryId ?? 'none'}::${line.itemName.trim().toLowerCase()}';
       byKey.putIfAbsent(key, () => []).add(line);
     }
@@ -826,16 +826,23 @@ class MaintenanceRecord extends Equatable {
           final first = entry.value.first;
           final categoryLabel = labelOf(first);
           final multiple = (namesByCategory[categoryLabel]?.length ?? 0) > 1;
+          final assetIds = entry.value
+              .map((line) => line.assetUniqueId)
+              .whereType<String>()
+              .where((id) => id.isNotEmpty)
+              .toSet();
           return ChecklistAssetGroup(
             key: entry.key,
             assetCategoryId: first.assetCategoryId,
             assetName: first.itemName,
-            assetUniqueId: first.assetUniqueId,
+            assetUniqueId: assetIds.length == 1 ? assetIds.single : null,
             categoryLabel: categoryLabel,
             lines: entry.value,
             displayTitle: multiple ? first.itemName : categoryLabel,
             checkedOut: entry.value.every((l) => l.isCheckedOut && !l.excluded),
-            checkoutSource: first.checkoutSource,
+            checkoutSource: entry.value.map((line) => line.checkoutSource).toSet().length == 1
+                ? first.checkoutSource
+                : '',
             applicability: first.applicability,
             supervisorExcluded: entry.value
                 .any((l) => l.excluded && l.checkoutSource == 'SUPERVISOR'),
@@ -964,7 +971,7 @@ class MaintenanceRecord extends Equatable {
       ];
 }
 
-/// One asset's lines within a checklist record, as shown by the group
+/// One backend template group's lines, including all its physical assets.
 /// check-out UI. Photos for the group live on [photoHolder].
 class ChecklistAssetGroup extends Equatable {
   const ChecklistAssetGroup({
@@ -995,6 +1002,15 @@ class ChecklistAssetGroup extends Equatable {
 
   /// The first line carries the group's photo evidence.
   MaintenanceRecordLine get photoHolder => lines.first;
+
+  /// Keep each physical asset's evidence reachable after grouping its switch.
+  List<MaintenanceRecordLine> get photoHolders {
+    final seen = <String>{};
+    return lines.where((line) {
+      final first = seen.add(line.assetUniqueId ?? 'none');
+      return first || line.attachments.isNotEmpty;
+    }).toList();
+  }
 
   @override
   List<Object?> get props => [
