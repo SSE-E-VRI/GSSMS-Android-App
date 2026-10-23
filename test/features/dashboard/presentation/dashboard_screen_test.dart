@@ -69,6 +69,7 @@ void main() {
       expect(find.text('Dashboard'), findsOneWidget);
       expect(find.text('Attention Required'), findsOneWidget);
       expect(find.text('Monthly Transformer Check'), findsOneWidget);
+      expect(find.text('Sendurai'), findsOneWidget);
       // The new Pending Actions card lengthens the list, so lower sections
       // are lazily built on scroll — drive the outer Scrollable explicitly
       // (the inner KPI GridView is a second Scrollable, so the default
@@ -77,10 +78,11 @@ void main() {
           scrollable: find.byType(Scrollable).first);
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('dashboard_pending_actions')), findsOneWidget);
-      await tester.scrollUntilVisible(find.text('Operational Metrics'), 300,
+      // KPI overview now leads the screen — scroll back up to it.
+      await tester.scrollUntilVisible(find.text('Overview'), -300,
           scrollable: find.byType(Scrollable).first);
       await tester.pumpAndSettle();
-      expect(find.text('Operational Metrics'), findsOneWidget);
+      expect(find.text('Overview'), findsOneWidget);
       expect(find.text('Compliance Rate'), findsOneWidget);
       expect(find.text('88.0%'), findsOneWidget);
     });

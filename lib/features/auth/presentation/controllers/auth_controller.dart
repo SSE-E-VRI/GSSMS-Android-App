@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show debugPrint, kDebugMode;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gssms_mobile/core/auth/session_cleanup.dart';
 import 'package:gssms_mobile/core/config/app_config.dart';
@@ -125,7 +126,10 @@ class AuthController extends Notifier<AuthState> {
       if (!identical(op, _opGenBox)) return;
       _pendingPassword = null;
       state = AuthError(e.message, code: e.code);
-    } catch (_) {
+    } catch (e, st) {
+      // Never swallow the cause silently: this branch is the one that hid a
+      // config error behind a generic message during the 2026-10-23 audit.
+      if (kDebugMode) debugPrint('Unexpected sign-in failure: $e\n$st');
       if (!identical(op, _opGenBox)) return;
       _pendingPassword = null;
       state = const AuthError(
@@ -162,7 +166,10 @@ class AuthController extends Notifier<AuthState> {
       _pendingPassword = null;
       state = AuthError(e.message, code: e.code);
       rethrow;
-    } catch (_) {
+    } catch (e, st) {
+      // Never swallow the cause silently: this branch is the one that hid a
+      // config error behind a generic message during the 2026-10-23 audit.
+      if (kDebugMode) debugPrint('Unexpected sign-in failure: $e\n$st');
       if (!identical(op, _opGenBox)) return;
       _pendingPassword = null;
       const err = AuthError(
@@ -218,7 +225,10 @@ class AuthController extends Notifier<AuthState> {
       if (!identical(op, _opGenBox)) return;
       _pendingPassword = null;
       state = AuthError(e.message, code: e.code);
-    } catch (_) {
+    } catch (e, st) {
+      // Never swallow the cause silently: this branch is the one that hid a
+      // config error behind a generic message during the 2026-10-23 audit.
+      if (kDebugMode) debugPrint('Unexpected sign-in failure: $e\n$st');
       if (!identical(op, _opGenBox)) return;
       _pendingPassword = null;
       state = const AuthError('Failed to verify 2FA code. Please try again.');

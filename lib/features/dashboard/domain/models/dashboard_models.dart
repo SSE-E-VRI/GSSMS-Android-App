@@ -271,8 +271,33 @@ class PendingAction extends Equatable {
   static int? _fkId(dynamic v) => v is Map ? asJsonInt(v['id']) : asJsonInt(v);
 
   factory PendingAction.fromJson(Map<String, dynamic> json) {
-    final workOrderId =
-        _fkId(json['work_order_id'] ?? json['work_order'] ?? json['wo_id']);
+    // `summary.pending_tasks` rows are serialized MaintenanceSchedules
+    // (maintenance_master_name / asset_name / station_name / due_date) plus
+    // the linked active work order as `linked_work_order: {id, status}`.
+    final linked = json['linked_work_order'];
+    final linkedStatus =
+        linked is Map ? asJsonString(linked['status'])?.toUpperCase() : null;
+    final workOrderId = _fkId(json['work_order_id'] ??
+        json['work_order'] ??
+        json['wo_id'] ??
+        linked);
+    final station = asJsonString(json['station_name']);
+    final asset = asJsonString(json['asset_name']);
+    final place = <String>[
+      if (asset != null && asset.isNotEmpty && asset != 'Unknown Asset') asset,
+      if (station != null && station.isNotEmpty && station != asset) station,
+    ];
+    final explicitKind = asJsonString(
+        json['kind'] ?? json['type'] ?? json['action'] ?? json['category']);
+    var kind = PendingActionKind.fromString(explicitKind);
+    if (kind == PendingActionKind.unknown) {
+      if (linkedStatus == 'TECH_COMPLETED') {
+        kind = PendingActionKind.verification;
+      } else if (json.containsKey('maintenance_master_name') ||
+          json.containsKey('template_name')) {
+        kind = PendingActionKind.task;
+      }
+    }
     final complaintId = _fkId(json['complaint_id'] ?? json['complaint']);
     final inspectionId = _fkId(json['inspection_id'] ?? json['inspection']);
     return PendingAction(
@@ -281,9 +306,10 @@ class PendingAction extends Equatable {
           complaintId ??
           inspectionId ??
           0,
-      kind: PendingActionKind.fromString(asJsonString(
-          json['kind'] ?? json['type'] ?? json['action'] ?? json['category'])),
+      kind: kind,
       title: asJsonString(json['title'] ??
+              json['maintenance_master_name'] ??
+              json['template_name'] ??
               json['name'] ??
               json['label'] ??
               json['subject'] ??
@@ -293,16 +319,17 @@ class PendingAction extends Equatable {
               json['wo_number'] ??
               json['number']) ??
           'Pending action',
-      subtitle: asJsonString(json['subtitle'] ??
-          json['description'] ??
+      subtitle: asJsonString(json['subtitle'] ?? json['description']) ??
+          (place.isNotEmpty ? place.join(' • ') : null) ??
+          asJsonString(json['location'] ??
           json['station_name'] ??
           json['depot_name'] ??
           json['remarks']),
       workOrderId: workOrderId,
       complaintId: complaintId,
       inspectionId: inspectionId,
-      dueDate: json['due_date'] != null
-          ? asJsonDateTime(json['due_date'])
+      dueDate: (json['due_date'] ?? json['next_due_date']) != null
+          ? asJsonDateTime(json['due_date'] ?? json['next_due_date'])
           : (json['created_at'] != null
               ? asJsonDateTime(json['created_at'])
               : null),

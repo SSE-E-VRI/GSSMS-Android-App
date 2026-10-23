@@ -179,6 +179,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Widget _buildStandardLoginForm(AuthState authState, bool isLoading) {
     return Form(
       key: _formKey,
+      // After the first submit, re-check as the user types so a stale
+      // "Enter your username" clears as soon as the field is filled.
+      autovalidateMode: AutovalidateMode.onUserInteraction,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

@@ -668,6 +668,14 @@ class _AttentionSection extends ConsumerWidget {
             loaded.attention.dueSoon.length;
       }),
     );
+    final overdueCount = ref.watch(
+      dashboardControllerProvider.select((dashboardState) {
+        final loaded = dashboardState is DashboardError
+            ? dashboardState.previousLoaded
+            : dashboardState;
+        return loaded is DashboardLoaded ? loaded.attention.overdue.length : 0;
+      }),
+    );
     if (totalAttention < 0) {
       return Padding(
         padding: const EdgeInsets.only(bottom: GssmsSpacing.s20),
@@ -708,7 +716,7 @@ class _AttentionSection extends ConsumerWidget {
             tinted: needsAttention,
             emphasize: needsAttention,
             message: needsAttention
-                ? '$totalAttention action${totalAttention > 1 ? 's' : ''} need attention'
+                ? _attentionMessage(overdueCount, totalAttention - overdueCount)
                 : 'All scheduled maintenance and items are up to date.',
             action: needsAttention && sessionAllows(session, 'dashboard.view')
                 ? TextButton(
@@ -721,6 +729,16 @@ class _AttentionSection extends ConsumerWidget {
       ),
     );
   }
+}
+
+/// "3 overdue · 2 due this week" reads better than a bare total, and the
+/// overdue part is what a supervisor acts on first.
+String _attentionMessage(int overdue, int dueSoon) {
+  final parts = <String>[
+    if (overdue > 0) '$overdue overdue',
+    if (dueSoon > 0) '$dueSoon due this week',
+  ];
+  return '${parts.join(' · ')} — schedules need attention';
 }
 
 class _HomeSectionLabel extends StatelessWidget {

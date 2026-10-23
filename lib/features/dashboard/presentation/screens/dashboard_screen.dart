@@ -97,6 +97,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       return const DashboardSkeleton();
     }
 
+    if (state is DashboardError && state.previousLoaded is DashboardLoaded) {
+      return _buildLoaded(state.previousLoaded!, session,
+          staleMessage: state.message);
+    }
+
     if (state is DashboardError) {
       return Center(
         child: Padding(
@@ -123,41 +128,88 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     }
 
     if (state is DashboardLoaded) {
-      final attention = state.attention;
-      final stats = state.summary.stats;
-
-      return RefreshIndicator(
-        onRefresh: () => ref.read(dashboardControllerProvider.notifier).loadDashboard(),
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            _buildAttentionSection(attention),
-            const SizedBox(height: 16),
-            StatusDonutChart(
-              segments: stats.statusSegments,
-              total: stats.totalWorkOrders,
-            ),
-            if (stats.typeStats.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              _buildTypeStatsRow(stats),
-            ],
-            const SizedBox(height: 16),
-            _buildPendingActions(
-              stats,
-              state.summary.pendingTasks.where((t) => !t.isBreakdown).toList(),
-              session,
-            ),
-            const SizedBox(height: 16),
-            _buildKpiGrid(stats),
-          ],
-        ),
-      );
+      return _buildLoaded(state, session);
     }
 
     return const DashboardSkeleton();
   }
 
-  Widget _buildAttentionSection(AttentionSummary attention) {
+  /// Glance-first order: headline numbers, then what is late, then what to
+  /// do next, then the breakdown charts. When a refresh fails but an earlier
+  /// load exists, that data stays on screen under a "could not refresh" note
+  /// instead of being replaced by a full-page error.
+  Widget _buildLoaded(DashboardLoaded state, UserSession? session,
+      {String? staleMessage}) {
+    final attention = state.attention;
+    final stats = state.summary.stats;
+    return RefreshIndicator(
+      onRefresh: () => ref.read(dashboardControllerProvider.notifier).loadDashboard(),
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+        children: [
+          if (staleMessage != null) ...[
+            _buildStaleBanner(staleMessage),
+            const SizedBox(height: 12),
+          ],
+          _buildKpiGrid(stats, session),
+          const SizedBox(height: 16),
+          _buildAttentionSection(attention, session),
+          const SizedBox(height: 16),
+          _buildPendingActions(
+            stats,
+            state.summary.pendingTasks.where((t) => !t.isBreakdown).toList(),
+            session,
+          ),
+          const SizedBox(height: 16),
+          StatusDonutChart(
+            segments: stats.statusSegments,
+            total: stats.totalWorkOrders,
+          ),
+          if (stats.typeStats.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            _buildTypeStatsRow(stats),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStaleBanner(String message) {
+    final palette = context.gssms.warning;
+    return Container(
+      key: const Key('dashboard_stale_banner'),
+      padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
+      decoration: BoxDecoration(
+        color: palette.background,
+        borderRadius: BorderRadius.circular(GssmsRadius.r8),
+        border: Border.all(color: palette.border),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.cloud_off_outlined, size: 20, color: palette.foreground),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'Could not refresh. Showing the last loaded figures.',
+              style: TextStyle(fontSize: 13, color: palette.foreground),
+            ),
+          ),
+          TextButton(
+            onPressed: () =>
+                ref.read(dashboardControllerProvider.notifier).loadDashboard(),
+            child: const Text('Retry'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _push(Widget screen) {
+    Navigator.of(context).push(MaterialPageRoute<void>(builder: (_) => screen));
+  }
+
+  Widget _buildAttentionSection(AttentionSummary attention, UserSession? session) {
+    final canOpen = sessionAllows(session, 'maintenance.view');
     final hasOverdue = attention.overdue.isNotEmpty;
     final hasDueSoon = attention.dueSoon.isNotEmpty;
 
@@ -187,6 +239,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                     ),
                   ],
                 ),
+                if (hasOverdue)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
@@ -218,13 +271,22 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             if (!hasOverdue && !hasDueSoon)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Text('No urgent items requiring attention.', style: TextStyle(color: context.gssms.textSecondary, fontSize: 13)),
+                child: Row(
+                  children: [
+                    Icon(Icons.check_circle_outline, size: 20, color: context.gssms.success.foreground),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text('Nothing overdue or due this week.',
+                          style: TextStyle(color: context.gssms.textSecondary, fontSize: 13)),
+                    ),
+                  ],
+                ),
               )
             else ...[
               if (hasOverdue) ...[
                 Text('Overdue Schedules', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: context.gssms.danger.foreground)),
                 const SizedBox(height: 6),
-                ..._attentionTiles(attention.overdue, isOverdue: true,
+                ..._attentionTiles(attention.overdue, isOverdue: true, canOpen: canOpen,
                     expanded: _showAllOverdue,
                     onToggle: () => setState(() => _showAllOverdue = !_showAllOverdue)),
                 const SizedBox(height: 10),
@@ -232,7 +294,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
               if (hasDueSoon) ...[
                 Text('Due in 7 Days', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: context.gssms.warning.foreground)),
                 const SizedBox(height: 6),
-                ..._attentionTiles(attention.dueSoon, isOverdue: false,
+                ..._attentionTiles(attention.dueSoon, isOverdue: false, canOpen: canOpen,
                     expanded: _showAllDueSoon,
                     onToggle: () => setState(() => _showAllDueSoon = !_showAllDueSoon)),
               ],
@@ -248,12 +310,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
   List<Widget> _attentionTiles(
     List<AttentionItem> items, {
     required bool isOverdue,
+    required bool canOpen,
     required bool expanded,
     required VoidCallback onToggle,
   }) {
     final shown = expanded ? items : items.take(_attentionPreview).toList();
     return [
-      ...shown.map((item) => _buildAttentionTile(item, isOverdue: isOverdue)),
+      ...shown.map((item) => _buildAttentionTile(item, isOverdue: isOverdue, canOpen: canOpen)),
       if (items.length > _attentionPreview)
         Align(
           alignment: Alignment.centerLeft,
@@ -267,7 +330,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     ];
   }
 
-  Widget _buildAttentionTile(AttentionItem item, {required bool isOverdue}) {
+  Widget _buildAttentionTile(AttentionItem item,
+      {required bool isOverdue, required bool canOpen}) {
     final days = item.daysOverdue ??
         (item.dueDate != null
             ? DateTime.now().difference(item.dueDate!).inDays
@@ -283,7 +347,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final palette = isOverdue ? context.gssms.danger : context.gssms.warning;
     final dateStr = item.dueDate != null ? DateFormat('dd/MM/yyyy').format(item.dueDate!) : 'Pending';
 
-    return Container(
+    final tile = Container(
       margin: const EdgeInsets.only(bottom: 6),
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
@@ -297,13 +361,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Most rows share a schedule name ("Station Monthly
+                // Maintenance"), so the place is what tells them apart.
                 Text(
-                  item.masterName,
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                  where.isNotEmpty ? where : item.masterName,
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                 ),
                 if (where.isNotEmpty)
                   Text(
-                    where,
+                    item.masterName,
                     style: TextStyle(fontSize: 11, color: context.gssms.textSecondary),
                   ),
               ],
@@ -325,6 +391,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             ),
           ),
         ],
+      ),
+    );
+    if (!canOpen) return tile;
+    return Semantics(
+      button: true,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(GssmsRadius.r8),
+        onTap: () => _push(const PendingActionsScreen()),
+        child: tile,
       ),
     );
   }
@@ -404,7 +479,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
           title: t.title,
           subtitle: [
             if ((t.subtitle ?? '').isNotEmpty) t.subtitle!,
-            if (t.kind != PendingActionKind.unknown) t.kind.displayName,
+            if (t.kind != PendingActionKind.unknown &&
+                t.kind != PendingActionKind.task)
+              t.kind.displayName,
+            if (_dueLabel(t.dueDate) != null) _dueLabel(t.dueDate)!,
           ].join(' • '),
           onTap: () {
             if (t.workOrderId != null && t.workOrderId! > 0) {
@@ -531,6 +609,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     );
   }
 
+  String? _dueLabel(DateTime? due) {
+    if (due == null) return null;
+    final today = DateUtils.dateOnly(DateTime.now());
+    final days = DateUtils.dateOnly(due.toLocal()).difference(today).inDays;
+    if (days < 0) return '${-days}d overdue';
+    if (days == 0) return 'Due today';
+    return 'Due ${DateFormat('d MMM').format(due.toLocal())}';
+  }
+
   IconData _pendingIcon(PendingActionKind kind) {
     switch (kind) {
       case PendingActionKind.verification:
@@ -579,9 +666,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             backgroundColor: color.withValues(alpha: 0.12),
             child: Icon(icon, color: color, size: 20)),
         title: Text(title,
-            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
         subtitle: Text(subtitle,
-            style: TextStyle(fontSize: 11, color: context.gssms.textSecondary),
+            style: TextStyle(fontSize: 12, color: context.gssms.textSecondary),
             maxLines: 2,
             overflow: TextOverflow.ellipsis),
         trailing: const Icon(Icons.arrow_forward_ios, size: 14),
@@ -593,12 +682,20 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     );
   }
 
-  Widget _buildKpiGrid(DashboardStats stats) {
+  Color _complianceColor(double rate) {
+    if (rate >= 90) return context.gssms.success.foreground;
+    if (rate >= 70) return context.gssms.warning.foreground;
+    return context.gssms.danger.foreground;
+  }
+
+  Widget _buildKpiGrid(DashboardStats stats, UserSession? session) {
+    final canWork = sessionAllows(session, 'maintenance.view');
+    final canComplaints = sessionAllows(session, 'complaints.view');
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Operational Metrics',
+          'Overview',
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: context.gssms.link),
         ),
         const SizedBox(height: 10),
@@ -619,13 +716,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             children: [
               Expanded(
                 child: _buildKpiCard('Total Job Works', '${stats.totalWorkOrders}',
-                    Icons.assignment_outlined, context.gssms.link),
+                    Icons.assignment_outlined, context.gssms.link,
+                    onTap: canWork ? () => _push(const WorkOrderListScreen()) : null),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: _buildKpiCard('Compliance Rate',
                     '${stats.complianceRate.toStringAsFixed(1)}%',
-                    Icons.check_circle_outline, context.gssms.success.foreground),
+                    Icons.check_circle_outline, _complianceColor(stats.complianceRate)),
               ),
             ],
           ),
@@ -637,12 +735,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             children: [
               Expanded(
                 child: _buildKpiCard('Pending Tasks', '${stats.scheduledTasksDisplay}',
-                    Icons.hourglass_empty_outlined, context.gssms.warning.foreground),
+                    Icons.hourglass_empty_outlined, context.gssms.warning.foreground,
+                    onTap: canWork ? () => _push(const PendingActionsScreen()) : null),
               ),
               const SizedBox(width: 10),
               Expanded(
                 child: _buildKpiCard('Open Breakdowns', '${stats.openComplaintCount}',
-                    Icons.report_problem_outlined, context.gssms.danger.foreground),
+                    Icons.report_problem_outlined, context.gssms.danger.foreground,
+                    onTap: canComplaints ? () => _push(const ComplaintListScreen()) : null),
               ),
             ],
           ),
@@ -651,11 +751,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     );
   }
 
-  Widget _buildKpiCard(String title, String value, IconData icon, Color color) {
+  Widget _buildKpiCard(String title, String value, IconData icon, Color color,
+      {VoidCallback? onTap}) {
     return Card(
       elevation: 2,
+      clipBehavior: Clip.antiAlias,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      child: Padding(
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -681,12 +785,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             const SizedBox(height: 8),
             Text(
               title,
-              style: TextStyle(fontSize: 12, color: context.gssms.textSecondary, fontWeight: FontWeight.w500),
+              style: TextStyle(fontSize: 13, color: context.gssms.textSecondary, fontWeight: FontWeight.w500),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
           ],
         ),
+      ),
       ),
     );
   }
