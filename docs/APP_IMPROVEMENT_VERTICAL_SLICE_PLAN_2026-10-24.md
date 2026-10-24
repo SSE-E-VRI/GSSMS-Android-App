@@ -1,7 +1,7 @@
 # GSSMS app improvement plan: smallest working vertical slices
 
 Date: 24 October 2026
-Status: Two app data-layer fixes implemented and tested; phone acceptance failed on offline navigation/session restoration. See [phone acceptance results](PHONE_ACCEPTANCE_2026-10-24.md).
+Status: 0.3.7 hotfix prepared separately. F1/F2/F3 follow-ups implemented; focused A1/A3/A10 phone reacceptance passed, with acknowledged read-cache freshness F4 still open. See [original acceptance](PHONE_ACCEPTANCE_2026-10-24.md) and [focused reacceptance](OFFLINE_REOPEN_REACCEPTANCE_2026-10-24.md).
 
 ## 1. Objective
 

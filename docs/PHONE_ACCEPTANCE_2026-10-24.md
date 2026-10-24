@@ -2,6 +2,10 @@
 
 Date: 24 October 2026 (Asia/Calcutta)
 
+Historical baseline: subsequent focused F1/F2/F3 results are in
+[offline reopen reacceptance](OFFLINE_REOPEN_REACCEPTANCE_2026-10-24.md).
+The original observations and FAIL verdict below remain unchanged.
+
 ## Verdict
 
 **FAIL for the complete offline workflow.** The latest-edit and queued-value-overlay fixes work on the phone, but two additional blockers prevent a user from reopening prepared work entirely offline:

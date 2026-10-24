@@ -37,3 +37,9 @@ still needs explicit cleanup.
 Selected sanitized evidence is retained under `docs/acceptance/`; additional
 screenshots and logs under `build/phone-acceptance/` are disposable. No live
 production endpoint or production credentials are needed for this setup.
+
+For a separate run, set `GSSMS_PHONE_TEST_OUTPUT` to its workspace output folder
+before running the seed, server and ADB helpers. The reopen reacceptance used
+`build/phone-reacceptance/` and loopback port 8766, preserving the first run.
+`audit_evidence.py` scans selected retained text against generated test passwords,
+JWT/Bearer patterns and XML password fields without printing matched secrets.

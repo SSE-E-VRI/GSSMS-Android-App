@@ -1,6 +1,7 @@
 """Prepare only the existing, synthetic October phone-test database."""
 import json
 import secrets
+import os
 from pathlib import Path
 from django.conf import settings
 from django.core.management import call_command
@@ -16,7 +17,8 @@ def seed():
         'audit_seed_tech', 'audit_seed_sup', 'phone_slice_other'
     }, 'Unexpected database users; refusing to seed'
     call_command('seed_rbac', verbosity=0)
-    output = Path(__file__).resolve().parents[2] / 'build' / 'phone-acceptance'
+    output = Path(os.environ.get('GSSMS_PHONE_TEST_OUTPUT',
+        Path(__file__).resolve().parents[2] / 'build' / 'phone-acceptance'))
     output.mkdir(parents=True, exist_ok=True)
     credential_file = output / 'credentials.json'
     credentials = json.loads(credential_file.read_text()) if credential_file.exists() else {

@@ -2,6 +2,8 @@
 import subprocess
 import json
 import time
+import os
+import re
 import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -9,7 +11,8 @@ from pathlib import Path
 ADB = r'C:\Users\ADMIN\AppData\Local\Android\Sdk\platform-tools\adb.exe'
 DEVICE = '61ac9e71'
 PACKAGE = 'com.ssee_vri.gssms_mobile.dev'
-OUT = Path(__file__).resolve().parents[2] / 'build' / 'phone-acceptance'
+OUT = Path(os.environ.get('GSSMS_PHONE_TEST_OUTPUT',
+    Path(__file__).resolve().parents[2] / 'build' / 'phone-acceptance'))
 OUT.mkdir(parents=True, exist_ok=True)
 
 
@@ -46,6 +49,13 @@ if __name__ == '__main__':
         snapshot(args[0])
     elif action == 'tap':
         adb('shell', 'input', 'tap', *args)
+    elif action == 'tap-label':
+        snapshot('ui-current')
+        candidates = [node for node in ET.parse(OUT / 'ui-current.xml').getroot().iter('node')
+          if (node.attrib.get('text') or node.attrib.get('content-desc') or '') == args[0]]
+        assert len(candidates) == 1, 'Expected one observed label'
+        x1, y1, x2, y2 = map(int, re.findall(r'\d+', candidates[0].attrib['bounds']))
+        adb('shell', 'input', 'tap', str((x1+x2)//2), str((y1+y2)//2))
     elif action == 'text':
         adb('shell', 'input', 'text', args[0])
     elif action == 'key':
@@ -67,3 +77,14 @@ if __name__ == '__main__':
         print(json.dumps(result))
         if args:
             (OUT / f'{args[0]}.json').write_text(json.dumps(result, indent=2))
+    elif action == 'cached-record':
+        raw = adb('shell', 'run-as', PACKAGE, 'cat',
+                  'shared_prefs/FlutterSharedPreferences.xml')
+        values = {n.attrib.get('name'): n.text for n in ET.fromstring(raw)}
+        record = json.loads(values['flutter.gssms_cache_record_' + args[0]])
+        result = {'id': record['id'], 'lines': [
+            {'id': line['id'], 'recorded_value': line.get('recorded_value')}
+            for line in record.get('lines', [])]}
+        print(json.dumps(result))
+        if len(args) > 1:
+            (OUT / f'{args[1]}.json').write_text(json.dumps(result, indent=2))

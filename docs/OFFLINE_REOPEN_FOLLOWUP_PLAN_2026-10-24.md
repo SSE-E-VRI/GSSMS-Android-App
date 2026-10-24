@@ -70,5 +70,19 @@ Keep these named items open unless separately proven:
 - **Group check-out mismatch:** use a fully checked-out disposable fixture for
   this slice; do not certify the separate check-out fix from that workaround.
 
-Production remains unchanged during dev acceptance. Keep the test backend,
+Dev acceptance must not install or mutate production. Keep the test backend,
 baseline and completed-run database snapshots outside Flutter's `build` folder.
+
+## Implemented and rechecked
+
+F2 is implemented in `ff3cb91`. The focused A1/A3/A10 phone checks and the tested
+401 refused-refresh path passed; see [the reacceptance report](OFFLINE_REOPEN_REACCEPTANCE_2026-10-24.md).
+The signed 0.3.7 artifact remains separate. Its exact binary was independently
+observed installed on the connected phone; no production install command was
+issued during dev acceptance.
+
+**New named open item F4:** after home-screen replay clears an acknowledged line
+command, the downloaded read model can still show its older value until an online
+record refresh. Make owner-safe acknowledged-cache reconciliation the next small
+slice. Test a cold offline read immediately after home-only sync and ownership/
+interrupted-persistence cases, without changing the saved queue format.

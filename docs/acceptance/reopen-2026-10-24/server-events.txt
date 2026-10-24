@@ -1,0 +1,97 @@
+INFO 2026-10-24 15:57:28,365 server HTTP/2 support not enabled (install the http2 and tls Twisted extras)
+INFO 2026-10-24 15:57:28,377 server Configuring endpoint tcp:port=8766:interface=127.0.0.1
+INFO 2026-10-24 15:57:28,379 server Listening on TCP address 127.0.0.1:8766
+INFO 2026-10-24 15:59:03,492 runserver HTTP POST /api/v1/auth/refresh/ 200 [0.08, 127.0.0.1:60251]
+WARNING 2026-10-24 15:59:22,377 log Unauthorized: /api/v1/maintenance/work-orders/
+WARNING 2026-10-24 15:59:22,378 log Unauthorized: /api/v1/maintenance/schedules/attention/
+WARNING 2026-10-24 15:59:22,378 log Unauthorized: /api/v1/maintenance/dashboard/summary/
+WARNING 2026-10-24 15:59:22,378 log Unauthorized: /api/v1/maintenance/work-orders/
+WARNING 2026-10-24 15:59:22,378 log Unauthorized: /api/v1/assets/
+WARNING 2026-10-24 15:59:22,379 runserver HTTP GET /api/v1/maintenance/work-orders/?page_size=100 401 [0.04, 127.0.0.1:65048]
+WARNING 2026-10-24 15:59:22,380 runserver HTTP GET /api/v1/maintenance/schedules/attention/ 401 [0.04, 127.0.0.1:65049]
+WARNING 2026-10-24 15:59:22,381 runserver HTTP GET /api/v1/maintenance/dashboard/summary/ 401 [0.04, 127.0.0.1:65050]
+WARNING 2026-10-24 15:59:22,381 runserver HTTP GET /api/v1/maintenance/work-orders/?page_size=100 401 [0.03, 127.0.0.1:65051]
+WARNING 2026-10-24 15:59:22,381 runserver HTTP GET /api/v1/assets/?page_size=100 401 [0.03, 127.0.0.1:65052]
+INFO 2026-10-24 15:59:22,717 runserver HTTP POST /api/v1/auth/refresh/ 200 [0.01, 127.0.0.1:65053]
+INFO 2026-10-24 15:59:23,109 runserver HTTP GET /api/v1/maintenance/work-orders/?page_size=100 200 [0.03, 127.0.0.1:65051]
+INFO 2026-10-24 15:59:23,199 runserver HTTP GET /api/v1/assets/?page_size=100 200 [0.05, 127.0.0.1:65051]
+INFO 2026-10-24 15:59:23,449 runserver HTTP GET /api/v1/maintenance/schedules/attention/ 200 [0.04, 127.0.0.1:65051]
+INFO 2026-10-24 15:59:23,544 runserver HTTP GET /api/v1/maintenance/dashboard/summary/ 200 [0.06, 127.0.0.1:65051]
+INFO 2026-10-24 15:59:23,576 runserver HTTP GET /api/v1/maintenance/work-orders/?page_size=100 200 [0.01, 127.0.0.1:65051]
+INFO 2026-10-24 16:00:32,644 runserver HTTP POST /api/v1/auth/login/ 200 [1.51, 127.0.0.1:54215]
+INFO 2026-10-24 16:00:33,153 runserver HTTP GET /api/v1/assets/?page_size=100 200 [0.13, 127.0.0.1:63604]
+INFO 2026-10-24 16:00:33,160 runserver HTTP GET /api/v1/maintenance/schedules/attention/ 200 [0.13, 127.0.0.1:63601]
+INFO 2026-10-24 16:00:33,697 runserver HTTP GET /api/v1/maintenance/dashboard/summary/ 200 [0.67, 127.0.0.1:63602]
+INFO 2026-10-24 16:00:33,705 runserver HTTP GET /api/v1/maintenance/work-orders/?page_size=100 200 [0.68, 127.0.0.1:63600]
+INFO 2026-10-24 16:00:33,708 runserver HTTP GET /api/v1/maintenance/work-orders/?page_size=100 200 [0.68, 127.0.0.1:63603]
+INFO 2026-10-24 16:00:46,686 runserver HTTP GET /api/v1/maintenance/work-orders/1/ 200 [0.03, 127.0.0.1:53022]
+INFO 2026-10-24 16:00:46,897 runserver HTTP GET /api/v1/maintenance/work-orders/1/audit/ 200 [0.04, 127.0.0.1:53023]
+INFO 2026-10-24 16:00:46,898 runserver HTTP GET /api/v1/maintenance/work-orders/1/allowed-actions/ 200 [0.05, 127.0.0.1:53022]
+WARNING 2026-10-24 16:00:50,685 log Unauthorized: /api/v1/maintenance/records/1/
+WARNING 2026-10-24 16:00:50,686 runserver HTTP GET /api/v1/maintenance/records/1/ 401 [0.01, 127.0.0.1:58501]
+INFO 2026-10-24 16:00:50,716 runserver HTTP POST /api/v1/auth/refresh/ 200 [0.01, 127.0.0.1:58502]
+INFO 2026-10-24 16:00:50,818 runserver HTTP GET /api/v1/maintenance/records/1/ 200 [0.07, 127.0.0.1:58501]
+INFO 2026-10-24 16:00:50,955 runserver HTTP GET /api/v1/maintenance/records/1/ 200 [0.05, 127.0.0.1:58501]
+WARNING 2026-10-24 16:03:25,393 log Unauthorized: /api/v1/auth/refresh/
+WARNING 2026-10-24 16:03:25,393 runserver HTTP POST /api/v1/auth/refresh/ 401 [0.01, 127.0.0.1:60351]
+INFO 2026-10-24 16:04:38,425 runserver WebSocket HANDSHAKING /ws [127.0.0.1:62701]
+INFO 2026-10-24 16:04:38,519 runserver WebSocket DISCONNECT /ws [127.0.0.1:62701]
+ERROR 2026-10-24 16:04:39,116 server Exception inside application: No route found for path 'ws'.
+Traceback (most recent call last):
+  File "C:\Users\ADMIN\AppData\Local\Programs\Python\Python314\Lib\site-packages\django\contrib\staticfiles\handlers.py", line 101, in __call__
+    return await self.application(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ADMIN\AppData\Local\Programs\Python\Python314\Lib\site-packages\channels\routing.py", line 48, in __call__
+    return await application(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\gssms-test-backend\backend\accounts\middleware.py", line 41, in __call__
+    return await super().__call__(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ADMIN\AppData\Local\Programs\Python\Python314\Lib\site-packages\channels\middleware.py", line 24, in __call__
+    return await self.inner(scope, receive, send)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\ADMIN\AppData\Local\Programs\Python\Python314\Lib\site-packages\channels\routing.py", line 136, in __call__
+    raise ValueError("No route found for path %r." % path)
+ValueError: No route found for path 'ws'.
+INFO 2026-10-24 16:05:51,690 runserver HTTP POST /api/v1/auth/login/ 200 [0.85, 127.0.0.1:49861]
+INFO 2026-10-24 16:05:53,275 runserver HTTP GET /api/v1/maintenance/work-orders/?page_size=100 200 [0.07, 127.0.0.1:49871]
+INFO 2026-10-24 16:05:53,276 runserver HTTP GET /api/v1/maintenance/work-orders/?page_size=100 200 [0.07, 127.0.0.1:49874]
+INFO 2026-10-24 16:05:53,286 runserver HTTP GET /api/v1/maintenance/schedules/attention/ 200 [0.08, 127.0.0.1:49872]
+INFO 2026-10-24 16:05:53,289 runserver HTTP GET /api/v1/assets/?page_size=100 200 [0.08, 127.0.0.1:49875]
+INFO 2026-10-24 16:05:53,293 runserver HTTP GET /api/v1/maintenance/dashboard/summary/ 200 [0.08, 127.0.0.1:49873]
+INFO 2026-10-24 16:07:28,840 runserver HTTP POST /api/v1/auth/refresh/ 200 [0.01, 127.0.0.1:49707]
+INFO 2026-10-24 16:07:30,745 runserver HTTP GET /api/v1/maintenance/work-orders/?page_size=100 200 [0.04, 127.0.0.1:49711]
+INFO 2026-10-24 16:07:30,767 runserver HTTP GET /api/v1/maintenance/work-orders/?page_size=100 200 [0.05, 127.0.0.1:49714]
+INFO 2026-10-24 16:07:30,771 runserver HTTP GET /api/v1/maintenance/schedules/attention/ 200 [0.06, 127.0.0.1:49712]
+INFO 2026-10-24 16:07:30,773 runserver HTTP GET /api/v1/assets/?page_size=100 200 [0.06, 127.0.0.1:49715]
+INFO 2026-10-24 16:07:30,780 runserver HTTP GET /api/v1/maintenance/dashboard/summary/ 200 [0.07, 127.0.0.1:49713]
+INFO 2026-10-24 16:08:16,545 runserver HTTP POST /api/v1/auth/login/ 200 [0.85, 127.0.0.1:56562]
+INFO 2026-10-24 16:08:17,066 runserver HTTP GET /api/v1/maintenance/schedules/attention/ 200 [0.06, 127.0.0.1:56564]
+INFO 2026-10-24 16:08:17,068 runserver HTTP GET /api/v1/assets/?page_size=100 200 [0.06, 127.0.0.1:56567]
+INFO 2026-10-24 16:08:17,081 runserver HTTP GET /api/v1/maintenance/dashboard/summary/ 200 [0.07, 127.0.0.1:56565]
+INFO 2026-10-24 16:08:17,083 runserver HTTP GET /api/v1/maintenance/work-orders/?page_size=100 200 [0.08, 127.0.0.1:56563]
+INFO 2026-10-24 16:08:17,084 runserver HTTP GET /api/v1/maintenance/work-orders/?page_size=100 200 [0.08, 127.0.0.1:56566]
+INFO 2026-10-24 16:08:23,748 runserver HTTP GET /api/v1/maintenance/work-orders/1/ 200 [0.02, 127.0.0.1:56598]
+INFO 2026-10-24 16:08:23,964 runserver HTTP GET /api/v1/maintenance/work-orders/1/audit/ 200 [0.03, 127.0.0.1:56599]
+INFO 2026-10-24 16:08:23,966 runserver HTTP GET /api/v1/maintenance/work-orders/1/allowed-actions/ 200 [0.03, 127.0.0.1:56598]
+INFO 2026-10-24 16:08:27,868 runserver HTTP GET /api/v1/maintenance/records/1/ 200 [0.05, 127.0.0.1:56620]
+INFO 2026-10-24 16:08:28,012 runserver HTTP GET /api/v1/maintenance/records/1/ 200 [0.04, 127.0.0.1:56620]
+INFO 2026-10-24 16:10:38,711 runserver HTTP POST /api/v1/auth/refresh/ 200 [0.02, 127.0.0.1:56000]
+INFO 2026-10-24 16:10:40,036 runserver HTTP POST /api/v1/maintenance/records/1/submit_line/ 200 [0.05, 127.0.0.1:56007]
+INFO 2026-10-24 16:10:40,059 runserver HTTP GET /api/v1/maintenance/schedules/attention/ 200 [0.06, 127.0.0.1:56009]
+INFO 2026-10-24 16:10:40,061 runserver HTTP GET /api/v1/maintenance/work-orders/?page_size=100 200 [0.06, 127.0.0.1:56008]
+INFO 2026-10-24 16:10:40,135 runserver HTTP GET /api/v1/assets/?page_size=100 200 [0.07, 127.0.0.1:56012]
+INFO 2026-10-24 16:10:40,137 runserver HTTP GET /api/v1/maintenance/dashboard/summary/ 200 [0.08, 127.0.0.1:56010]
+INFO 2026-10-24 16:10:40,140 runserver HTTP GET /api/v1/maintenance/work-orders/?page_size=100 200 [0.08, 127.0.0.1:56011]
+WARNING 2026-10-24 16:14:02,935 log Unauthorized: /api/v1/maintenance/work-orders/1/
+WARNING 2026-10-24 16:14:02,935 runserver HTTP GET /api/v1/maintenance/work-orders/1/ 401 [0.01, 127.0.0.1:51476]
+INFO 2026-10-24 16:14:02,986 runserver HTTP POST /api/v1/auth/refresh/ 200 [0.01, 127.0.0.1:51477]
+INFO 2026-10-24 16:14:03,354 runserver HTTP GET /api/v1/maintenance/work-orders/1/ 200 [0.13, 127.0.0.1:51476]
+INFO 2026-10-24 16:14:03,411 runserver HTTP GET /api/v1/maintenance/work-orders/1/audit/ 200 [0.02, 127.0.0.1:51478]
+INFO 2026-10-24 16:14:03,412 runserver HTTP GET /api/v1/maintenance/work-orders/1/allowed-actions/ 200 [0.03, 127.0.0.1:51476]
+INFO 2026-10-24 16:14:06,947 runserver HTTP GET /api/v1/maintenance/records/1/ 200 [0.04, 127.0.0.1:51497]
+INFO 2026-10-24 16:14:07,047 runserver HTTP GET /api/v1/maintenance/records/1/ 200 [0.04, 127.0.0.1:51497]
+WARNING 2026-10-24 16:17:56,095 log Unauthorized: /api/v1/maintenance/work-orders/1/
+WARNING 2026-10-24 16:17:56,096 runserver HTTP GET /api/v1/maintenance/work-orders/1/ 401 [0.01, 127.0.0.1:50645]
+INFO 2026-10-24 16:17:56,240 runserver HTTP POST /api/v1/auth/refresh/ 200 [0.01, 127.0.0.1:50646]
+INFO 2026-10-24 16:17:56,356 runserver HTTP GET /api/v1/maintenance/work-orders/1/ 200 [0.03, 127.0.0.1:50645]

@@ -1,10 +1,12 @@
 """Local-only, explicitly controlled faults for one synthetic checklist route."""
 import json
 import time
+import os
 from pathlib import Path
 from django.http import JsonResponse
 
-OUT = Path(__file__).resolve().parents[2] / 'build' / 'phone-acceptance'
+OUT = Path(os.environ.get('GSSMS_PHONE_TEST_OUTPUT',
+    Path(__file__).resolve().parents[2] / 'build' / 'phone-acceptance'))
 OUT.mkdir(parents=True, exist_ok=True)
 
 
