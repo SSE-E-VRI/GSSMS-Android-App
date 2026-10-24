@@ -8,6 +8,15 @@ visible feature or change in what the app shows; MAJOR is a breaking change or
 forced update. The app talks to the GSSMS web/backend; API changes are additive,
 so older app builds keep working.
 
+## [0.3.8+13] - 2026-10-24
+
+### Fixed
+- Checklist, complaint, inspection and profile photo uploads failed with "Photo upload was denied" (HTTP 403). The public edge in front of the production API blocks any request body containing a real JPEG before it reaches the server, so no account, role or assignment change could help. Uploads are now sent base64-encoded as `text/plain` with the original multipart Content-Type in `X-GSSMS-Content-Type`; the backend restores the original request. Token-refresh retries and queued offline photos use the same path.
+
+### Release scope
+- Requires web/backend 1.9.16 to be deployed first; against an older backend uploads still fail (400 instead of 403).
+- No change to permissions, the saved queue format or any API contract.
+
 ## [0.3.7+12] - 2026-10-24
 
 ### Fixed

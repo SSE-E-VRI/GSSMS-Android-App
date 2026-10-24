@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gssms_mobile/core/config/app_config.dart';
 import 'package:gssms_mobile/core/network/auth_interceptor.dart';
 import 'package:gssms_mobile/core/network/certificate_pinning.dart';
+import 'package:gssms_mobile/core/network/encoded_upload_interceptor.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
 
 final authenticatedDioProvider = Provider<Dio>((ref) {
@@ -70,6 +71,7 @@ class DioClient {
         handler.next(options);
       }));
     }
+    dio.interceptors.add(EncodedUploadInterceptor());
     dio.interceptors.add(
       AuthInterceptor(
         dio: dio,

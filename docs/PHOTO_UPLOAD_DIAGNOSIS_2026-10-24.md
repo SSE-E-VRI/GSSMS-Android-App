@@ -1,6 +1,57 @@
 # Photo upload denial — 24 October 2026
 
-Status: investigation open; no root-cause fix verified yet.
+Status: **root cause found; fix implemented and verified against the production
+edge, pending backend deployment.** See "Root cause" below; the earlier
+investigation notes follow it unchanged.
+
+## Root cause
+
+The 403 is not issued by Django. `gssms.share.zrok.io` is served through
+zrok's public frontend, which sits behind an AWS load balancer. Its firewall
+answers `403 Forbidden` (`Server: awselb/2.0`, HTML body) to **any request
+body containing a standard JPEG quantization table** (`FFDB` segment) — i.e.
+every real photo — on any path, before the request reaches Daphne. It is not
+specific to ALU/MTUR, an account, a role or an assignment; it affects every
+JPEG upload from the Android app and the web app (checklist, complaint,
+inspection, execution evidence, proof, profile photo).
+
+Earlier probes passed because they used fake image bytes, which the firewall
+ignores. Verified with unauthenticated probes to a nonexistent record
+(Django can only answer 401; no data written):
+
+| Body | Edge result |
+| --- | --- |
+| Real JPEG (30 KB or 1.28 MB), multipart or raw | 403 `awselb/2.0` |
+| Only the JPEG `FFDB` segment | 403 `awselb/2.0` |
+| Fake `FFD8FF` + text, random bytes | 401 `daphne` |
+| Base64 body sent with a multipart Content-Type | empty 400 (edge) |
+| Base64 multipart body as `text/plain` + headers below | 401 `daphne` |
+
+## Fix
+
+Uploads are sent base64-encoded as `text/plain`, with
+`X-GSSMS-Body-Encoding: base64` and the real Content-Type (with boundary) in
+`X-GSSMS-Content-Type`. The backend restores the original bytes and
+Content-Type before any parsing, so permissions, assignment checks and JPEG
+validation run unchanged on exactly the request the client built.
+
+- Backend: `GSSMS/backend/gssms_project/middleware.py`
+  (`EncodedBodyMiddleware`, first after CORS; 24 MB encoded cap; CORS
+  allow-headers updated). Requests without the header are untouched.
+- Web: `GSSMS/frontend/src/services/encodedUpload.js`, applied in the shared
+  axios request interceptor to any `FormData` containing a file.
+- Android: `lib/core/network/encoded_upload_interceptor.dart`, installed in
+  `DioClient.create`; token-refresh retries replay the same encoded bytes, and
+  queued outbox photos use the same path.
+
+**Deployment order:** deploy the backend (which also ships the web bundle)
+first, then install the new APK. An updated APK against the old backend
+gets a 400 instead of today's 403 — uploads already fail there, so this is
+no regression, but photos only succeed once the backend is live.
+
+The proper long-term fix is to stop depending on zrok's shared public
+frontend for production (own domain/tunnel), or have zrok clear the false
+positive; the encoding can then remain harmlessly or be removed.
 
 ## Report
 
