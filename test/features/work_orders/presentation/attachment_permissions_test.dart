@@ -253,8 +253,55 @@ void main() {
       final state = controller.state as ChecklistLoaded;
       expect(state.record.lines.single.attachments, [_photo]);
       expect(
-          state.errorMessage, contains('photo permission or job assignment'));
+          state.errorMessage,
+          'Photo upload denied (403). You do not have permission to perform this action.');
       verifyNever(() => evidence.discard(any()));
+    });
+    test('second upload preserves the specific backend denial', () async {
+      start();
+      when(() => repo.uploadLineAttachment(55,
+          lineId: 11, kind: 'BEFORE', imagePath: '/second.jpg')).thenThrow(
+        DioException(
+          requestOptions: RequestOptions(path: '/records/55/lines/11/attachments/'),
+          response: Response(requestOptions: RequestOptions(path: ''),
+            statusCode: 403, data: {'detail': 'This Job Work is assigned to another technician.'}),
+        ),
+      );
+      expect(await controller.uploadLineAttachment(
+          lineId: 11, kind: 'BEFORE', imagePath: '/second.jpg'), isFalse);
+      final current = controller.state as ChecklistLoaded;
+      expect(current.errorMessage,
+          'Photo upload denied (403). This Job Work is assigned to another technician.');
+      expect(current.record.lines.single.attachments, [_photo]);
+      verifyNever(() => evidence.discard(any()));
+    });
+    test('multiple photos append independently and later rejection preserves them', () async {
+      start();
+      for (final pair in [(10, 'BEFORE'), (11, 'BEFORE'), (12, 'AFTER'), (13, 'AFTER')]) {
+        final path = '/photo_${pair.$1}.jpg';
+        when(() => repo.uploadLineAttachment(55,
+            lineId: 11, kind: pair.$2, imagePath: path))
+            .thenAnswer((_) async => LineAttachment(id: pair.$1, kind: pair.$2));
+        expect(await controller.uploadLineAttachment(
+            lineId: 11, kind: pair.$2, imagePath: path), isTrue);
+      }
+      final saved = (controller.state as ChecklistLoaded).record.lines.single.attachments;
+      expect(saved.map((a) => a.id), [9, 10, 11, 12, 13]);
+      expect(saved.where((a) => a.kind == 'BEFORE').length, 3);
+      expect(saved.where((a) => a.kind == 'AFTER').length, 2);
+      when(() => repo.uploadLineAttachment(55,
+          lineId: 11, kind: 'AFTER', imagePath: '/rejected.jpg')).thenThrow(
+        DioException(requestOptions: RequestOptions(path: ''),
+          response: Response(requestOptions: RequestOptions(path: ''),
+            statusCode: 403, data: '<html>Internal proxy response</html>')),
+      );
+      expect(await controller.uploadLineAttachment(
+          lineId: 11, kind: 'AFTER', imagePath: '/rejected.jpg'), isFalse);
+      final current = controller.state as ChecklistLoaded;
+      expect(current.record.lines.single.attachments, saved);
+      expect(current.errorMessage,
+          'Photo upload denied (403). The upload service returned no readable reason.');
+      expect(current.errorMessage, isNot(contains('<html>')));
     });
     test('authorized upload sends the open record and correct holder line',
         () async {

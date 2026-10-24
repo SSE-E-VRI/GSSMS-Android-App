@@ -933,7 +933,7 @@ class ChecklistController extends Notifier<ChecklistState> {
       if (latest is! ChecklistLoaded) return false;
       state = latest.copyWith(
           errorMessage: classifyApiFailure(e) == ApiFailureKind.permission
-              ? 'Photo upload was denied. Your photo permission or job assignment may have changed. Sign in again to refresh access, or contact your administrator.'
+              ? 'Photo upload denied (403). ${serverMessage((e as DioException).response?.data) ?? 'The upload service returned no readable reason.'}'
               : 'Failed to upload photo: ${_readableError(e)}');
       return false;
     }

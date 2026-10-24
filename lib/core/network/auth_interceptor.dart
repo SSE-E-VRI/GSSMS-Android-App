@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:gssms_mobile/core/network/api_error.dart';
 import 'package:gssms_mobile/features/auth/domain/models/auth_exceptions.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
 
@@ -270,6 +271,11 @@ class AuthInterceptor extends QueuedInterceptor {
       final sanitized = _sanitizeUri(err.requestOptions.uri);
       debugPrint(
           '[HTTP ERR] ${err.response?.statusCode} $sanitized (${err.type})');
+      if (err.response?.statusCode == 403 &&
+          err.requestOptions.path.endsWith('/attachments/')) {
+        final reason = serverMessage(err.response?.data);
+        debugPrint('[PHOTO DENIAL] ${reason ?? 'No readable server reason.'}');
+      }
     }
   }
 }
