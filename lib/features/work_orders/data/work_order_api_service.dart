@@ -369,6 +369,9 @@ class WorkOrderApiService {
     String? idempotencyKey,
   }) async {
     final payload = <String, dynamic>{'status': status};
+    if (status.toUpperCase() == 'CANCELLED') {
+      payload['meta_data'] = {'cancellation_category': 'USER_ERROR'};
+    }
     if (remarks != null && remarks.isNotEmpty) payload['remarks'] = remarks;
     if (checklist != null) payload['checklist'] = checklist;
     if (evidence != null) payload['evidence'] = evidence;
@@ -743,8 +746,13 @@ class WorkOrderApiService {
     );
   }
 
-  /// Alternative checklist templates for a schedule
-  /// (`conversion-context` -> `template.alternatives`).
+  /// Authoritative eligibility and lock flags for an approval request.
+  Future<Map<String, dynamic>> getScheduleApprovalState(int scheduleId) async {
+    final response = await _dio.get('$_schedules/$scheduleId/');
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
+  /// Alternative checklist templates from the conversion context.
   Future<List<ScheduleAlternative>> getScheduleAlternatives(
     int scheduleId,
   ) async {

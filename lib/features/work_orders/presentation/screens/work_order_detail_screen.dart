@@ -127,7 +127,7 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
           if (canRequest) ...const [
             PopupMenuItem<String>(
               value: 'skip',
-              child: Text('Request PM skip'),
+              child: Text('Skip this due period'),
             ),
             PopupMenuItem<String>(
               value: 'change_checklist',
@@ -812,7 +812,9 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
       case 'CLOSED':
         return 'The job work is closed. No further work can be recorded on it.';
       case 'CANCELLED':
-        return 'The job work is cancelled and will not be executed.';
+        return 'Only this Job Work is cancelled. A PM due remains open and a '
+            'replacement Job Work can be created. To cancel the due period, '
+            'use Skip this due period and obtain Division Admin approval.';
       default:
         return 'The job work status will change to '
             '${WorkOrderStatus.fromString(target).displayName}.';

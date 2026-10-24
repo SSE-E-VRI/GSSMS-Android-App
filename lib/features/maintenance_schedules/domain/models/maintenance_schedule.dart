@@ -94,6 +94,7 @@ class MaintenanceSchedule extends Equatable {
     this.assetName,
     this.assetUniqueId,
     this.terminationReason,
+    this.skipSupported = false,
   });
 
   final int id;
@@ -126,6 +127,7 @@ class MaintenanceSchedule extends Equatable {
   final String? assetName;
   final String? assetUniqueId;
   final String? terminationReason;
+  final bool skipSupported;
 
   bool get isConverted => workOrderId != null;
   bool get isEligible => eligibility?.eligible ?? false;
@@ -184,6 +186,8 @@ class MaintenanceSchedule extends Equatable {
       assetName: asJsonString(json['asset_name']),
       assetUniqueId: asJsonString(json['asset_unique_id']),
       terminationReason: asJsonString(json['termination_reason']),
+      skipSupported: asJsonBool(json['skip_supported']) ??
+          (json['obligation_master'] != null),
     );
   }
 
@@ -206,5 +210,6 @@ class MaintenanceSchedule extends Equatable {
         assetName,
         assetUniqueId,
         terminationReason,
+        skipSupported,
       ];
 }

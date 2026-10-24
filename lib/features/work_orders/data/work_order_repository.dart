@@ -128,6 +128,7 @@ abstract class IWorkOrderRepository {
     int? severityId,
   });
   Future<void> unflagRemarkDeficiency(int recordId, {required int remarkIndex});
+  Future<Map<String, dynamic>> getScheduleApprovalState(int scheduleId);
   Future<List<ScheduleAlternative>> getScheduleAlternatives(int scheduleId);
   Future<ApprovalRequestSummary> requestPmSkip(
     int scheduleId, {
@@ -542,6 +543,10 @@ class WorkOrderRepository implements IWorkOrderRepository {
   Future<void> unflagRemarkDeficiency(int recordId,
           {required int remarkIndex}) =>
       _apiService.unflagRemarkDeficiency(recordId, remarkIndex: remarkIndex);
+
+  @override
+  Future<Map<String, dynamic>> getScheduleApprovalState(int scheduleId) =>
+      _apiService.getScheduleApprovalState(scheduleId);
 
   @override
   Future<List<ScheduleAlternative>> getScheduleAlternatives(int scheduleId) =>

@@ -80,7 +80,7 @@ void main() {
     await tester.tap(find.byKey(const Key('work_order_overflow_menu')));
     await tester.pumpAndSettle();
     expect(find.text('Reassign technician'), findsOneWidget);
-    expect(find.text('Request PM skip'), findsOneWidget);
+    expect(find.text('Skip this due period'), findsOneWidget);
     expect(find.text('Request checklist change'), findsOneWidget);
     expect(find.byKey(const Key('pre_start_panel')), findsOneWidget);
   });

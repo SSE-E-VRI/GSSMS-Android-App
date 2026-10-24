@@ -59,7 +59,7 @@ still require separate security review.
 
 ## Release candidate
 
-Current candidate: **0.3.5-rc1+9** ([GitHub pre-release](https://github.com/SSE-E-VRI/GSSMS-Android-App/releases/tag/v0.3.5-rc1)); staging/field approval is pending. See [photo upload permission fix](docs/PHOTO_UPLOAD_PERMISSION_FIX_2026-10-23.md). See
+Current APK version: **0.3.6+11**. Includes separate Job Work cancellation and due-period skip requests. Deploy the matching backend with maintenance migration 0111 before rollout; staging/field approval remains pending. See [photo upload permission fix](docs/PHOTO_UPLOAD_PERMISSION_FIX_2026-10-23.md). See
 [production readiness](docs/PRODUCTION_READINESS_2026-10-23.md) for verification
 results and remaining field-validation gates.
 

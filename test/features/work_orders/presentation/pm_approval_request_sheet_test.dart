@@ -33,13 +33,14 @@ Future<void> _pump(
   IWorkOrderRepository repo,
   PmApprovalRequestMode mode, {
   List<bool?>? results,
+  bool dark = false,
 }) async {
   tester.view.physicalSize = const Size(800, 1600);
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
   await tester.pumpWidget(
     MaterialApp(
-      theme: AppTheme.lightTheme,
+      theme: dark ? AppTheme.darkTheme : AppTheme.lightTheme,
       home: Scaffold(
         body: Builder(
           builder: (ctx) => TextButton(
@@ -67,7 +68,13 @@ Future<void> _pump(
 
 void main() {
   late _MockRepo repo;
-  setUp(() => repo = _MockRepo());
+  setUp(() {
+    repo = _MockRepo();
+    when(() => repo.getScheduleApprovalState(any())).thenAnswer((_) async => {
+      'skip_supported': true, 'obligation_master': 1, 'status': 'IN_PROGRESS',
+      'template_locked': false, 'has_pending_approval': false,
+    });
+  });
 
   test('canShow gates on role, type, schedule id and status', () {
     expect(PmApprovalRequestSheet.canShow(_wo, _depotSession), isTrue);
@@ -118,7 +125,7 @@ void main() {
     final results = <bool?>[];
     await _pump(tester, repo, PmApprovalRequestMode.skip, results: results);
 
-    expect(find.text('Request PM Skip'), findsOneWidget);
+    expect(find.text('Skip this due period'), findsOneWidget);
     expect(find.text(PmApprovalRequestSheet.skipInfo), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('pm_skip_reason')));
@@ -209,6 +216,57 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('An approval request is already pending.'), findsOneWidget);
-    expect(find.text('Request PM Skip'), findsOneWidget);
+    expect(find.text('Skip this due period'), findsOneWidget);
   });
+  for (final scenario in <String, Map<String, dynamic>>{
+    'recorded work': {'template_locked': true},
+    'pending approval': {'has_pending_approval': true},
+    'unsupported legacy due': {'skip_supported': false},
+    'closed due': {'status': 'SKIPPED'},
+  }.entries) {
+    testWidgets('skip blocked by ${scenario.key}', (tester) async {
+      when(() => repo.getScheduleApprovalState(any())).thenAnswer((_) async => {
+        'skip_supported': true, 'status': 'OVERDUE',
+        ...scenario.value,
+      });
+      await _pump(tester, repo, PmApprovalRequestMode.skip);
+      expect(find.byKey(const Key('pm_schedule_block')), findsOneWidget);
+      final submit = tester.widget<FilledButton>(
+          find.byKey(const Key('pm_request_submit')));
+      expect(submit.onPressed, isNull);
+      verifyNever(() => repo.requestPmSkip(any(),
+          reasonCode: any(named: 'reasonCode'), remarks: any(named: 'remarks')));
+    });
+  }
+  testWidgets('legacy due is supported without an obligation master', (tester) async {
+    when(() => repo.getScheduleApprovalState(any())).thenAnswer((_) async => {
+      'skip_supported': true, 'status': 'OVERDUE',
+    });
+    when(() => repo.requestPmSkip(any(), reasonCode: any(named: 'reasonCode'),
+        remarks: any(named: 'remarks')))
+        .thenAnswer((_) async => const ApprovalRequestSummary(id: 2));
+    await _pump(tester, repo, PmApprovalRequestMode.skip);
+    await tester.enterText(find.byKey(const Key('pm_request_remarks')), 'Skip selected period');
+    await tester.tap(find.byKey(const Key('pm_request_submit')));
+    await tester.pumpAndSettle();
+    verify(() => repo.requestPmSkip(55, reasonCode: 'ASSET_UNAVAILABLE',
+        remarks: 'Skip selected period')).called(1);
+  });
+  testWidgets('failed eligibility lookup disables requests', (tester) async {
+    when(() => repo.getScheduleApprovalState(any())).thenThrow(Exception('Offline'));
+    await _pump(tester, repo, PmApprovalRequestMode.skip);
+    expect(find.textContaining('Could not check this due period'), findsOneWidget);
+    expect(tester.widget<FilledButton>(find.byKey(const Key('pm_request_submit'))).onPressed, isNull);
+  });
+
+  testWidgets('dark theme shows distinct skip explanation and locked reason', (tester) async {
+    when(() => repo.getScheduleApprovalState(any())).thenAnswer((_) async => {
+      'skip_supported': true, 'status': 'OVERDUE', 'template_locked': true,
+    });
+    await _pump(tester, repo, PmApprovalRequestMode.skip, dark: true);
+    expect(find.text(PmApprovalRequestSheet.skipInfo), findsOneWidget);
+    expect(find.textContaining('retained earlier attempts'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
 }

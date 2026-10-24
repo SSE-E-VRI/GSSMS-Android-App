@@ -37,12 +37,14 @@ Future<bool?> showPmApprovalRequestSheet(
 class PmApprovalRequestSheet extends StatefulWidget {
   const PmApprovalRequestSheet({
     super.key,
-    required this.workOrder,
+    this.workOrder,
+    this.scheduleId,
     required this.mode,
     required this.repository,
-  });
+  }) : assert(workOrder != null || scheduleId != null);
 
-  final WorkOrder workOrder;
+  final WorkOrder? workOrder;
+  final int? scheduleId;
   final PmApprovalRequestMode mode;
   final IWorkOrderRepository repository;
 
@@ -55,8 +57,10 @@ class PmApprovalRequestSheet extends StatefulWidget {
           wo.status == WorkOrderStatus.assigned);
 
   static const skipInfo =
-      'Skipping requires approval from Division Admin. Open Job Works will be '
-      'cancelled and the next occurrence materialized upon approval.';
+      'This request does not cancel the Job Work or clear the due. Division '
+      'Admin approval skips only this due period and cancels its unstarted Job '
+      'Works. Future maintenance remains scheduled; later periods may still be '
+      'overdue. To keep this due open for a replacement, use Cancel Job Work.';
   static const changeInfo =
       'Checklist change requires Division Admin approval. Upon approval, open '
       'Job Works will be updated to the new checklist.';
@@ -87,14 +91,17 @@ class _PmApprovalRequestSheetState extends State<PmApprovalRequestSheet> {
   bool _loadingAlternatives = false;
   String? _loadError;
   bool _submitting = false;
+  bool _loadingSchedule = true;
+  String? _scheduleBlock;
   String? _submitError;
 
   bool get _isSkip => widget.mode == PmApprovalRequestMode.skip;
-  int get _scheduleId => widget.workOrder.originalScheduleId!;
+  int get _scheduleId => widget.scheduleId ?? widget.workOrder!.originalScheduleId!;
 
   @override
   void initState() {
     super.initState();
+    _loadSchedule();
     if (!_isSkip) _loadAlternatives();
   }
 
@@ -126,13 +133,45 @@ class _PmApprovalRequestSheetState extends State<PmApprovalRequestSheet> {
     }
   }
 
+  Future<void> _loadSchedule() async {
+    try {
+      final state = await widget.repository.getScheduleApprovalState(_scheduleId);
+      String? block;
+      final supported = _isSkip
+          ? (state['skip_supported'] ?? (state['obligation_master'] != null)) == true
+          : state['obligation_master'] != null;
+      if (!supported) {
+        block = 'This due period does not support this request.';
+      } else if (state['has_pending_approval'] == true) {
+        block = 'An approval request is already pending for this due period.';
+      } else if (state['template_locked'] == true) {
+        block = 'Recorded work, including retained earlier attempts, prevents '
+            'skipping or changing this due period.';
+      } else if (!['PENDING', 'OVERDUE', 'IN_PROGRESS'].contains(state['status'])) {
+        block = 'This due period is no longer open.';
+      }
+      if (!mounted) return;
+      setState(() {
+        _loadingSchedule = false;
+        _scheduleBlock = block;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _loadingSchedule = false;
+        _scheduleBlock = 'Could not check this due period: ${userFacingError(e)}';
+      });
+    }
+  }
+
   bool get _canSubmit {
-    if (_submitting) return false;
+    if (_submitting || _loadingSchedule || _scheduleBlock != null) return false;
     if (_isSkip) return true;
     return !_loadingAlternatives && _selectedAlternativeId != null;
   }
 
   Future<void> _submit() async {
+    if (!_canSubmit) return;
     if (!(_formKey.currentState?.validate() ?? false)) return;
     final remarks = _remarksController.text.trim();
     setState(() {
@@ -170,7 +209,7 @@ class _PmApprovalRequestSheetState extends State<PmApprovalRequestSheet> {
     final info = tokens.tone(GssmsTone.info);
     final danger = tokens.tone(GssmsTone.danger);
     final warning = tokens.tone(GssmsTone.warning);
-    final title = _isSkip ? 'Request PM Skip' : 'Request Checklist Change';
+    final title = _isSkip ? 'Skip this due period' : 'Request Checklist Change';
 
     return Padding(
       padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
@@ -236,6 +275,14 @@ class _PmApprovalRequestSheetState extends State<PmApprovalRequestSheet> {
                   requireLong: _isSkip && _reasonCode == 'OTHER',
                 ),
               ),
+              if (_loadingSchedule) const LinearProgressIndicator(),
+              if (_scheduleBlock != null)
+                _notice(
+                  key: const Key('pm_schedule_block'),
+                  text: _scheduleBlock!,
+                  icon: Icons.info_outline,
+                  palette: warning,
+                ),
               if (_submitError != null) ...[
                 const SizedBox(height: GssmsSpacing.s12),
                 _notice(

@@ -141,6 +141,14 @@ void main() {
       expect(updated.status, WorkOrderStatus.inProgress);
     });
 
+    test('cancel job explicitly keeps the PM due open', () async {
+      dio.httpClientAdapter = MockAdapter((options) async {
+        expect(options.data['meta_data'], {'cancellation_category': 'USER_ERROR'});
+        return _json({'id': 101, 'status': 'CANCELLED', 'type': 'PREVENTIVE'}, 200);
+      });
+      await apiService.changeStatus(101, status: 'CANCELLED', remarks: 'Wrong job');
+    });
+
     test('assignTechnician PATCHes assigned_to on the work order', () async {
       dio.httpClientAdapter = MockAdapter((options) async {
         expect(options.path, '/api/v1/maintenance/work-orders/101/');

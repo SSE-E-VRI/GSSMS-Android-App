@@ -17,6 +17,8 @@ import 'package:gssms_mobile/features/pending_actions/presentation/controllers/p
 import 'package:gssms_mobile/features/work_orders/presentation/pending_action_status_labels.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/screens/work_order_detail_screen.dart';
 import 'package:intl/intl.dart';
+import 'package:gssms_mobile/features/work_orders/presentation/widgets/pm_approval_request_sheet.dart';
+import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_order_controllers.dart';
 
 /// Mobile mirror of web's Dashboard "Pending Actions" 4-tab card
 /// (DashboardView.jsx): Scheduled Tasks / Complaints / Inspection Notes /
@@ -437,8 +439,37 @@ class _SchedulesTab extends ConsumerWidget {
               // station are distinguishable; station rows render as before.
               if (s.assetName != null) s.assetName!,
               if (s.dueDate != null) 'Due ${dateFormat.format(s.dueDate!)}',
+              if (canRequestPmApproval(session) && s.skipSupported &&
+                  [ScheduleStatus.pending, ScheduleStatus.overdue,
+                    ScheduleStatus.inProgress].contains(s.status))
+                'Skip this due period: use the calendar action',
             ].join(' • ')),
-            trailing: s.isConverted
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (canRequestPmApproval(session) && s.skipSupported &&
+                    [ScheduleStatus.pending, ScheduleStatus.overdue,
+                      ScheduleStatus.inProgress].contains(s.status))
+                  IconButton(
+                    tooltip: 'Skip this due period',
+                    icon: const Icon(Icons.event_busy_outlined),
+                    onPressed: () async {
+                    final done = await showModalBottomSheet<bool>(
+                      context: context,
+                      isScrollControlled: true,
+                      useSafeArea: true,
+                      builder: (_) => PmApprovalRequestSheet(
+                        scheduleId: s.id,
+                        mode: PmApprovalRequestMode.skip,
+                        repository: ref.read(workOrderRepositoryProvider),
+                      ),
+                    );
+                    if (done == true) {
+                      await ref.read(pendingActionsControllerProvider.notifier).load();
+                    }
+                  },
+                  ),
+                s.isConverted
                 ? (_woStatusChip(s.workOrderStatus) ??
                     Icon(Icons.link,
                         color: context.gssms.success.foreground, size: 18))
@@ -447,6 +478,8 @@ class _SchedulesTab extends ConsumerWidget {
                         Text(statusLabel, style: const TextStyle(fontSize: 11)),
                     visualDensity: VisualDensity.compact,
                   ),
+              ],
+            ),
           ),
         );
       },

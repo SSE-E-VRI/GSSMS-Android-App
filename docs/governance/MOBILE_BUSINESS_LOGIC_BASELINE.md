@@ -65,3 +65,30 @@ The open defect and gap are scheduled for a separate test-first code slice that 
 - An independent reviewer confirms code and test evidence.
 - The record revision is bumped.
 - A frozen rule may not change in a code-only commit.
+
+
+## PM cancellation and due-period skip ? 23 October 2026
+
+Android distinguishes **Cancel Job Work** from **Skip this due period**.
+Cancelling a Job Work sends `USER_ERROR` cancellation metadata: the due remains
+open and a replacement Job Work may be created. It does not skip maintenance.
+The skip request is available from the Job Work overflow menu and the calendar
+action in Pending Actions, including eligible legacy schedules without a Job
+Work. Only existing authorised depot roles can request it; Division Admin
+approval remains server-owned. Submission alone does not cancel work or clear
+the due. Approval skips only the selected period, cancels eligible unstarted
+linked Job Works, and preserves future maintenance; later periods can remain
+overdue.
+
+Before enabling submission, Android fetches the schedule and checks
+`skip_supported`, `template_locked`, `has_pending_approval` and open status.
+Recorded work from earlier attempts still blocks skipping. Failed lookups block
+submission; server validation remains authoritative against concurrent changes.
+Checklist-change eligibility remains obligation-based. Older servers fall back
+to obligation-based skip eligibility; legacy support requires the backend skip
+release and migration 0111 before rollout.
+
+Validation: 528 targeted Flutter tests passed (work orders, pending actions,
+maintenance schedules and version consistency; rerun on 24 October 2026). Full-app analysis and focused changed-source analysis
+reported no issues. No physical-device test, APK build, production write or
+deployment was performed for this change.

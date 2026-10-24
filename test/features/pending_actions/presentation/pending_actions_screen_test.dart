@@ -11,6 +11,11 @@ import 'package:gssms_mobile/features/pending_actions/presentation/controllers/p
 import 'package:gssms_mobile/features/pending_actions/presentation/screens/pending_actions_screen.dart';
 
 import '../../../helpers/fake_auth.dart';
+import 'package:mocktail/mocktail.dart';
+import 'package:gssms_mobile/features/work_orders/data/work_order_repository.dart';
+import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_order_controllers.dart';
+
+class _Repo extends Mock implements IWorkOrderRepository {}
 
 /// Serves a fixed, already-loaded state and never hits the network.
 class _FakePendingActionsController extends PendingActionsController {
@@ -24,11 +29,12 @@ class _FakePendingActionsController extends PendingActionsController {
   Future<void> load() async {}
 }
 
-Widget _app(PendingActionsState state) => ProviderScope(
+Widget _app(PendingActionsState state, {IWorkOrderRepository? repo}) => ProviderScope(
       overrides: [
+        if (repo != null) workOrderRepositoryProvider.overrideWithValue(repo),
         authControllerProvider.overrideWith(
           () => FakeAuthenticatedController(
-              fakeSession(permissions: const ['maintenance.view'])),
+              fakeSession(permissions: repo == null ? const ['maintenance.view'] : const ['maintenance.view', 'maintenance.edit'])),
         ),
         pendingActionsControllerProvider
             .overrideWith(() => _FakePendingActionsController(state)),
@@ -49,6 +55,27 @@ MaintenanceSchedule _schedule(int id, String name, {bool isBreakdown = false}) =
     });
 
 void main() {
+  testWidgets('legacy due opens skip request without creating a Job Work', (tester) async {
+    tester.view.physicalSize = const Size(800, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final repo = _Repo();
+    when(() => repo.getScheduleApprovalState(55)).thenAnswer((_) async => {
+      'skip_supported': true, 'status': 'OVERDUE',
+    });
+    await tester.pumpWidget(_app(PendingActionsState(loading: false, schedules: [
+      MaintenanceSchedule.fromJson({'id': 55, 'template_name': 'Legacy PM',
+        'status': 'OVERDUE', 'skip_supported': true}),
+    ]), repo: repo));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Skip this due period'));
+    await tester.pumpAndSettle();
+    expect(find.text('Skip this due period'), findsOneWidget);
+    expect(find.byKey(const Key('pm_request_submit')), findsOneWidget);
+    verify(() => repo.getScheduleApprovalState(55)).called(1);
+    verifyNever(() => repo.requestPmSkip(any(), reasonCode: any(named: 'reasonCode'),
+        remarks: any(named: 'remarks')));
+  });
   group('Pending Actions Schedules tab', () {
     testWidgets('excludes is_breakdown rows and the badge count matches',
         (tester) async {

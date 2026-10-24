@@ -36,7 +36,9 @@ class WorkOrderAction extends Equatable {
     final requirements = req is Map ? Map<String, dynamic>.from(req) : null;
     return WorkOrderAction(
       targetStatus: asJsonString(json['target_status']) ?? '',
-      label: asJsonString(json['label']) ?? asJsonString(json['target_status']) ?? '',
+      label: asJsonString(json['target_status'])?.toUpperCase() == 'CANCELLED'
+          ? 'Cancel Job Work'
+          : asJsonString(json['label']) ?? asJsonString(json['target_status']) ?? '',
       enabled: asJsonBool(json['enabled']) ?? false,
       disabledReason: asJsonString(json['disabled_reason']),
       requiresReason: asJsonBool(json['requires_reason']) ??
