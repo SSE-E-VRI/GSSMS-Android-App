@@ -710,7 +710,7 @@ class WorkOrderRepository implements IWorkOrderRepository {
     final commands = await _cacheService.getOutboxCommands();
     // Ownership may change while storage is being read.
     if (await _cacheService.getCacheOwnerUserId() != owner) return record;
-    final latestByLine = <int, Map<String, dynamic>>{};
+    final latestByLine = <int, OutboxCommand>{};
     for (final command in commands) {
       if (command.ownerUserId != owner ||
           command.entityId != record.id ||
@@ -720,13 +720,14 @@ class WorkOrderRepository implements IWorkOrderRepository {
         continue;
       }
       final lineId = int.tryParse('${command.payload['line_id']}');
-      if (lineId != null) latestByLine[lineId] = command.payload;
+      if (lineId != null) latestByLine[lineId] = command;
     }
     return record.copyWith(
         lines: record.lines.map((line) {
-      final payload = latestByLine[line.id];
-      if (payload == null) return line;
-      var updated = line;
+      final queued = latestByLine[line.id];
+      if (queued == null) return line;
+      final payload = queued.payload;
+      var updated = line.copyWith(localSyncStatus: queued.status);
       if (payload.containsKey('value')) {
         updated = updated.copyWith(recordedValue: payload['value']);
       }

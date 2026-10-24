@@ -19,6 +19,7 @@ import 'package:gssms_mobile/features/work_orders/domain/models/work_order_actio
 import 'package:gssms_mobile/features/work_orders/domain/models/work_order_audit.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_order_controllers.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_order_state.dart';
+import 'package:gssms_mobile/features/work_orders/presentation/controllers/downloaded_checklist_access.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/screens/checklist_screen.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/screens/complaint_execution_screen.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/screens/inspection_execution_screen.dart';
@@ -409,6 +410,9 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
     // as the client-side floor.
     final canResume =
         route == ExecutionRoute.checklist ? canChecklist : canEdit;
+    final canOpenDownloaded = state.actionsUnavailableOffline &&
+        route == ExecutionRoute.checklist &&
+        ref.watch(downloadedChecklistAccessProvider(wo)).asData?.value == true;
 
     Widget? primary;
     if (canStart) {
@@ -427,7 +431,7 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
     } else if (canResume &&
         wo.status == WorkOrderStatus.inProgress &&
         ((allowed?.allowsTarget('TECH_COMPLETED') ?? false) ||
-            (allowed?.allowsTarget('IN_PROGRESS') ?? false))) {
+            (allowed?.allowsTarget('IN_PROGRESS') ?? false) || canOpenDownloaded)) {
       primary = FilledButton.icon(
         key: const Key('action_open_checklist'),
         icon: const Icon(Icons.checklist),

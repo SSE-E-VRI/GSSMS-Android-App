@@ -398,7 +398,8 @@ class _ChecklistLineCardState extends ConsumerState<ChecklistLineCard> {
                 ),
                 const SizedBox(width: 3),
                 Text(
-                  line.isSaved ? 'Saved' : 'Saving…',
+                  !line.isSaved ? 'Saving…' : line.localSyncStatus != null
+                      ? 'On phone' : 'Saved',
                   style: textTheme.labelSmall?.copyWith(
                     color: line.isSaved
                         ? tokens.success.foreground

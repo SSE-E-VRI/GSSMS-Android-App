@@ -386,6 +386,7 @@ class MaintenanceRecordLine extends Equatable {
     this.excluded = false,
     this.exclusionReason,
     this.isSaved = true,
+    this.localSyncStatus,
     this.attachments = const [],
     this.checkedOut,
     this.checkoutSource = '',
@@ -433,6 +434,8 @@ class MaintenanceRecordLine extends Equatable {
 
   /// Lines excluded from this record's checklist by the supervisor.
   final bool excluded;
+  /// Derived from the owned outbox; never persisted in the server read cache.
+  final OutboxCommandStatus? localSyncStatus;
   final String? exclusionReason;
 
   final bool isSaved;
@@ -534,6 +537,7 @@ class MaintenanceRecordLine extends Equatable {
     Object? deficiency = _unset,
     bool? deficiencyAttended,
     bool? isSaved,
+    Object? localSyncStatus = _unset,
     List<LineAttachment>? attachments,
     bool? excluded,
     Object? exclusionReason = _unset,
@@ -574,6 +578,8 @@ class MaintenanceRecordLine extends Equatable {
           ? this.exclusionReason
           : exclusionReason as String?,
       isSaved: isSaved ?? this.isSaved,
+      localSyncStatus: identical(localSyncStatus, _unset)
+          ? this.localSyncStatus : localSyncStatus as OutboxCommandStatus?,
       attachments: attachments ?? this.attachments,
       checkedOut:
           identical(checkedOut, _unset) ? this.checkedOut : checkedOut as bool?,
@@ -699,6 +705,7 @@ class MaintenanceRecordLine extends Equatable {
         excluded,
         exclusionReason,
         isSaved,
+        localSyncStatus,
         attachments,
         checkedOut,
         checkoutSource,

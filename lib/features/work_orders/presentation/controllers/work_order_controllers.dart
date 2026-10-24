@@ -285,11 +285,16 @@ class WorkOrderDetailController extends Notifier<WorkOrderDetailState> {
   /// Loads server-permitted transitions and the audit trail into the current
   /// detail state, ignoring failures of either.
   Future<void> loadActionsAndAudit() async {
+    var actionsUnavailableOffline = false;
     final results = await Future.wait([
       _repository
           .fetchAllowedActions(arg)
           .then<Object?>((v) => v)
-          .catchError((_) => null),
+          .catchError((Object error) {
+            actionsUnavailableOffline =
+                classifyApiFailure(error) == ApiFailureKind.network;
+            return null;
+          }),
       _repository
           .fetchAudit(arg)
           .then<Object?>((v) => v)
@@ -301,6 +306,7 @@ class WorkOrderDetailController extends Notifier<WorkOrderDetailState> {
     state = current.copyWith(
       actions: results[0] as WorkOrderActionSet?,
       audit: results[1] as WorkOrderAudit?,
+      actionsUnavailableOffline: actionsUnavailableOffline,
     );
   }
 
@@ -604,6 +610,8 @@ class ChecklistController extends Notifier<ChecklistState> {
             actionOptionId: effectiveActionId,
             observationAction: remarks,
             isSaved: true,
+            localSyncStatus: outcome == MutationOutcome.synced
+                ? null : OutboxCommandStatus.pending,
           );
         }
         return l;

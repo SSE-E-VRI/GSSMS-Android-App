@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gssms_mobile/core/sync/sync_manager.dart';
+import 'package:gssms_mobile/core/sync/outbox_command.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_order_state.dart';
 
@@ -53,7 +54,15 @@ class ChecklistActionBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final syncState = ref.watch(syncManagerProvider);
-    final lastSyncedText = _formatLastSyncTime(syncState.lastSyncTime);
+    final localStatuses = state.record.lines
+        .map((line) => line.localSyncStatus).whereType<OutboxCommandStatus>();
+    final needsAttention = localStatuses.any((status) =>
+        status == OutboxCommandStatus.failed || status == OutboxCommandStatus.conflict);
+    final lastSyncedText = needsAttention
+        ? 'Saved on this phone – needs attention'
+        : localStatuses.isNotEmpty
+            ? 'Saved on this phone – waiting to sync'
+            : _formatLastSyncTime(syncState.lastSyncTime);
     final textTheme = Theme.of(context).textTheme;
     final tokens = context.gssms;
     final remaining = state.remainingRequired;

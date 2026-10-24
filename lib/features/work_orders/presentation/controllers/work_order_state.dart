@@ -196,6 +196,7 @@ class WorkOrderDetailLoaded extends WorkOrderDetailState {
     this.errorMessage,
     this.actions,
     this.audit,
+    this.actionsUnavailableOffline = false,
   });
 
   final WorkOrder workOrder;
@@ -209,6 +210,7 @@ class WorkOrderDetailLoaded extends WorkOrderDetailState {
 
   /// Full status history, loaded alongside the detail.
   final WorkOrderAudit? audit;
+  final bool actionsUnavailableOffline;
 
   WorkOrderDetailLoaded copyWith({
     WorkOrder? workOrder,
@@ -217,6 +219,7 @@ class WorkOrderDetailLoaded extends WorkOrderDetailState {
     String? errorMessage,
     WorkOrderActionSet? actions,
     WorkOrderAudit? audit,
+    bool? actionsUnavailableOffline,
   }) {
     return WorkOrderDetailLoaded(
       workOrder: workOrder ?? this.workOrder,
@@ -225,12 +228,15 @@ class WorkOrderDetailLoaded extends WorkOrderDetailState {
       errorMessage: errorMessage,
       actions: actions ?? this.actions,
       audit: audit ?? this.audit,
+      actionsUnavailableOffline:
+          actionsUnavailableOffline ?? this.actionsUnavailableOffline,
     );
   }
 
   @override
   List<Object?> get props =>
-      [workOrder, isTransitioning, actionMessage, errorMessage, actions, audit];
+      [workOrder, isTransitioning, actionMessage, errorMessage, actions, audit,
+       actionsUnavailableOffline];
 }
 
 class WorkOrderDetailError extends WorkOrderDetailState {
