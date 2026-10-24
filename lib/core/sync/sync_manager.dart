@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:equatable/equatable.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gssms_mobile/core/database/local_cache_service.dart';
 import 'package:gssms_mobile/core/network/api_error.dart';
@@ -173,14 +174,15 @@ class SyncManager extends Notifier<SyncState> {
     // rule so a closure can never overtake pending line work for the
     // same/linked entity.
     final transitionStatus = asJsonString(cmd.payload['status'])?.toUpperCase();
-    final isTerminalTransition = cmd.type == OutboxCommandType.transitionStatus &&
-        (transitionStatus == 'TECH_COMPLETED' ||
-            transitionStatus == 'VERIFIED' ||
-            transitionStatus == 'CLOSED');
+    final isTerminalTransition =
+        cmd.type == OutboxCommandType.transitionStatus &&
+            (transitionStatus == 'TECH_COMPLETED' ||
+                transitionStatus == 'VERIFIED' ||
+                transitionStatus == 'CLOSED');
     if (cmd.type == OutboxCommandType.completeRecord || isTerminalTransition) {
       final hasUnsyncedLineWork = scopedCommands.any((c) =>
           (c.type == OutboxCommandType.submitLine ||
-                  c.type == OutboxCommandType.uploadLineAttachment) &&
+              c.type == OutboxCommandType.uploadLineAttachment) &&
           c.entityId == cmd.entityId &&
           !syncedKeys.contains(c.idempotencyKey));
       if (hasUnsyncedLineWork) return true;
@@ -245,14 +247,15 @@ class SyncManager extends Notifier<SyncState> {
     }
   }
 
-  /// Atomically enqueues [command] unless a PENDING duplicate already exists.
+  /// Atomically enqueues [command], replacing pending line assignments with
+  /// their latest value and deduplicating other pending commands.
   ///
   /// The dedup read, check and save all run inside `_synchronized`, closing
   /// the check-then-act race in which two near-simultaneous calls both read
   /// the outbox before either save lands and both enqueue the same logical
   /// write under different idempotency keys (double-tap offline).
   ///
-  /// Returns true when a new command was enqueued, false on dedup-hit.
+  /// Returns true when persisted (including replacement), false on dedup-hit.
   Future<bool> enqueueDeduped(
     OutboxCommand command, {
     required bool Function(OutboxCommand existing) isDuplicate,
@@ -263,8 +266,30 @@ class SyncManager extends Notifier<SyncState> {
       final stamped =
           ownerId == null ? command : command.copyWith(ownerUserId: ownerId);
       final commands = [...await _cacheService.getOutboxCommands()];
-      final isDup = commands.any((c) =>
-          c.status == OutboxCommandStatus.pending && isDuplicate(c));
+      // Line autosaves are assignments: keep the latest payload, not the
+      // first character typed. Use the new operation's key, never associate
+      // a changed payload with a key that may already have reached the server.
+      // The drain holds this same lock through acknowledgment/persistence, so
+      // an in-flight acknowledgment cannot remove this replacement.
+      final matching = commands
+          .where((c) =>
+              c.ownerUserId == stamped.ownerUserId &&
+              c.status == OutboxCommandStatus.pending &&
+              isDuplicate(c))
+          .toList();
+      final isDup = matching.isNotEmpty;
+      if (isDup && stamped.type == OutboxCommandType.submitLine) {
+        if (matching.length == 1 &&
+            mapEquals(matching.single.payload, stamped.payload)) {
+          return false;
+        }
+        final index = commands.indexOf(matching.first);
+        commands.removeWhere(matching.contains);
+        commands.insert(index, stamped);
+        await _cacheService.saveOutboxCommands(commands);
+        await refreshPendingCount();
+        return true;
+      }
       if (isDup) return false;
       commands.add(stamped);
       await _cacheService.saveOutboxCommands(commands);
@@ -521,8 +546,7 @@ class SyncManager extends Notifier<SyncState> {
     try {
       await refreshPendingCount();
       if (state.pendingCount == 0) return;
-      if (!skipBackoffGate &&
-          DateTime.now().isBefore(_offlineBackoffUntil)) {
+      if (!skipBackoffGate && DateTime.now().isBefore(_offlineBackoffUntil)) {
         return;
       }
       await drainOutbox();

@@ -209,6 +209,7 @@ class WorkOrderRepository implements IWorkOrderRepository {
   final WorkOrderApiService _apiService;
   final ILocalCacheService _cacheService;
   final SyncManager? _syncManager;
+  Future<void> _lineSaves = Future<void>.value();
 
   bool _isNetworkException(dynamic e) {
     if (e is DioException) {
@@ -714,14 +715,25 @@ class WorkOrderRepository implements IWorkOrderRepository {
 
   @override
   Future<MutationOutcome> submitChecklistLine(
+      int recordId, Map<String, dynamic> lineData) {
+    // Keep autosaves in invocation order even if network attempts complete
+    // out of order. A failed save must not block subsequent edits.
+    final payload = Map<String, dynamic>.from(lineData);
+    final save =
+        _lineSaves.then((_) => _submitChecklistLine(recordId, payload));
+    _lineSaves = save.then<void>((_) {}, onError: (Object _, StackTrace __) {});
+    return save;
+  }
+
+  Future<MutationOutcome> _submitChecklistLine(
       int recordId, Map<String, dynamic> lineData) async {
     final lineId = lineData['line_id'] ?? 0;
     // Key is created BEFORE the first attempt and reused for the queued
     // command, so a request that reached the server but timed out client-side
-    // is deduplicated on replay. (If an existing pending duplicate is kept by
-    // enqueueDeduped, that older command's key is used instead - acceptable.)
+    // can reuse its identity on retry. Backend deduplication is a separate
+    // requirement; a newer assignment receives its own key and payload.
     final idempotencyKey =
-        'line_${recordId}_${lineId}_${DateTime.now().millisecondsSinceEpoch}';
+        'line_${recordId}_${lineId}_${DateTime.now().microsecondsSinceEpoch}';
     try {
       await _apiService.submitLine(recordId, lineData,
           idempotencyKey: idempotencyKey);
