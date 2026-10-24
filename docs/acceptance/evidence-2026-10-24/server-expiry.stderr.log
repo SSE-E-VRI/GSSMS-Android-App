@@ -1,0 +1,21 @@
+INFO 2026-10-24 12:45:31,561 server HTTP/2 support not enabled (install the http2 and tls Twisted extras)
+INFO 2026-10-24 12:45:31,564 server Configuring endpoint tcp:port=8765:interface=127.0.0.1
+INFO 2026-10-24 12:45:31,566 server Listening on TCP address 127.0.0.1:8765
+INFO 2026-10-24 12:46:35,914 runserver HTTP POST /api/v1/auth/login/ 200 [1.51, 127.0.0.1:64313]
+INFO 2026-10-24 12:46:36,732 runserver HTTP GET /api/v1/maintenance/work-orders/?page_size=100 200 [0.43, 127.0.0.1:64326]
+INFO 2026-10-24 12:46:36,735 runserver HTTP GET /api/v1/maintenance/work-orders/?page_size=100 200 [0.44, 127.0.0.1:64323]
+INFO 2026-10-24 12:46:36,745 runserver HTTP GET /api/v1/assets/?page_size=100 200 [0.44, 127.0.0.1:64327]
+INFO 2026-10-24 12:46:36,760 runserver HTTP GET /api/v1/maintenance/dashboard/summary/ 200 [0.46, 127.0.0.1:64325]
+INFO 2026-10-24 12:46:36,765 runserver HTTP GET /api/v1/maintenance/schedules/attention/ 200 [0.47, 127.0.0.1:64324]
+WARNING 2026-10-24 12:46:51,089 log Unauthorized: /api/v1/maintenance/work-orders/1/
+WARNING 2026-10-24 12:46:51,090 runserver HTTP GET /api/v1/maintenance/work-orders/1/ 401 [0.01, 127.0.0.1:62067]
+INFO 2026-10-24 12:46:51,127 runserver HTTP POST /api/v1/auth/refresh/ 200 [0.01, 127.0.0.1:62068]
+INFO 2026-10-24 12:46:51,209 runserver HTTP GET /api/v1/maintenance/work-orders/1/ 200 [0.03, 127.0.0.1:62067]
+INFO 2026-10-24 12:46:51,372 runserver HTTP GET /api/v1/maintenance/work-orders/1/allowed-actions/ 200 [0.04, 127.0.0.1:62067]
+INFO 2026-10-24 12:46:51,375 runserver HTTP GET /api/v1/maintenance/work-orders/1/audit/ 200 [0.04, 127.0.0.1:62069]
+INFO 2026-10-24 12:46:55,257 runserver HTTP GET /api/v1/maintenance/records/1/ 200 [0.06, 127.0.0.1:54277]
+INFO 2026-10-24 12:46:55,394 runserver HTTP GET /api/v1/maintenance/records/1/ 200 [0.07, 127.0.0.1:54277]
+WARNING 2026-10-24 12:47:52,264 log Unauthorized: /api/v1/maintenance/records/1/submit_line/
+WARNING 2026-10-24 12:47:52,265 runserver HTTP POST /api/v1/maintenance/records/1/submit_line/ 401 [0.02, 127.0.0.1:61558]
+INFO 2026-10-24 12:47:52,335 runserver HTTP POST /api/v1/auth/refresh/ 200 [0.02, 127.0.0.1:61559]
+INFO 2026-10-24 12:47:52,457 runserver HTTP POST /api/v1/maintenance/records/1/submit_line/ 200 [0.04, 127.0.0.1:61558]

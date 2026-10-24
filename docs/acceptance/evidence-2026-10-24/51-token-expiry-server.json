@@ -1,0 +1,20 @@
+{
+  "counts": {
+    "maintenance_maintenancerecord": 1,
+    "maintenance_maintenancerecordline": 2,
+    "assets_assetspecificationmeasurement": 0,
+    "assets_deficiency": 0,
+    "maintenance_workorderevent": 1,
+    "core_activitylog": 0
+  },
+  "line_values": [
+    [
+      1,
+      "\"66.5\""
+    ],
+    [
+      2,
+      "\"0\""
+    ]
+  ]
+}

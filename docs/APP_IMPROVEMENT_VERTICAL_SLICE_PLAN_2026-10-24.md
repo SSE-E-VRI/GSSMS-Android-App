@@ -1,7 +1,7 @@
 # GSSMS app improvement plan: smallest working vertical slices
 
 Date: 24 October 2026
-Status: Approved approach with review changes incorporated; no implementation or new device validation completed by this document.
+Status: Two app data-layer fixes implemented and tested; phone acceptance failed on offline navigation/session restoration. See [phone acceptance results](PHONE_ACCEPTANCE_2026-10-24.md).
 
 ## 1. Objective
 
@@ -60,9 +60,9 @@ Setting the same existing checklist-line value is the best first candidate becau
 - Moved `D:\GSSMS-Android-APP\build\uitest\ui.sqlite3` to **`D:\gssms-test-backend\ui.sqlite3`**. Both original paths are absent after the move. The backend and database are now outside Flutter's `build` cleanup scope.
 - No running Python process referencing `uitest` was reported by the pre-move process check. A read-only SQLite `PRAGMA quick_check` after relocation returned `ok`.
 - Post-move database SHA-256: `AC85ED3E3EE104FB329F59CE4328AF245AE4F21537DEDB7E828A8F830816EB8D`.
-- Owner: implementing assistant. App-side work proceeds independently of backend readiness. No phone mutation test or production mutation was performed for these app fixes.
+- Owner: implementing assistant. App-side fixes and unit tests were completed independently of backend readiness. Subsequent disposable-backend phone tests are recorded in [the acceptance report](PHONE_ACCEPTANCE_2026-10-24.md). No production mutation was performed.
 - Before phone tests, explicitly configure the relocated backend to use `D:\gssms-test-backend\ui.sqlite3`; the inspected stock settings otherwise default to `backend\db.sqlite3` (or `backend\db_test.sqlite3` for test settings). Moving files does not prove the launch configuration uses the intended database.
-- Backend revision, launch command, reset/reseed command, fixture IDs, phone-reachable endpoint and check-out patch/alternative fixture still require recording before phone acceptance. The relocation and database integrity check do not establish those gates as complete.
+- Backend source hash, launch/reset/reseed commands, fixture IDs, phone endpoint and the fully checked-out alternative fixture are now recorded in the phone acceptance report. The copied backend is not identified by a clean Git revision. Migration and fixture snapshots remain outside `build`.
 - Saved queue JSON keys, command types and status codes remain unchanged by the two app fixes; existing queued commands continue to use the current decoder.
 
 ### App-side implementation evidence — 24 October
@@ -74,7 +74,7 @@ Setting the same existing checklist-line value is the best first candidate becau
 - Sync and work-order data/presentation regression suites: **407 passed** using `flutter test --no-pub --concurrency=2 test/core/sync test/features/work_orders/data test/features/work_orders/presentation`. Evidence: `build/offline-slice-regression-20261024.log`.
 - An earlier higher-concurrency run exhausted host memory; the completed lower-concurrency run above is the acceptance result.
 - Direct Dart analysis of the two changed implementation files and two regression-test files: **no issues found**. Evidence: `build/offline-slice-analysis-20261024.log`. A workspace-wide `flutter analyze --no-pub` invocation stalled without diagnostics and was stopped; no workspace-wide analysis pass is claimed.
-- These are app-side automated results. A1–A14 phone acceptance and integrated server replay guarantees remain unproven; no backend duplicate protection is claimed.
+- These are app-side automated results. Subsequent phone results are in [PHONE_ACCEPTANCE_2026-10-24.md](PHONE_ACCEPTANCE_2026-10-24.md): latest-edit, queue persistence/overlay and scoped replay checks passed, but A1 and end-to-end A3 failed. A11 version-conflict behavior remains unverified. No general backend duplicate protection is claimed.
 
 ## 3. First slice: one offline checklist submission
 

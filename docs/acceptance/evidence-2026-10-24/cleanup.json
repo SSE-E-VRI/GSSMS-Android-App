@@ -1,0 +1,11 @@
+{
+  "airplane_mode": "0",
+  "wifi": "1",
+  "usb_stay_awake": "0",
+  "reverse_mappings": "",
+  "test_server_listening": false,
+  "dev_preference_modes": [
+    "771",
+    "660"
+  ]
+}

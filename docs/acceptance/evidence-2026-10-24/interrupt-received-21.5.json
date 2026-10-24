@@ -1,0 +1,17 @@
+{
+  "event": {
+    "path": "/api/v1/maintenance/records/1/submit_line/",
+    "at": 1792825602.155311,
+    "key": "line_1_1_1792825555615405",
+    "payload": {
+      "line_id": 1,
+      "value": "21.5",
+      "status": "OK",
+      "status_option": null,
+      "action_option": null,
+      "remarks": null
+    },
+    "phase": "received"
+  },
+  "force_stopped_at": 1792825602.5504317
+}
