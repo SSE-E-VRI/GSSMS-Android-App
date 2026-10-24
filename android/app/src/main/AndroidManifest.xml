@@ -2,6 +2,9 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Geolocator contains an optional notification path; location capture
+         remains foreground-only and does not request notification access. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.CAMERA" />
     <!--
       ME-02: one fresh foreground location fix for CAMERA evidence photos.
