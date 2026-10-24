@@ -1,4 +1,7 @@
 import 'dart:async';
+import 'package:jwt_decoder/jwt_decoder.dart';
+import 'package:gssms_mobile/core/storage/offline_session_store.dart';
+import 'package:gssms_mobile/features/auth/domain/models/auth_role.dart';
 import 'package:gssms_mobile/core/database/local_cache_service.dart';
 import 'package:gssms_mobile/core/storage/secure_storage_service.dart';
 import 'package:gssms_mobile/features/auth/data/auth_api_service.dart';
@@ -58,15 +61,22 @@ class AuthRepository implements IAuthRepository {
     required ISecureStorageService secureStorage,
     ILocalCacheService? cacheService,
     AuthSessionRefreshed? onSessionRefreshed,
+    IOfflineSessionStore? offlineSessionStore,
+    DateTime Function()? now,
   })  : _apiService = apiService,
         _secureStorage = secureStorage,
         _cacheService = cacheService,
-        _onSessionRefreshed = onSessionRefreshed;
+        _onSessionRefreshed = onSessionRefreshed,
+        _offlineSessionStore = offlineSessionStore,
+        _now = now ?? DateTime.now;
 
   final AuthApiService _apiService;
   final ISecureStorageService _secureStorage;
   final ILocalCacheService? _cacheService;
   final AuthSessionRefreshed? _onSessionRefreshed;
+  final IOfflineSessionStore? _offlineSessionStore;
+  final DateTime Function() _now;
+  static const offlineLifetime = Duration(hours: 8);
 
   UserSession? _currentSession;
   String? _currentAccessToken;
@@ -98,7 +108,9 @@ class AuthRepository implements IAuthRepository {
           {bool replaceRefresh = false, bool notify = false}) =>
       _serializeSession(() async {
         if (generation != _opGeneration) return null;
-        final session = UserSession.fromJwt(accessToken);
+        final verifiedAt = _now().toUtc();
+        final session = UserSession.fromJwt(accessToken)
+            .copyWith(offlineUntil: verifiedAt.add(offlineLifetime));
         final previous = _currentSession;
         if (refreshToken != null && refreshToken.isNotEmpty) {
           await _secureStorage.saveRefreshToken(refreshToken);
@@ -107,6 +119,10 @@ class AuthRepository implements IAuthRepository {
         }
         if (generation != _opGeneration) return null;
         await _bindCacheToSession(session, previous: previous);
+        if (session.userId != null) {
+          await _offlineSessionStore?.write(OfflineSessionSnapshot(
+              accessToken, session.userId!, verifiedAt, verifiedAt));
+        }
         if (generation != _opGeneration) return null;
         _currentAccessToken = accessToken;
         _currentSession = session;
@@ -144,15 +160,79 @@ class AuthRepository implements IAuthRepository {
       return await _commitSession(gen, tokens.accessToken, tokens.refreshToken);
     } on GuestExpiredException {
       if (gen != _opGeneration) return null;
-      await logout();
+      if (_currentSession?.isOffline == true) {
+        await expireSession();
+      } else {
+        await logout();
+      }
       rethrow;
     } on UnauthorizedException {
+      if (gen == _opGeneration) await expireSession();
+      return null;
+    } on NetworkAuthException {
+      return _restoreOfflineSession(gen);
+    } on ForbiddenException {
+      if (gen == _opGeneration) await expireSession();
+      return null;
+    } on AccountDisabledException {
+      if (gen == _opGeneration) await expireSession();
+      return null;
+    } on InvalidCredentialsException {
       if (gen == _opGeneration) await expireSession();
       return null;
     } catch (_) {
       return null;
     }
   }
+
+  Future<UserSession?> _restoreOfflineSession(int generation) =>
+      _serializeSession(() async {
+        if (generation != _opGeneration) return null;
+        final snapshot = await _offlineSessionStore?.read();
+        if (snapshot == null) return null;
+        final now = _now().toUtc();
+        final deadline = snapshot.verifiedAt.toUtc().add(offlineLifetime);
+        if (now.isBefore(snapshot.verifiedAt.toUtc()) ||
+            now.isBefore(snapshot.lastUsedAt.toUtc()) ||
+            !now.isBefore(deadline)) {
+          return null;
+        }
+        final owner = await _cacheService?.getCacheOwnerUserId();
+        if (owner != snapshot.userId) return null;
+        UserSession session;
+        try {
+          // Expired network tokens supply only their last verified identity.
+          // They are never sent as credentials for this local-only session.
+          final claims = JwtDecoder.decode(snapshot.accessToken);
+          if (claims['exp'] is! num) return null;
+          session = UserSession.fromClaims(claims, '')
+              .copyWith(isOffline: true, offlineUntil: deadline);
+        } catch (_) {
+          return null;
+        }
+        final profileDeadline = session.validUntil?.toUtc();
+        if (profileDeadline != null) {
+          if (!now.isBefore(profileDeadline)) return null;
+          if (profileDeadline.isBefore(deadline)) {
+            session = session.copyWith(offlineUntil: profileDeadline);
+          }
+        }
+        if (session.userId != owner ||
+            !session.roles.contains(AuthRole.maintenanceStaff) ||
+            !session.hasPermission('maintenance.view') ||
+            !session.hasPermission('maintenance.edit')) {
+          return null;
+        }
+        await _offlineSessionStore?.write(OfflineSessionSnapshot(
+            snapshot.accessToken, snapshot.userId, snapshot.verifiedAt, now));
+        if (generation != _opGeneration ||
+            await _cacheService?.getCacheOwnerUserId() != owner) {
+          return null;
+        }
+        _currentAccessToken = null;
+        _currentSession = session;
+        return session;
+      });
 
   @override
   Future<String?> refreshToken() async {
@@ -329,6 +409,7 @@ class AuthRepository implements IAuthRepository {
     await _serializeSession(() async {
       try {
         await _secureStorage.clearTokens();
+        await _offlineSessionStore?.clear();
       } finally {
         await _cacheService?.clearAllCache();
       }
@@ -344,6 +425,7 @@ class AuthRepository implements IAuthRepository {
     await _serializeSession(() async {
       try {
         await _secureStorage.clearTokens();
+        await _offlineSessionStore?.clear();
       } finally {
         // Keep the outbox and cache owner: only the same user signing in again
         // can reach (and sync) the queued work.

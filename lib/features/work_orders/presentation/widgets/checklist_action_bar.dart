@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gssms_mobile/core/sync/sync_manager.dart';
 import 'package:gssms_mobile/core/sync/outbox_command.dart';
+import 'package:gssms_mobile/features/auth/domain/rbac.dart';
+import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_order_state.dart';
 
@@ -54,10 +56,14 @@ class ChecklistActionBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final syncState = ref.watch(syncManagerProvider);
+    final offlineOnly =
+        sessionFromAuth(ref.watch(authControllerProvider))?.isOffline == true;
     final localStatuses = state.record.lines
-        .map((line) => line.localSyncStatus).whereType<OutboxCommandStatus>();
+        .map((line) => line.localSyncStatus)
+        .whereType<OutboxCommandStatus>();
     final needsAttention = localStatuses.any((status) =>
-        status == OutboxCommandStatus.failed || status == OutboxCommandStatus.conflict);
+        status == OutboxCommandStatus.failed ||
+        status == OutboxCommandStatus.conflict);
     final lastSyncedText = needsAttention
         ? 'Saved on this phone – needs attention'
         : localStatuses.isNotEmpty
@@ -87,7 +93,8 @@ class ChecklistActionBar extends ConsumerWidget {
               if (lastSyncedText != null) ...[
                 Text(
                   lastSyncedText,
-                  style: textTheme.labelSmall?.copyWith(color: tokens.textSecondary),
+                  style: textTheme.labelSmall
+                      ?.copyWith(color: tokens.textSecondary),
                 ),
                 const SizedBox(height: GssmsSpacing.s6),
               ],
@@ -162,7 +169,9 @@ class ChecklistActionBar extends ConsumerWidget {
                             borderRadius: BorderRadius.circular(GssmsRadius.r8),
                           ),
                         ),
-                        onPressed: (state.isSubmitting || isSavingProgress)
+                        onPressed: (offlineOnly ||
+                                state.isSubmitting ||
+                                isSavingProgress)
                             ? null
                             : (state.canSubmit
                                 ? onSignAndSubmit
@@ -181,7 +190,7 @@ class ChecklistActionBar extends ConsumerWidget {
                         label: FittedBox(
                           fit: BoxFit.scaleDown,
                           child: Text(
-                            'Sign & Submit',
+                            offlineOnly ? 'Connect to submit' : 'Sign & Submit',
                             maxLines: 1,
                             style: textTheme.labelLarge
                                 ?.copyWith(fontWeight: FontWeight.bold),

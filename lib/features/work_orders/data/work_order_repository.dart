@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:dio/dio.dart';
+import 'package:gssms_mobile/features/auth/domain/models/user_session.dart';
 import 'package:gssms_mobile/core/database/local_cache_service.dart';
 import 'package:gssms_mobile/core/sync/mutation_outcome.dart';
 import 'package:gssms_mobile/core/sync/outbox_command.dart';
@@ -203,12 +204,15 @@ class WorkOrderRepository implements IWorkOrderRepository {
     this._apiService, {
     ILocalCacheService? cacheService,
     SyncManager? syncManager,
+    UserSession? Function()? sessionProvider,
   })  : _cacheService = cacheService ?? LocalCacheService(),
-        _syncManager = syncManager;
+        _syncManager = syncManager,
+        _sessionProvider = sessionProvider;
 
   final WorkOrderApiService _apiService;
   final ILocalCacheService _cacheService;
   final SyncManager? _syncManager;
+  final UserSession? Function()? _sessionProvider;
   Future<void> _lineSaves = Future<void>.value();
 
   bool _isNetworkException(dynamic e) {
@@ -241,21 +245,55 @@ class WorkOrderRepository implements IWorkOrderRepository {
   Future<bool> _enqueueDeduped(
     OutboxCommand cmd, {
     bool Function(OutboxCommand existing)? matches,
+    bool autoDrain = true,
   }) async {
     final sync = _syncManager;
     if (sync == null) return false;
-    return sync.enqueueDeduped(
-      cmd,
-      isDuplicate: (existing) {
-        // Same logical write only: same command type + entity, and any
-        // caller-supplied content match.
-        if (existing.type != cmd.type || existing.entityId != cmd.entityId) {
-          return false;
-        }
-        if (matches != null) return matches(existing);
-        return true;
-      },
-    );
+    bool isDuplicate(OutboxCommand existing) {
+      // Same logical write only: same command type + entity, and any
+      // caller-supplied content match.
+      if (existing.type != cmd.type || existing.entityId != cmd.entityId) {
+        return false;
+      }
+      if (matches != null) return matches(existing);
+      return true;
+    }
+
+    if (!autoDrain) {
+      return sync.enqueueDeduped(cmd,
+          isDuplicate: isDuplicate, autoDrain: false);
+    }
+    return sync.enqueueDeduped(cmd, isDuplicate: isDuplicate);
+  }
+
+  Future<MaintenanceRecord> _ownedOfflineRecord(int recordId) async {
+    final session = _sessionProvider?.call();
+    final owner = session?.userId;
+    if (session?.isOffline != true ||
+        owner == null ||
+        session!.offlineUntil == null ||
+        !DateTime.now().toUtc().isBefore(session.offlineUntil!.toUtc()) ||
+        await _cacheService.getCacheOwnerUserId() != owner) {
+      throw const OnlineRequiredException(
+          'Offline access expired. Reconnect and sign in.');
+    }
+    final record = await _cacheService.getCachedMaintenanceRecord(recordId);
+    final workOrderId = record?.workOrderId;
+    final order = workOrderId == null
+        ? null
+        : await _cacheService.getCachedWorkOrderDetail(workOrderId);
+    if (record == null ||
+        order == null ||
+        order.assignedToId != owner ||
+        order.status != WorkOrderStatus.inProgress ||
+        order.linkedRecordId != recordId ||
+        await _cacheService.getCacheOwnerUserId() != owner ||
+        _sessionProvider?.call()?.userId != owner ||
+        _sessionProvider?.call()?.isOffline != true) {
+      throw const OnlineRequiredException(
+          'Only your downloaded In Progress checklists are available offline.');
+    }
+    return record;
   }
 
   @override
@@ -334,6 +372,15 @@ class WorkOrderRepository implements IWorkOrderRepository {
 
   @override
   Future<WorkOrder> fetchWorkOrderById(int id) async {
+    if (_sessionProvider?.call()?.isOffline == true) {
+      final order = await _cacheService.getCachedWorkOrderDetail(id);
+      if (order?.linkedRecordId == null) {
+        throw const OnlineRequiredException(
+            'This checklist was not downloaded.');
+      }
+      await _ownedOfflineRecord(order!.linkedRecordId!);
+      return order;
+    }
     try {
       final order = await _apiService.getWorkOrder(id);
       await _cacheService.cacheWorkOrderDetail(order);
@@ -687,6 +734,9 @@ class WorkOrderRepository implements IWorkOrderRepository {
 
   @override
   Future<MaintenanceRecord> fetchMaintenanceRecord(int recordId) async {
+    if (_sessionProvider?.call()?.isOffline == true) {
+      return _overlayQueuedLines(await _ownedOfflineRecord(recordId));
+    }
     MaintenanceRecord record;
     try {
       record = await _apiService.getMaintenanceRecord(recordId);
@@ -783,6 +833,27 @@ class WorkOrderRepository implements IWorkOrderRepository {
     // requirement; a newer assignment receives its own key and payload.
     final idempotencyKey =
         'line_${recordId}_${lineId}_${DateTime.now().microsecondsSinceEpoch}';
+    if (_sessionProvider?.call()?.isOffline == true) {
+      final record = await _ownedOfflineRecord(recordId);
+      if (_syncManager == null) {
+        throw StateError('Offline saves are unavailable.');
+      }
+      if (!record.lines.any(
+          (line) => line.id == lineId && line.isCheckedOut && !line.excluded)) {
+        throw const OnlineRequiredException(
+            'This line is not available for an offline reading.');
+      }
+      await _enqueueDeduped(
+          OutboxCommand(
+              idempotencyKey: idempotencyKey,
+              type: OutboxCommandType.submitLine,
+              entityId: recordId,
+              payload: lineData,
+              createdAt: DateTime.now()),
+          matches: (c) => c.payload['line_id'] == lineId,
+          autoDrain: false);
+      return MutationOutcome.queued;
+    }
     final owner = await _cacheService.getCacheOwnerUserId();
     final outstanding = await _cacheService.getOutboxCommands();
     // Do not send a newer value directly while an older queued assignment

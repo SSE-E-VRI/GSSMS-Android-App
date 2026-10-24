@@ -8,6 +8,7 @@ import '../features/auth/presentation/controllers/auth_controller.dart';
 import '../features/auth/presentation/controllers/auth_state.dart';
 import '../features/auth/presentation/screens/login_screen.dart';
 import '../features/home/presentation/screens/home_screen.dart';
+import '../features/work_orders/presentation/screens/offline_work_screen.dart';
 
 class GssmsApp extends ConsumerStatefulWidget {
   const GssmsApp({super.key});
@@ -19,6 +20,7 @@ class GssmsApp extends ConsumerStatefulWidget {
 class _GssmsAppState extends ConsumerState<GssmsApp>
     with WidgetsBindingObserver {
   ProviderSubscription<AuthState>? _authSub;
+  final _navigatorKey = GlobalKey<NavigatorState>();
 
   @override
   void initState() {
@@ -26,9 +28,14 @@ class _GssmsAppState extends ConsumerState<GssmsApp>
     WidgetsBinding.instance.addObserver(this);
     // Subscribe once (not in build) — replay queued work when a session
     // becomes available instead of waiting for a new mutation.
-    _authSub = ref.listenManual<AuthState>(authControllerProvider,
-        (previous, next) {
-      if (next is Authenticated && previous is! Authenticated) {
+    _authSub =
+        ref.listenManual<AuthState>(authControllerProvider, (previous, next) {
+      if (next is! Authenticated && previous is Authenticated) {
+        _navigatorKey.currentState?.popUntil((route) => route.isFirst);
+      }
+      if (next is Authenticated &&
+          !next.session.isOffline &&
+          (previous is! Authenticated || previous.session.isOffline)) {
         unawaited(ref.read(syncManagerProvider.notifier).resumePendingSync());
       }
     });
@@ -49,9 +56,15 @@ class _GssmsAppState extends ConsumerState<GssmsApp>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // Coming back to the foreground is the moment connectivity has most
     // likely changed (walked back into coverage, Wi-Fi reconnected).
-    if (state == AppLifecycleState.resumed &&
-        ref.read(authControllerProvider) is Authenticated) {
-      unawaited(ref.read(syncManagerProvider.notifier).resumePendingSync());
+    final auth = ref.read(authControllerProvider);
+    if (state == AppLifecycleState.resumed && auth is Authenticated) {
+      if (auth.session.isOffline) {
+        unawaited(ref
+            .read(authControllerProvider.notifier)
+            .reconnectOfflineSession());
+      } else {
+        unawaited(ref.read(syncManagerProvider.notifier).resumePendingSync());
+      }
     }
   }
 
@@ -61,6 +74,7 @@ class _GssmsAppState extends ConsumerState<GssmsApp>
     final themeMode = ref.watch(themeModeProvider);
 
     return MaterialApp(
+      navigatorKey: _navigatorKey,
       title: 'GSSMS Mobile',
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
@@ -71,7 +85,11 @@ class _GssmsAppState extends ConsumerState<GssmsApp>
   }
 
   static _AuthPhase _phaseOf(AuthState state) {
-    if (state is Authenticated) return _AuthPhase.authenticated;
+    if (state is Authenticated) {
+      return state.session.isOffline
+          ? _AuthPhase.offline
+          : _AuthPhase.authenticated;
+    }
     if (state is AuthInitial ||
         (state is AuthLoading && state.message == 'Restoring session...')) {
       return _AuthPhase.startup;
@@ -81,6 +99,8 @@ class _GssmsAppState extends ConsumerState<GssmsApp>
 
   Widget _buildHomeForPhase(_AuthPhase phase) {
     switch (phase) {
+      case _AuthPhase.offline:
+        return const OfflineWorkScreen();
       case _AuthPhase.authenticated:
         final state = ref.read(authControllerProvider);
         if (state is Authenticated) {
@@ -95,7 +115,7 @@ class _GssmsAppState extends ConsumerState<GssmsApp>
   }
 }
 
-enum _AuthPhase { authenticated, startup, login }
+enum _AuthPhase { authenticated, offline, startup, login }
 
 class _StartupView extends StatelessWidget {
   const _StartupView();

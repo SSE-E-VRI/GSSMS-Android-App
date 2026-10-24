@@ -8,6 +8,8 @@ import 'package:gssms_mobile/core/database/local_cache_service.dart';
 import 'package:gssms_mobile/core/network/api_error.dart';
 import 'package:gssms_mobile/core/sync/outbox_command.dart';
 import 'package:gssms_mobile/core/utils/json_parsing.dart';
+import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
+import 'package:gssms_mobile/features/auth/presentation/controllers/auth_state.dart';
 import 'package:gssms_mobile/features/work_orders/data/evidence_service.dart';
 import 'package:gssms_mobile/features/work_orders/data/work_order_api_service.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_order_controllers.dart';
@@ -304,6 +306,8 @@ class SyncManager extends Notifier<SyncState> {
   }
 
   Future<void> drainOutbox() async {
+    final auth = ref.read(authControllerProvider);
+    if (auth is Authenticated && auth.session.isOffline) return;
     // Set the guard synchronously (no `await` before it) so a second call
     // arriving before this one's queued action even starts can't slip past
     // the check and queue a redundant drain behind it.

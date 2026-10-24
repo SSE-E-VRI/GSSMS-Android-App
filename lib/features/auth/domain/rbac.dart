@@ -6,6 +6,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Fail-closed permission check. A missing session never grants access.
 bool sessionAllows(UserSession? session, String permissionCode) {
+  if (session?.isOffline == true &&
+      (session!.offlineUntil == null ||
+          !DateTime.now().toUtc().isBefore(session.offlineUntil!.toUtc()))) {
+    return false;
+  }
+  if (session?.isOffline == true &&
+      permissionCode != 'maintenance.view' &&
+      permissionCode != 'maintenance.edit') {
+    return false;
+  }
   return session?.hasPermission(permissionCode) ?? false;
 }
 

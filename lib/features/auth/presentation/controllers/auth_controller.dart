@@ -4,6 +4,7 @@ import 'package:gssms_mobile/core/auth/session_cleanup.dart';
 import 'package:gssms_mobile/core/config/app_config.dart';
 import 'package:gssms_mobile/core/network/dio_client.dart';
 import 'package:gssms_mobile/core/storage/secure_storage_service.dart';
+import 'package:gssms_mobile/core/storage/offline_session_store.dart';
 import 'package:gssms_mobile/core/sync/sync_manager.dart';
 import 'package:gssms_mobile/features/auth/data/auth_api_service.dart';
 import 'package:gssms_mobile/features/auth/data/auth_repository.dart';
@@ -50,6 +51,7 @@ final authRepositoryProvider = Provider<IAuthRepository>((ref) {
     apiService: apiService,
     secureStorage: storage,
     cacheService: ref.watch(localCacheServiceProvider),
+    offlineSessionStore: SecureOfflineSessionStore(),
     onSessionRefreshed: (session, previous) {
       return ref
           .read(authControllerProvider.notifier)
@@ -99,6 +101,40 @@ class AuthController extends Notifier<AuthState> {
       if (!identical(op, _opGenBox)) return;
       state = const Unauthenticated();
     }
+  }
+
+  /// Revalidate before leaving the restricted offline mode or replaying work.
+  Future<void> reconnectOfflineSession() async {
+    final previous = state;
+    if (previous is! Authenticated || !previous.session.isOffline) return;
+    final op = _opGenBox = Object();
+    UserSession? session;
+    try {
+      session = await _repository.restoreSession();
+    } catch (_) {
+      // A transient storage error must not grant a new session or lose work.
+      return;
+    }
+    if (!identical(op, _opGenBox)) return;
+    if (session != null) {
+      await onAccessTokenRefreshed(session, previous.session);
+    } else {
+      await expireOfflineSession();
+    }
+  }
+
+  Future<void> expireOfflineSession() async {
+    final current = state;
+    if (current is! Authenticated || !current.session.isOffline) return;
+    var cleared = true;
+    try {
+      await _repository.expireSession();
+    } catch (_) {
+      cleared = false;
+    }
+    await handleSessionExpired(
+        'Offline access ended. Connect and sign in again; queued work is kept.',
+        cleared);
   }
 
   /// Perform initial login with username & password
@@ -277,7 +313,8 @@ class AuthController extends Notifier<AuthState> {
     } catch (_) {}
     // Surface a failed wipe (contract of clearOperationalSession): the user
     // must be able to see that prior offline data may still be on the device.
-    final wiped = await clearOperationalSession(ref, preserveOfflineQueue: true);
+    final wiped =
+        await clearOperationalSession(ref, preserveOfflineQueue: true);
     state = AuthError(
       (reason ?? 'Your session has expired. Please log in again.') +
           (wiped && credentialsCleared

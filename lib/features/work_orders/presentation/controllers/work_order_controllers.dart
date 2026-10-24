@@ -31,7 +31,8 @@ final workOrderRepositoryProvider = Provider<IWorkOrderRepository>((ref) {
   final cache = ref.watch(localCacheServiceProvider);
   final syncManager = ref.watch(syncManagerProvider.notifier);
   return WorkOrderRepository(api,
-      cacheService: cache, syncManager: syncManager);
+      cacheService: cache, syncManager: syncManager,
+      sessionProvider: () => ref.read(authRepositoryProvider).currentSession);
 });
 
 // --- Work Order List Controller ---

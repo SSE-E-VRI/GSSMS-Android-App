@@ -22,6 +22,8 @@ class UserSession extends Equatable {
     this.validUntil,
     this.scope = const OrgScope(),
     this.profilePicture,
+    this.isOffline = false,
+    this.offlineUntil,
   });
 
   final String accessToken;
@@ -38,6 +40,8 @@ class UserSession extends Equatable {
   final DateTime? validUntil;
   final OrgScope scope;
   final String? profilePicture;
+  final bool isOffline;
+  final DateTime? offlineUntil;
 
   String get displayName {
     final name = '${firstName ?? ''} ${lastName ?? ''}'.trim();
@@ -94,6 +98,8 @@ class UserSession extends Equatable {
     OrgScope? scope,
     String? profilePicture,
     bool clearProfilePicture = false,
+    bool? isOffline,
+    DateTime? offlineUntil,
   }) {
     return UserSession(
       accessToken: accessToken ?? this.accessToken,
@@ -109,7 +115,10 @@ class UserSession extends Equatable {
       has2FA: has2FA ?? this.has2FA,
       validUntil: validUntil ?? this.validUntil,
       scope: scope ?? this.scope,
-      profilePicture: clearProfilePicture ? null : (profilePicture ?? this.profilePicture),
+      profilePicture:
+          clearProfilePicture ? null : (profilePicture ?? this.profilePicture),
+      isOffline: isOffline ?? this.isOffline,
+      offlineUntil: offlineUntil ?? this.offlineUntil,
     );
   }
 
@@ -128,7 +137,8 @@ class UserSession extends Equatable {
       // expired just because the device clock runs ahead of the server's.
       const clockSkewLeeway = Duration(seconds: 30);
       final expiresAt = DateTime.fromMillisecondsSinceEpoch(
-          (expSeconds * 1000).round(), isUtc: true);
+          (expSeconds * 1000).round(),
+          isUtc: true);
       if (DateTime.now().toUtc().isAfter(expiresAt.add(clockSkewLeeway))) {
         throw const UnauthorizedException('Token is expired');
       }
@@ -194,10 +204,12 @@ class UserSession extends Equatable {
         : const OrgScope();
 
     final userIdRaw = claims['user_id'] ?? claims['id'];
-    final int? userId = userIdRaw is int ? userIdRaw : int.tryParse('$userIdRaw');
+    final int? userId =
+        userIdRaw is int ? userIdRaw : int.tryParse('$userIdRaw');
 
     final depotIdRaw = claims['depot_id'];
-    final int? depotId = depotIdRaw is int ? depotIdRaw : int.tryParse('$depotIdRaw');
+    final int? depotId =
+        depotIdRaw is int ? depotIdRaw : int.tryParse('$depotIdRaw');
 
     final profilePicture = claims['profile_picture']?.toString();
 
@@ -215,12 +227,16 @@ class UserSession extends Equatable {
       has2FA: claims['has_2fa'] == true,
       validUntil: validUntil,
       scope: scope,
-      profilePicture: profilePicture != null && profilePicture.isNotEmpty ? profilePicture : null,
+      profilePicture: profilePicture != null && profilePicture.isNotEmpty
+          ? profilePicture
+          : null,
     );
   }
 
   @override
   List<Object?> get props => [
+        isOffline,
+        offlineUntil,
         accessToken,
         username,
         userId,

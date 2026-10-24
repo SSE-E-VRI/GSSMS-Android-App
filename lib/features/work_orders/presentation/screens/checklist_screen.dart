@@ -369,7 +369,7 @@ class _ChecklistFormScreenState extends ConsumerState<ChecklistFormScreen> {
       final allGroups = record.assetGroups;
       final categories = state.subCategories;
       final session = sessionOf(ref);
-      final canCheckOut = canWriteChecklist(session);
+      final canCheckOut = canWriteChecklist(session) && session?.isOffline != true;
       final canUncheck = canUncheckoutGroup(session);
 
       return CustomScrollView(
@@ -398,7 +398,7 @@ class _ChecklistFormScreenState extends ConsumerState<ChecklistFormScreen> {
               ],
             ),
             actions: [
-              _buildOverflowMenu(state),
+              if (session?.isOffline != true) _buildOverflowMenu(state),
             ],
             bottom: PreferredSize(
               preferredSize: const Size.fromHeight(6),

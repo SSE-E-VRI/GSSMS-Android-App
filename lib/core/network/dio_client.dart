@@ -24,6 +24,7 @@ final authenticatedDioProvider = Provider<Dio>((ref) {
           .read(authControllerProvider.notifier)
           .handleSessionExpired(null, cleared);
     },
+    offlineOnly: () => authRepo.currentSession?.isOffline == true,
   );
 });
 
@@ -36,6 +37,7 @@ class DioClient {
     required LogoutHandler onSessionExpired,
     Duration connectTimeout = const Duration(seconds: 15),
     Duration receiveTimeout = const Duration(seconds: 15),
+    bool Function()? offlineOnly,
   }) {
     final dio = Dio(
       BaseOptions(
@@ -56,6 +58,18 @@ class DioClient {
       dio.httpClientAdapter = buildPinnedAdapter(config.spkiPins.toSet());
     }
 
+    if (offlineOnly != null) {
+      dio.interceptors.add(InterceptorsWrapper(onRequest: (options, handler) {
+        if (offlineOnly()) {
+          return handler.reject(DioException(
+              requestOptions: options,
+              type: DioExceptionType.cancel,
+              error:
+                  'Offline access: reconnect before using online operations.'));
+        }
+        handler.next(options);
+      }));
+    }
     dio.interceptors.add(
       AuthInterceptor(
         dio: dio,
