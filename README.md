@@ -59,7 +59,7 @@ still require separate security review.
 
 ## Release candidate
 
-Current APK version: **0.3.6+11**. Includes separate Job Work cancellation and due-period skip requests. Deploy the matching backend with maintenance migration 0111 before rollout; staging/field approval remains pending. See [photo upload permission fix](docs/PHOTO_UPLOAD_PERMISSION_FIX_2026-10-23.md). See
+Current candidate version: **0.3.7+12**, a hotfix for latest offline checklist edits and pending-value restoration. The saved queue format is unchanged. Full offline reopen remains a separate follow-up; see [phone acceptance](docs/PHONE_ACCEPTANCE_2026-10-24.md). Includes the existing separate Job Work cancellation and due-period skip requests. The matching backend still requires maintenance migration 0111 for those workflows. See [photo upload permission fix](docs/PHOTO_UPLOAD_PERMISSION_FIX_2026-10-23.md). See
 [production readiness](docs/PRODUCTION_READINESS_2026-10-23.md) for verification
 results and remaining field-validation gates.
 

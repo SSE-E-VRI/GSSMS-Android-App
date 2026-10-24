@@ -8,6 +8,18 @@ visible feature or change in what the app shows; MAJOR is a breaking change or
 forced update. The app talks to the GSSMS web/backend; API changes are additive,
 so older app builds keep working.
 
+## [0.3.7+12] - 2026-10-24
+
+### Fixed
+- Repeated offline checklist edits retain the latest value, including numeric autosaves.
+- Pending checklist values are restored from the existing outbox when records are reopened after session restoration.
+- An older queued assignment cannot overwrite a newer value sent after reconnect.
+
+### Release scope
+- Data-layer hotfix only. The saved queue format is unchanged.
+- Full offline reopening remains blocked by checklist navigation and cold session restoration; those are separate follow-ups.
+- Server-side duplicate protection and simultaneous-edit conflicts remain outside this hotfix's guarantees.
+
 ## [0.3.5+10] - 2026-10-23
 
 ### Fixed

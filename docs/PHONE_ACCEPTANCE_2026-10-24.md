@@ -88,7 +88,7 @@ Evidence: [offline restart screenshot](acceptance/evidence-2026-10-24/19-offline
 
 ### F3 — Checklist sync wording can imply a server sync while work is pending
 
-While line 1 was pending and disconnected, the checklist displayed a generic Saved marker and Last synced just now. The home page did correctly identify one change saved on the device. `SyncManager` advances `lastSyncTime` after a drain attempt even when it ends offline, and the checklist action bar renders it as Last synced.
+While line 1 was pending and disconnected, the checklist displayed a generic Saved marker and Last synced just now. The home page did correctly identify one change saved on the device. The screenshot does not establish which earlier timestamp update produced that wording: an earlier completed sync can remain visible after a new edit is queued. On the tested branch, `drainOutbox()` also assigns `lastSyncTime` after its main loop without checking that pending work is empty. Neither observation establishes the precise timestamp origin in this capture. The demonstrated defect is that the checklist renders Last synced while it has unsent changes.
 
 This did not discard data in the tests, but it weakens confidence in whether a field reading reached the server. Follow-up should distinguish local persistence, attempted sync and acknowledged server sync. Keep this separate from the data-format changes, which remain unnecessary.
 
