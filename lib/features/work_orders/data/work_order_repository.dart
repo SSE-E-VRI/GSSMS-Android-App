@@ -687,17 +687,65 @@ class WorkOrderRepository implements IWorkOrderRepository {
 
   @override
   Future<MaintenanceRecord> fetchMaintenanceRecord(int recordId) async {
+    MaintenanceRecord record;
     try {
-      final record = await _apiService.getMaintenanceRecord(recordId);
+      record = await _apiService.getMaintenanceRecord(recordId);
       await _cacheService.cacheMaintenanceRecord(record);
-      return record;
     } catch (e) {
       if (_isNetworkException(e)) {
         final cached = await _cacheService.getCachedMaintenanceRecord(recordId);
-        if (cached != null) return cached;
+        if (cached != null) return _overlayQueuedLines(cached);
       }
       rethrow;
     }
+    return _overlayQueuedLines(record);
+  }
+
+  /// The cache remains server truth. Outstanding assignments are a read-time
+  /// overlay, reconstructed from the existing queue even after a restart.
+  Future<MaintenanceRecord> _overlayQueuedLines(
+      MaintenanceRecord record) async {
+    final owner = await _cacheService.getCacheOwnerUserId();
+    if (owner == null) return record;
+    final commands = await _cacheService.getOutboxCommands();
+    // Ownership may change while storage is being read.
+    if (await _cacheService.getCacheOwnerUserId() != owner) return record;
+    final latestByLine = <int, Map<String, dynamic>>{};
+    for (final command in commands) {
+      if (command.ownerUserId != owner ||
+          command.entityId != record.id ||
+          command.type != OutboxCommandType.submitLine ||
+          command.status == OutboxCommandStatus.synced ||
+          command.status == OutboxCommandStatus.draft) {
+        continue;
+      }
+      final lineId = int.tryParse('${command.payload['line_id']}');
+      if (lineId != null) latestByLine[lineId] = command.payload;
+    }
+    return record.copyWith(
+        lines: record.lines.map((line) {
+      final payload = latestByLine[line.id];
+      if (payload == null) return line;
+      var updated = line;
+      if (payload.containsKey('value')) {
+        updated = updated.copyWith(recordedValue: payload['value']);
+      }
+      if (payload['status'] is String) {
+        updated = updated.copyWith(status: payload['status'] as String);
+      }
+      if (payload.containsKey('status_option')) {
+        updated = updated.copyWith(
+            statusOptionId: int.tryParse('${payload['status_option']}'));
+      }
+      if (payload.containsKey('action_option')) {
+        updated = updated.copyWith(
+            actionOptionId: int.tryParse('${payload['action_option']}'));
+      }
+      if (payload.containsKey('remarks')) {
+        updated = updated.copyWith(observationAction: payload['remarks']);
+      }
+      return updated;
+    }).toList());
   }
 
   @override
@@ -734,6 +782,28 @@ class WorkOrderRepository implements IWorkOrderRepository {
     // requirement; a newer assignment receives its own key and payload.
     final idempotencyKey =
         'line_${recordId}_${lineId}_${DateTime.now().microsecondsSinceEpoch}';
+    final owner = await _cacheService.getCacheOwnerUserId();
+    final outstanding = await _cacheService.getOutboxCommands();
+    // Do not send a newer value directly while an older queued assignment
+    // could subsequently replay over it when connectivity returns.
+    if (_syncManager != null &&
+        outstanding.any((c) =>
+            c.ownerUserId == owner &&
+            c.type == OutboxCommandType.submitLine &&
+            c.entityId == recordId &&
+            c.payload['line_id'] == lineId &&
+            c.status == OutboxCommandStatus.pending)) {
+      await _enqueueDeduped(
+          OutboxCommand(
+            idempotencyKey: idempotencyKey,
+            type: OutboxCommandType.submitLine,
+            entityId: recordId,
+            payload: lineData,
+            createdAt: DateTime.now(),
+          ),
+          matches: (c) => c.payload['line_id'] == lineId);
+      return MutationOutcome.queued;
+    }
     try {
       await _apiService.submitLine(recordId, lineData,
           idempotencyKey: idempotencyKey);

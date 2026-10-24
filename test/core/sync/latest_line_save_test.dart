@@ -92,6 +92,20 @@ void main() {
     expect((await cache.getOutboxCommands()).single.payload['value'], '1');
   });
 
+  test('reconnected save cannot be overwritten by older queued value',
+      () async {
+    await enqueue(command('old', '1'));
+    when(() => api.submitLine(55, any(),
+        idempotencyKey: any(named: 'idempotencyKey'))).thenAnswer((_) async {});
+    final repo =
+        WorkOrderRepository(api, cacheService: cache, syncManager: sync);
+    await repo.submitChecklistLine(55, {'line_id': 12, 'value': '12.5'});
+    final values = verify(() => api.submitLine(55, captureAny(),
+        idempotencyKey: any(named: 'idempotencyKey'))).captured.cast<Map>();
+    expect(values.map((v) => v['value']), ['12.5']);
+    expect(await cache.getOutboxCommands(), isEmpty);
+  });
+
   test('older in-flight acknowledgment cannot remove newer edit', () async {
     final started = Completer<void>();
     final release = Completer<void>();
