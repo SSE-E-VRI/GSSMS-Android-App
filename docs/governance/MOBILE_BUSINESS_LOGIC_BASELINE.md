@@ -90,5 +90,6 @@ release and migration 0111 before rollout.
 
 Validation: 528 targeted Flutter tests passed (work orders, pending actions,
 maintenance schedules and version consistency; rerun on 24 October 2026). Full-app analysis and focused changed-source analysis
-reported no issues. No physical-device test, APK build, production write or
-deployment was performed for this change.
+reported no issues. The signed production APK 0.3.6+11 was subsequently built and verified on
+24 October 2026; see `docs/PRODUCTION_READINESS_2026-10-23.md`. No physical-device
+test, production write or deployment was performed for this change.

@@ -1,5 +1,26 @@
 # Production hardening - 23 October 2026
 
+## APK build update ? 24 October 2026
+
+Version **0.3.6+11**, built from Android commit `a8d71d0`, includes the
+separate Cancel Job Work and Skip this due period flows and the intervening
+committed dashboard/checklist updates. The production-flavour release APK uses
+`https://gssms.share.zrok.io` and package `com.ssee_vri.gssms_mobile`.
+
+- Artifact: `build/releases/gssms-mobile-0.3.6+11-prod.apk` (89.1 MiB).
+- SHA-256: `717b8aabeb542da92d0698bcd792d4c1a6fffae0708ece3f4f188300d3b9d9ac`.
+- Existing release certificate matches the preceding APK; APK v2 signature verified.
+- ZIP integrity, 21 native libraries, ELF alignment and ZIP 16 KB alignment passed.
+- Manifest verified: versionName 0.3.6, versionCode 11, min SDK 24, target SDK 36.
+- 528 targeted Flutter tests passed; prior full and focused analysis found no issues.
+- Deploy backend commit `049c72f` with migration
+  `maintenance.0111_legacy_skip_terminal_constraints` before using legacy skips.
+- No installation, physical-device acceptance test or backend deployment was
+  performed. Earlier field-acceptance gates below remain applicable. This APK
+  build does not constitute production acceptance.
+
+The report below records earlier hardening evidence for 0.3.2+6.
+
 Candidate: 0.3.2+6. This report supersedes the source-remediation status of the
 21 October baseline, not its historical evidence. No production-server data
 changes, deployment, distribution or authenticated mutation tests were performed.
