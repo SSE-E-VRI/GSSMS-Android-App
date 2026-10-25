@@ -383,6 +383,14 @@ class SyncManager extends Notifier<SyncState> {
 
           try {
             await _executeCommand(cmd);
+            // Update the owner-scoped offline read model before retiring the
+            // acknowledged command. A cache-write failure leaves it in the
+            // outbox for safe idempotent replay instead of showing stale data.
+            if (cmd.type == OutboxCommandType.submitLine &&
+                actorUserId != null && cmd.ownerUserId == actorUserId &&
+                epoch == _sessionEpoch) {
+              await _reconcileAcknowledgedLine(cmd);
+            }
             // Synced successfully - track key and omit from remaining outbox
             syncedKeys.add(cmd.idempotencyKey);
           } on DioException catch (dioErr) {
@@ -629,6 +637,27 @@ class SyncManager extends Notifier<SyncState> {
     } catch (_) {
       return path;
     }
+  }
+
+  /// Mirrors an acknowledged line assignment into the saved offline record.
+  /// The same serialized drain lock protects the queue and cache update.
+  Future<void> _reconcileAcknowledgedLine(OutboxCommand cmd) async {
+    final cached = await _cacheService.getCachedMaintenanceRecord(cmd.entityId);
+    if (cached == null) return;
+    final lineId = asJsonInt(cmd.payload['line_id']);
+    if (lineId == null || !cached.lines.any((line) => line.id == lineId)) return;
+    final updated = cached.lines.map((line) {
+      if (line.id != lineId) return line;
+      return line.copyWith(
+        recordedValue: cmd.payload['value'],
+        status: asJsonString(cmd.payload['status']) ?? line.status,
+        statusOptionId: asJsonInt(cmd.payload['status_option']),
+        actionOptionId: asJsonInt(cmd.payload['action_option']),
+        isSaved: true,
+        localSyncStatus: null,
+      );
+    }).toList();
+    await _cacheService.cacheMaintenanceRecord(cached.copyWith(lines: updated));
   }
 
   Future<void> _executeCommand(OutboxCommand cmd) async {
