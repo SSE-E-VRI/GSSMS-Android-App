@@ -164,9 +164,11 @@ class _RectificationExecutionScreenState
           .read(executionApiServiceProvider)
           .getRectification(widget.workOrderId);
       if (!mounted) return;
+      final preserveDraft = _autosave.isDirty || _autosave.isSaving;
       _hydrating = true;
       try {
         setState(() {
+          if (preserveDraft) return;
           _payload = payload;
           _finalRemarksController.text = payload.finalRemarks;
           _otherStaffController.text = payload.otherStaff;
@@ -180,7 +182,7 @@ class _RectificationExecutionScreenState
       } finally {
         _hydrating = false;
       }
-      _autosave.markClean();
+      if (!preserveDraft) _autosave.markClean();
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = userFacingError(e));
@@ -378,7 +380,7 @@ class _RectificationExecutionScreenState
         SnackBar(
             content: Text('Could not retake photo: ${userFacingError(e)}')),
       );
-      await _load();
+      
     } finally {
       await _discard(picked.path);
       if (mounted) setState(() => _saving = false);
