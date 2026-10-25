@@ -288,14 +288,23 @@ class _VerificationWorkspaceScreenState
                 'Verify records you as the supervisor on this work order. Confirm you have reviewed the checklist.',
                 style: TextStyle(fontSize: 11, color: context.gssms.textSecondary),
               ),
-              CheckboxListTile(
-                key: const Key('verify_high_risk_confirm'),
-                value: _highRiskConfirmed,
-                onChanged: (value) =>
-                    setState(() => _highRiskConfirmed = value ?? false),
-                title: const Text('I confirm this verification'),
-                controlAffinity: ListTileControlAffinity.leading,
-                contentPadding: EdgeInsets.zero,
+              Semantics(
+                label: 'I confirm this verification',
+                checked: _highRiskConfirmed,
+                child: Row(
+                  children: [
+                    ExcludeSemantics(
+                      child: Checkbox(
+                        key: const Key('verify_high_risk_confirm'),
+                        value: _highRiskConfirmed,
+                        onChanged: (value) => setState(
+                          () => _highRiskConfirmed = value ?? false,
+                        ),
+                      ),
+                    ),
+                    const Expanded(child: Text('I confirm this verification')),
+                  ],
+                ),
               ),
             ],
           ),
