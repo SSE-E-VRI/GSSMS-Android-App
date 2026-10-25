@@ -31,8 +31,8 @@ class PendingExecutionPhotoStore {
   static String keyFor(int workOrderId) => '$keyPrefix$workOrderId';
 
   /// This user's pending photos for [workOrderId] whose file still exists.
-  /// Entries saved before owners were recorded have none and are adopted
-  /// by whoever opens the Job Work next.
+  /// Legacy ownerless entries are quarantined rather than assigned to
+  /// another signed-in technician. Their files remain retained.
   Future<List<PendingExecutionPhoto>> load(
     int workOrderId, {
     required int? ownerUserId,
@@ -40,7 +40,7 @@ class PendingExecutionPhotoStore {
     final photos = <PendingExecutionPhoto>[];
     for (final entry in await _entries(keyFor(workOrderId))) {
       final owner = entry['ownerUserId'];
-      if (owner != null && owner != ownerUserId) continue;
+      if (ownerUserId == null || owner != ownerUserId) continue;
       final kind = entry['kind'];
       final localPath = entry['localPath'];
       if (kind is! String || localPath is! String) continue;
@@ -60,7 +60,7 @@ class PendingExecutionPhotoStore {
     final key = keyFor(workOrderId);
     final others = (await _entries(key)).where((entry) {
       final owner = entry['ownerUserId'];
-      return owner != null && owner != ownerUserId;
+      return ownerUserId == null || owner != ownerUserId;
     });
     final next = [
       ...others,
