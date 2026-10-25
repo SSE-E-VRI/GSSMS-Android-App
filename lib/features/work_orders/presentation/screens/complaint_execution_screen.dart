@@ -160,6 +160,7 @@ class _ComplaintExecutionScreenState
       final exec = await api.getComplaintExecution(widget.workOrderId);
       final info = await infoFuture;
       if (!mounted) return;
+      final preserveDraft = _autosave.isDirty || _autosave.isSaving;
       _hydrating = true;
       try {
         setState(() {
@@ -177,6 +178,7 @@ class _ComplaintExecutionScreenState
               (exec.requiresFailureDetails ? DateTime.now() : null);
           _failureCodeError = null;
           _restoredTimeError = null;
+          }
         });
       } finally {
         _hydrating = false;
@@ -250,6 +252,7 @@ class _ComplaintExecutionScreenState
   Future<void> _saveDraft() async {
     setState(() => _saving = true);
     try {
+      if (!await _autosave.flush(manual: true)) return;
       if (_pendingPhotos.isNotEmpty) {
         final uploaded = await _uploadPendingPhotos();
         if (!mounted) return;
@@ -486,6 +489,11 @@ class _ComplaintExecutionScreenState
     // photos must land on the server — and _execution must be refreshed —
     // before that check runs, or a fully-captured-but-not-yet-saved pair
     // would be wrongly rejected as missing.
+    if (!await _autosave.flush(manual: true)) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not save: ${_autosave.lastError}')));
+      return;
+    }
     if (_pendingPhotos.isNotEmpty) {
       setState(() => _submitting = true);
       final uploaded = await _uploadPendingPhotos();
