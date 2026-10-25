@@ -387,9 +387,16 @@ class SyncManager extends Notifier<SyncState> {
             // acknowledged command. A cache-write failure leaves it in the
             // outbox for safe idempotent replay instead of showing stale data.
             if (cmd.type == OutboxCommandType.submitLine &&
-                actorUserId != null && cmd.ownerUserId == actorUserId &&
+                actorUserId != null &&
+                cmd.ownerUserId == actorUserId &&
                 epoch == _sessionEpoch) {
-              await _reconcileAcknowledgedLine(cmd);
+              try {
+                await _reconcileAcknowledgedLine(cmd);
+              } catch (_) {
+                // The server has it; not a failure for the user to see.
+                remainingCommands.add(cmd);
+                continue;
+              }
             }
             // Synced successfully - track key and omit from remaining outbox
             syncedKeys.add(cmd.idempotencyKey);
@@ -511,7 +518,8 @@ class SyncManager extends Notifier<SyncState> {
         try {
           // Breakdown photos waiting for Save Progress live outside the
           // outbox; sweeping them would silently lose unsaved evidence.
-          for (final p in await PendingExecutionPhotoStore.allReferencedPaths()) {
+          for (final p
+              in await PendingExecutionPhotoStore.allReferencedPaths()) {
             queuedPaths.add(_canonicalPath(p));
           }
           await _evidenceService.cleanupExpiredEvidence(
@@ -645,18 +653,30 @@ class SyncManager extends Notifier<SyncState> {
     final cached = await _cacheService.getCachedMaintenanceRecord(cmd.entityId);
     if (cached == null) return;
     final lineId = asJsonInt(cmd.payload['line_id']);
-    if (lineId == null || !cached.lines.any((line) => line.id == lineId)) return;
+    if (lineId == null || !cached.lines.any((line) => line.id == lineId)) {
+      return;
+    }
+    // Only the fields the command carried, as the pending-save overlay does.
+    final p = cmd.payload;
     final updated = cached.lines.map((line) {
       if (line.id != lineId) return line;
-      return line.copyWith(
-        recordedValue: cmd.payload['value'],
-        status: asJsonString(cmd.payload['status']) ?? line.status,
-        statusOptionId: asJsonInt(cmd.payload['status_option']),
-        actionOptionId: asJsonInt(cmd.payload['action_option']),
-        observationAction: asJsonString(cmd.payload['remarks']),
-        isSaved: true,
-        localSyncStatus: null,
-      );
+      var next = line.copyWith(isSaved: true, localSyncStatus: null);
+      if (p.containsKey('value')) {
+        next = next.copyWith(recordedValue: p['value']);
+      }
+      if (p['status'] is String) {
+        next = next.copyWith(status: p['status'] as String);
+      }
+      if (p.containsKey('status_option')) {
+        next = next.copyWith(statusOptionId: asJsonInt(p['status_option']));
+      }
+      if (p.containsKey('action_option')) {
+        next = next.copyWith(actionOptionId: asJsonInt(p['action_option']));
+      }
+      if (p.containsKey('remarks')) {
+        next = next.copyWith(observationAction: asJsonString(p['remarks']));
+      }
+      return next;
     }).toList();
     await _cacheService.cacheMaintenanceRecord(cached.copyWith(lines: updated));
   }
