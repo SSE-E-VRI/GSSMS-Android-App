@@ -156,7 +156,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 1100));
       await tester.pump();
 
-      expect(api.complaintDraftSaves, hasLength(1));
+      expect(api.complaintDraftSaves, isNotEmpty);
       expect(api.complaintDraftSaves.single['initial_findings'], 'Relay burnt');
       expect(find.textContaining('All changes saved'), findsOneWidget);
       // Typing was not disturbed by the save.
@@ -190,7 +190,7 @@ void main() {
         ..writeAsBytesSync([0xFF, 0xD8, 0xFF, 0xD9]);
       SharedPreferences.setMockInitialValues({
         'complaint_execution_pending_photos_7': jsonEncode([
-          {'kind': 'BEFORE', 'localPath': photo.path},
+          {'kind': 'BEFORE', 'localPath': photo.path, 'ownerUserId': 1},
         ]),
       });
       final api = _FakeExecApi();
@@ -284,7 +284,7 @@ void main() {
       expect(find.text('217'), findsOneWidget);
     });
 
-    testWidgets('the form stays usable when the breakdown details cannot load',
+    testWidgets('the form fails closed when breakdown details cannot load',
         (tester) async {
       final api = _FakeExecApi()..breakdownInfo = null;
       _tallSurface(tester);
