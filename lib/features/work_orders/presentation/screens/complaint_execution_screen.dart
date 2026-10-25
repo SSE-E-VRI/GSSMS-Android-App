@@ -674,7 +674,16 @@ class _ComplaintExecutionScreenState
                           const SizedBox(height: 12),
                         ],
                         if (!_editable) ...[
-                          if (_info != null) _readOnlyNotice(context, _info!),
+                          if (_info != null)
+                            _readOnlyNotice(context, _info!)
+                          else
+                            Row(
+                              key: const Key('exec_read_only_notice'),
+                              children: [
+                                const Expanded(child: Text('Job details could not be loaded. Editing is disabled until permissions can be verified.')),
+                                TextButton(onPressed: _load, child: const Text('Retry')),
+                              ],
+                            ),
                           const SizedBox(height: 12),
                         ],
                         SectionCard(
