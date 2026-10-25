@@ -653,6 +653,7 @@ class SyncManager extends Notifier<SyncState> {
         status: asJsonString(cmd.payload['status']) ?? line.status,
         statusOptionId: asJsonInt(cmd.payload['status_option']),
         actionOptionId: asJsonInt(cmd.payload['action_option']),
+        observationAction: asJsonString(cmd.payload['remarks']),
         isSaved: true,
         localSyncStatus: null,
       );
