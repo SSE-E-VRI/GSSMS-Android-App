@@ -92,7 +92,7 @@ class _ComplaintExecutionScreenState
   bool get _busy => _saving || _submitting;
 
   /// Same rule as the web form and the server: edits only while IN_PROGRESS.
-  bool get _editable => _info?.isEditable ?? true;
+  bool get _editable => _info?.isEditable ?? false;
 
   @override
   void initState() {
@@ -165,6 +165,7 @@ class _ComplaintExecutionScreenState
         setState(() {
           _execution = exec;
           _info = info ?? _info;
+          if (!preserveDraft) {
           _findingsController.text = exec.initialFindings;
           _actionController.text = exec.actionTaken;
           _remarksController.text = exec.finalRemarks;
