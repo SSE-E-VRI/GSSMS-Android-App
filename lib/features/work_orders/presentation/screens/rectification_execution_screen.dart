@@ -129,7 +129,7 @@ class _RectificationExecutionScreenState
     super.dispose();
   }
 
-  void _syncDrafts(RectificationPayload payload) {
+  void _syncDrafts(RectificationPayload payload, {bool preserveDraft = false}) {
     for (final id in _drafts.keys.toList()) {
       if (payload.items.every((i) => i.id != id)) {
         _drafts.remove(id)?.dispose();
@@ -168,8 +168,8 @@ class _RectificationExecutionScreenState
       _hydrating = true;
       try {
         setState(() {
-          if (preserveDraft) return;
           _payload = payload;
+          if (!preserveDraft) {
           _finalRemarksController.text = payload.finalRemarks;
           _otherStaffController.text = payload.otherStaff;
           _failureCode = payload.failureCode;
@@ -177,7 +177,8 @@ class _RectificationExecutionScreenState
               (payload.requiresFailureDetails ? DateTime.now() : null);
           _failureCodeError = null;
           _restoredTimeError = null;
-          _syncDrafts(payload);
+          }
+          _syncDrafts(payload, preserveDraft: preserveDraft);
         });
       } finally {
         _hydrating = false;
