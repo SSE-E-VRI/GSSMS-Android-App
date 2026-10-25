@@ -64,7 +64,7 @@ void main() {
     expect((await store.load(7, ownerUserId: 2)).single.localPath, theirs);
   });
 
-  test('entries saved before owners existed are adopted, not lost', () async {
+  test('legacy ownerless photos are quarantined and retained', () async {
     final legacy = photo('legacy.jpg');
     SharedPreferences.setMockInitialValues({
       PendingExecutionPhotoStore.keyFor(7): jsonEncode([
@@ -72,12 +72,12 @@ void main() {
       ]),
     });
 
-    final loaded = await store.load(7, ownerUserId: 5);
-    expect(loaded.single.localPath, legacy);
-
-    await store.save(7, loaded, ownerUserId: 5);
-    expect(await store.load(7, ownerUserId: 6), isEmpty,
-        reason: 'once adopted the photo belongs to the user who saved it');
+    expect(await store.load(7, ownerUserId: 5), isEmpty);
+    expect(await store.load(7, ownerUserId: 6), isEmpty);
+    await store.save(7, const [], ownerUserId: 5);
+    expect(await PendingExecutionPhotoStore.allReferencedPaths(),
+        contains(File(legacy).absolute.path));
+    expect(File(legacy).existsSync(), isTrue);
   });
 
   test('photos whose file is gone are dropped on load', () async {
