@@ -673,7 +673,7 @@ class _ComplaintExecutionScreenState
                           const SizedBox(height: 12),
                         ],
                         if (!_editable) ...[
-                          _readOnlyNotice(context, _info!),
+                          if (_info != null) _readOnlyNotice(context, _info!),
                           const SizedBox(height: 12),
                         ],
                         SectionCard(
