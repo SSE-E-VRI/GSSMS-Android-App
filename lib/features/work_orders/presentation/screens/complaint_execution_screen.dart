@@ -252,7 +252,8 @@ class _ComplaintExecutionScreenState
   Future<void> _saveDraft() async {
     setState(() => _saving = true);
     try {
-      if (!await _autosave.flush(manual: true)) return;
+      final saved = await _autosave.flush(manual: true);
+      if (!saved) return;
       if (_pendingPhotos.isNotEmpty) {
         final uploaded = await _uploadPendingPhotos();
         if (!mounted) return;
