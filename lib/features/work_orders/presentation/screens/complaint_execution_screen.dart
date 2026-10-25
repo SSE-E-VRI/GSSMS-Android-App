@@ -65,8 +65,12 @@ class _ComplaintExecutionScreenState
   ComplaintExecution? _execution;
 
   /// Breakdown details and Job Work status; null if they could not be
-  /// loaded (the form then stays editable and the server decides).
+  /// loaded (the form then stays read-only with a Retry).
   BreakdownInfo? _info;
+
+  /// Photos saved before the app recorded who took them, offered only to
+  /// the assigned technician (see [_refreshLegacyPhotos]).
+  List<PendingExecutionPhoto> _legacyPhotos = const [];
   List<Map<String, String>> _params = [];
   int? _failureCode;
   DateTime? _restoredTime;
@@ -151,8 +155,8 @@ class _ComplaintExecutionScreenState
     });
     try {
       final api = ref.read(executionApiServiceProvider);
-      // The breakdown details are context, not required to work: a failure
-      // there leaves the form usable (and editable — the server decides).
+      // A failure loading the breakdown details leaves the form read-only
+      // (status unknown) with a Retry, never editable by default.
       final infoFuture = api
           .getBreakdownInfo(widget.workOrderId)
           .then<BreakdownInfo?>((i) => i)
@@ -166,13 +170,14 @@ class _ComplaintExecutionScreenState
         setState(() {
           _execution = exec;
           _info = info ?? _info;
+          // Unsaved typing wins over the server copy; photos still refresh.
           if (!preserveDraft) {
-          _findingsController.text = exec.initialFindings;
-          _actionController.text = exec.actionTaken;
-          _remarksController.text = exec.finalRemarks;
+            _findingsController.text = exec.initialFindings;
+            _actionController.text = exec.actionTaken;
+            _remarksController.text = exec.finalRemarks;
             _params = exec.parameters
-              .map((e) => Map<String, String>.from(e))
-              .toList();
+                .map((e) => Map<String, String>.from(e))
+                .toList();
             _failureCode = exec.failureCode;
             _restoredTime = exec.restoredTime ??
                 (exec.requiresFailureDetails ? DateTime.now() : null);
@@ -184,6 +189,7 @@ class _ComplaintExecutionScreenState
         _hydrating = false;
       }
       if (!preserveDraft) _autosave.markClean();
+      await _refreshLegacyPhotos();
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = userFacingError(e));
@@ -209,6 +215,56 @@ class _ComplaintExecutionScreenState
         ..clear()
         ..addAll(restored);
     });
+  }
+
+  /// Ownerless photos from app 0.3.9 and earlier are offered only when the
+  /// server says this user is the assigned technician and the Job Work is
+  /// In Progress, so a shared phone never hands one technician's photos to
+  /// another.
+  Future<void> _refreshLegacyPhotos() async {
+    final info = _info;
+    final me = _ownerUserId;
+    final mayClaim = info != null &&
+        info.isEditable &&
+        me != null &&
+        info.assignedToId == me;
+    final legacy = mayClaim
+        ? await _pendingStore.legacy(widget.workOrderId)
+        : const <PendingExecutionPhoto>[];
+    if (!mounted) return;
+    setState(() => _legacyPhotos = legacy);
+  }
+
+  Future<void> _claimLegacyPhotos() async {
+    final me = _ownerUserId;
+    if (me == null) return;
+    await _pendingStore.claimLegacy(widget.workOrderId, ownerUserId: me);
+    await _loadPendingPhotos();
+    if (!mounted) return;
+    setState(() => _legacyPhotos = const []);
+  }
+
+  Future<void> _discardLegacyPhotos() async {
+    final confirmed = await showConfirmationDialog(
+      context,
+      title: 'Remove earlier photos?',
+      icon: Icons.delete_outline,
+      message: 'These photos were never uploaded. They will be removed from '
+          'this phone.',
+      confirmLabel: 'Remove',
+      confirmKey: const Key('confirm_discard_legacy_photos'),
+      destructive: true,
+    );
+    if (!confirmed || !mounted) return;
+    final paths = await _pendingStore.discardLegacy(widget.workOrderId);
+    final evidence = ref.read(evidenceServiceProvider);
+    for (final path in paths) {
+      try {
+        await evidence.discard(path);
+      } catch (_) {}
+    }
+    if (!mounted) return;
+    setState(() => _legacyPhotos = const []);
   }
 
   Future<void> _persistPendingPhotos() => _pendingStore.save(
@@ -238,34 +294,29 @@ class _ComplaintExecutionScreenState
         'action_taken': _actionController.text.trim(),
         'final_remarks': _remarksController.text.trim(),
         'parameters': _params
-            .where((r) =>
-                r['parameter']!.isNotEmpty && r['value']!.isNotEmpty)
+            .where((r) => r['parameter']!.isNotEmpty && r['value']!.isNotEmpty)
             .toList(),
         'failure_code': _failureCode,
         'restored_time': _restoredTime?.toIso8601String(),
       };
 
-  /// Save Progress: uploads any pending local photos first (they must be on
-  /// the server before a draft save is meaningful), then saves the text
-  /// fields. Stops at the first photo upload failure, leaving the rest
-  /// pending — nothing already uploaded gets re-sent on retry.
+  /// Save Progress: saves the text fields once, then uploads any pending
+  /// local photos and reloads. Text typed while the photos upload survives
+  /// the reload and is saved after it. Stops at the first photo upload
+  /// failure, leaving the rest pending — nothing already uploaded gets
+  /// re-sent on retry.
   Future<void> _saveDraft() async {
     setState(() => _saving = true);
     try {
-      final saved = await _autosave.flush(manual: true);
-      if (!saved) return;
-      if (_pendingPhotos.isNotEmpty) {
+      var ok = await _autosave.flush(manual: true);
+      if (ok && _pendingPhotos.isNotEmpty) {
         final uploaded = await _uploadPendingPhotos();
         if (!mounted) return;
-        if (!uploaded) {
-          // The photo error is already on screen; still save the typed
-          // fields so one failed photo never costs the technician's text.
-          await _autosave.flush(manual: true);
-          return;
-        }
+        // The photo error is already on screen; the text is already saved.
+        if (!uploaded) return;
         await _load();
+        if (_autosave.isDirty) ok = await _autosave.flush();
       }
-      final ok = await _autosave.flush(manual: true);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -297,7 +348,11 @@ class _ComplaintExecutionScreenState
             contentType: DioMediaType('image', 'jpeg'),
           ),
         );
-        await ref.read(evidenceServiceProvider).discard(photo.localPath);
+        // The server has the photo: a failed local delete must not leave it
+        // pending, or the next save would upload it again.
+        try {
+          await ref.read(evidenceServiceProvider).discard(photo.localPath);
+        } catch (_) {}
         if (mounted) {
           setState(() => _pendingPhotos.remove(photo));
         } else {
@@ -308,8 +363,8 @@ class _ComplaintExecutionScreenState
         if (!mounted) return false;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content:
-                  Text('Could not upload a pending photo: ${userFacingError(e)}')),
+              content: Text(
+                  'Could not upload a pending photo: ${userFacingError(e)}')),
         );
         return false;
       }
@@ -340,7 +395,8 @@ class _ComplaintExecutionScreenState
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not capture photo: ${userFacingError(e)}')),
+        SnackBar(
+            content: Text('Could not capture photo: ${userFacingError(e)}')),
       );
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -429,7 +485,6 @@ class _ComplaintExecutionScreenState
         SnackBar(
             content: Text('Could not retake photo: ${userFacingError(e)}')),
       );
-      
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -448,7 +503,9 @@ class _ComplaintExecutionScreenState
     setState(() => _saving = true);
     try {
       final captured = await ref.read(evidenceServiceProvider).capture(
-            kind: photo.kind == 'AFTER' ? EvidenceKind.after : EvidenceKind.before,
+            kind: photo.kind == 'AFTER'
+                ? EvidenceKind.after
+                : EvidenceKind.before,
             source: source,
           );
       if (captured == null || !mounted) return;
@@ -462,7 +519,8 @@ class _ComplaintExecutionScreenState
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not capture photo: ${userFacingError(e)}')),
+        SnackBar(
+            content: Text('Could not capture photo: ${userFacingError(e)}')),
       );
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -478,7 +536,8 @@ class _ComplaintExecutionScreenState
       message:
           'This photo has not been uploaded yet and will be removed from this device.',
       confirmLabel: 'Remove',
-      confirmKey: Key('confirm_delete_pending_photo_${photo.localPath.hashCode}'),
+      confirmKey:
+          Key('confirm_delete_pending_photo_${photo.localPath.hashCode}'),
     );
     if (!confirmed || !mounted) return;
     await ref.read(evidenceServiceProvider).discard(photo.localPath);
@@ -682,10 +741,23 @@ class _ComplaintExecutionScreenState
                             Row(
                               key: const Key('exec_read_only_notice'),
                               children: [
-                                const Expanded(child: Text('Job details could not be loaded. Editing is disabled until permissions can be verified.')),
-                                TextButton(onPressed: _load, child: const Text('Retry')),
+                                const Expanded(
+                                  child: Text(
+                                      'Job details could not be loaded. '
+                                      'Editing is disabled until the Job Work '
+                                      'status can be checked.'),
+                                ),
+                                TextButton(
+                                  key: const Key('exec_details_retry_button'),
+                                  onPressed: _load,
+                                  child: const Text('Retry'),
+                                ),
                               ],
                             ),
+                          const SizedBox(height: 12),
+                        ],
+                        if (_editable && _legacyPhotos.isNotEmpty) ...[
+                          _legacyPhotosNotice(context),
                           const SizedBox(height: 12),
                         ],
                         SectionCard(
@@ -698,17 +770,15 @@ class _ComplaintExecutionScreenState
                               enabled: !_busy && _editable,
                               maxLines: 3,
                               decoration: const InputDecoration(
-                                labelText:
-                                    'Initial Assessment & Findings *',
+                                labelText: 'Initial Assessment & Findings *',
                                 helperText: 'What was observed / diagnosed',
                                 hintText:
                                     'e.g. Equipment found operational during inspection. Reported fault could not be reproduced.',
                                 hintMaxLines: 3,
                               ),
-                              validator: (v) =>
-                                  v == null || v.trim().isEmpty
-                                      ? 'Findings are required'
-                                      : null,
+                              validator: (v) => v == null || v.trim().isEmpty
+                                  ? 'Findings are required'
+                                  : null,
                             ),
                             const SizedBox(height: 12),
                             TextFormField(
@@ -717,17 +787,15 @@ class _ComplaintExecutionScreenState
                               enabled: !_busy && _editable,
                               maxLines: 3,
                               decoration: const InputDecoration(
-                                labelText:
-                                    'Rectification / Action Taken *',
+                                labelText: 'Rectification / Action Taken *',
                                 helperText: 'What was actually done',
                                 hintText:
                                     'e.g. Loose terminal tightened; supply restored.',
                                 hintMaxLines: 2,
                               ),
-                              validator: (v) =>
-                                  v == null || v.trim().isEmpty
-                                      ? 'Action taken is required'
-                                      : null,
+                              validator: (v) => v == null || v.trim().isEmpty
+                                  ? 'Action taken is required'
+                                  : null,
                             ),
                           ],
                         ),
@@ -789,10 +857,9 @@ class _ComplaintExecutionScreenState
                                 hintText:
                                     'e.g. Equipment restored to normal operation.',
                               ),
-                              validator: (v) =>
-                                  v == null || v.trim().isEmpty
-                                      ? 'Final remarks are required'
-                                      : null,
+                              validator: (v) => v == null || v.trim().isEmpty
+                                  ? 'Final remarks are required'
+                                  : null,
                             ),
                           ],
                         ),
@@ -962,6 +1029,55 @@ class _ComplaintExecutionScreenState
               'It can be edited only while In Progress, so this form is read-only.',
               style: TextStyle(color: tone.foreground),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _legacyPhotosNotice(BuildContext context) {
+    final tone = context.gssms.info;
+    final n = _legacyPhotos.length;
+    return Container(
+      key: const Key('exec_legacy_photos_notice'),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: tone.background,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.photo_library_outlined,
+                  size: 18, color: tone.foreground),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '$n ${n == 1 ? 'photo' : 'photos'} for this Job Work '
+                  'were taken on this phone before the app update and '
+                  'never uploaded.',
+                  style: TextStyle(color: tone.foreground),
+                ),
+              ),
+            ],
+          ),
+          Wrap(
+            alignment: WrapAlignment.end,
+            spacing: 8,
+            children: [
+              TextButton(
+                key: const Key('discard_legacy_photos_button'),
+                onPressed: _busy ? null : _discardLegacyPhotos,
+                child: const Text('Remove from phone'),
+              ),
+              FilledButton.tonal(
+                key: const Key('claim_legacy_photos_button'),
+                onPressed: _busy ? null : _claimLegacyPhotos,
+                child: const Text('Add to my photos'),
+              ),
+            ],
           ),
         ],
       ),

@@ -146,7 +146,8 @@ class _RectificationExecutionScreenState
         attachEditListener(draft.action, _onEdited);
         attachEditListener(draft.reason, _onEdited);
         _drafts[item.id] = draft;
-      } else {
+      } else if (!preserveDraft) {
+        // Unsaved typing wins over the server copy.
         existing.action.text = item.actionTaken;
         existing.outcome = item.outcome;
         existing.reason.text = item.reason;
@@ -169,14 +170,15 @@ class _RectificationExecutionScreenState
       try {
         setState(() {
           _payload = payload;
+          // Photos and items always refresh; unsaved typing is kept.
           if (!preserveDraft) {
-          _finalRemarksController.text = payload.finalRemarks;
-          _otherStaffController.text = payload.otherStaff;
-          _failureCode = payload.failureCode;
-          _restoredTime = payload.restoredTime ??
-              (payload.requiresFailureDetails ? DateTime.now() : null);
-          _failureCodeError = null;
-          _restoredTimeError = null;
+            _finalRemarksController.text = payload.finalRemarks;
+            _otherStaffController.text = payload.otherStaff;
+            _failureCode = payload.failureCode;
+            _restoredTime = payload.restoredTime ??
+                (payload.requiresFailureDetails ? DateTime.now() : null);
+            _failureCodeError = null;
+            _restoredTimeError = null;
           }
           _syncDrafts(payload, preserveDraft: preserveDraft);
         });
@@ -265,7 +267,8 @@ class _RectificationExecutionScreenState
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not capture photo: ${userFacingError(e)}')),
+          SnackBar(
+              content: Text('Could not capture photo: ${userFacingError(e)}')),
         );
       }
       return null;
@@ -310,7 +313,8 @@ class _RectificationExecutionScreenState
     }
   }
 
-  Future<void> _deletePhoto(RectificationItem item, ExecutionPhoto photo) async {
+  Future<void> _deletePhoto(
+      RectificationItem item, ExecutionPhoto photo) async {
     final confirmed = await showConfirmationDialog(
       context,
       title: 'Delete photo?',
@@ -342,7 +346,8 @@ class _RectificationExecutionScreenState
   /// Uploads a replacement photo first, then removes [photo] — only once
   /// the new one is confirmed on the server, so a failed pick/upload never
   /// leaves the item with neither photo.
-  Future<void> _retakePhoto(RectificationItem item, ExecutionPhoto photo) async {
+  Future<void> _retakePhoto(
+      RectificationItem item, ExecutionPhoto photo) async {
     final confirmed = await showConfirmationDialog(
       context,
       title: 'Retake photo?',
@@ -383,7 +388,6 @@ class _RectificationExecutionScreenState
         SnackBar(
             content: Text('Could not retake photo: ${userFacingError(e)}')),
       );
-      
     } finally {
       await _discard(picked.path);
       if (mounted) setState(() => _saving = false);
@@ -604,10 +608,9 @@ class _RectificationExecutionScreenState
                               decoration: const InputDecoration(
                                 labelText: 'Final outcome remarks *',
                               ),
-                              validator: (v) =>
-                                  v == null || v.trim().isEmpty
-                                      ? 'Final outcome is required'
-                                      : null,
+                              validator: (v) => v == null || v.trim().isEmpty
+                                  ? 'Final outcome is required'
+                                  : null,
                             ),
                             const SizedBox(height: 12),
                             TextFormField(
@@ -646,8 +649,8 @@ class _RectificationExecutionScreenState
                                 key: const Key('save_rect_draft_button'),
                                 onPressed: _busy ? null : _saveDraft,
                                 icon: const Icon(Icons.save_outlined),
-                                label: Text(
-                                    _saving ? 'Saving…' : 'Save Progress'),
+                                label:
+                                    Text(_saving ? 'Saving…' : 'Save Progress'),
                               ),
                             ),
                             const SizedBox(width: 12),
@@ -655,8 +658,7 @@ class _RectificationExecutionScreenState
                               child: FilledButton.icon(
                                 key: const Key('submit_rect_button'),
                                 onPressed: _busy ? null : _submit,
-                                icon:
-                                    const Icon(Icons.verified_outlined),
+                                icon: const Icon(Icons.verified_outlined),
                                 label: Text(_submitting
                                     ? 'Submitting…'
                                     : 'Sign & Submit'),
@@ -688,8 +690,7 @@ class _RectificationExecutionScreenState
           Text(item.checkpoint.isNotEmpty ? item.checkpoint : 'Item',
               style: Theme.of(context).textTheme.titleSmall),
           const SizedBox(height: 4),
-          Text(item.finding,
-              style: Theme.of(context).textTheme.bodyMedium),
+          Text(item.finding, style: Theme.of(context).textTheme.bodyMedium),
           const SizedBox(height: 4),
           Wrap(
             spacing: 8,
@@ -730,16 +731,14 @@ class _RectificationExecutionScreenState
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
             key: Key('rect_item_outcome_${item.id}'),
-            initialValue: (draft?.outcome.isNotEmpty == true)
-                ? draft!.outcome
-                : null,
+            initialValue:
+                (draft?.outcome.isNotEmpty == true) ? draft!.outcome : null,
             isExpanded: true,
             decoration:
                 const InputDecoration(labelText: 'Outcome *', isDense: true),
             items: [
               for (final o in _outcomes.where((o) => o.isNotEmpty))
-                DropdownMenuItem(
-                    value: o, child: Text(_outcomeLabel(o))),
+                DropdownMenuItem(value: o, child: Text(_outcomeLabel(o))),
             ],
             onChanged: _busy
                 ? null

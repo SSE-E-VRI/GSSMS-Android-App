@@ -36,8 +36,20 @@ class _FakeExecApi extends ExecutionApiService {
     Map<String, dynamic> fields,
   ) async {
     complaintDraftSaves.add(fields);
+    if (keepsComplaintDrafts) {
+      complaint = ComplaintExecution(
+        id: complaint.id,
+        initialFindings: fields['initial_findings'] as String,
+        actionTaken: fields['action_taken'] as String,
+        finalRemarks: fields['final_remarks'] as String,
+        photos: complaint.photos,
+      );
+    }
     return complaint;
   }
+
+  /// Like the real server: a saved draft is what the next load returns.
+  bool keepsComplaintDrafts = false;
 
   @override
   Future<ComplaintExecution> submitComplaintExecution(
@@ -48,9 +60,27 @@ class _FakeExecApi extends ExecutionApiService {
     return complaint;
   }
 
+  int complaintLoads = 0;
+  final List<String> complaintPhotoUploads = [];
+  int rectificationLoads = 0;
+
   @override
-  Future<ComplaintExecution> getComplaintExecution(int workOrderId) async =>
-      complaint;
+  Future<ComplaintExecution> getComplaintExecution(int workOrderId) async {
+    complaintLoads++;
+    return complaint;
+  }
+
+  @override
+  Future<ExecutionPhoto> uploadComplaintPhoto(
+    int workOrderId, {
+    required String kind,
+    required MultipartFile file,
+  }) async {
+    // Read the file as Dio would, which also closes it.
+    await file.finalize().drain<void>();
+    complaintPhotoUploads.add(kind);
+    return ExecutionPhoto(id: 100 + complaintPhotoUploads.length, kind: kind);
+  }
 
   BreakdownInfo? breakdownInfo =
       const BreakdownInfo(status: 'IN_PROGRESS', ticket: 'UMG-202610-0020');
@@ -68,8 +98,10 @@ class _FakeExecApi extends ExecutionApiService {
       inspection;
 
   @override
-  Future<RectificationPayload> getRectification(int workOrderId) async =>
-      rectification;
+  Future<RectificationPayload> getRectification(int workOrderId) async {
+    rectificationLoads++;
+    return rectification;
+  }
 
   @override
   Future<RectificationPayload> saveRectificationDraft(
@@ -110,6 +142,26 @@ Widget _harness(
     ],
     child: MaterialApp(theme: AppTheme.lightTheme, home: home),
   );
+}
+
+/// Runs the screen's pull-to-refresh handler, as a pull does, without the
+/// 2 s autosave timer firing.
+Future<void> _pullToRefresh(WidgetTester tester) async {
+  final refresh =
+      tester.widget<RefreshIndicator>(find.byType(RefreshIndicator));
+  await refresh.onRefresh();
+  await tester.pump();
+}
+
+/// Lets real file reads and deletes finish, which only progress in real
+/// time: until [done] holds (at most ~5 s), or for 0.5 s without one.
+Future<void> _settleIo(WidgetTester tester, {bool Function()? done}) async {
+  for (var i = 0; i < (done == null ? 5 : 50); i++) {
+    await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 100)));
+    await tester.pump();
+    if (done?.call() ?? false) break;
+  }
 }
 
 void _tallSurface(WidgetTester tester) {
@@ -220,7 +272,8 @@ void main() {
         ..breakdownInfo = BreakdownInfo.fromWorkOrderJson({
           'status': 'IN_PROGRESS',
           'ticket_number': 'UMG-202610-0020',
-          'description': 'platform light not working and MCB found in normal position',
+          'description':
+              'platform light not working and MCB found in normal position',
           'original_complaint_details': {
             'failure_date': '2026-10-24',
             'failure_time': '18:30:00',
@@ -296,6 +349,189 @@ void main() {
 
       expect(find.byKey(const Key('breakdown_info_card')), findsNothing);
       expect(find.byKey(const Key('submit_exec_button')), findsNothing);
+      expect(find.byKey(const Key('exec_read_only_notice')), findsOneWidget);
+      expect(find.textContaining('Job details could not be loaded'),
+          findsOneWidget);
+
+      // Retry once the details load again: the form becomes editable.
+      api.breakdownInfo = const BreakdownInfo(status: 'IN_PROGRESS');
+      await tester.tap(find.byKey(const Key('exec_details_retry_button')));
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('exec_read_only_notice')), findsNothing);
+      expect(find.byKey(const Key('submit_exec_button')), findsOneWidget);
+    });
+
+    testWidgets('a reload keeps text typed but not yet saved (F-004)',
+        (tester) async {
+      final api = _FakeExecApi()
+        ..complaint =
+            const ComplaintExecution(id: 9, initialFindings: 'Server text');
+      _tallSurface(tester);
+      await tester.pumpWidget(
+        _harness(const ComplaintExecutionScreen(workOrderId: 7), api),
+      );
+      await tester.pumpAndSettle();
+      expect(api.complaintLoads, 1);
+
+      await tester.enterText(
+          find.byKey(const Key('exec_findings_field')), 'Typed now');
+      // Pull to refresh before the 2 s autosave fires.
+      await _pullToRefresh(tester);
+
+      expect(api.complaintLoads, 2, reason: 'the refresh reloaded');
+      expect(api.complaintDraftSaves, isEmpty, reason: 'not saved yet');
+      expect(find.text('Typed now'), findsOneWidget);
+      expect(find.text('Server text'), findsNothing);
+
+      // The kept text is still saved by the autosave afterwards.
+      await tester.pump(const Duration(seconds: 2));
+      await tester.pump();
+      expect(api.complaintDraftSaves.last['initial_findings'], 'Typed now');
+    });
+
+    testWidgets(
+        'Save Progress with a waiting photo saves the typed text once, '
+        'then uploads the photo (F-004)', (tester) async {
+      final dir = Directory.systemTemp.createTempSync('pending_photo_');
+      addTearDown(() {
+        if (dir.existsSync()) dir.deleteSync(recursive: true);
+      });
+      final photo = File('${dir.path}${Platform.pathSeparator}before.jpg')
+        ..writeAsBytesSync([0xFF, 0xD8, 0xFF, 0xD9]);
+      SharedPreferences.setMockInitialValues({
+        'complaint_execution_pending_photos_7': jsonEncode([
+          {'kind': 'BEFORE', 'localPath': photo.path, 'ownerUserId': 1},
+        ]),
+      });
+      final api = _FakeExecApi()
+        ..keepsComplaintDrafts = true
+        ..complaint =
+            const ComplaintExecution(id: 9, initialFindings: 'Server text');
+      _tallSurface(tester);
+      await tester.pumpWidget(
+        _harness(const ComplaintExecutionScreen(workOrderId: 7), api),
+      );
+      await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 300)));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+          find.byKey(const Key('exec_findings_field')), 'Typed before save');
+      final save = find.byKey(const Key('save_exec_draft_button'));
+      await tester.ensureVisible(save);
+      await tester.tap(save);
+      // The upload reads and deletes the real file.
+      await _settleIo(tester,
+          done: () => find.text('Progress saved.').evaluate().isNotEmpty);
+
+      expect(api.complaintDraftSaves, hasLength(1));
+      expect(api.complaintDraftSaves.single['initial_findings'],
+          'Typed before save');
+      expect(api.complaintPhotoUploads, ['BEFORE']);
+      expect(find.textContaining('Could not'), findsNothing);
+      expect(api.complaintLoads, 2, reason: 'reloaded after the upload');
+      expect(find.text('Typed before save'), findsOneWidget);
+      expect(find.text('Progress saved.'), findsOneWidget);
+    });
+
+    group('photos saved before the app recorded owners (F-003)', () {
+      late Directory dir;
+      late File legacy;
+
+      setUp(() {
+        dir = Directory.systemTemp.createTempSync('legacy_photo_');
+        legacy = File('${dir.path}${Platform.pathSeparator}legacy.jpg')
+          ..writeAsBytesSync([0xFF, 0xD8, 0xFF, 0xD9]);
+        SharedPreferences.setMockInitialValues({
+          'complaint_execution_pending_photos_7': jsonEncode([
+            {'kind': 'AFTER', 'localPath': legacy.path},
+          ]),
+        });
+      });
+
+      tearDown(() {
+        if (dir.existsSync()) dir.deleteSync(recursive: true);
+      });
+
+      final notice = find.byKey(const Key('exec_legacy_photos_notice'));
+
+      Future<void> open(WidgetTester tester, _FakeExecApi api,
+          {bool offered = false}) async {
+        _tallSurface(tester);
+        await tester.pumpWidget(
+          _harness(const ComplaintExecutionScreen(workOrderId: 7), api),
+        );
+        await _settleIo(tester,
+            done: offered ? () => notice.evaluate().isNotEmpty : null);
+        await tester.pumpAndSettle();
+      }
+
+      testWidgets('are offered to the assigned technician, who can add them',
+          (tester) async {
+        final api = _FakeExecApi()
+          ..breakdownInfo =
+              const BreakdownInfo(status: 'IN_PROGRESS', assignedToId: 1);
+        await open(tester, api, offered: true);
+
+        expect(notice, findsOneWidget);
+        expect(
+            find.textContaining('1 photo for this Job Work'), findsOneWidget);
+        expect(find.text('After photos (0/10)'), findsOneWidget);
+
+        await tester.tap(find.byKey(const Key('claim_legacy_photos_button')));
+        await _settleIo(tester,
+            done: () => find.text('After photos (1/10)').evaluate().isNotEmpty);
+        await tester.pumpAndSettle();
+
+        expect(
+            find.byKey(const Key('exec_legacy_photos_notice')), findsNothing);
+        expect(find.text('After photos (1/10)'), findsOneWidget);
+        expect(legacy.existsSync(), isTrue);
+      });
+
+      testWidgets('can be removed from the phone after confirming',
+          (tester) async {
+        final api = _FakeExecApi()
+          ..breakdownInfo =
+              const BreakdownInfo(status: 'IN_PROGRESS', assignedToId: 1);
+        await open(tester, api, offered: true);
+
+        await tester.tap(find.byKey(const Key('discard_legacy_photos_button')));
+        await tester.pumpAndSettle();
+        await tester
+            .tap(find.byKey(const Key('confirm_discard_legacy_photos')));
+        await _settleIo(tester, done: () => notice.evaluate().isEmpty);
+        await tester.pumpAndSettle();
+
+        expect(
+            find.byKey(const Key('exec_legacy_photos_notice')), findsNothing);
+        expect(legacy.existsSync(), isFalse);
+        expect(find.text('After photos (0/10)'), findsOneWidget);
+      });
+
+      testWidgets('are never shown to another technician', (tester) async {
+        final api = _FakeExecApi()
+          ..breakdownInfo =
+              const BreakdownInfo(status: 'IN_PROGRESS', assignedToId: 2);
+        await open(tester, api);
+
+        expect(
+            find.byKey(const Key('exec_legacy_photos_notice')), findsNothing);
+        expect(find.text('After photos (0/10)'), findsOneWidget);
+        expect(legacy.existsSync(), isTrue, reason: 'kept for their owner');
+      });
+
+      testWidgets('are not offered when the Job Work is not In Progress',
+          (tester) async {
+        final api = _FakeExecApi()
+          ..breakdownInfo =
+              const BreakdownInfo(status: 'TECH_COMPLETED', assignedToId: 1);
+        await open(tester, api);
+
+        expect(
+            find.byKey(const Key('exec_legacy_photos_notice')), findsNothing);
+      });
     });
 
     testWidgets('Sign & Submit signs with the Technician Name typed',
@@ -415,7 +651,8 @@ void main() {
               pointNumber: 1,
               observation: 'Loose bolt',
               inspectionEvidencePhotos: [
-                ExecutionPhoto(id: 32, url: 'https://backend.example/media/p.jpg'),
+                ExecutionPhoto(
+                    id: 32, url: 'https://backend.example/media/p.jpg'),
               ],
             ),
             InspectionPointExecutionEntry(
@@ -431,12 +668,13 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.byKey(const Key('insp_exec_general_evidence')), findsOneWidget);
+      expect(
+          find.byKey(const Key('insp_exec_general_evidence')), findsOneWidget);
       expect(find.byKey(const Key('inspector_photo_31')), findsOneWidget);
       expect(find.byKey(const Key('insp_exec_inspector_photos_11')),
           findsOneWidget);
-      expect(find.byKey(const Key('insp_exec_inspector_photos_12')),
-          findsNothing);
+      expect(
+          find.byKey(const Key('insp_exec_inspector_photos_12')), findsNothing);
       expect(find.byKey(const Key('inspector_photo_32')), findsOneWidget);
     });
 
@@ -461,6 +699,64 @@ void main() {
     });
 
     testWidgets(
+        'Rectification reload keeps typed text and still refreshes photos (F-004)',
+        (tester) async {
+      final api = _FakeExecApi()
+        ..rectification = const RectificationPayload(
+          editable: true,
+          finalRemarks: 'Server remarks',
+          items: [
+            RectificationItem(
+                id: 21,
+                asset: 'TR-01',
+                finding: 'Oil leak',
+                actionTaken: 'Server action'),
+          ],
+        );
+      _tallSurface(tester);
+      await tester.pumpWidget(
+        _harness(const RectificationExecutionScreen(workOrderId: 7), api),
+      );
+      await tester.pumpAndSettle();
+      expect(api.rectificationLoads, 1);
+
+      await tester.enterText(
+          find.byKey(const Key('rect_item_action_21')), 'Typed action');
+      await tester.enterText(
+          find.byKey(const Key('rect_final_remarks_field')), 'Typed remarks');
+      // A photo uploaded meanwhile appears on the server copy.
+      api.rectification = const RectificationPayload(
+        editable: true,
+        finalRemarks: 'Server remarks',
+        items: [
+          RectificationItem(
+            id: 21,
+            asset: 'TR-01',
+            finding: 'Oil leak',
+            actionTaken: 'Server action',
+            photos: [ExecutionPhoto(id: 55, kind: 'BEFORE')],
+          ),
+        ],
+      );
+      await _pullToRefresh(tester);
+
+      expect(api.rectificationLoads, 2, reason: 'the refresh reloaded');
+      expect(api.rectificationDraftSaves, isEmpty, reason: 'not saved yet');
+      expect(find.text('Typed action'), findsOneWidget);
+      expect(find.text('Typed remarks'), findsOneWidget);
+      expect(find.text('Server action'), findsNothing);
+      expect(find.text('Server remarks'), findsNothing);
+      expect(find.byKey(const Key('delete_exec_photo_55')), findsOneWidget,
+          reason: 'photos refresh even while text is kept');
+
+      await tester.pump(const Duration(seconds: 2));
+      await tester.pump();
+      final saved = api.rectificationDraftSaves.last;
+      expect(saved['final_remarks'], 'Typed remarks');
+      expect((saved['items'] as List).single['action_taken'], 'Typed action');
+    });
+
+    testWidgets(
         'RectificationExecutionScreen shows the checklist evidence read-only',
         (tester) async {
       final api = _FakeExecApi()
@@ -475,7 +771,8 @@ void main() {
                 ExecutionPhoto(
                     id: 71,
                     kind: 'BEFORE',
-                    url: 'https://backend.example/media/maintenance_line_evidence/f.jpg',
+                    url:
+                        'https://backend.example/media/maintenance_line_evidence/f.jpg',
                     locked: true),
               ],
             ),

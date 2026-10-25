@@ -31,8 +31,8 @@ class PendingExecutionPhotoStore {
   static String keyFor(int workOrderId) => '$keyPrefix$workOrderId';
 
   /// This user's pending photos for [workOrderId] whose file still exists.
-  /// Legacy ownerless entries are quarantined rather than assigned to
-  /// another signed-in technician. Their files remain retained.
+  /// Legacy ownerless entries are held back (see [legacy]); their files are
+  /// kept.
   Future<List<PendingExecutionPhoto>> load(
     int workOrderId, {
     required int? ownerUserId,
@@ -51,31 +51,81 @@ class PendingExecutionPhotoStore {
   }
 
   /// Replaces this user's pending photos for [workOrderId] with [photos],
-  /// keeping any other user's entries untouched.
+  /// keeping any other user's entries untouched. Without a signed-in user
+  /// nothing is written, so no new ownerless entries are ever created.
   Future<void> save(
     int workOrderId,
     List<PendingExecutionPhoto> photos, {
     required int? ownerUserId,
   }) async {
+    if (ownerUserId == null) return;
     final key = keyFor(workOrderId);
-    final others = (await _entries(key)).where((entry) {
-      final owner = entry['ownerUserId'];
-      return ownerUserId == null || owner != ownerUserId;
-    });
-    final next = [
+    final others = (await _entries(key))
+        .where((entry) => entry['ownerUserId'] != ownerUserId);
+    await _write(key, [
       ...others,
       for (final photo in photos)
         {
           'kind': photo.kind,
           'localPath': photo.localPath,
-          if (ownerUserId != null) 'ownerUserId': ownerUserId,
+          'ownerUserId': ownerUserId,
         },
+    ]);
+  }
+
+  /// Photos saved before owners were recorded (app 0.3.9 and earlier) whose
+  /// file still exists. Nobody sees them until [claimLegacy] or
+  /// [discardLegacy] is called for them.
+  Future<List<PendingExecutionPhoto>> legacy(int workOrderId) async {
+    final photos = <PendingExecutionPhoto>[];
+    for (final entry in await _entries(keyFor(workOrderId))) {
+      if (entry['ownerUserId'] != null) continue;
+      final kind = entry['kind'];
+      final localPath = entry['localPath'];
+      if (kind is! String || localPath is! String) continue;
+      if (!await File(localPath).exists()) continue;
+      photos.add(PendingExecutionPhoto(kind: kind, localPath: localPath));
+    }
+    return photos;
+  }
+
+  /// Gives every ownerless photo of [workOrderId] to [ownerUserId]. The
+  /// caller must first confirm with the server that this user is the Job
+  /// Work's assigned technician.
+  Future<void> claimLegacy(int workOrderId, {required int ownerUserId}) async {
+    final key = keyFor(workOrderId);
+    await _write(key, [
+      for (final entry in await _entries(key))
+        if (entry['ownerUserId'] == null)
+          {...entry, 'ownerUserId': ownerUserId}
+        else
+          entry,
+    ]);
+  }
+
+  /// Drops every ownerless entry of [workOrderId] and returns the local
+  /// paths it referenced, for the caller to delete.
+  Future<List<String>> discardLegacy(int workOrderId) async {
+    final key = keyFor(workOrderId);
+    final entries = await _entries(key);
+    await _write(key, [
+      for (final entry in entries)
+        if (entry['ownerUserId'] != null) entry,
+    ]);
+    return [
+      for (final entry in entries)
+        if (entry['ownerUserId'] == null && entry['localPath'] is String)
+          entry['localPath'] as String,
     ];
+  }
+
+  static Future<void> _write(
+      String key, List<Map<String, dynamic>> entries) async {
     final prefs = await SharedPreferences.getInstance();
-    if (next.isEmpty) {
+    if (entries.isEmpty) {
       await prefs.remove(key);
     } else {
-      await prefs.setString(key, jsonEncode(next));
+      await prefs.setString(key, jsonEncode(entries));
     }
   }
 
