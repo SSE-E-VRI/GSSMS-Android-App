@@ -170,14 +170,14 @@ class _ComplaintExecutionScreenState
           _findingsController.text = exec.initialFindings;
           _actionController.text = exec.actionTaken;
           _remarksController.text = exec.finalRemarks;
-          _params = exec.parameters
+            _params = exec.parameters
               .map((e) => Map<String, String>.from(e))
               .toList();
-          _failureCode = exec.failureCode;
-          _restoredTime = exec.restoredTime ??
-              (exec.requiresFailureDetails ? DateTime.now() : null);
-          _failureCodeError = null;
-          _restoredTimeError = null;
+            _failureCode = exec.failureCode;
+            _restoredTime = exec.restoredTime ??
+                (exec.requiresFailureDetails ? DateTime.now() : null);
+            _failureCodeError = null;
+            _restoredTimeError = null;
           }
         });
       } finally {
