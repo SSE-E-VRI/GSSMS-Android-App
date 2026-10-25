@@ -297,6 +297,7 @@ class _VerificationWorkspaceScreenState
                         onChanged: (value) => setState(
                           () => _highRiskConfirmed = value ?? false,
                         ),
+                    ),
                     const Expanded(child: Text('I confirm this verification')),
                   ],
                 ),
