@@ -138,6 +138,9 @@ pw.Widget _buildItemCard(
       ),
 
       _contentBlock('Finding', item.finding, empty: 'No finding recorded'),
+      if (item.sourcePhotos.isNotEmpty)
+        _photoBlock('Original Evidence (from the checklist)',
+            item.sourcePhotos, photos),
       _contentBlock('Action Taken', item.actionTaken,
           empty: 'No action recorded'),
       if (item.outcome == RectificationOutcome.notRectified)
@@ -249,6 +252,44 @@ pw.Widget _contentBlock(
     ),
   );
 }
+
+/// A `.contentBlock` whose body is a photo row (web: Original Evidence).
+pw.Widget _photoBlock(
+  String label,
+  List<ReportPhoto> list,
+  Map<String, Uint8List?> photos,
+) =>
+    pw.Padding(
+      padding: const pw.EdgeInsets.only(bottom: 6.0),
+      child: pw.Column(
+        crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+        mainAxisSize: pw.MainAxisSize.min,
+        children: [
+          CssBox(
+            padding: const pw.EdgeInsets.only(bottom: 1.8),
+            margin: const pw.EdgeInsets.only(bottom: 3.0),
+            bottom: const CssSide(0.75, ReportPdfTheme.border, dashed: true),
+            child: cssText(
+              label,
+              sizePt: 9.3,
+              weight: 700,
+              upper: true,
+              letterSpacingEm: 0.03,
+              color: ReportPdfTheme.muted,
+              lineHeight: _root,
+            ),
+          ),
+          ...photoGridLines(
+            [for (final p in list) PhotoTile(photos[p.key])],
+            _contentW,
+            lineHeight: _root,
+          ),
+        ],
+      ),
+    );
+
+/// Item card content width (517.5) for a full-width photo row.
+const double _contentW = 517.5;
 
 /// Column width inside the evidence grid: (517.5 - 2 * 0.75 - 2 * 9 - 9) / 2.
 const double _evidenceColW = 244.5;

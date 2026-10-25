@@ -105,12 +105,18 @@ class JobWorkReportApiService {
     return uri.hasQuery ? '${uri.path}?${uri.query}' : uri.path;
   }
 
+  /// Accept header for photo downloads. The media endpoint is a DRF view
+  /// with JSON renderers only, and DRF answers 406 to a request that accepts
+  /// nothing but `image/*` — before it even serves the file — so every report
+  /// photo came back as "No photo". `*/*` keeps the request satisfiable.
+  static const String photoAccept = 'image/*, */*';
+
   Future<Uint8List> fetchPhotoBytes(String url) async {
     final response = await _dio.get<List<int>>(
       mediaFetchUrl(url),
       options: Options(
         responseType: ResponseType.bytes,
-        headers: {'Accept': 'image/*'},
+        headers: {'Accept': photoAccept},
       ),
     );
     final data = response.data;

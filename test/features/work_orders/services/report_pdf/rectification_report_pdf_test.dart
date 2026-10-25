@@ -58,6 +58,32 @@ void main() {
         greaterThanOrEqualTo(1));
   });
 
+  test('prints the checklist evidence a deficiency was raised with', () async {
+    final r = RectificationJobWorkReport.fromJson({
+      'ticket_number': 'JW-9',
+      'items': [
+        {
+          'asset': 'EB Bunk',
+          'checkpoint': 'Earth pit',
+          'outcome': 'RECTIFIED',
+          'photos': [
+            {'image': 'http://x/media/a.jpg', 'kind': 'BEFORE'},
+          ],
+          'source_photos': [
+            {'image': 'http://x/media/found.jpg', 'url': 'http://x/media/found.jpg', 'kind': 'BEFORE'},
+          ],
+        },
+      ],
+    });
+    expect(r.items.single.sourcePhotos.single.url, 'http://x/media/found.jpg');
+    // The report preloads it with the item's own photos.
+    expect(r.allPhotos.map((p) => p.url), contains('http://x/media/found.jpg'));
+    final doc = await JobWorkReportPdfService.build(r,
+        generatedAt: DateTime(2026, 1, 2, 3, 4), compress: false);
+    final text = String.fromCharCodes(await doc.save());
+    expect(text, contains('%PDF-'));
+  });
+
   test('item cards flow onto further pages without dropping content',
       () async {
     final pages = await _pageCount(_report(8));

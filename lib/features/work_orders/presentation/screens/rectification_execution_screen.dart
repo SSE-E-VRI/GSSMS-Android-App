@@ -14,6 +14,7 @@ import 'package:gssms_mobile/core/widgets/status_chip.dart';
 import 'package:gssms_mobile/features/auth/domain/rbac.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:gssms_mobile/features/auth/presentation/widgets/permission_denied_view.dart';
+import 'package:gssms_mobile/features/work_orders/data/evidence_service.dart';
 import 'package:gssms_mobile/features/work_orders/data/execution_api_service.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/mode_execution.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/widgets/execution_autosave.dart';
@@ -237,12 +238,13 @@ class _RectificationExecutionScreenState
     }
   }
 
-  /// Lets the user choose camera or gallery, then captures/picks a JPEG.
+  /// Lets the user choose camera or gallery, then captures/picks a photo
+  /// through [EvidenceService] — scaled to 1600px, re-encoded as JPEG and
+  /// stripped of EXIF/GPS on the phone, like every other evidence photo.
   /// Returns null if the user cancelled the source choice, gallery
-  /// permission was refused, or the picker was cancelled/picked something
-  /// unusable (no error, nothing happened) — a non-null [XFile] is ready
-  /// to upload.
-  Future<XFile?> _pickPhoto() async {
+  /// permission was refused, or the picker was cancelled. The caller owns
+  /// the returned local copy and discards it after the upload attempt.
+  Future<EvidenceFile?> _pickPhoto(String kind) async {
     final source = await pickExecutionImageSource(context);
     if (source == null || !mounted) return null;
     if (source == ImageSource.gallery &&
@@ -250,25 +252,34 @@ class _RectificationExecutionScreenState
       return null;
     }
     if (!mounted) return null;
-    XFile? picked;
     try {
-      picked = await ImagePicker().pickImage(source: source, imageQuality: 85);
-    } catch (_) {
+      return await ref.read(evidenceServiceProvider).capture(
+            kind: kind.toUpperCase() == 'AFTER'
+                ? EvidenceKind.after
+                : EvidenceKind.before,
+            source: source,
+          );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not capture photo: ${userFacingError(e)}')),
+        );
+      }
       return null;
     }
-    if (picked == null || !mounted) return null;
-    final lower = picked.path.toLowerCase();
-    if (!lower.endsWith('.jpg') && !lower.endsWith('.jpeg')) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Only JPEG photos are allowed.')),
-      );
-      return null;
-    }
-    return picked;
+  }
+
+  /// This screen uploads immediately and keeps nothing for later, so the
+  /// local copy goes whether the upload worked or not (a failure shows an
+  /// error and the user retakes).
+  Future<void> _discard(String path) async {
+    try {
+      await ref.read(evidenceServiceProvider).discard(path);
+    } catch (_) {}
   }
 
   Future<void> _addPhoto(RectificationItem item, String kind) async {
-    final picked = await _pickPhoto();
+    final picked = await _pickPhoto(kind);
     if (picked == null || !mounted) return;
     setState(() => _saving = true);
     try {
@@ -291,6 +302,7 @@ class _RectificationExecutionScreenState
         SnackBar(content: Text('Could not upload: ${userFacingError(e)}')),
       );
     } finally {
+      await _discard(picked.path);
       if (mounted) setState(() => _saving = false);
     }
   }
@@ -338,7 +350,7 @@ class _RectificationExecutionScreenState
       confirmKey: Key('confirm_retake_rect_photo_${photo.id}'),
     );
     if (!confirmed || !mounted) return;
-    final picked = await _pickPhoto();
+    final picked = await _pickPhoto(photo.kind ?? 'BEFORE');
     if (picked == null || !mounted) return;
     setState(() => _saving = true);
     try {
@@ -368,6 +380,7 @@ class _RectificationExecutionScreenState
       );
       await _load();
     } finally {
+      await _discard(picked.path);
       if (mounted) setState(() => _saving = false);
     }
   }
@@ -742,6 +755,15 @@ class _RectificationExecutionScreenState
             ),
           ),
           const SizedBox(height: 12),
+          if (item.sourcePhotos.isNotEmpty) ...[
+            // What the deficiency was raised with (web parity), read-only.
+            InspectorEvidenceStrip(
+              key: Key('rect_source_photos_${item.id}'),
+              label: 'Original evidence (checklist)',
+              photos: item.sourcePhotos,
+            ),
+            const SizedBox(height: 12),
+          ],
           ExecutionPhotoGrid(
             photos: item.photos,
             canManage: true,

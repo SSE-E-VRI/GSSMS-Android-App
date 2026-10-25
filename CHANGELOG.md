@@ -8,6 +8,23 @@ visible feature or change in what the app shows; MAJOR is a breaking change or
 forced update. The app talks to the GSSMS web/backend; API changes are additive,
 so older app builds keep working.
 
+## [0.3.9+14] - 2026-10-25
+
+### Fixed
+- Job Work report photos all printed "No photo": they were requested with `Accept: image/*`, which the server's media view answers with 406.
+- Depot Incharge Verify screen: checklist line photos, the PM proof-of-execution photo, the inspector's point and general evidence, and a deficiency's original checklist evidence were not shown; they now are (read-only, tap to enlarge).
+- Breakdown photos waiting for Save Progress could be deleted by the 48 h evidence cleanup; they are now protected and recorded per user (a reassigned Job Work never shows another technician's pending photos).
+- Every photo upload gets at least 120 s (only checklist uploads had it); inspection and rectification photos are resized and stripped of EXIF on the phone; a checklist photo hitting a 502/503/504 is queued instead of lost.
+- Backend media URLs are always fetched from the configured server, so a proxy that rewrites scheme or host can no longer blank evidence photos.
+
+### Changed
+- Breakdown execution form matches the web: Breakdown Information card, read-only unless In Progress, Technician Name for the signature, Final Remarks after the photos, web guidance text, 10 photos per kind, and "On this phone. Uploads when you tap Save Progress." for photos not yet uploaded.
+- Inspection execution and the rectification forms show the inspector's / checklist's original evidence read-only.
+- Checklist and rectification reports print the proof-of-execution photo and the deficiency's original evidence, as the web reports do.
+
+### Release scope
+- Requires web/backend 1.9.17 deployed first (migration 0112).
+
 ## [0.3.8+13] - 2026-10-24
 
 ### Fixed

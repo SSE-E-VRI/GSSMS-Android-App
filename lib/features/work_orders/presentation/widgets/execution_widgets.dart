@@ -1,3 +1,4 @@
+import 'package:gssms_mobile/core/widgets/authenticated_image_thumbnail.dart';
 import 'package:gssms_mobile/core/widgets/protected_network_image.dart';
 import 'dart:io';
 
@@ -7,7 +8,11 @@ import 'package:image_picker/image_picker.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
 import 'package:gssms_mobile/features/auth/domain/rbac.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
+import 'package:gssms_mobile/features/work_orders/data/pending_execution_photo_store.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/mode_execution.dart';
+
+export 'package:gssms_mobile/features/work_orders/data/pending_execution_photo_store.dart'
+    show PendingExecutionPhoto;
 
 /// Editable {parameter, value, unit} rows (max 50 server-side). Used by the
 /// complaint and inspection execution forms — the server validates
@@ -18,11 +23,25 @@ class ParamRowsEditor extends StatefulWidget {
     required this.initial,
     required this.onChanged,
     this.enabled = true,
+    this.readOnly = false,
+    this.emptyText,
+    this.parameterHint,
   });
 
   final List<Map<String, String>> initial;
   final ValueChanged<List<Map<String, String>>> onChanged;
   final bool enabled;
+
+  /// Shows the rows without add/remove controls (a Job Work that can no
+  /// longer be edited), as opposed to [enabled], which only greys them out
+  /// while a save is running.
+  final bool readOnly;
+
+  /// Shown instead of the rows when there are none.
+  final String? emptyText;
+
+  /// Example shown in an empty Parameter field (e.g. "R-Y Voltage").
+  final String? parameterHint;
 
   @override
   State<ParamRowsEditor> createState() => _ParamRowsEditorState();
@@ -67,8 +86,22 @@ class _ParamRowsEditorState extends State<ParamRowsEditor> {
 
   @override
   Widget build(BuildContext context) {
+    final editable = widget.enabled && !widget.readOnly;
+    final empty = widget.emptyText;
     return Column(
       children: [
+        if (_params.isEmpty && empty != null)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Text(empty,
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.copyWith(color: context.gssms.textSecondary)),
+            ),
+          ),
         for (var i = 0; i < _params.length; i++)
           Padding(
             padding: EdgeInsets.only(bottom: i == _params.length - 1 ? 0 : 8),
@@ -78,9 +111,10 @@ class _ParamRowsEditorState extends State<ParamRowsEditor> {
                   flex: 3,
                   child: TextFormField(
                     controller: _params[i],
-                    enabled: widget.enabled,
-                    decoration: const InputDecoration(
+                    enabled: editable,
+                    decoration: InputDecoration(
                       labelText: 'Parameter',
+                      hintText: widget.parameterHint,
                       isDense: true,
                     ),
                     onChanged: (_) => _emit(),
@@ -91,7 +125,7 @@ class _ParamRowsEditorState extends State<ParamRowsEditor> {
                   flex: 3,
                   child: TextFormField(
                     controller: _values[i],
-                    enabled: widget.enabled,
+                    enabled: editable,
                     decoration: const InputDecoration(
                       labelText: 'Value',
                       isDense: true,
@@ -104,7 +138,7 @@ class _ParamRowsEditorState extends State<ParamRowsEditor> {
                   flex: 2,
                   child: TextFormField(
                     controller: _units[i],
-                    enabled: widget.enabled,
+                    enabled: editable,
                     decoration: const InputDecoration(
                       labelText: 'Unit',
                       isDense: true,
@@ -112,55 +146,101 @@ class _ParamRowsEditorState extends State<ParamRowsEditor> {
                     onChanged: (_) => _emit(),
                   ),
                 ),
-                IconButton(
-                  key: Key('remove_param_row_$i'),
-                  icon: const Icon(Icons.delete_outline, size: 18),
-                  tooltip: 'Remove row',
-                  onPressed: !widget.enabled
-                      ? null
-                      : () => setState(() {
-                            _params[i].dispose();
-                            _values[i].dispose();
-                            _units[i].dispose();
-                            _params.removeAt(i);
-                            _values.removeAt(i);
-                            _units.removeAt(i);
-                            _emit();
-                          }),
-                ),
+                if (!widget.readOnly)
+                  IconButton(
+                    key: Key('remove_param_row_$i'),
+                    icon: const Icon(Icons.delete_outline, size: 18),
+                    tooltip: 'Remove row',
+                    onPressed: !editable
+                        ? null
+                        : () => setState(() {
+                              _params[i].dispose();
+                              _values[i].dispose();
+                              _units[i].dispose();
+                              _params.removeAt(i);
+                              _values.removeAt(i);
+                              _units.removeAt(i);
+                              _emit();
+                            }),
+                  ),
               ],
             ),
           ),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: TextButton.icon(
-            key: const Key('add_param_row_button'),
-            onPressed: !widget.enabled || _params.length >= 50
-                ? null
-                : () => setState(() {
-                      _params.add(TextEditingController());
-                      _values.add(TextEditingController());
-                      _units.add(TextEditingController());
-                      _emit();
-                    }),
-            icon: const Icon(Icons.add, size: 16),
-            label: const Text('Add parameter'),
+        if (!widget.readOnly)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              key: const Key('add_param_row_button'),
+              onPressed: !editable || _params.length >= 50
+                  ? null
+                  : () => setState(() {
+                        _params.add(TextEditingController());
+                        _values.add(TextEditingController());
+                        _units.add(TextEditingController());
+                        _emit();
+                      }),
+              icon: const Icon(Icons.add, size: 16),
+              label: const Text('Add parameter'),
+            ),
           ),
-        ),
       ],
     );
   }
 }
 
-/// A photo captured/picked locally but not yet uploaded to the server —
-/// stays on-device until the caller explicitly uploads it (e.g. on Save
-/// Progress or Sign & Submit), rather than on every Add/Retake tap.
-class PendingExecutionPhoto {
-  const PendingExecutionPhoto({required this.kind, required this.localPath});
+/// Read-only row of photos the inspector took when logging the inspection
+/// (a point's own evidence, or the general site photos). Tap to enlarge;
+/// never deletable here. Renders nothing when there are none.
+class InspectorEvidenceStrip extends StatelessWidget {
+  const InspectorEvidenceStrip({
+    super.key,
+    required this.label,
+    required this.photos,
+  });
 
-  /// 'BEFORE' | 'AFTER'
-  final String kind;
-  final String localPath;
+  final String label;
+  final List<ExecutionPhoto> photos;
+
+  @override
+  Widget build(BuildContext context) {
+    final shown = [
+      for (final p in photos)
+        if ((p.url ?? '').trim().isNotEmpty) p,
+    ];
+    if (shown.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.lock_outline, size: 14, color: context.gssms.textSecondary),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text('$label (${shown.length})',
+                  style: Theme.of(context).textTheme.labelMedium),
+            ),
+          ],
+        ),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (final p in shown)
+              AuthenticatedImageThumbnail(
+                key: Key('inspector_photo_${p.id}'),
+                url: p.url,
+                width: 64,
+                height: 64,
+                previewTitle: (p.caption ?? '').trim().isNotEmpty
+                    ? p.caption
+                    : 'Inspection photo #${p.id}',
+              ),
+          ],
+        ),
+      ],
+    );
+  }
 }
 
 /// Before/After photo grid for one execution scope (whole execution, one
@@ -362,7 +442,7 @@ class _ExecutionPhotoTile extends StatelessWidget {
             if (onRetake != null)
               IconButton(
                 key: Key('retake_exec_photo_${photo.id}'),
-                icon: const Icon(Icons.replay_outlined, size: 18),
+                icon: const Icon(Icons.photo_camera_outlined, size: 18),
                 tooltip: 'Retake photo',
                 onPressed: busy ? null : () => onRetake!(photo),
               ),
@@ -451,7 +531,9 @@ class _PendingPhotoTile extends StatelessWidget {
                 const SizedBox(width: 4),
                 Flexible(
                   child: Text(
-                    'Not uploaded yet',
+                    'On this phone. Uploads when you tap Save Progress.',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: context.gssms.warning.foreground,
                         ),
@@ -463,7 +545,7 @@ class _PendingPhotoTile extends StatelessWidget {
           if (canManage) ...[
             if (onRetake != null)
               IconButton(
-                icon: const Icon(Icons.replay_outlined, size: 18),
+                icon: const Icon(Icons.photo_camera_outlined, size: 18),
                 tooltip: 'Retake photo',
                 onPressed: busy ? null : () => onRetake!(photo),
               ),

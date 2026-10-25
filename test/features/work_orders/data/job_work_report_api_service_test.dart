@@ -141,7 +141,10 @@ void main() {
       expect(bytes, [1, 2, 3]);
       expect(seen!.path, '/media/x.jpg?a=1');
       expect(seen!.responseType, ResponseType.bytes);
-      expect(seen!.headers['Accept'], 'image/*');
+      // `image/*` alone is answered 406 by the server's DRF media view, which
+      // left every report photo blank; the header must also accept `*/*`.
+      expect(seen!.headers['Accept'], JobWorkReportApiService.photoAccept);
+      expect(seen!.headers['Accept'], contains('*/*'));
     });
   });
 }

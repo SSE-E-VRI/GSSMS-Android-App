@@ -11,6 +11,7 @@ import 'package:gssms_mobile/core/utils/json_parsing.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_state.dart';
 import 'package:gssms_mobile/features/work_orders/data/evidence_service.dart';
+import 'package:gssms_mobile/features/work_orders/data/pending_execution_photo_store.dart';
 import 'package:gssms_mobile/features/work_orders/data/work_order_api_service.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_order_controllers.dart';
 
@@ -500,6 +501,11 @@ class SyncManager extends Notifier<SyncState> {
           }
         }
         try {
+          // Breakdown photos waiting for Save Progress live outside the
+          // outbox; sweeping them would silently lose unsaved evidence.
+          for (final p in await PendingExecutionPhotoStore.allReferencedPaths()) {
+            queuedPaths.add(_canonicalPath(p));
+          }
           await _evidenceService.cleanupExpiredEvidence(
             excludePaths: queuedPaths,
           );

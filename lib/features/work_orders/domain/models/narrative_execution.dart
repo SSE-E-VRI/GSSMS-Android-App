@@ -1,5 +1,7 @@
 import 'package:equatable/equatable.dart';
 import 'package:gssms_mobile/core/utils/json_parsing.dart';
+import 'package:gssms_mobile/features/work_orders/domain/models/mode_execution.dart'
+    show ExecutionPhoto;
 
 /// Narrative execution (SSOT JOB_WORK_ORIGINATION_AND_DEFICIENCY_SSOT RULE 5.1):
 /// the findings / action / photos form used for breakdowns, deficiency
@@ -253,6 +255,7 @@ class RectificationItem extends Equatable {
     this.outcome = '',
     this.reason = '',
     this.photos = const [],
+    this.sourcePhotos = const [],
   });
 
   final int id;
@@ -262,6 +265,9 @@ class RectificationItem extends Equatable {
   final String? severity;
   final String? sourceTicket;
   final String actionTaken;
+
+  /// The checklist photos the deficiency was raised with (read-only).
+  final List<ExecutionPhoto> sourcePhotos;
 
   /// '', 'RECTIFIED' or 'NOT_RECTIFIED'.
   final String outcome;
@@ -310,6 +316,7 @@ class RectificationItem extends Equatable {
               .map((m) => NarrativePhoto.fromJson(Map<String, dynamic>.from(m)))
               .toList()
           : const [],
+      sourcePhotos: ExecutionPhoto.listOf(json['source_photos']),
     );
   }
 
@@ -324,7 +331,8 @@ class RectificationItem extends Equatable {
         actionTaken,
         outcome,
         reason,
-        photos
+        photos,
+        sourcePhotos,
       ];
 }
 

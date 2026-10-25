@@ -145,6 +145,15 @@ class VerifyKindSummary extends StatelessWidget {
               InfoRow(label: 'Outcome', value: _outcomeLabel(item.outcome)),
               if (item.reason.trim().isNotEmpty)
                 InfoRow(label: 'Reason', value: item.reason),
+              if (item.sourcePhotos.isNotEmpty)
+                Padding(
+                  key: Key('verify_rect_source_photos_${item.id}'),
+                  padding: const EdgeInsets.only(top: GssmsSpacing.s8),
+                  child: InspectorEvidenceStrip(
+                    label: 'Original evidence (checklist)',
+                    photos: item.sourcePhotos,
+                  ),
+                ),
               _photos(item.photos),
             ],
           ),
@@ -167,18 +176,53 @@ class VerifyKindSummary extends StatelessWidget {
     PointwiseInspectionExecution? exec,
   ) {
     final points = exec?.points ?? const <InspectionPointExecutionEntry>[];
+    final general = exec?.generalEvidencePhotos ?? const <ExecutionPhoto>[];
+    final executionPhotos = exec?.executionPhotos ?? const <ExecutionPhoto>[];
+    // The inspector's own photos, as the web Verify view and report show
+    // them: on the server a point's inspection evidence counts as its
+    // Before photo, so the verifier must be able to see it.
+    final generalCard = general.isEmpty
+        ? null
+        : SectionCard(
+            key: const Key('verify_inspection_general_evidence'),
+            title: 'Inspection evidence',
+            icon: Icons.camera_alt_outlined,
+            children: [
+              InspectorEvidenceStrip(label: 'General photos', photos: general),
+            ],
+          );
     if (points.isEmpty) {
-      return const SectionCard(
-        key: Key('verify_kind_inspection'),
-        title: 'Inspection points',
-        icon: Icons.fact_check_outlined,
-        children: [TextWell(text: null, placeholder: 'No points recorded.')],
+      return Column(
+        key: const Key('verify_kind_inspection'),
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          if (generalCard != null) ...[
+            generalCard,
+            const SizedBox(height: GssmsSpacing.s12),
+          ],
+          SectionCard(
+            title: 'Inspection points',
+            icon: Icons.fact_check_outlined,
+            children: [
+              if (executionPhotos.isEmpty)
+                const TextWell(text: null, placeholder: 'No points recorded.')
+              else
+                // A legacy (non-pointwise) Job Work keeps its Before/After
+                // on the execution itself.
+                _photos(executionPhotos),
+            ],
+          ),
+        ],
       );
     }
     return Column(
       key: const Key('verify_kind_inspection'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (generalCard != null) ...[
+          generalCard,
+          const SizedBox(height: GssmsSpacing.s12),
+        ],
         for (final p in points) ...[
           SectionCard(
             title: 'Point #${p.pointNumber}',
@@ -193,6 +237,15 @@ class VerifyKindSummary extends StatelessWidget {
                 value: p.correctiveActionPerformed ? 'Yes' : 'No',
               ),
               _params(context, p.technicalParameters),
+              if (p.inspectionEvidencePhotos.isNotEmpty)
+                Padding(
+                  key: Key('verify_point_inspector_photos_${p.pointJobWorkId}'),
+                  padding: const EdgeInsets.only(top: GssmsSpacing.s8),
+                  child: InspectorEvidenceStrip(
+                    label: 'From the inspection',
+                    photos: p.inspectionEvidencePhotos,
+                  ),
+                ),
               _photos(p.photos),
             ],
           ),

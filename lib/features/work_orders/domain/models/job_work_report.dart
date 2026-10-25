@@ -404,6 +404,7 @@ class ChecklistJobWorkReport extends JobWorkReport {
     required this.groups,
     required this.deficiencies,
     this.showJobWork = false,
+    this.proofOfExecution,
   });
 
   /// Report for a Job Work with no checklist record ("No details available").
@@ -527,6 +528,10 @@ class ChecklistJobWorkReport extends JobWorkReport {
       groups: groups,
       deficiencies: deficiencies,
       showJobWork: showJobWork,
+      proofOfExecution: () {
+        final url = _str(rec['proof_of_execution']).trim();
+        return url.isEmpty ? null : ReportPhoto(key: url, url: url);
+      }(),
     );
   }
 
@@ -578,6 +583,10 @@ class ChecklistJobWorkReport extends JobWorkReport {
   final List<ChecklistDeficiencyRow> deficiencies;
   final bool showJobWork;
 
+  /// The record-level photo uploaded with the completion (web FormPreview's
+  /// "Any other documents to upload"); null when none.
+  final ReportPhoto? proofOfExecution;
+
   /// True when there is nothing to show ("No details available.").
   bool get isEmpty => groups.isEmpty;
 
@@ -592,6 +601,7 @@ class ChecklistJobWorkReport extends JobWorkReport {
   List<ReportPhoto> get allPhotos => _dedupe([
         for (final g in groups)
           for (final r in g.rows) ...r.attachments,
+        if (proofOfExecution != null) proofOfExecution!,
       ]);
 
   @override
@@ -608,6 +618,7 @@ class ChecklistJobWorkReport extends JobWorkReport {
         groups,
         deficiencies,
         showJobWork,
+        proofOfExecution,
       ];
 }
 
@@ -1152,10 +1163,15 @@ class RectificationReportItem extends Equatable {
     required this.reason,
     required this.beforePhotos,
     required this.afterPhotos,
+    this.sourcePhotos = const [],
   });
 
   final String asset;
   final String checkpoint;
+
+  /// The checklist photos the deficiency was raised with (web report's
+  /// "Original Evidence (from the checklist)").
+  final List<ReportPhoto> sourcePhotos;
 
   /// 'N/A' when blank.
   final String severity;
@@ -1188,6 +1204,7 @@ class RectificationReportItem extends Equatable {
         reason,
         beforePhotos,
         afterPhotos,
+        sourcePhotos,
       ];
 }
 
@@ -1251,6 +1268,7 @@ class RectificationJobWorkReport extends JobWorkReport {
               afterPhotos: [
                 for (final x in photos) if (x.kind == 'AFTER') x
               ],
+              sourcePhotos: ReportPhoto.listOf(i['source_photos']),
             );
           }(),
       ],
@@ -1291,6 +1309,7 @@ class RectificationJobWorkReport extends JobWorkReport {
 
   @override
   List<ReportPhoto> get allPhotos => _dedupe([
+        for (final i in items) ...i.sourcePhotos,
         for (final i in items) ...i.beforePhotos,
         for (final i in items) ...i.afterPhotos,
       ]);

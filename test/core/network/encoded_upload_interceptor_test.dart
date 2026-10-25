@@ -16,9 +16,10 @@ final _jpeg = Uint8List.fromList(
     [0xFF, 0xD8, 0xFF, 0xDB, 0x00, 0x43, 0x00, 0x06, 0x04, 0xFF, 0xD9]);
 
 class _Sent {
-  _Sent(this.headers, this.body);
+  _Sent(this.headers, this.body, this.receiveTimeout);
   final Map<String, dynamic> headers;
   final List<int> body;
+  final Duration? receiveTimeout;
 }
 
 class _RecordingAdapter implements HttpClientAdapter {
@@ -33,8 +34,8 @@ class _RecordingAdapter implements HttpClientAdapter {
     final bytes = requestStream == null
         ? <int>[]
         : await requestStream.fold<List<int>>(<int>[], (a, b) => a..addAll(b));
-    sent.add(_Sent(
-        options.headers.map((k, v) => MapEntry(k.toLowerCase(), v)), bytes));
+    sent.add(_Sent(options.headers.map((k, v) => MapEntry(k.toLowerCase(), v)),
+        bytes, options.receiveTimeout));
     return ResponseBody.fromString(
       jsonEncode({'id': 9, 'url': 'https://x/evidence.jpg'}),
       status(options),
@@ -129,6 +130,24 @@ void main() {
     expect(adapter.sent[1].body, adapter.sent[0].body);
     expect(adapter.sent[1].body, isNotEmpty);
     expect(adapter.sent[1].headers[_encodingHeader], 'base64');
+  });
+
+  test('every photo upload gets the long upload timeout, other calls do not',
+      () async {
+    final adapter = _RecordingAdapter((_) => 201);
+    final dio = client(adapter);
+
+    // A plain execution-photo call, as ExecutionApiService makes it: no
+    // per-request timeout of its own.
+    await dio.post<dynamic>('/api/v1/staff-workorders/7/complaint-execution/photos/',
+        data: FormData.fromMap({
+          'kind': 'BEFORE',
+          'image': MultipartFile.fromBytes(_jpeg, filename: 'evidence.jpg'),
+        }));
+    await dio.post<dynamic>('/api/v1/x/', data: {'status': 'OK'});
+
+    expect(adapter.sent[0].receiveTimeout, kUploadTimeout);
+    expect(adapter.sent[1].receiveTimeout, const Duration(seconds: 15));
   });
 
   test('requests without files are not encoded', () async {

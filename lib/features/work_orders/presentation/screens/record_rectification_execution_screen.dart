@@ -11,6 +11,8 @@ import 'package:gssms_mobile/features/auth/presentation/controllers/auth_control
 import 'package:gssms_mobile/features/work_orders/data/evidence_service.dart';
 import 'package:gssms_mobile/features/work_orders/data/narrative_execution_api_service.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/narrative_execution.dart';
+import 'package:gssms_mobile/features/work_orders/presentation/widgets/execution_widgets.dart'
+    show InspectorEvidenceStrip;
 import 'package:gssms_mobile/features/work_orders/presentation/screens/narrative_execution_screen.dart'
     show kNarrativeAutosaveDelay;
 
@@ -202,10 +204,12 @@ class _RecordRectificationExecutionScreenState
     final evidenceKind = kind == NarrativePhotoKind.before
         ? EvidenceKind.before
         : EvidenceKind.after;
+    final evidence = ref.read(evidenceServiceProvider);
+    String? capturedPath;
     try {
-      final captured =
-          await ref.read(evidenceServiceProvider).capture(kind: evidenceKind);
+      final captured = await evidence.capture(kind: evidenceKind);
       if (captured == null) return;
+      capturedPath = captured.path;
       if (!captured.isWithinSizeLimit) {
         if (mounted) {
           showGssmsSnackBar(context,
@@ -226,6 +230,12 @@ class _RecordRectificationExecutionScreenState
         showGssmsSnackBar(context, userFacingError(e), tone: GssmsTone.danger);
       }
     } finally {
+      // Uploaded immediately, nothing kept for later: drop the local copy.
+      if (capturedPath != null) {
+        try {
+          await evidence.discard(capturedPath);
+        } catch (_) {}
+      }
       if (mounted) setState(() => _uploading = false);
     }
   }
@@ -501,6 +511,15 @@ class _RecordRectificationExecutionScreenState
               ),
             ],
             const SizedBox(height: 12),
+            if (item.sourcePhotos.isNotEmpty) ...[
+              // What the deficiency was raised with (web parity), read-only.
+              InspectorEvidenceStrip(
+                key: Key('rect_source_photos_${item.id}'),
+                label: 'Original evidence (checklist)',
+                photos: item.sourcePhotos,
+              ),
+              const SizedBox(height: 12),
+            ],
             _photoGroup(
                 context, item, s, NarrativePhotoKind.before, 'Before *'),
             const SizedBox(height: 10),

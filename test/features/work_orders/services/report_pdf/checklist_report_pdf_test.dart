@@ -206,6 +206,33 @@ void main() {
     expect(await _pages(photo), greaterThan(await _pages(plain)));
   });
 
+  test('the proof-of-execution photo is read, preloaded and printed', () async {
+    const url = 'https://x/media/maintenance_proofs/proof.jpg';
+    final r = ChecklistJobWorkReport.fromRecordJson({
+      'remarks': 'Done',
+      'proof_of_execution': url,
+      'lines': [
+        {
+          'item_name': 'EB Bunk',
+          'inspection_point': 'Meter',
+          'checked_out': true,
+          'status': 'OK',
+        },
+      ],
+    }, _wo());
+    expect(r.proofOfExecution?.url, url);
+    expect(r.allPhotos.map((p) => p.key), contains(url));
+
+    final withProof = await JobWorkReportPdfService.build(r,
+        generatedAt: DateTime(2026, 10, 2, 9, 30), compress: false);
+    final text = String.fromCharCodes(await withProof.save());
+    expect(text, contains('%PDF-'));
+
+    final none = ChecklistJobWorkReport.fromRecordJson(
+        {'lines': const <dynamic>[]}, _wo());
+    expect(none.proofOfExecution, isNull);
+  });
+
 }
 
 WorkOrder _wo() => const WorkOrder(

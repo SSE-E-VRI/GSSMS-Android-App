@@ -71,6 +71,28 @@ void main() {
         expect(trustedMediaUri(url, config), isNull, reason: url);
       }
     });
+    test('a media URL built with the wrong origin is fetched from the backend',
+        () {
+      // e.g. the tunnel not forwarding X-Forwarded-Proto: Django then writes
+      // http:// or its internal host into every photo URL.
+      for (final url in [
+        'http://backend.example/media/p.jpg',
+        'http://127.0.0.1:8000/media/p.jpg',
+        'https://evil.example/media/p.jpg',
+      ]) {
+        expect(trustedMediaUri(url, config).toString(),
+            'https://backend.example/media/p.jpg',
+            reason: 'never sends credentials anywhere but the backend: $url');
+      }
+      expect(trustedMediaUri('http://backend.example/media/p.jpg?v=2', config)
+              .toString(),
+          'https://backend.example/media/p.jpg?v=2');
+      // Still refused: credentials in the URL, non-media paths elsewhere.
+      expect(trustedMediaUri('https://user@evil.example/media/p.jpg', config),
+          isNull);
+      expect(trustedMediaUri('https://evil.example/other/p.jpg', config), isNull);
+    });
+
     test('allows dev transport only for the configured origin', () {
       const dev = AppConfig(
           baseUrl: 'http://10.0.2.2:8000', environment: AppEnvironment.dev);

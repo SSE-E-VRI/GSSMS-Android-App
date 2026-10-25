@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gssms_mobile/core/theme/app_theme.dart';
+import 'package:gssms_mobile/core/widgets/authenticated_image_thumbnail.dart';
 import 'package:gssms_mobile/features/auth/domain/rbac.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
 import 'package:gssms_mobile/features/auth/presentation/widgets/permission_denied_view.dart';
 import 'package:gssms_mobile/core/widgets/feedback.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/maintenance_record.dart';
+import 'package:gssms_mobile/features/work_orders/domain/models/mode_execution.dart';
+import 'package:gssms_mobile/features/work_orders/presentation/widgets/execution_widgets.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/verification_workspace.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/widgets/verify_asset_groups_section.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/widgets/verify_deficiency_section.dart';
@@ -179,6 +182,34 @@ class _VerificationWorkspaceScreenState
             )
           else
             ...lines.map(_buildLineCard),
+          // The record-level photo uploaded with the completion — the web
+          // report's "Any other documents to upload".
+          if (workspace.record?.proofOfExecutionUrl != null)
+            Card(
+              key: const Key('verify_proof_of_execution'),
+              margin: const EdgeInsets.only(top: 8),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Other documents',
+                        style: TextStyle(
+                            fontWeight: FontWeight.bold, fontSize: 13)),
+                    const SizedBox(height: 8),
+                    AuthenticatedImageThumbnail(
+                      url: workspace.record!.proofOfExecutionUrl,
+                      width: 120,
+                      height: 120,
+                      previewTitle: 'Other documents',
+                      tapKey: const Key('preview_proof_of_execution'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           const SizedBox(height: 16),
         ],
         if (workspace.mode != 'INSPECTION') ...[
@@ -371,11 +402,34 @@ class _VerificationWorkspaceScreenState
                 'Remarks: ${line.observationAction}',
                 style: TextStyle(fontSize: 11, color: context.gssms.textSecondary),
               ),
+            // The technician's Before/After evidence for this line (the
+            // asset group's photos sit on its first line). Read-only, tap to
+            // enlarge — the supervisor verifies against these.
+            if (_serverPhotos(line).isNotEmpty)
+              Padding(
+                key: Key('verify_line_photos_${line.id}'),
+                padding: const EdgeInsets.only(top: 8),
+                child: ExecutionPhotoGrid(
+                  photos: _serverPhotos(line),
+                  canManage: false,
+                  busy: false,
+                  maxPerKind: 5,
+                  onAdd: (_) {},
+                  onDelete: (_) {},
+                ),
+              ),
           ],
         ),
       ),
     );
   }
+
+  /// Uploaded photos only: a placeholder still waiting in someone's outbox
+  /// has no URL to show.
+  List<ExecutionPhoto> _serverPhotos(MaintenanceRecordLine line) => [
+        for (final a in line.attachments)
+          if (a.url.isNotEmpty) ExecutionPhoto(id: a.id, kind: a.kind, url: a.url),
+      ];
 
   String _readingText(MaintenanceRecordLine line) {
     if (line.valueType.isMultiPart) {

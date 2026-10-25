@@ -204,6 +204,249 @@ void main() {
       expect(verifyButton.onPressed, isNull);
     });
 
+    testWidgets('a Depot Incharge sees the checklist line photo evidence',
+        (tester) async {
+      stubDetail();
+      when(() => mockRepo.fetchVerificationWorkspace(101)).thenAnswer(
+        (_) async => const VerificationWorkspace(
+          canVerify: true,
+          record: MaintenanceRecord(
+            id: 55,
+            workOrderId: 101,
+            lines: [
+              MaintenanceRecordLine(
+                id: 1,
+                itemName: 'EB Bunk',
+                inspectionPoint: 'Check and clean the EB meter',
+                recordedValue: 'OK',
+                status: 'OK',
+                attachments: [
+                  LineAttachment(
+                      id: 7,
+                      kind: 'BEFORE',
+                      url: 'https://backend.example/media/maintenance_line_evidence/b.jpg'),
+                  LineAttachment(
+                      id: 8,
+                      kind: 'AFTER',
+                      url: 'https://backend.example/media/maintenance_line_evidence/a.jpg'),
+                  // Still in the technician's outbox: nothing to show yet.
+                  LineAttachment(id: -1, kind: 'AFTER'),
+                ],
+              ),
+              MaintenanceRecordLine(
+                id: 2,
+                itemName: 'EB Bunk',
+                inspectionPoint: 'Earth resistance',
+                status: 'OK',
+              ),
+            ],
+          ),
+        ),
+      );
+
+      await tester.pumpWidget(
+        wrap(const VerificationWorkspaceScreen(workOrderId: 101)),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('verify_line_photos_1')), findsOneWidget);
+      expect(find.byKey(const Key('verify_line_photos_2')), findsNothing);
+      expect(find.text('Before photos (1/5)'), findsOneWidget);
+      expect(find.text('After photos (1/5)'), findsOneWidget);
+      expect(find.byKey(const Key('preview_exec_photo_7')), findsOneWidget);
+      expect(find.byKey(const Key('preview_exec_photo_8')), findsOneWidget);
+      // Read-only for the supervisor.
+      expect(find.byKey(const Key('delete_exec_photo_7')), findsNothing);
+      expect(find.byKey(const Key('add_before_photo_button')), findsNothing);
+    });
+
+    testWidgets(
+        'a Depot Incharge sees a PM record\'s proof-of-execution photo',
+        (tester) async {
+      stubDetail();
+      when(() => mockRepo.fetchVerificationWorkspace(101)).thenAnswer(
+        (_) async => VerificationWorkspace.fromJson({
+          'can_verify': true,
+          'work_order': {'status': 'TECH_COMPLETED', 'execution_mode': 'CHECKLIST'},
+          'record': {
+            'id': 55,
+            'proof_of_execution':
+                'https://backend.example/media/maintenance_proofs/proof.jpg',
+            'lines': [
+              {
+                'id': 1,
+                'item_name': 'EB Bunk',
+                'inspection_point': 'Check and clean the EB meter',
+                'status': 'OK',
+                'checked_out': true,
+              },
+            ],
+          },
+        }),
+      );
+
+      await tester.pumpWidget(
+        wrap(const VerificationWorkspaceScreen(workOrderId: 101)),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('verify_proof_of_execution')), findsOneWidget);
+      expect(find.byKey(const Key('preview_proof_of_execution')), findsOneWidget);
+    });
+
+    testWidgets(
+        'a Depot Incharge sees the inspector\'s and the technician\'s inspection photos',
+        (tester) async {
+      stubDetail();
+      const media = 'https://backend.example/media';
+      when(() => mockRepo.fetchVerificationWorkspace(101)).thenAnswer(
+        (_) async => VerificationWorkspace.fromJson({
+          'can_verify': true,
+          'work_order': {
+            'status': 'TECH_COMPLETED',
+            'execution_mode': 'INSPECTION',
+            // Shaped like build_pointwise_inspection_execution_data.
+            'inspection_execution': {
+              'is_pointwise': true,
+              'inspection_details': {
+                'inspection_number': 'INSP-1',
+                'general_evidence_photos': [
+                  {'id': 31, 'image': '$media/inspection_evidence_photos/g.jpg', 'caption': 'Yard view'},
+                ],
+              },
+              'points': [
+                {
+                  'point_job_work_id': 5,
+                  'point_number': 1,
+                  'observation': 'Loose terminal',
+                  'execution': {
+                    'id': 9,
+                    'initial_findings': 'Terminal loose',
+                    'photos': [
+                      {'id': 41, 'photo_type': 'AFTER', 'image': '$media/inspection_execution_photos/a.jpg'},
+                    ],
+                    'inspection_evidence_photos': [
+                      {'id': 32, 'image': '$media/inspection_evidence_photos/p.jpg'},
+                    ],
+                  },
+                },
+              ],
+            },
+          },
+        }),
+      );
+
+      await tester.pumpWidget(
+        wrap(const VerificationWorkspaceScreen(workOrderId: 101)),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('verify_inspection_general_evidence')),
+          findsOneWidget);
+      expect(find.byKey(const Key('inspector_photo_31')), findsOneWidget);
+      expect(find.byKey(const Key('verify_point_inspector_photos_5')),
+          findsOneWidget);
+      expect(find.byKey(const Key('inspector_photo_32')), findsOneWidget);
+      expect(find.text('From the inspection (1)'), findsOneWidget);
+      // The technician's own After photo, read-only.
+      expect(find.byKey(const Key('preview_exec_photo_41')), findsOneWidget);
+      expect(find.byKey(const Key('delete_exec_photo_41')), findsNothing);
+    });
+
+    testWidgets(
+        'a Depot Incharge sees each deficiency\'s rectification photos',
+        (tester) async {
+      stubDetail();
+      const media = 'https://backend.example/media/rectification_evidence';
+      when(() => mockRepo.fetchVerificationWorkspace(101)).thenAnswer(
+        (_) async => VerificationWorkspace.fromJson({
+          'can_verify': true,
+          'work_order': {
+            'status': 'TECH_COMPLETED',
+            'execution_mode': 'RECTIFICATION',
+          },
+          // Shaped like RectificationService.payload / _item_dict.
+          'rectification': {
+            'final_remarks': 'All rectified',
+            'items': [
+              {
+                'id': 3,
+                'deficiency_id': 77,
+                'is_active': true,
+                'asset': 'EB Bunk',
+                'checkpoint': 'Earth pit',
+                'finding': 'Earth pit cover missing',
+                'severity': 'Medium',
+                'action_taken': 'New cover fixed',
+                'outcome': 'RECTIFIED',
+                'photos': [
+                  {'id': 61, 'kind': 'BEFORE', 'url': '$media/b.jpg', 'image': '$media/b.jpg', 'locked': true},
+                  {'id': 62, 'kind': 'AFTER', 'url': '$media/a.jpg', 'image': '$media/a.jpg', 'locked': true},
+                ],
+                // The checklist photo the deficiency was raised with.
+                'source_photos': [
+                  {'id': 71, 'kind': 'BEFORE', 'url': 'https://backend.example/media/maintenance_line_evidence/f.jpg', 'locked': true, 'source': 'CHECKLIST'},
+                ],
+              },
+              {
+                // Removed from the Job Work: not shown.
+                'id': 4,
+                'is_active': false,
+                'asset': 'Old item',
+                'photos': [
+                  {'id': 63, 'kind': 'BEFORE', 'url': '$media/x.jpg'},
+                ],
+              },
+            ],
+          },
+        }),
+      );
+
+      await tester.pumpWidget(
+        wrap(const VerificationWorkspaceScreen(workOrderId: 101)),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('verify_kind_rectification')), findsOneWidget);
+      expect(find.text('Earth pit cover missing'), findsOneWidget);
+      expect(find.byKey(const Key('preview_exec_photo_61')), findsOneWidget);
+      expect(find.byKey(const Key('preview_exec_photo_62')), findsOneWidget);
+      expect(find.byKey(const Key('preview_exec_photo_63')), findsNothing);
+      expect(find.byKey(const Key('delete_exec_photo_61')), findsNothing);
+      expect(find.byKey(const Key('verify_rect_source_photos_3')), findsOneWidget);
+      expect(find.byKey(const Key('inspector_photo_71')), findsOneWidget);
+      expect(find.text('Original evidence (checklist) (1)'), findsOneWidget);
+    });
+
+    testWidgets('a legacy inspection Job Work shows its execution photos',
+        (tester) async {
+      stubDetail();
+      when(() => mockRepo.fetchVerificationWorkspace(101)).thenAnswer(
+        (_) async => VerificationWorkspace.fromJson({
+          'can_verify': true,
+          'work_order': {
+            'execution_mode': 'INSPECTION',
+            'inspection_execution': {
+              'is_pointwise': false,
+              'points': [],
+              'photos': [
+                {'id': 51, 'photo_type': 'BEFORE', 'image': 'https://backend.example/media/inspection_execution_photos/b.jpg'},
+              ],
+              'inspection_details': {},
+            },
+          },
+        }),
+      );
+
+      await tester.pumpWidget(
+        wrap(const VerificationWorkspaceScreen(workOrderId: 101)),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.byKey(const Key('preview_exec_photo_51')), findsOneWidget);
+      expect(find.text('No points recorded.'), findsNothing);
+    });
+
     testWidgets('Return to Technician still uses generic REWORK_REQUIRED', (tester) async {
       stubDetail();
       when(() => mockRepo.fetchVerificationWorkspace(101)).thenAnswer(

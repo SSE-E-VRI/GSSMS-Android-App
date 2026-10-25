@@ -61,6 +61,15 @@ class ExecutionApiService {
 
   // ——— Complaint (Breakdown) mode ———
 
+  /// Breakdown details and current status from the Job Work detail.
+  Future<BreakdownInfo> getBreakdownInfo(int workOrderId) async {
+    final response =
+        await _dio.get('/api/v1/maintenance/work-orders/$workOrderId/');
+    final data = _asObject(response.data);
+    if (data == null) _badPayload(response, 'job work');
+    return BreakdownInfo.fromWorkOrderJson(data);
+  }
+
   Future<ComplaintExecution> getComplaintExecution(int workOrderId) async {
     final response = await _dio.get('${_wo(workOrderId)}complaint-execution/');
     final data = _asObject(response.data);

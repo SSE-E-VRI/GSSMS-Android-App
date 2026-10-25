@@ -199,10 +199,12 @@ class _NarrativeExecutionScreenState
     final evidenceKind = kind == NarrativePhotoKind.before
         ? EvidenceKind.before
         : EvidenceKind.after;
+    final evidence = ref.read(evidenceServiceProvider);
+    String? capturedPath;
     try {
-      final captured =
-          await ref.read(evidenceServiceProvider).capture(kind: evidenceKind);
+      final captured = await evidence.capture(kind: evidenceKind);
       if (captured == null) return;
+      capturedPath = captured.path;
       if (!captured.isWithinSizeLimit) {
         if (mounted) {
           showGssmsSnackBar(context,
@@ -222,6 +224,12 @@ class _NarrativeExecutionScreenState
         showGssmsSnackBar(context, userFacingError(e), tone: GssmsTone.danger);
       }
     } finally {
+      // Uploaded immediately, nothing kept for later: drop the local copy.
+      if (capturedPath != null) {
+        try {
+          await evidence.discard(capturedPath);
+        } catch (_) {}
+      }
       if (mounted) setState(() => _uploading = false);
     }
   }

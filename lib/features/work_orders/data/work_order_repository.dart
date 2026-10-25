@@ -215,6 +215,17 @@ class WorkOrderRepository implements IWorkOrderRepository {
   final UserSession? Function()? _sessionProvider;
   Future<void> _lineSaves = Future<void>.value();
 
+  /// Same "try again later" statuses SyncManager retries automatically.
+  bool _isTransientHttpFailure(dynamic e) {
+    if (e is! DioException) return false;
+    final status = e.response?.statusCode;
+    return status == 408 ||
+        status == 429 ||
+        status == 502 ||
+        status == 503 ||
+        status == 504;
+  }
+
   bool _isNetworkException(dynamic e) {
     if (e is DioException) {
       if (e.type == DioExceptionType.connectionTimeout ||
@@ -1043,7 +1054,12 @@ class WorkOrderRepository implements IWorkOrderRepository {
       );
       return LineAttachment.fromJson(data);
     } catch (e) {
-      if (_isNetworkException(e) && _syncManager != null) {
+      // A transient gateway answer (the tunnel while the backend restarts)
+      // is queued like a dropped connection: the outbox already treats it as
+      // retryable, and the server dedupes the same bytes, so a replay can't
+      // duplicate the photo. Otherwise the photo would vanish from the screen.
+      if ((_isNetworkException(e) || _isTransientHttpFailure(e)) &&
+          _syncManager != null) {
         final cmd = OutboxCommand(
           idempotencyKey: idempotencyKey,
           type: OutboxCommandType.uploadLineAttachment,

@@ -159,7 +159,7 @@ List<pw.Widget> buildChecklistReportPdf(
 
   out.addAll(_buildDeficiencySummary(r.deficiencies));
   out.add(_Gap(36.0));
-  out.add(_pad(_buildAdditionalDetailsAndSignOff(r, at)));
+  out.add(_pad(_buildAdditionalDetailsAndSignOff(r, at, photos)));
   return out;
 }
 
@@ -734,11 +734,28 @@ List<pw.Widget> _buildDeficiencySummary(List<ChecklistDeficiencyRow> defs) {
 // Additional Details + sign-off
 // ---------------------------------------------------------------------------
 
+/// The uploaded document, contain-fitted into at most 492 x 300pt; a muted
+/// placeholder when it could not be downloaded.
+pw.Widget _proofImage(Uint8List? bytes) {
+  if (bytes != null && bytes.isNotEmpty) {
+    try {
+      return pw.Container(
+        constraints: const pw.BoxConstraints(maxWidth: 492.0, maxHeight: 300.0),
+        child: pw.Image(pw.MemoryImage(bytes), fit: pw.BoxFit.contain),
+      );
+    } catch (_) {}
+  }
+  return cssText('Document unavailable',
+      sizePt: 10.5, italic: true, color: ReportPdfTheme.faint, lineHeight: 1.4);
+}
+
 pw.Widget _buildAdditionalDetailsAndSignOff(
-    ChecklistJobWorkReport r, DateTime at) {
+    ChecklistJobWorkReport r, DateTime at, Map<String, Uint8List?> photos) {
   final remarks =
       r.remarks.trim().isEmpty ? 'No remarks recorded.' : r.remarks.trim();
   final lh = ReportRoot.lineHeight;
+  final proof = r.proofOfExecution;
+  final proofBytes = proof == null ? null : photos[proof.key];
 
   final details = CssBox.bordered(
     side: const CssSide(0.75, ReportPdfTheme.border),
@@ -770,6 +787,15 @@ pw.Widget _buildAdditionalDetailsAndSignOff(
           child: cssText(remarks, sizePt: 12.0, lineHeight: lh),
         ),
         pw.SizedBox(height: 6.0), // .mb-2 of the remarks wrapper
+        // FormPreview: "Any other documents to upload" (mt-4, centred,
+        // max-height 400px = 300pt, contained).
+        if (proof != null) ...[
+          pw.SizedBox(height: 18.0),
+          cssText('Any other documents to upload:',
+              sizePt: 12.0, weight: 700, lineHeight: lh),
+          pw.SizedBox(height: 6.0),
+          pw.Center(child: _proofImage(proofBytes)),
+        ],
       ],
     ),
   );

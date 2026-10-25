@@ -11,6 +11,7 @@ import 'package:gssms_mobile/features/work_orders/data/evidence_service.dart';
 import 'package:gssms_mobile/features/work_orders/data/work_order_api_service.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/controllers/work_order_controllers.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class _MockApi extends Mock implements WorkOrderApiService {}
 
@@ -181,6 +182,9 @@ void main() {
   });
 
   test('evidence sweep excludes files queued by another owner', () async {
+    // The sweep also reads pending Breakdown photos from preferences and
+    // skips itself when it cannot (deleting nothing is the safe failure).
+    SharedPreferences.setMockInitialValues({});
     const otherPath = 'other_user_photo.jpg';
     await cache.setCacheOwnerUserId(1);
     await cache.saveOutboxCommands([

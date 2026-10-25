@@ -238,6 +238,84 @@ class ComplaintExecution extends Equatable {
       ];
 }
 
+/// Read-only context shown at the top of the Breakdown execution form —
+/// the same "Breakdown Information" the web form shows — plus the Job Work
+/// status that decides whether the form can still be edited. Built from the
+/// Job Work detail (`original_complaint_details`).
+class BreakdownInfo extends Equatable {
+  const BreakdownInfo({
+    required this.status,
+    this.ticket = '',
+    this.failureDate,
+    this.failureTime = '',
+    this.complainant = '',
+    this.reportedAsset = '',
+    this.station = '',
+    this.description = '',
+    this.complaintCreatedAt,
+  });
+
+  /// Upper-case server status, e.g. IN_PROGRESS.
+  final String status;
+  final String ticket;
+  final DateTime? failureDate;
+
+  /// HH:mm, or '' when unknown.
+  final String failureTime;
+  final String complainant;
+  final String reportedAsset;
+  final String station;
+  final String description;
+  final DateTime? complaintCreatedAt;
+
+  /// The server accepts execution edits only while IN_PROGRESS.
+  bool get isEditable => status == 'IN_PROGRESS';
+
+  factory BreakdownInfo.fromWorkOrderJson(Map<String, dynamic> json) {
+    final raw = json['original_complaint_details'];
+    final c = raw is Map ? Map<String, dynamic>.from(raw) : const <String, dynamic>{};
+    String text(dynamic v) => (asJsonString(v) ?? '').trim();
+    String first(List<dynamic> values) {
+      for (final v in values) {
+        final t = text(v);
+        if (t.isNotEmpty) return t;
+      }
+      return '';
+    }
+
+    final time = text(c['failure_time']);
+    return BreakdownInfo(
+      status: text(json['status']).toUpperCase(),
+      ticket: text(json['ticket_number']),
+      failureDate: asJsonDateTime(c['failure_date']),
+      failureTime: time.length >= 5 ? time.substring(0, 5) : time,
+      complainant: text(c['complainant_name']),
+      // Web: the Job Work's asset, else the complaint's free-text asset.
+      reportedAsset: first([
+        json['asset_name'],
+        c['asset_name'],
+        c['general_asset_description'],
+      ]),
+      station: first([c['station_name'], json['station_name']]),
+      description: first([json['description'], c['description']]),
+      complaintCreatedAt: asJsonDateTime(c['created_at']),
+    );
+  }
+
+  @override
+  List<Object?> get props => [
+        status,
+        ticket,
+        failureDate,
+        failureTime,
+        complainant,
+        reportedAsset,
+        station,
+        description,
+        complaintCreatedAt,
+      ];
+}
+
 /// One deficiency item on a grouped rectification Job Work.
 class RectificationItem extends Equatable {
   const RectificationItem({
@@ -255,10 +333,15 @@ class RectificationItem extends Equatable {
     this.reason = '',
     this.photos = const [],
     this.isActive = true,
+    this.sourcePhotos = const [],
   });
 
   final int id;
   final int? deficiencyId;
+
+  /// The checklist photos the deficiency was raised with (read-only
+  /// context for the rectifying technician and the verifier).
+  final List<ExecutionPhoto> sourcePhotos;
   final String asset;
   final String checkpoint;
   final String finding;
@@ -295,6 +378,7 @@ class RectificationItem extends Equatable {
       reason: asJsonString(json['reason']) ?? '',
       photos: ExecutionPhoto.listOf(json['photos']),
       isActive: asJsonBool(json['is_active']) ?? true,
+      sourcePhotos: ExecutionPhoto.listOf(json['source_photos']),
     );
   }
 
@@ -314,6 +398,7 @@ class RectificationItem extends Equatable {
         reason,
         photos,
         isActive,
+        sourcePhotos,
       ];
 }
 
@@ -437,6 +522,7 @@ class InspectionPointExecutionEntry extends Equatable {
     this.correctiveActionPerformed = true,
     this.technicalParameters = const [],
     this.photos = const [],
+    this.inspectionEvidencePhotos = const [],
   });
 
   final int pointJobWorkId;
@@ -453,6 +539,12 @@ class InspectionPointExecutionEntry extends Equatable {
   final bool correctiveActionPerformed;
   final List<Map<String, String>> technicalParameters;
   final List<ExecutionPhoto> photos;
+
+  /// Photos the inspector took of this point when the inspection was logged
+  /// (first Job Work for the point only). Read-only, and on the server they
+  /// satisfy the point's Before requirement — the web form and report show
+  /// them, so the technician and the verifier must see them too.
+  final List<ExecutionPhoto> inspectionEvidencePhotos;
 
   static List<Map<String, String>> paramsOf(dynamic v) {
     if (v is! List) return const [];
@@ -512,6 +604,9 @@ class InspectionPointExecutionEntry extends Equatable {
           true),
       technicalParameters: techParams,
       photos: ExecutionPhoto.listOf(exec['photos'] ?? json['photos']),
+      inspectionEvidencePhotos: ExecutionPhoto.listOf(
+          exec['inspection_evidence_photos'] ??
+              json['inspection_evidence_photos']),
     );
   }
 
@@ -542,6 +637,7 @@ class InspectionPointExecutionEntry extends Equatable {
         correctiveActionPerformed,
         technicalParameters,
         photos,
+        inspectionEvidencePhotos,
       ];
 }
 
@@ -557,11 +653,21 @@ class PointwiseInspectionExecution extends Equatable {
     this.stationName,
     this.inspectorName,
     this.overallRemarks,
+    this.generalEvidencePhotos = const [],
+    this.executionPhotos = const [],
   });
 
   final int? workOrderId;
   final String? ticketNumber;
   final List<InspectionPointExecutionEntry> points;
+
+  /// Site/overview photos the inspector took when logging the inspection
+  /// (not tied to a point). Read-only context.
+  final List<ExecutionPhoto> generalEvidencePhotos;
+
+  /// Photos on the Job Work's own execution rather than a point: what a
+  /// legacy (non-pointwise) inspection Job Work stores its Before/After in.
+  final List<ExecutionPhoto> executionPhotos;
   final String? inspectionNumber;
   final String? inspectionTitle;
   final String? inspectionDate;
@@ -591,6 +697,9 @@ class PointwiseInspectionExecution extends Equatable {
       stationName: asJsonString(details['station_name']),
       inspectorName: asJsonString(details['inspector_name']),
       overallRemarks: asJsonString(details['inspection_remarks']),
+      generalEvidencePhotos:
+          ExecutionPhoto.listOf(details['general_evidence_photos']),
+      executionPhotos: ExecutionPhoto.listOf(json['photos']),
     );
   }
 
@@ -605,5 +714,7 @@ class PointwiseInspectionExecution extends Equatable {
         stationName,
         inspectorName,
         overallRemarks,
+        generalEvidencePhotos,
+        executionPhotos,
       ];
 }

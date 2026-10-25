@@ -1,13 +1,13 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:intl/intl.dart';
 import 'package:gssms_mobile/core/network/api_error.dart';
+import 'package:gssms_mobile/core/theme/app_theme.dart';
 import 'package:gssms_mobile/core/utils/gallery_permission.dart';
 import 'package:gssms_mobile/core/widgets/confirmation_dialog.dart';
 import 'package:gssms_mobile/core/widgets/section_card.dart';
@@ -16,6 +16,7 @@ import 'package:gssms_mobile/features/auth/presentation/controllers/auth_control
 import 'package:gssms_mobile/features/auth/presentation/widgets/permission_denied_view.dart';
 import 'package:gssms_mobile/features/work_orders/data/evidence_service.dart';
 import 'package:gssms_mobile/features/work_orders/data/execution_api_service.dart';
+import 'package:gssms_mobile/features/work_orders/data/pending_execution_photo_store.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/mode_execution.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/widgets/execution_autosave.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/widgets/execution_widgets.dart';
@@ -23,10 +24,12 @@ import 'package:gssms_mobile/features/work_orders/presentation/widgets/failure_d
 
 /// Technician execution form for COMPLAINT-mode (Breakdown) Job Works.
 ///
-/// Mirrors web `ComplaintExecutionForm`: Initial Assessment & Findings,
-/// Rectification / Action Taken, Final Remarks (all required), technical
-/// parameters, Before + After photos (5 max per kind, JPEG), debounced
-/// autosave, Save Progress and Sign & Submit → TECH_COMPLETED. Completeness is enforced
+/// Mirrors web `ComplaintExecutionForm`: read-only Breakdown Information,
+/// Initial Assessment & Findings, Rectification / Action Taken, optional
+/// technical parameters, Before + After photos (10 max per kind, JPEG),
+/// Final Remarks (the three texts required), Technician Name, debounced
+/// autosave, Save Progress and Sign & Submit → TECH_COMPLETED. Read-only
+/// unless the Job Work is IN_PROGRESS. Completeness is enforced
 /// server-side; client checks are advisory.
 ///
 /// Photos are captured/picked straight to a durable local file and stay
@@ -57,7 +60,13 @@ class _ComplaintExecutionScreenState
   final _actionController = TextEditingController();
   final _remarksController = TextEditingController();
 
+  final _techNameController = TextEditingController();
+
   ComplaintExecution? _execution;
+
+  /// Breakdown details and Job Work status; null if they could not be
+  /// loaded (the form then stays editable and the server decides).
+  BreakdownInfo? _info;
   List<Map<String, String>> _params = [];
   int? _failureCode;
   DateTime? _restoredTime;
@@ -72,20 +81,25 @@ class _ComplaintExecutionScreenState
   late final ExecutionAutosaveController _autosave;
 
   /// Photos captured/picked this session (or a prior one) that haven't been
-  /// uploaded yet — durable on disk via EvidenceService, indexed in
-  /// SharedPreferences under [_pendingPhotosKey] so they survive the app
-  /// being killed before Save Progress / Sign & Submit is tapped.
+  /// uploaded yet — durable on disk via EvidenceService, indexed by
+  /// [PendingExecutionPhotoStore] so they survive the app being killed
+  /// before Save Progress / Sign & Submit is tapped, and are never swept by
+  /// the evidence retention pass.
   final List<PendingExecutionPhoto> _pendingPhotos = [];
+
+  final _pendingStore = const PendingExecutionPhotoStore();
 
   bool get _busy => _saving || _submitting;
 
-  String get _pendingPhotosKey =>
-      'complaint_execution_pending_photos_${widget.workOrderId}';
+  /// Same rule as the web form and the server: edits only while IN_PROGRESS.
+  bool get _editable => _info?.isEditable ?? true;
 
   @override
   void initState() {
     super.initState();
     _api = ref.read(executionApiServiceProvider);
+    _techNameController.text =
+        sessionFromAuth(ref.read(authControllerProvider))?.username ?? '';
     _autosave = ExecutionAutosaveController(save: _autosaveSave);
     for (final c in [
       _findingsController,
@@ -126,6 +140,7 @@ class _ComplaintExecutionScreenState
     _findingsController.dispose();
     _actionController.dispose();
     _remarksController.dispose();
+    _techNameController.dispose();
     super.dispose();
   }
 
@@ -135,14 +150,21 @@ class _ComplaintExecutionScreenState
       _error = null;
     });
     try {
-      final exec = await ref
-          .read(executionApiServiceProvider)
-          .getComplaintExecution(widget.workOrderId);
+      final api = ref.read(executionApiServiceProvider);
+      // The breakdown details are context, not required to work: a failure
+      // there leaves the form usable (and editable — the server decides).
+      final infoFuture = api
+          .getBreakdownInfo(widget.workOrderId)
+          .then<BreakdownInfo?>((i) => i)
+          .catchError((Object _) => null);
+      final exec = await api.getComplaintExecution(widget.workOrderId);
+      final info = await infoFuture;
       if (!mounted) return;
       _hydrating = true;
       try {
         setState(() {
           _execution = exec;
+          _info = info ?? _info;
           _findingsController.text = exec.initialFindings;
           _actionController.text = exec.actionTaken;
           _remarksController.text = exec.finalRemarks;
@@ -167,27 +189,17 @@ class _ComplaintExecutionScreenState
     }
   }
 
-  /// Restores any pending (not-yet-uploaded) photos left from a previous
-  /// session, dropping entries whose local file no longer exists.
+  /// The signed-in user, who owns the photos captured on this screen.
+  int? get _ownerUserId =>
+      sessionFromAuth(ref.read(authControllerProvider))?.userId;
+
+  /// Restores this user's pending (not-yet-uploaded) photos left from a
+  /// previous session, dropping entries whose local file no longer exists.
   Future<void> _loadPendingPhotos() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_pendingPhotosKey);
-    if (raw == null) return;
-    List<dynamic> decoded;
-    try {
-      decoded = jsonDecode(raw) as List<dynamic>;
-    } catch (_) {
-      return;
-    }
-    final restored = <PendingExecutionPhoto>[];
-    for (final entry in decoded) {
-      if (entry is! Map) continue;
-      final kind = entry['kind'] as String?;
-      final localPath = entry['localPath'] as String?;
-      if (kind == null || localPath == null) continue;
-      if (!await File(localPath).exists()) continue;
-      restored.add(PendingExecutionPhoto(kind: kind, localPath: localPath));
-    }
+    final restored = await _pendingStore.load(
+      widget.workOrderId,
+      ownerUserId: _ownerUserId,
+    );
     if (!mounted) return;
     setState(() {
       _pendingPhotos
@@ -196,15 +208,11 @@ class _ComplaintExecutionScreenState
     });
   }
 
-  Future<void> _persistPendingPhotos() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _pendingPhotosKey,
-      jsonEncode(_pendingPhotos
-          .map((p) => {'kind': p.kind, 'localPath': p.localPath})
-          .toList()),
-    );
-  }
+  Future<void> _persistPendingPhotos() => _pendingStore.save(
+        widget.workOrderId,
+        List.of(_pendingPhotos),
+        ownerUserId: _ownerUserId,
+      );
 
   void _onFailureCodeChanged(int? code) {
     setState(() {
@@ -243,7 +251,13 @@ class _ComplaintExecutionScreenState
     try {
       if (_pendingPhotos.isNotEmpty) {
         final uploaded = await _uploadPendingPhotos();
-        if (!uploaded || !mounted) return;
+        if (!mounted) return;
+        if (!uploaded) {
+          // The photo error is already on screen; still save the typed
+          // fields so one failed photo never costs the technician's text.
+          await _autosave.flush(manual: true);
+          return;
+        }
         await _load();
       }
       final ok = await _autosave.flush(manual: true);
@@ -526,13 +540,17 @@ class _ComplaintExecutionScreenState
     try {
       await _autosave.flush();
       final session = sessionFromAuth(ref.read(authControllerProvider));
+      // The name signed on the report: what the technician typed, else the
+      // login name (web: techSignatureName || username).
+      final typedName = _techNameController.text.trim();
+      final technicianName =
+          typedName.isNotEmpty ? typedName : (session?.username ?? '');
       await ref.read(executionApiServiceProvider).submitComplaintExecution(
         widget.workOrderId,
         {
           ..._draftPayload(),
           'remarks': _remarksController.text.trim(),
-          if (session?.username.isNotEmpty == true)
-            'technician_name': session!.username,
+          if (technicianName.isNotEmpty) 'technician_name': technicianName,
           'technician_signature': 'SIGNED_DIGITALLY',
         },
       );
@@ -638,6 +656,14 @@ class _ComplaintExecutionScreenState
                         if (widget.title != null &&
                             widget.title!.trim().isNotEmpty)
                           const SizedBox(height: 12),
+                        if (_info != null) ...[
+                          _breakdownInfoCard(context, _info!),
+                          const SizedBox(height: 12),
+                        ],
+                        if (!_editable) ...[
+                          _readOnlyNotice(context, _info!),
+                          const SizedBox(height: 12),
+                        ],
                         SectionCard(
                           title: 'Findings & Action',
                           icon: Icons.fact_check_outlined,
@@ -645,11 +671,15 @@ class _ComplaintExecutionScreenState
                             TextFormField(
                               key: const Key('exec_findings_field'),
                               controller: _findingsController,
-                              enabled: !_busy,
+                              enabled: !_busy && _editable,
                               maxLines: 3,
                               decoration: const InputDecoration(
                                 labelText:
                                     'Initial Assessment & Findings *',
+                                helperText: 'What was observed / diagnosed',
+                                hintText:
+                                    'e.g. Equipment found operational during inspection. Reported fault could not be reproduced.',
+                                hintMaxLines: 3,
                               ),
                               validator: (v) =>
                                   v == null || v.trim().isEmpty
@@ -660,41 +690,35 @@ class _ComplaintExecutionScreenState
                             TextFormField(
                               key: const Key('exec_action_field'),
                               controller: _actionController,
-                              enabled: !_busy,
+                              enabled: !_busy && _editable,
                               maxLines: 3,
                               decoration: const InputDecoration(
                                 labelText:
                                     'Rectification / Action Taken *',
+                                helperText: 'What was actually done',
+                                hintText:
+                                    'e.g. Loose terminal tightened; supply restored.',
+                                hintMaxLines: 2,
                               ),
                               validator: (v) =>
                                   v == null || v.trim().isEmpty
                                       ? 'Action taken is required'
                                       : null,
                             ),
-                            const SizedBox(height: 12),
-                            TextFormField(
-                              key: const Key('exec_remarks_field'),
-                              controller: _remarksController,
-                              enabled: !_busy,
-                              maxLines: 3,
-                              decoration: const InputDecoration(
-                                labelText: 'Final Remarks *',
-                              ),
-                              validator: (v) =>
-                                  v == null || v.trim().isEmpty
-                                      ? 'Final remarks are required'
-                                      : null,
-                            ),
                           ],
                         ),
                         const SizedBox(height: 12),
                         SectionCard(
-                          title: 'Technical Parameters',
+                          title: 'Technical Parameters (Optional)',
                           icon: Icons.tune_outlined,
                           children: [
                             ParamRowsEditor(
                               initial: _params,
                               enabled: !_busy,
+                              readOnly: !_editable,
+                              emptyText:
+                                  'No parameters applicable to this breakdown.',
+                              parameterHint: 'e.g. R-Y Voltage',
                               onChanged: (rows) {
                                 setState(() => _params = rows);
                                 _autosave.markEdited();
@@ -710,9 +734,11 @@ class _ComplaintExecutionScreenState
                             ExecutionPhotoGrid(
                               photos: _execution?.photos ?? const [],
                               pendingPhotos: _pendingPhotos,
-                              canManage: true,
+                              canManage: _editable,
                               busy: _busy,
-                              maxPerKind: 5,
+                              // Matches the server and web (10 per kind,
+                              // including the complaint's own locked photos).
+                              maxPerKind: 10,
                               onAdd: _addPhoto,
                               onDelete: _deletePhoto,
                               onRetake: _retakePhoto,
@@ -722,54 +748,199 @@ class _ComplaintExecutionScreenState
                           ],
                         ),
                         const SizedBox(height: 12),
+                        // After the photos, as on the web: the outcome is
+                        // written once the work and its evidence are done.
+                        SectionCard(
+                          title: 'Final Remarks',
+                          icon: Icons.flag_outlined,
+                          children: [
+                            TextFormField(
+                              key: const Key('exec_remarks_field'),
+                              controller: _remarksController,
+                              enabled: !_busy && _editable,
+                              maxLines: 3,
+                              decoration: const InputDecoration(
+                                labelText: 'Final Remarks *',
+                                helperText: 'Final outcome',
+                                hintText:
+                                    'e.g. Equipment restored to normal operation.',
+                              ),
+                              validator: (v) =>
+                                  v == null || v.trim().isEmpty
+                                      ? 'Final remarks are required'
+                                      : null,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
                         FailureDetailsSection(
                           assetCriticality: _execution?.assetCriticality,
                           requiresFailureDetails:
                               _execution?.requiresFailureDetails ?? false,
                           failureCode: _failureCode,
-                          onFailureCodeChanged:
-                              _busy ? null : _onFailureCodeChanged,
+                          onFailureCodeChanged: _busy || !_editable
+                              ? null
+                              : _onFailureCodeChanged,
                           restoredTime: _restoredTime,
-                          onRestoredTimeChanged:
-                              _busy ? null : _onRestoredTimeChanged,
-                          breakdownTime: _execution?.breakdownTime,
+                          onRestoredTimeChanged: _busy || !_editable
+                              ? null
+                              : _onRestoredTimeChanged,
+                          // Web falls back to the complaint's creation time.
+                          breakdownTime: _execution?.breakdownTime ??
+                              _info?.complaintCreatedAt,
                           failureCodeOptions:
                               _execution?.failureCodeOptions ?? const [],
-                          enabled: !_busy,
+                          enabled: !_busy && _editable,
                           failureCodeError: _failureCodeError,
                           restoredTimeError: _restoredTimeError,
                         ),
-                        const SizedBox(height: 16),
-                        AutosaveStatusLine(controller: _autosave),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: OutlinedButton.icon(
-                                key: const Key('save_exec_draft_button'),
-                                onPressed: _busy ? null : _saveDraft,
-                                icon: const Icon(Icons.save_outlined),
-                                label: Text(
-                                    _saving ? 'Saving…' : 'Save Progress'),
+                        if (_editable) ...[
+                          const SizedBox(height: 12),
+                          SectionCard(
+                            title: 'Sign & Submit',
+                            icon: Icons.draw_outlined,
+                            children: [
+                              TextFormField(
+                                key: const Key('exec_technician_name_field'),
+                                controller: _techNameController,
+                                enabled: !_busy,
+                                textCapitalization: TextCapitalization.words,
+                                decoration: const InputDecoration(
+                                  labelText: 'Technician Name',
+                                  helperText:
+                                      'Signed on the report. Defaults to your login name.',
+                                ),
                               ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: FilledButton.icon(
-                                key: const Key('submit_exec_button'),
-                                onPressed: _busy ? null : _submit,
-                                icon: const Icon(Icons.verified_outlined),
-                                label: Text(_submitting
-                                    ? 'Submitting…'
-                                    : 'Sign & Submit'),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          AutosaveStatusLine(controller: _autosave),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  key: const Key('save_exec_draft_button'),
+                                  onPressed: _busy ? null : _saveDraft,
+                                  icon: const Icon(Icons.save_outlined),
+                                  label: Text(
+                                      _saving ? 'Saving…' : 'Save Progress'),
+                                ),
                               ),
-                            ),
-                          ],
-                        ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: FilledButton.icon(
+                                  key: const Key('submit_exec_button'),
+                                  onPressed: _busy ? null : _submit,
+                                  icon: const Icon(Icons.verified_outlined),
+                                  label: Text(_submitting
+                                      ? 'Submitting…'
+                                      : 'Sign & Submit'),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                         const SizedBox(height: 24),
                       ],
                     ),
                   ),
                 ),
+    );
+  }
+
+  /// The web form's read-only "Breakdown Information" block: what was
+  /// reported, so the technician works with the complaint in view.
+  Widget _breakdownInfoCard(BuildContext context, BreakdownInfo info) {
+    String orDash(String v) => v.trim().isEmpty ? '—' : v;
+    final date = info.failureDate == null
+        ? '—'
+        : DateFormat('dd/MM/yyyy').format(info.failureDate!);
+    final theme = Theme.of(context);
+    final labelStyle = theme.textTheme.labelSmall?.copyWith(
+      color: context.gssms.textSecondary,
+      letterSpacing: 0.4,
+    );
+    Widget field(String label, String value) => Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(label.toUpperCase(), style: labelStyle),
+            const SizedBox(height: 2),
+            Text(value, style: theme.textTheme.bodyMedium),
+          ],
+        );
+    Widget pair(Widget a, Widget b) => Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: a),
+            const SizedBox(width: 12),
+            Expanded(child: b),
+          ],
+        );
+    return SectionCard(
+      key: const Key('breakdown_info_card'),
+      title: 'Breakdown Information',
+      icon: Icons.campaign_outlined,
+      children: [
+        pair(
+          field('Job Work', orDash(info.ticket)),
+          field('Complainant', orDash(info.complainant)),
+        ),
+        const SizedBox(height: 10),
+        pair(
+          field('Failure Date', date),
+          field('Failure Time', orDash(info.failureTime)),
+        ),
+        const SizedBox(height: 10),
+        pair(
+          field('Reported Asset', orDash(info.reportedAsset)),
+          field('Station / Location', orDash(info.station)),
+        ),
+        const SizedBox(height: 10),
+        Text('ORIGINAL BREAKDOWN DESCRIPTION', style: labelStyle),
+        const SizedBox(height: 4),
+        // Read-only, always: the complainant's record (web R4).
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: context.gssms.surfaceInset,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(orDash(info.description),
+              style: theme.textTheme.bodyMedium
+                  ?.copyWith(color: context.gssms.textSecondary)),
+        ),
+      ],
+    );
+  }
+
+  Widget _readOnlyNotice(BuildContext context, BreakdownInfo info) {
+    final status = info.status
+        .split('_')
+        .where((w) => w.isNotEmpty)
+        .map((w) => '${w[0]}${w.substring(1).toLowerCase()}')
+        .join(' ');
+    final tone = context.gssms.warning;
+    return Container(
+      key: const Key('exec_read_only_notice'),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: tone.background,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Icon(Icons.lock_outline, size: 18, color: tone.foreground),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              'This Job Work is ${status.isEmpty ? 'not in progress' : status}. '
+              'It can be edited only while In Progress, so this form is read-only.',
+              style: TextStyle(color: tone.foreground),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

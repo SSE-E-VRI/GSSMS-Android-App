@@ -743,11 +743,16 @@ class MaintenanceRecord extends Equatable {
     this.jobWorkAssetUniqueId,
     this.jobWorkAssetName,
     this.workOrderStatus,
+    this.proofOfExecutionUrl,
   });
 
   final int id;
   final int? workOrderId;
   final String? workOrderTicket;
+
+  /// The record-level photo uploaded with the completion ("Any other
+  /// documents to upload" on the web report); null when none.
+  final String? proofOfExecutionUrl;
   final int? scheduleId;
   final String? templateName;
   final String? stationName;
@@ -899,6 +904,10 @@ class MaintenanceRecord extends Equatable {
       jobWorkAssetName: asJsonString(ctx?['asset_name']),
       workOrderStatus: asJsonString(ctx?['status']) ??
           asJsonString(schedule?['work_order_status']),
+      proofOfExecutionUrl: () {
+        final url = asJsonString(json['proof_of_execution'])?.trim();
+        return url == null || url.isEmpty ? null : url;
+      }(),
     );
   }
 
@@ -910,6 +919,7 @@ class MaintenanceRecord extends Equatable {
         'date_of_maintenance': dateOfMaintenance?.toIso8601String(),
         'remarks': remarks,
         'status': status,
+        'proof_of_execution': proofOfExecutionUrl,
         'schedule_details': {
           'work_order_id': workOrderId,
           'work_order_ticket': workOrderTicket,
@@ -951,6 +961,7 @@ class MaintenanceRecord extends Equatable {
       jobWorkAssetUniqueId: jobWorkAssetUniqueId,
       jobWorkAssetName: jobWorkAssetName,
       workOrderStatus: workOrderStatus,
+      proofOfExecutionUrl: proofOfExecutionUrl,
     );
   }
 
@@ -975,6 +986,7 @@ class MaintenanceRecord extends Equatable {
         jobWorkAssetUniqueId,
         jobWorkAssetName,
         workOrderStatus,
+        proofOfExecutionUrl,
       ];
 }
 

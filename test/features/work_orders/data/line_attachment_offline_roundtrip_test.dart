@@ -158,5 +158,64 @@ void main() {
         }
       }
     });
+
+    void failUploadWith(int status) {
+      when(() => mockApiService.uploadLineAttachment(
+            any(),
+            lineId: any(named: 'lineId'),
+            kind: any(named: 'kind'),
+            imagePath: any(named: 'imagePath'),
+            capturedAt: any(named: 'capturedAt'),
+            source: any(named: 'source'),
+            latitude: any(named: 'latitude'),
+            longitude: any(named: 'longitude'),
+            locationAccuracyM: any(named: 'locationAccuracyM'),
+            locationRecordedAt: any(named: 'locationRecordedAt'),
+            idempotencyKey: any(named: 'idempotencyKey'),
+          )).thenThrow(DioException(
+        requestOptions: RequestOptions(path: '/'),
+        type: DioExceptionType.badResponse,
+        response: Response<dynamic>(
+          requestOptions: RequestOptions(path: '/'),
+          statusCode: status,
+        ),
+      ));
+    }
+
+    for (final status in [502, 503, 504]) {
+      test('a $status from the tunnel queues the photo instead of losing it',
+          () async {
+        failUploadWith(status);
+        final repository = WorkOrderRepository(
+          mockApiService,
+          cacheService: cacheService,
+          syncManager: container.read(syncManagerProvider.notifier),
+        );
+
+        final attachment = await repository.uploadLineAttachment(15,
+            lineId: 8, kind: 'BEFORE', imagePath: '/evidence/before_1.jpg');
+
+        expect(attachment.syncStatus, OutboxCommandStatus.pending);
+        final queued = await cacheService.getOutboxCommands();
+        expect(queued.single.payload['file_path'], '/evidence/before_1.jpg');
+        expect(queued.single.status, OutboxCommandStatus.pending);
+      });
+    }
+
+    test('a validation rejection is still shown, not queued', () async {
+      failUploadWith(400);
+      final repository = WorkOrderRepository(
+        mockApiService,
+        cacheService: cacheService,
+        syncManager: container.read(syncManagerProvider.notifier),
+      );
+
+      await expectLater(
+        repository.uploadLineAttachment(15,
+            lineId: 8, kind: 'BEFORE', imagePath: '/evidence/before_1.jpg'),
+        throwsA(isA<DioException>()),
+      );
+      expect(await cacheService.getOutboxCommands(), isEmpty);
+    });
   });
 }

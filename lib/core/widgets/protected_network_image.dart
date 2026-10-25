@@ -10,10 +10,28 @@ import 'package:gssms_mobile/features/auth/domain/rbac.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
 
 /// Only the configured backend origin may receive session credentials.
+///
+/// A backend media URL (`/media/...`) is fetched from the configured origin
+/// whatever origin the server wrote into it — the web client and the report
+/// do the same. Behind the public tunnel the server builds absolute URLs from
+/// forwarded headers, so a proxy that drops `X-Forwarded-Proto` or rewrites
+/// the host would otherwise leave every evidence photo blank. The request
+/// still only ever goes to [AppConfig.baseUrl].
 Uri? trustedMediaUri(String value, AppConfig config) {
   try {
     final base = Uri.parse(config.baseUrl);
-    final uri = base.resolve(value.trim());
+    var uri = base.resolve(value.trim());
+    if (value.trim().isNotEmpty &&
+        uri.hasScheme &&
+        (uri.scheme == 'http' || uri.scheme == 'https') &&
+        uri.userInfo.isEmpty &&
+        !uri.hasFragment &&
+        (uri.path.startsWith('/media/') || uri.path.startsWith('/api/v1/media/'))) {
+      uri = base.replace(
+        path: uri.path,
+        query: uri.hasQuery ? uri.query : null,
+      );
+    }
     if (value.trim().isEmpty ||
         uri.userInfo.isNotEmpty ||
         uri.hasFragment ||
