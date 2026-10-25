@@ -423,6 +423,8 @@ class _ComplaintExecutionScreenState
       await _load();
     } catch (e) {
       if (!mounted) return;
+      await _load();
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
             content: Text('Could not retake photo: ${userFacingError(e)}')),
