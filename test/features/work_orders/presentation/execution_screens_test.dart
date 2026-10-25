@@ -102,6 +102,7 @@ Widget _harness(
         () => FakeAuthenticatedController(
           fakeSession(
             role: AuthRole.maintenanceStaff,
+            userId: 1,
             permissions: permissions,
           ),
         ),
