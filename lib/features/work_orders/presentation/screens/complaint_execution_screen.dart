@@ -490,10 +490,13 @@ class _ComplaintExecutionScreenState
     // before that check runs, or a fully-captured-but-not-yet-saved pair
     // would be wrongly rejected as missing.
     if (!await _autosave.flush(manual: true)) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Could not save: ${_autosave.lastError}')));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not save: ${_autosave.lastError}')),
+      );
       return;
     }
+    if (!mounted) return;
     if (_pendingPhotos.isNotEmpty) {
       setState(() => _submitting = true);
       final uploaded = await _uploadPendingPhotos();
