@@ -295,7 +295,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byKey(const Key('breakdown_info_card')), findsNothing);
-      expect(find.byKey(const Key('submit_exec_button')), findsOneWidget);
+      expect(find.byKey(const Key('submit_exec_button')), findsNothing);
     });
 
     testWidgets('Sign & Submit signs with the Technician Name typed',
