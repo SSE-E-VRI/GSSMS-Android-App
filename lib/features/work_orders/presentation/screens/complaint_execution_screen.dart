@@ -181,7 +181,7 @@ class _ComplaintExecutionScreenState
       } finally {
         _hydrating = false;
       }
-      _autosave.markClean();
+      if (!preserveDraft) _autosave.markClean();
     } catch (e) {
       if (!mounted) return;
       setState(() => _error = userFacingError(e));
@@ -423,7 +423,7 @@ class _ComplaintExecutionScreenState
         SnackBar(
             content: Text('Could not retake photo: ${userFacingError(e)}')),
       );
-      await _load();
+      
     } finally {
       if (mounted) setState(() => _saving = false);
     }
