@@ -59,7 +59,7 @@ class EnergyPlaceholderScreen extends StatelessWidget {
                       Icon(Icons.info_outline, size: 18, color: context.gssms.warning.foreground),
                       const SizedBox(width: 8),
                       Text(
-                        'Pending backend prerequisites',
+                        'Energy features coming later',
                         style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: context.gssms.warning.foreground),
                       ),
                     ],
