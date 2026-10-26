@@ -8,6 +8,34 @@ Future<void> _wait([int ms = 80]) => Future.delayed(Duration(milliseconds: ms));
 
 void main() {
   group('ExecutionAutosaveController', () {
+    test('flush waits for edits made while its save is in flight', () async {
+      var saves = 0;
+      final first = Completer<void>();
+      final second = Completer<void>();
+      final c = ExecutionAutosaveController(
+        delay: const Duration(seconds: 5),
+        save: () async {
+          saves++;
+          await (saves == 1 ? first.future : second.future);
+        },
+      );
+      c.markEdited();
+      var finished = false;
+      final flush = c.flush().then((ok) {
+        finished = true;
+        return ok;
+      });
+      c.markEdited();
+      first.complete();
+      await _wait(20);
+      expect(saves, 2);
+      expect(finished, isFalse);
+      second.complete();
+      expect(await flush, isTrue);
+      expect(c.isDirty, isFalse);
+      c.dispose();
+    });
+
     test('several edits within the delay produce one save', () async {
       var saves = 0;
       final c = ExecutionAutosaveController(

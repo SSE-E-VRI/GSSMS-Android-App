@@ -57,12 +57,18 @@ class ExecutionAutosaveController extends ChangeNotifier {
   /// Returns false only when a save was attempted and failed.
   Future<bool> flush({bool manual = false}) async {
     _timer?.cancel();
-    while (_inFlight != null) {
-      await _inFlight;
+    var forceSave = manual;
+    while (true) {
+      while (_inFlight != null) {
+        await _inFlight;
+      }
+      if (_submitted || _disposed) return true;
+      if (!forceSave && !_dirty) return true;
+      if (!await _run(manual: forceSave)) return false;
+      forceSave = false;
+      // A user can keep editing during the request. Do not let navigation or
+      // submission proceed until those newer edits have also been persisted.
     }
-    if (_submitted || _disposed) return true;
-    if (!manual && !_dirty) return true;
-    return _run(manual: manual);
   }
 
   Future<bool> _run({required bool manual}) async {

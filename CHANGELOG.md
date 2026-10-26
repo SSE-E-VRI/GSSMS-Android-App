@@ -8,6 +8,14 @@ visible feature or change in what the app shows; MAJOR is a breaking change or
 forced update. The app talks to the GSSMS web/backend; API changes are additive,
 so older app builds keep working.
 
+## [0.3.10+15] - 2026-10-26
+
+### Fixed
+- Execution forms wait for edits made during an active autosave before submission or navigation proceeds.
+
+### Changed
+- Login page displays version 0.3.10; Android versionCode is 15.
+
 ## [0.3.9+14] - 2026-10-25
 
 ### Fixed
