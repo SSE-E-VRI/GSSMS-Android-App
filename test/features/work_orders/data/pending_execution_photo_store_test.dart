@@ -38,7 +38,8 @@ void main() {
   test('each user sees only their own pending photos for a Job Work', () async {
     final mine = photo('mine.jpg');
     final theirs = photo('theirs.jpg');
-    await store.save(7, [PendingExecutionPhoto(kind: 'BEFORE', localPath: theirs)],
+    await store.save(
+        7, [PendingExecutionPhoto(kind: 'BEFORE', localPath: theirs)],
         ownerUserId: 2);
     await store.save(7, [PendingExecutionPhoto(kind: 'AFTER', localPath: mine)],
         ownerUserId: 1);
@@ -53,9 +54,11 @@ void main() {
   test('saving keeps another user\'s photos and clearing removes only mine',
       () async {
     final theirs = photo('theirs.jpg');
-    await store.save(7, [PendingExecutionPhoto(kind: 'BEFORE', localPath: theirs)],
+    await store.save(
+        7, [PendingExecutionPhoto(kind: 'BEFORE', localPath: theirs)],
         ownerUserId: 2);
-    await store.save(7, [PendingExecutionPhoto(kind: 'BEFORE', localPath: photo('a.jpg'))],
+    await store.save(
+        7, [PendingExecutionPhoto(kind: 'BEFORE', localPath: photo('a.jpg'))],
         ownerUserId: 1);
 
     await store.save(7, const [], ownerUserId: 1);
@@ -64,7 +67,7 @@ void main() {
     expect((await store.load(7, ownerUserId: 2)).single.localPath, theirs);
   });
 
-  test('entries saved before owners existed are adopted, not lost', () async {
+  test('legacy ownerless photos are quarantined and retained', () async {
     final legacy = photo('legacy.jpg');
     SharedPreferences.setMockInitialValues({
       PendingExecutionPhotoStore.keyFor(7): jsonEncode([
@@ -72,17 +75,61 @@ void main() {
       ]),
     });
 
-    final loaded = await store.load(7, ownerUserId: 5);
-    expect(loaded.single.localPath, legacy);
+    expect(await store.load(7, ownerUserId: 5), isEmpty);
+    expect(await store.load(7, ownerUserId: 6), isEmpty);
+    await store.save(7, const [], ownerUserId: 5);
+    expect(await PendingExecutionPhotoStore.allReferencedPaths(),
+        contains(File(legacy).absolute.path));
+    expect(File(legacy).existsSync(), isTrue);
+  });
 
-    await store.save(7, loaded, ownerUserId: 5);
-    expect(await store.load(7, ownerUserId: 6), isEmpty,
-        reason: 'once adopted the photo belongs to the user who saved it');
+  test('claimLegacy gives only the ownerless photos to the claiming user',
+      () async {
+    final legacy = photo('legacy.jpg');
+    final theirs = photo('theirs.jpg');
+    SharedPreferences.setMockInitialValues({
+      PendingExecutionPhotoStore.keyFor(7): jsonEncode([
+        {'kind': 'AFTER', 'localPath': legacy},
+        {'kind': 'BEFORE', 'localPath': theirs, 'ownerUserId': 2},
+      ]),
+    });
+
+    expect((await store.legacy(7)).single.localPath, legacy);
+    await store.claimLegacy(7, ownerUserId: 5);
+
+    expect(await store.legacy(7), isEmpty);
+    expect((await store.load(7, ownerUserId: 5)).single.localPath, legacy);
+    expect((await store.load(7, ownerUserId: 2)).single.localPath, theirs);
+  });
+
+  test('discardLegacy removes only the ownerless entries and returns them',
+      () async {
+    final legacy = photo('legacy.jpg');
+    final mine = photo('mine.jpg');
+    SharedPreferences.setMockInitialValues({
+      PendingExecutionPhotoStore.keyFor(7): jsonEncode([
+        {'kind': 'AFTER', 'localPath': legacy},
+        {'kind': 'BEFORE', 'localPath': mine, 'ownerUserId': 1},
+      ]),
+    });
+
+    expect(await store.discardLegacy(7), [legacy]);
+    expect(await store.legacy(7), isEmpty);
+    expect((await store.load(7, ownerUserId: 1)).single.localPath, mine);
+  });
+
+  test('saving without a signed-in user writes nothing', () async {
+    await store.save(
+        7, [PendingExecutionPhoto(kind: 'BEFORE', localPath: photo('x.jpg'))],
+        ownerUserId: null);
+
+    expect(await store.legacy(7), isEmpty);
+    expect(await PendingExecutionPhotoStore.allReferencedPaths(), isEmpty);
   });
 
   test('photos whose file is gone are dropped on load', () async {
-    await store.save(
-        7, const [PendingExecutionPhoto(kind: 'BEFORE', localPath: '/gone.jpg')],
+    await store.save(7,
+        const [PendingExecutionPhoto(kind: 'BEFORE', localPath: '/gone.jpg')],
         ownerUserId: 1);
 
     expect(await store.load(7, ownerUserId: 1), isEmpty);
@@ -102,7 +149,8 @@ void main() {
   test('the outbox retention sweep never deletes pending Breakdown photos',
       () async {
     final pending = photo('pending.jpg');
-    await store.save(7, [PendingExecutionPhoto(kind: 'BEFORE', localPath: pending)],
+    await store.save(
+        7, [PendingExecutionPhoto(kind: 'BEFORE', localPath: pending)],
         ownerUserId: 1);
 
     final api = _MockApi();

@@ -22,13 +22,11 @@ ExecutionRoute executionRouteFor(WorkOrder workOrder) {
     return ExecutionRoute.complaint;
   }
   if (workOrder.originalDeficiencyId != null ||
-      (workOrder.executionMode ?? '').toUpperCase().trim() ==
-          'RECTIFICATION') {
+      (workOrder.executionMode ?? '').toUpperCase().trim() == 'RECTIFICATION') {
     return ExecutionRoute.rectification;
   }
   if (workOrder.originalInspectionId != null ||
-      (workOrder.executionMode ?? '').toUpperCase().trim() ==
-          'INSPECTION') {
+      (workOrder.executionMode ?? '').toUpperCase().trim() == 'INSPECTION') {
     return ExecutionRoute.inspection;
   }
   switch ((workOrder.executionMode ?? '').toUpperCase().trim()) {
@@ -97,8 +95,16 @@ class ExecutionPhoto extends Equatable {
   }
 
   @override
-  List<Object?> get props =>
-      [id, kind, url, locked, fromComplaint, uploadedAt, uploadedByName, caption];
+  List<Object?> get props => [
+        id,
+        kind,
+        url,
+        locked,
+        fromComplaint,
+        uploadedAt,
+        uploadedByName,
+        caption
+      ];
 }
 
 /// Active failure code dropdown option (ISO 55000 failure catalogue).
@@ -253,6 +259,7 @@ class BreakdownInfo extends Equatable {
     this.station = '',
     this.description = '',
     this.complaintCreatedAt,
+    this.assignedToId,
   });
 
   /// Upper-case server status, e.g. IN_PROGRESS.
@@ -268,12 +275,16 @@ class BreakdownInfo extends Equatable {
   final String description;
   final DateTime? complaintCreatedAt;
 
+  /// The technician the server has this Job Work assigned to.
+  final int? assignedToId;
+
   /// The server accepts execution edits only while IN_PROGRESS.
   bool get isEditable => status == 'IN_PROGRESS';
 
   factory BreakdownInfo.fromWorkOrderJson(Map<String, dynamic> json) {
     final raw = json['original_complaint_details'];
-    final c = raw is Map ? Map<String, dynamic>.from(raw) : const <String, dynamic>{};
+    final c =
+        raw is Map ? Map<String, dynamic>.from(raw) : const <String, dynamic>{};
     String text(dynamic v) => (asJsonString(v) ?? '').trim();
     String first(List<dynamic> values) {
       for (final v in values) {
@@ -299,6 +310,9 @@ class BreakdownInfo extends Equatable {
       station: first([c['station_name'], json['station_name']]),
       description: first([json['description'], c['description']]),
       complaintCreatedAt: asJsonDateTime(c['created_at']),
+      assignedToId: json['assigned_to'] is Map
+          ? asJsonInt((json['assigned_to'] as Map)['id'])
+          : asJsonInt(json['assigned_to']),
     );
   }
 
@@ -313,6 +327,7 @@ class BreakdownInfo extends Equatable {
         station,
         description,
         complaintCreatedAt,
+        assignedToId,
       ];
 }
 
@@ -574,26 +589,26 @@ class InspectionPointExecutionEntry extends Equatable {
     bool corrective(dynamic v, bool fallback) {
       if (v == null) return fallback;
       if (v is bool) return v;
-      return v.toString().toLowerCase() == 'true' ||
-          v.toString() == '1';
+      return v.toString().toLowerCase() == 'true' || v.toString() == '1';
     }
 
-    final techParams = paramsOf(
-        exec['technical_parameters'] ?? exec['parameters'] ?? json['technical_parameters'] ?? json['parameters']);
+    final techParams = paramsOf(exec['technical_parameters'] ??
+        exec['parameters'] ??
+        json['technical_parameters'] ??
+        json['parameters']);
 
     return InspectionPointExecutionEntry(
-      pointJobWorkId: asJsonInt(
-              json['point_job_work_id'] ?? exec['point_job_work_id']) ??
-          0,
+      pointJobWorkId:
+          asJsonInt(json['point_job_work_id'] ?? exec['point_job_work_id']) ??
+              0,
       pointId: asJsonInt(json['point_id'] ?? exec['point_id']),
       pointNumber: asJsonInt(json['point_number'] ?? exec['point_number']) ?? 0,
-      observation: asJsonString(json['observation'] ?? exec['observation']) ?? '',
+      observation:
+          asJsonString(json['observation'] ?? exec['observation']) ?? '',
       assetName: asJsonString(json['asset_name'] ?? exec['asset_name']),
       priority: asJsonString(json['priority'] ?? exec['priority']),
-      sequence:
-          asJsonInt(json['sequence'] ?? exec['sequence']) ?? 1,
-      hasExecution:
-          asJsonBool(json['has_execution']) ?? exec['id'] != null,
+      sequence: asJsonInt(json['sequence'] ?? exec['sequence']) ?? 1,
+      hasExecution: asJsonBool(json['has_execution']) ?? exec['id'] != null,
       initialFindings: pickStr('initial_findings'),
       actionTaken: pickStr('action_taken'),
       finalRemarks: pickStr('final_remarks'),

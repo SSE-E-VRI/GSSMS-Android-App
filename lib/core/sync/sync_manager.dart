@@ -383,6 +383,21 @@ class SyncManager extends Notifier<SyncState> {
 
           try {
             await _executeCommand(cmd);
+            // Update the owner-scoped offline read model before retiring the
+            // acknowledged command. A cache-write failure leaves it in the
+            // outbox for safe idempotent replay instead of showing stale data.
+            if (cmd.type == OutboxCommandType.submitLine &&
+                actorUserId != null &&
+                cmd.ownerUserId == actorUserId &&
+                epoch == _sessionEpoch) {
+              try {
+                await _reconcileAcknowledgedLine(cmd);
+              } catch (_) {
+                // The server has it; not a failure for the user to see.
+                remainingCommands.add(cmd);
+                continue;
+              }
+            }
             // Synced successfully - track key and omit from remaining outbox
             syncedKeys.add(cmd.idempotencyKey);
           } on DioException catch (dioErr) {
@@ -503,7 +518,8 @@ class SyncManager extends Notifier<SyncState> {
         try {
           // Breakdown photos waiting for Save Progress live outside the
           // outbox; sweeping them would silently lose unsaved evidence.
-          for (final p in await PendingExecutionPhotoStore.allReferencedPaths()) {
+          for (final p
+              in await PendingExecutionPhotoStore.allReferencedPaths()) {
             queuedPaths.add(_canonicalPath(p));
           }
           await _evidenceService.cleanupExpiredEvidence(
@@ -629,6 +645,40 @@ class SyncManager extends Notifier<SyncState> {
     } catch (_) {
       return path;
     }
+  }
+
+  /// Mirrors an acknowledged line assignment into the saved offline record.
+  /// The same serialized drain lock protects the queue and cache update.
+  Future<void> _reconcileAcknowledgedLine(OutboxCommand cmd) async {
+    final cached = await _cacheService.getCachedMaintenanceRecord(cmd.entityId);
+    if (cached == null) return;
+    final lineId = asJsonInt(cmd.payload['line_id']);
+    if (lineId == null || !cached.lines.any((line) => line.id == lineId)) {
+      return;
+    }
+    // Only the fields the command carried, as the pending-save overlay does.
+    final p = cmd.payload;
+    final updated = cached.lines.map((line) {
+      if (line.id != lineId) return line;
+      var next = line.copyWith(isSaved: true, localSyncStatus: null);
+      if (p.containsKey('value')) {
+        next = next.copyWith(recordedValue: p['value']);
+      }
+      if (p['status'] is String) {
+        next = next.copyWith(status: p['status'] as String);
+      }
+      if (p.containsKey('status_option')) {
+        next = next.copyWith(statusOptionId: asJsonInt(p['status_option']));
+      }
+      if (p.containsKey('action_option')) {
+        next = next.copyWith(actionOptionId: asJsonInt(p['action_option']));
+      }
+      if (p.containsKey('remarks')) {
+        next = next.copyWith(observationAction: asJsonString(p['remarks']));
+      }
+      return next;
+    }).toList();
+    await _cacheService.cacheMaintenanceRecord(cached.copyWith(lines: updated));
   }
 
   Future<void> _executeCommand(OutboxCommand cmd) async {
