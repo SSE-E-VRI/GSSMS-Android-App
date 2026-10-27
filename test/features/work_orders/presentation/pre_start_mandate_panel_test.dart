@@ -83,14 +83,14 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('pre_start_group_0')), findsOneWidget);
     expect(find.byKey(const Key('pre_start_group_1')), findsOneWidget);
-    expect(find.text('Skipped at START'), findsOneWidget);
-    expect(find.text('Will be checked'), findsOneWidget);
+    expect(find.text('Not checked out'), findsNWidgets(2));
+    expect(find.text('Not checked out'), findsNWidgets(2));
     expect(find.text('Reason: Out of service'), findsOneWidget);
-    expect(find.text('Check this group again'), findsOneWidget);
+    expect(find.text('Check out this group'), findsNWidgets(2));
     expect(find.text('(TR) 4 items'), findsOneWidget);
   });
 
-  testWidgets('Skip posts EXCLUDE with group keys', (tester) async {
+  testWidgets('Checking an unmandated group posts INCLUDE with group keys', (tester) async {
     stubLoad();
     when(() => repo.setSupervisorMandate(
           7,
@@ -102,7 +102,7 @@ void main() {
           id: 2,
           assetCategoryId: 5,
           assetName: 'PN',
-          action: 'EXCLUDE',
+          action: 'INCLUDE',
           reason: 'n/a',
         ));
     await tester.pumpWidget(wrap());
@@ -115,16 +115,31 @@ void main() {
       ),
       'n/a',
     );
-    await tester.tap(find.text('Skip this group'));
+    await tester.tap(find.descendant(of: find.byKey(const Key('pre_start_group_1')), matching: find.text('Check out this group')));
     await tester.pumpAndSettle();
     verify(() => repo.setSupervisorMandate(
           7,
           assetCategoryId: 5,
           assetName: 'PN',
-          action: 'EXCLUDE',
+          action: 'INCLUDE',
           reason: 'n/a',
         )).called(1);
-    expect(find.text('Skipped at START'), findsNWidgets(2));
+    expect(find.text('Not checked out'), findsOneWidget);
+  });
+
+  testWidgets('refresh picks up a checkout saved by another device', (tester) async {
+    stubLoad();
+    await tester.pumpWidget(wrap());
+    await tester.tap(find.byKey(const Key('pre_start_open')));
+    await tester.pumpAndSettle();
+    when(() => repo.getSupervisorMandates(7)).thenAnswer((_) async => const [
+      SupervisorMandate(id: 2, assetCategoryId: 5, assetName: 'PN', action: 'INCLUDE'),
+    ]);
+    await tester.pump(const Duration(seconds: 10));
+    await tester.pumpAndSettle();
+    expect(find.text('Un-check this group'), findsOneWidget);
+    verify(() => repo.getSupervisorMandates(7)).called(2);
+    await tester.pumpWidget(const SizedBox());
   });
 
   testWidgets('not-applicable execution mode', (tester) async {

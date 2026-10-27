@@ -125,6 +125,17 @@ class _VerificationWorkspaceScreenState
 
     final workspace = state.workspace;
     final lines = workspace.record?.activeLines ?? const [];
+    final groupPhotosByLine = <int, List<ExecutionPhoto>>{};
+    for (final group in workspace.record?.assetGroups ?? <ChecklistAssetGroup>[]) {
+      final groupLines = group.lines.where((l) => !l.excluded && l.isCheckedOut);
+      final photos = <int, ExecutionPhoto>{
+        for (final line in groupLines)
+          for (final photo in _serverPhotos(line)) photo.id: photo,
+      }.values.toList();
+      for (final line in groupLines) {
+        groupPhotosByLine[line.id] = photos;
+      }
+    }
     final session = sessionOf(ref);
     final controller = ref
         .read(verificationWorkspaceControllerProvider(widget.workOrderId).notifier);
@@ -181,7 +192,8 @@ class _VerificationWorkspaceScreenState
               ),
             )
           else
-            ...lines.map(_buildLineCard),
+            ...lines.map((line) => _buildLineCard(line,
+                galleryPhotos: groupPhotosByLine[line.id])),
           // The record-level photo uploaded with the completion — the web
           // report's "Any other documents to upload".
           if (workspace.record?.proofOfExecutionUrl != null)
@@ -343,7 +355,8 @@ class _VerificationWorkspaceScreenState
     );
   }
 
-  Widget _buildLineCard(MaintenanceRecordLine line) {
+  Widget _buildLineCard(MaintenanceRecordLine line,
+      {List<ExecutionPhoto>? galleryPhotos}) {
     final reading = _readingText(line);
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
@@ -403,6 +416,7 @@ class _VerificationWorkspaceScreenState
                 padding: const EdgeInsets.only(top: 8),
                 child: ExecutionPhotoGrid(
                   photos: _serverPhotos(line),
+                  galleryPhotos: galleryPhotos,
                   canManage: false,
                   busy: false,
                   maxPerKind: 5,

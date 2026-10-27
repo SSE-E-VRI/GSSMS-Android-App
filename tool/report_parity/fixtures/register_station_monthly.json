@@ -1,0 +1,1752 @@
+{
+  "id": "register_station_monthly",
+  "kind": "register",
+  "generatedAt": "2026-10-27T05:34:00Z",
+  "ticket": "TEST-202610-0019",
+  "workOrder": {
+    "id": 19,
+    "ticket_number": "TEST-202610-0019",
+    "status": "CLOSED",
+    "type": "PREVENTIVE",
+    "report_completed_at": "2026-10-26T09:10:09Z"
+  },
+  "payload": {
+    "date_of_maintenance": "2026-10-24T06:10:16Z",
+    "technician_name": "Test Technician",
+    "schedule_details": {
+      "station_name": "Test Station",
+      "template_name": "Station Monthly Maintenance",
+      "organization": {
+        "railway_name": "Southern Railway",
+        "division_name": "Test Division",
+        "depot_name": "Test Depot"
+      }
+    },
+    "verification": {
+      "verified_by_name": "Test Supervisor",
+      "verified_at": "2026-10-26T11:01:51Z",
+      "remarks": "Verified from Work Order review form"
+    },
+    "lines": [
+      {
+        "item_name": "EB Bunk",
+        "inspection_point": "Check and clean the EB meter bunk",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": "Clean",
+        "action_label_snapshot": "No Action Required",
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "EB Bunk",
+        "asset_category_id": 75,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "EB Bunk",
+        "inspection_point": "Check the discolouration of wires",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": "Found normal",
+        "action_label_snapshot": "Tightened",
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "EB Bunk",
+        "asset_category_id": 75,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "EB Bunk",
+        "inspection_point": "Check whether 2 earth pits are avilable and connected to EB Bunk",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": "available",
+        "action_label_snapshot": "No action required",
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "EB Bunk",
+        "asset_category_id": 75,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "EB Bunk",
+        "inspection_point": "Voltage",
+        "item_kind": "RECORD_PARAMETER",
+        "status": "OK",
+        "status_label_snapshot": null,
+        "action_label_snapshot": null,
+        "recorded_value": {
+          "B": "257",
+          "R": "246",
+          "Y": "248"
+        },
+        "unit_snapshot": "V",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "EB Bunk",
+        "asset_category_id": 75,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "EB Bunk",
+        "inspection_point": "Current",
+        "item_kind": "RECORD_PARAMETER",
+        "status": "OK",
+        "status_label_snapshot": null,
+        "action_label_snapshot": null,
+        "recorded_value": {
+          "B": "1.2",
+          "R": "11.1",
+          "Y": "5.79"
+        },
+        "unit_snapshot": "A",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "EB Bunk",
+        "asset_category_id": 75,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "EB Bunk",
+        "inspection_point": "Terminal temperature difference above 25 C",
+        "item_kind": "RECORD_PARAMETER",
+        "status": "OK",
+        "status_label_snapshot": null,
+        "action_label_snapshot": null,
+        "recorded_value": "No",
+        "unit_snapshot": "C",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "EB Bunk",
+        "asset_category_id": 75,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "Switch Room & Power Panel",
+        "inspection_point": "Availability of numbering in switches",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": "Available",
+        "action_label_snapshot": "No action required.",
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "Switch Room & Power Panel",
+        "asset_category_id": 76,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "Switch Room & Power Panel",
+        "inspection_point": "Working of meteres in panels",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": "Working",
+        "action_label_snapshot": "No action required.",
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "Switch Room & Power Panel",
+        "asset_category_id": 76,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "Switch Room & Power Panel",
+        "inspection_point": "Working of pilot lamps",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": "Working",
+        "action_label_snapshot": "No action required.",
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "Switch Room & Power Panel",
+        "asset_category_id": 76,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "Switch Room & Power Panel",
+        "inspection_point": "Availabilty of Fire extinguishers",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": "Available",
+        "action_label_snapshot": "No action required.",
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "Switch Room & Power Panel",
+        "asset_category_id": 76,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "Switch Room & Power Panel",
+        "inspection_point": "Availabity of safety mat in front of panel",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": "Available",
+        "action_label_snapshot": "No action required.",
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "Switch Room & Power Panel",
+        "asset_category_id": 76,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "Switch Room & Power Panel",
+        "inspection_point": "Any opening through cable entry path",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": "No opening",
+        "action_label_snapshot": "No action required.",
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "Switch Room & Power Panel",
+        "asset_category_id": 76,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "Switch Room & Power Panel",
+        "inspection_point": "Check and clean the earth pit and remove vegetation and bushes.",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": "Clean",
+        "action_label_snapshot": "No action required.",
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "Switch Room & Power Panel",
+        "asset_category_id": 76,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "Switch Room & Power Panel",
+        "inspection_point": "Check and apply grease to the earth electrode terminal.",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": "Applied",
+        "action_label_snapshot": "No action required.",
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "Switch Room & Power Panel",
+        "asset_category_id": 76,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "Switch Room & Power Panel",
+        "inspection_point": "Inspect earthing connections for corrosion and verify bonding (earth continuity to be checked).",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": "Found normal",
+        "action_label_snapshot": "No Action Required",
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "Switch Room & Power Panel",
+        "asset_category_id": 76,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "Switch Room & Power Panel",
+        "inspection_point": "Earth resistance last tested date",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": "Tested",
+        "action_label_snapshot": "Recorded value:_______ ohms",
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "Switch Room & Power Panel",
+        "asset_category_id": 76,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "Switch Room & Power Panel",
+        "inspection_point": "Earth resistance value",
+        "item_kind": "RECORD_PARAMETER",
+        "status": "OK",
+        "status_label_snapshot": null,
+        "action_label_snapshot": null,
+        "recorded_value": "2.5",
+        "unit_snapshot": "Ohms",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "Switch Room & Power Panel",
+        "asset_category_id": 76,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "CLS Panel",
+        "inspection_point": "Clean the entire system (remove dirt and dust) using a soft brush, cloth, or air blower.",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": "System is clean",
+        "action_label_snapshot": "No action required",
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "CLS Panels",
+        "asset_category_id": 17,
+        "asset_group_label_override": "",
+        "asset_unique_id": "TEST-CLS-001",
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "CLS Panel",
+        "inspection_point": "Check all LED Indication lamps and buzzers to ensure normal operation.",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": "Indicators working normally",
+        "action_label_snapshot": "No action required",
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "CLS Panels",
+        "asset_category_id": 17,
+        "asset_group_label_override": "",
+        "asset_unique_id": "TEST-CLS-001",
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "CLS Panel",
+        "inspection_point": "Check the working of Auto mode",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": "Auto mode working",
+        "action_label_snapshot": "No action required",
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "CLS Panels",
+        "asset_category_id": 17,
+        "asset_group_label_override": "",
+        "asset_unique_id": "TEST-CLS-001",
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "CLS Panel",
+        "inspection_point": "Clear any vegetation or weeds around the earth pit area.",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": "Area is clear",
+        "action_label_snapshot": "No action required",
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "CLS Panels",
+        "asset_category_id": 17,
+        "asset_group_label_override": "",
+        "asset_unique_id": "TEST-CLS-001",
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "CLS Panel",
+        "inspection_point": "UP AT Voltage and On Load Current",
+        "item_kind": "RECORD_PARAMETER",
+        "status": "OK",
+        "status_label_snapshot": null,
+        "action_label_snapshot": null,
+        "recorded_value": {
+          "Amp": "18.72",
+          "Volt": "224"
+        },
+        "unit_snapshot": "",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "CLS Panels",
+        "asset_category_id": 17,
+        "asset_group_label_override": "",
+        "asset_unique_id": "TEST-CLS-001",
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "CLS Panel",
+        "inspection_point": "DN AT Voltage and On Load Current",
+        "item_kind": "RECORD_PARAMETER",
+        "status": "OK",
+        "status_label_snapshot": null,
+        "action_label_snapshot": null,
+        "recorded_value": {
+          "Amp": "18.23",
+          "Volt": "238"
+        },
+        "unit_snapshot": "",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "CLS Panels",
+        "asset_category_id": 17,
+        "asset_group_label_override": "",
+        "asset_unique_id": "TEST-CLS-001",
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "CLS Panel",
+        "inspection_point": "EB Voltage and On Load Current",
+        "item_kind": "RECORD_PARAMETER",
+        "status": "OK",
+        "status_label_snapshot": null,
+        "action_label_snapshot": null,
+        "recorded_value": {
+          "Amp": "17.85",
+          "Volt": "240"
+        },
+        "unit_snapshot": "",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "CLS Panels",
+        "asset_category_id": 17,
+        "asset_group_label_override": "",
+        "asset_unique_id": "TEST-CLS-001",
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "UPS Systems",
+        "inspection_point": "Check and clean the UPS and battery.",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": "Clean",
+        "action_label_snapshot": "No Action Required",
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "UPS",
+        "asset_category_id": 21,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "UPS Systems",
+        "inspection_point": "Inspect wiring.",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": "Found normal",
+        "action_label_snapshot": "No Action Required",
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "UPS",
+        "asset_category_id": 21,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "UPS Systems",
+        "inspection_point": "Input voltage",
+        "item_kind": "RECORD_PARAMETER",
+        "status": "OK",
+        "status_label_snapshot": null,
+        "action_label_snapshot": null,
+        "recorded_value": "238",
+        "unit_snapshot": "V",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "UPS",
+        "asset_category_id": 21,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "UPS Systems",
+        "inspection_point": "Output Voltage",
+        "item_kind": "RECORD_PARAMETER",
+        "status": "OK",
+        "status_label_snapshot": null,
+        "action_label_snapshot": null,
+        "recorded_value": "230",
+        "unit_snapshot": "V",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "UPS",
+        "asset_category_id": 21,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "UPS Systems",
+        "inspection_point": "Load current",
+        "item_kind": "RECORD_PARAMETER",
+        "status": "OK",
+        "status_label_snapshot": null,
+        "action_label_snapshot": null,
+        "recorded_value": "0.5",
+        "unit_snapshot": "A",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "UPS",
+        "asset_category_id": 21,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "UPS Systems",
+        "inspection_point": "Battery1 No load voltage",
+        "item_kind": "RECORD_PARAMETER",
+        "status": "OK",
+        "status_label_snapshot": null,
+        "action_label_snapshot": null,
+        "recorded_value": "13.5",
+        "unit_snapshot": "V",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "UPS",
+        "asset_category_id": 21,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "UPS Systems",
+        "inspection_point": "Battery2 No load voltage",
+        "item_kind": "RECORD_PARAMETER",
+        "status": "OK",
+        "status_label_snapshot": null,
+        "action_label_snapshot": null,
+        "recorded_value": "13.5",
+        "unit_snapshot": "V",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "UPS",
+        "asset_category_id": 21,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "UPS Systems",
+        "inspection_point": "Battery3 No load voltage",
+        "item_kind": "RECORD_PARAMETER",
+        "status": "OK",
+        "status_label_snapshot": null,
+        "action_label_snapshot": null,
+        "recorded_value": "13.5",
+        "unit_snapshot": "V",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "UPS",
+        "asset_category_id": 21,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "UPS Systems",
+        "inspection_point": "Battery1 On load voltage",
+        "item_kind": "RECORD_PARAMETER",
+        "status": "OK",
+        "status_label_snapshot": null,
+        "action_label_snapshot": null,
+        "recorded_value": "12.5",
+        "unit_snapshot": "V",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "UPS",
+        "asset_category_id": 21,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "UPS Systems",
+        "inspection_point": "Battery2 On load voltage",
+        "item_kind": "RECORD_PARAMETER",
+        "status": "OK",
+        "status_label_snapshot": null,
+        "action_label_snapshot": null,
+        "recorded_value": "12.5",
+        "unit_snapshot": "V",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "UPS",
+        "asset_category_id": 21,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "UPS Systems",
+        "inspection_point": "Battery3 On load voltage",
+        "item_kind": "RECORD_PARAMETER",
+        "status": "OK",
+        "status_label_snapshot": null,
+        "action_label_snapshot": null,
+        "recorded_value": "12.5",
+        "unit_snapshot": "V",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "UPS",
+        "asset_category_id": 21,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "Lifts",
+        "inspection_point": "Check the working of lift",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": null,
+        "action_label_snapshot": null,
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": false,
+        "excluded": true,
+        "asset_category": "Lifts",
+        "asset_category_id": 14,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "Lifts",
+        "inspection_point": "Check the functioning of ARD",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": null,
+        "action_label_snapshot": null,
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": false,
+        "excluded": true,
+        "asset_category": "Lifts",
+        "asset_category_id": 14,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "Escalator",
+        "inspection_point": "Check the working of Escalator",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": null,
+        "action_label_snapshot": null,
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": false,
+        "excluded": true,
+        "asset_category": "Escalators",
+        "asset_category_id": 15,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "Escalator",
+        "inspection_point": "Check the working of emergency stop switch",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": null,
+        "action_label_snapshot": null,
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": false,
+        "excluded": true,
+        "asset_category": "Escalators",
+        "asset_category_id": 15,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "Foot Over Bridge (FOB)",
+        "inspection_point": "check Light fittings",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": "No defective fittings",
+        "action_label_snapshot": "No action required",
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "Lifts",
+        "asset_category_id": 14,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "Foot Over Bridge (FOB)",
+        "inspection_point": "Check and attend for any Hanging wires",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": "No hanging wires",
+        "action_label_snapshot": "No Action Required",
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "Lifts",
+        "asset_category_id": 14,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "Platform Shelter light and fan",
+        "inspection_point": "Check and attend Light and fan",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": "Found normal",
+        "action_label_snapshot": "No Action Required",
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "Platform Shelter Light",
+        "asset_category_id": 80,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "Platform Shelter light and fan",
+        "inspection_point": "Check wiring",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": "Found normal",
+        "action_label_snapshot": "No Action Required",
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "Platform Shelter Light",
+        "asset_category_id": 80,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "Platform Shelter light and fan",
+        "inspection_point": "Inspect socket conditions",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": "Working correctly",
+        "action_label_snapshot": "No Action Required",
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "Platform Shelter Light",
+        "asset_category_id": 80,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "Platform Shelter light and fan",
+        "inspection_point": "Check and attend for any Hanging wires",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": "No hanging wires",
+        "action_label_snapshot": "No Action Required",
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "Platform Shelter Light",
+        "asset_category_id": 80,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "Platform LSP",
+        "inspection_point": "Check and Clean,LSP terminal block, fuse Carriers and cover",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": "Clean",
+        "action_label_snapshot": "No Action Required",
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "Platform LSP",
+        "asset_category_id": 81,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "Platform LSP",
+        "inspection_point": "Check for loose connections in terminal block, fuse carriers and cover",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": "No loose connection",
+        "action_label_snapshot": "No Action Required",
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "Platform LSP",
+        "asset_category_id": 81,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "Platform LSP",
+        "inspection_point": "Check for availability of proper rating of fuses/MCBs",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": "Available",
+        "action_label_snapshot": "No Action Required",
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "Platform LSP",
+        "asset_category_id": 81,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "Platform LSP",
+        "inspection_point": "Check and attend for any Hanging wires",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": "No hanging wires",
+        "action_label_snapshot": "No Action Required",
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "Platform LSP",
+        "asset_category_id": 81,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "Platform LSP",
+        "inspection_point": "Replace fused bulbs",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": "Found normal",
+        "action_label_snapshot": "No Action Required",
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "Platform LSP",
+        "asset_category_id": 81,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "Platform LSP",
+        "inspection_point": "Check and attend platform LSP Lights 1/3rd and 2/3rd operation",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": "Working correctly",
+        "action_label_snapshot": "No Action Required",
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "Platform LSP",
+        "asset_category_id": 81,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "Station Service Building Lights, Fans, Switches & Sockets",
+        "inspection_point": "Check and attend Light and fan",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": "Found normal",
+        "action_label_snapshot": "No Action Required",
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "Station Service Building",
+        "asset_category_id": 79,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "Station Service Building Lights, Fans, Switches & Sockets",
+        "inspection_point": "Check and attend switch and socket",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": "Found normal",
+        "action_label_snapshot": "No Action Required",
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "Station Service Building",
+        "asset_category_id": 79,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "Station Service Building Lights, Fans, Switches & Sockets",
+        "inspection_point": "Check and attend for any Hanging wires",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": "No hanging wires",
+        "action_label_snapshot": "No Action Required",
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "Station Service Building",
+        "asset_category_id": 79,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "High Mast light",
+        "inspection_point": "Check and Clean, High mast surrounding, Switch box",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": null,
+        "action_label_snapshot": null,
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": false,
+        "excluded": true,
+        "asset_category": "High Mast Light",
+        "asset_category_id": 85,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "High Mast light",
+        "inspection_point": "Check for loose connections in Switch",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": null,
+        "action_label_snapshot": null,
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": false,
+        "excluded": true,
+        "asset_category": "High Mast Light",
+        "asset_category_id": 85,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "High Mast light",
+        "inspection_point": "Check for availability of proper rating of fuses/MCBs & RCCBs",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": null,
+        "action_label_snapshot": null,
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": false,
+        "excluded": true,
+        "asset_category": "High Mast Light",
+        "asset_category_id": 85,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "High Mast light",
+        "inspection_point": "Check and attend for any Hanging wires",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": null,
+        "action_label_snapshot": null,
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": false,
+        "excluded": true,
+        "asset_category": "High Mast Light",
+        "asset_category_id": 85,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "High Mast light",
+        "inspection_point": "Check for proper working of hoisting assembly",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": null,
+        "action_label_snapshot": null,
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": false,
+        "excluded": true,
+        "asset_category": "High Mast Light",
+        "asset_category_id": 85,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "Street light and circulating area",
+        "inspection_point": "Check and Clean, circulating area LSP terminal block, fuse Carriers and cover",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": "Clean",
+        "action_label_snapshot": "No Action Required",
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "Street Light & Circulating",
+        "asset_category_id": 82,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "Street light and circulating area",
+        "inspection_point": "Check for loose connections in terminal block, fuse carriers and cover",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": "No loose connection",
+        "action_label_snapshot": "No Action Required",
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "Street Light & Circulating",
+        "asset_category_id": 82,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "Street light and circulating area",
+        "inspection_point": "Check for availability of proper rating of fuses/MCBs",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": "Available",
+        "action_label_snapshot": "No Action Required",
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "Street Light & Circulating",
+        "asset_category_id": 82,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "Street light and circulating area",
+        "inspection_point": "Check and attend for any Hanging wires",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": "No hanging wires",
+        "action_label_snapshot": "No Action Required",
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "Street Light & Circulating",
+        "asset_category_id": 82,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "Submersible Pumps",
+        "inspection_point": "Check and clean the starter.",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": "Clean",
+        "action_label_snapshot": "No Action Required",
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "Submersible Pump",
+        "asset_category_id": 11,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "Submersible Pumps",
+        "inspection_point": "Check and operate the submersible pump for 15 minutes",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": "Found normal",
+        "action_label_snapshot": "No Action Required",
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "Submersible Pump",
+        "asset_category_id": 11,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "Submersible Pumps",
+        "inspection_point": "Voltage",
+        "item_kind": "RECORD_PARAMETER",
+        "status": "OK",
+        "status_label_snapshot": null,
+        "action_label_snapshot": null,
+        "recorded_value": {
+          "B": "",
+          "R": "235",
+          "Y": ""
+        },
+        "unit_snapshot": "V",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "Submersible Pump",
+        "asset_category_id": 11,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "Submersible Pumps",
+        "inspection_point": "Current",
+        "item_kind": "RECORD_PARAMETER",
+        "status": "OK",
+        "status_label_snapshot": null,
+        "action_label_snapshot": null,
+        "recorded_value": {
+          "B": "",
+          "R": "10.35",
+          "Y": ""
+        },
+        "unit_snapshot": "A",
+        "checked_out": true,
+        "excluded": false,
+        "asset_category": "Submersible Pump",
+        "asset_category_id": 11,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "Rolling Lights",
+        "inspection_point": "Check and Clean rolling light bunk, surrounding area",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": null,
+        "action_label_snapshot": null,
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": false,
+        "excluded": true,
+        "asset_category": "Light",
+        "asset_category_id": 10,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "Rolling Lights",
+        "inspection_point": "Check for loose connections in terminal block, fuse carriers and cover",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": null,
+        "action_label_snapshot": null,
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": false,
+        "excluded": true,
+        "asset_category": "Light",
+        "asset_category_id": 10,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "Rolling Lights",
+        "inspection_point": "Check for availability of proper rating of fuses/MCBs",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": null,
+        "action_label_snapshot": null,
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": false,
+        "excluded": true,
+        "asset_category": "Light",
+        "asset_category_id": 10,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "Rolling Lights",
+        "inspection_point": "Replace defective lights",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": null,
+        "action_label_snapshot": null,
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": false,
+        "excluded": true,
+        "asset_category": "Light",
+        "asset_category_id": 10,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "Solar Power Plant",
+        "inspection_point": "Verify inverter status.",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": null,
+        "action_label_snapshot": null,
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": false,
+        "excluded": true,
+        "asset_category": "Solar Power Plant",
+        "asset_category_id": 78,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "Solar Power Plant",
+        "inspection_point": "Check and clean the earth pit and remove vegetation and bushes.",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": null,
+        "action_label_snapshot": null,
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": false,
+        "excluded": true,
+        "asset_category": "Solar Power Plant",
+        "asset_category_id": 78,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "Solar Power Plant",
+        "inspection_point": "Check and apply grease to the earth electrode terminal",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": null,
+        "action_label_snapshot": null,
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": false,
+        "excluded": true,
+        "asset_category": "Solar Power Plant",
+        "asset_category_id": 78,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "Solar Power Plant",
+        "inspection_point": "Inspect earthing connections for corrosion and verify bonding (earth continuity to be checked).",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": null,
+        "action_label_snapshot": null,
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": false,
+        "excluded": true,
+        "asset_category": "Solar Power Plant",
+        "asset_category_id": 78,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "Solar Power Plant",
+        "inspection_point": "Earth resistance last tested date",
+        "item_kind": "INSPECTION_POINT",
+        "status": "OK",
+        "status_label_snapshot": null,
+        "action_label_snapshot": null,
+        "recorded_value": null,
+        "unit_snapshot": "",
+        "checked_out": false,
+        "excluded": true,
+        "asset_category": "Solar Power Plant",
+        "asset_category_id": 78,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      },
+      {
+        "item_name": "Solar Power Plant",
+        "inspection_point": "Earth resistance value",
+        "item_kind": "RECORD_PARAMETER",
+        "status": "OK",
+        "status_label_snapshot": null,
+        "action_label_snapshot": null,
+        "recorded_value": null,
+        "unit_snapshot": "Ohms",
+        "checked_out": false,
+        "excluded": true,
+        "asset_category": "Solar Power Plant",
+        "asset_category_id": 78,
+        "asset_group_label_override": "",
+        "asset_unique_id": null,
+        "attachments": [
+          {
+            "image": "https://example.invalid/evidence.jpg",
+            "kind": "BEFORE"
+          }
+        ]
+      }
+    ]
+  }
+}

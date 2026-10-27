@@ -18,6 +18,7 @@ class ReportPdfTheme {
   static const faint = PdfColor.fromInt(0xFF9CA3AF);
   static const border = PdfColor.fromInt(0xFFD1D5DB);
   static const borderPrint = PdfColor.fromInt(0xFF4B5563);
+  static const bootstrapLight = PdfColor.fromInt(0xFFF8F9FA);
   static const surface = PdfColor.fromInt(0xFFF9FAFB);
 
   static const accent = PdfColor.fromInt(0xFF1F4E79);

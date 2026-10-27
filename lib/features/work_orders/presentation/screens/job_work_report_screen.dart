@@ -90,10 +90,6 @@ class _JobWorkReportScreenState extends ConsumerState<JobWorkReportScreen> {
     });
   }
 
-  String _fileName(JobWorkReport r) {
-    final safe = r.ticket.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
-    return 'JobWork-$safe-Report.pdf';
-  }
 
   Future<Uint8List> _getPdfBytes(LoadedJobWorkReport loaded) {
     return _pdfBytesFuture ??= () async {
@@ -111,7 +107,7 @@ class _JobWorkReportScreenState extends ConsumerState<JobWorkReportScreen> {
     setState(() => _busy = true);
     try {
       final bytes = await _getPdfBytes(loaded);
-      final name = _fileName(loaded.report);
+      final name = loaded.report.pdfFileName;
       if (share) {
         await Printing.sharePdf(bytes: bytes, filename: name);
       } else {
@@ -222,7 +218,7 @@ class _JobWorkReportScreenState extends ConsumerState<JobWorkReportScreen> {
       context,
       loaded: loaded,
       getPdfBytes: () => _getPdfBytes(loaded),
-      fileName: _fileName(loaded.report),
+      fileName: loaded.report.pdfFileName,
     );
   }
 }

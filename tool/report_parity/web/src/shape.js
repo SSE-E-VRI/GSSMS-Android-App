@@ -37,8 +37,12 @@ export const shapeChecklistData = (record, wo) => {
     const groups = lines.reduce((acc, line) => {
         // StaffDashboardView.jsx lines 318-319:
         if (line.checked_out === false || line.excluded) return acc;
-        const groupKey = line.asset_unique_id || line.asset_category || 'General Items';
-        if (!acc[groupKey]) acc[groupKey] = { group_name: groupKey, items: [] };
+        const groupKey = line.asset_unique_id
+            || `${line.asset_category_id ?? 'none'}::${(line.item_name || '').trim().toLowerCase()}`;
+        if (!acc[groupKey]) acc[groupKey] = {
+            group_name: line.asset_group_label_override || line.item_name || line.asset_category || 'General Items',
+            items: [],
+        };
 
         const isAddressed = Boolean(line.status_label_snapshot)
             || Boolean((line.observation_action || '').trim())

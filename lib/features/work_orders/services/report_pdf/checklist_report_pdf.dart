@@ -3,12 +3,52 @@ import 'dart:typed_data';
 
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
+import 'package:vector_math/vector_math_64.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/job_work_report.dart';
 import 'package:gssms_mobile/features/work_orders/services/job_work_report_pdf_primitives.dart';
 
 // Web: FormPreview.jsx + FormPreview.module.css (+ reportTheme / Bootstrap).
 // All text is black except the Deficiency Summary (#7f1d1d), root line-height
 // is Bootstrap's 1.5 ([ReportRoot.lineHeight]).
+
+// Register print metrics measured from the web master (90% A4 print).
+const checklistRegisterScale = 0.9;
+const checklistRegisterContentWidth = 538.0;
+const checklistRegisterPageFormat = PdfPageFormat(
+  594.96, 841.92, marginLeft: 28.5, marginRight: 28.46,
+  marginTop: 28.125, marginBottom: 28.125,
+);
+
+double get _tableWidth => ReportRoot.contentWidth - 30.0;
+
+/// Scale layout constraints as well as paint, preserving MultiPage pagination.
+class ChecklistPrintScale extends pw.SingleChildWidget {
+  ChecklistPrintScale({required pw.Widget child}) : super(child: child);
+
+  @override
+  void layout(pw.Context context, pw.BoxConstraints constraints,
+      {bool parentUsesSize = false}) {
+    child!.layout(context, pw.BoxConstraints(
+      minWidth: constraints.minWidth / checklistRegisterScale,
+      maxWidth: constraints.maxWidth / checklistRegisterScale,
+      minHeight: constraints.minHeight / checklistRegisterScale,
+      maxHeight: constraints.maxHeight / checklistRegisterScale,
+    ), parentUsesSize: parentUsesSize);
+    box = PdfRect(0, 0, child!.box!.width * checklistRegisterScale,
+        child!.box!.height * checklistRegisterScale);
+  }
+
+  @override
+  void paint(pw.Context context) {
+    super.paint(context);
+    final matrix = Matrix4.identity()
+      ..translateByDouble(box!.left, box!.bottom, 0, 1)
+      ..scaleByDouble(checklistRegisterScale, checklistRegisterScale, 1, 1);
+    context.canvas..saveContext()..setTransform(matrix);
+    child!.paint(context);
+    context.canvas.restoreContext();
+  }
+}
 
 const _line = pw.BorderSide(color: ReportPdfTheme.borderPrint, width: 0.75);
 
@@ -164,7 +204,7 @@ List<pw.Widget> buildChecklistReportPdf(
 }
 
 // ---------------------------------------------------------------------------
-// Meta row (.reportMeta): grid of 164pt columns, gap 9, centred vertically
+// Meta row (.reportMeta): equal columns, gap 9, centred vertically
 // ---------------------------------------------------------------------------
 
 pw.Widget _buildMeta(ChecklistJobWorkReport r) {
@@ -175,16 +215,34 @@ pw.Widget _buildMeta(ChecklistJobWorkReport r) {
     ('Date', r.dateLabel),
   ];
 
+  final columns = items.length;
+  final cellWidth = (_tableWidth - 9.0 * (columns - 1)) / columns;
   pw.Widget cell(int i) {
     final align = i == 0
         ? pw.TextAlign.left
         : (i == items.length - 1 ? pw.TextAlign.right : pw.TextAlign.center);
+    var value = items[i].$2;
+    // Chrome allows wrapping after a ticket's hyphen. pdf's RichText only
+    // wraps at whitespace, so preserve that break without changing the text.
+    if (items[i].$1 == 'Job Work') {
+      final labelWidth = ReportFonts.advance('Job Work: ', 12, weight: 700);
+      if (labelWidth + ReportFonts.advance(value, 12) > cellWidth) {
+        var cut = -1;
+        for (var j = 0; j < value.length; j++) {
+          if (value[j] == '-' && labelWidth +
+              ReportFonts.advance(value.substring(0, j + 1), 12) <= cellWidth) {
+            cut = j + 1;
+          }
+        }
+        if (cut > 0) value = '${value.substring(0, cut)}\n${value.substring(cut)}';
+      }
+    }
     return pw.SizedBox(
-      width: 164.0,
+      width: cellWidth,
       child: cssRich(
         [
           CssSpan('${items[i].$1}:', weight: 700),
-          CssSpan(' ${items[i].$2}'),
+          CssSpan(' $value'),
         ],
         sizePt: 12.0,
         lineHeight: ReportRoot.lineHeight,
@@ -194,8 +252,8 @@ pw.Widget _buildMeta(ChecklistJobWorkReport r) {
   }
 
   final rows = <pw.Widget>[];
-  for (var start = 0; start < items.length; start += 3) {
-    final end = math.min(items.length, start + 3);
+  for (var start = 0; start < items.length; start += columns) {
+    final end = math.min(items.length, start + columns);
     if (start > 0) rows.add(pw.SizedBox(height: 9.0));
     rows.add(pw.Row(
       crossAxisAlignment: pw.CrossAxisAlignment.center,
@@ -253,7 +311,7 @@ pw.Widget _groupHeading(String name) => pw.Column(
         CssBox.bordered(
           side: const CssSide(0.75, ReportPdfTheme.border),
           padding: const pw.EdgeInsets.all(6.0),
-          background: PdfColors.white,
+          background: ReportPdfTheme.bootstrapLight,
           child: cssText(name, sizePt: 15.0, weight: 700, lineHeight: 1.2),
         ),
         pw.SizedBox(height: 6.0), // h5 margin-bottom
@@ -436,7 +494,7 @@ pw.Widget _buildFlatTable(ChecklistReportGroup g, List<(int, int)> spans,
 /// Number of lines [text] wraps to in a column of [colFraction] of the table
 /// (greedy word wrap, like the browser).
 int _lines(String text, int weight, double colFraction) =>
-    _wrapLines(text, weight, colFraction * 510.0 - 12.75);
+    _wrapLines(text, weight, colFraction * _tableWidth - 12.75);
 
 /// Number of lines [text] wraps to in [width]pt of text area.
 int _wrapLines(String text, int weight, double width) =>
@@ -482,40 +540,12 @@ List<double> _snapExtras(List<double> px, List<double> natural) {
   return [for (var i = 0; i < px.length; i++) snapped[i] - natural[i]];
 }
 
-/// Height in pt the attachment photo strip adds under a row's checkpoint text
-/// (web FormPreview renders a LineAttachmentStrip there): a 6pt gap, then the
-/// thumbs wrapped into as many runs as fit the checkpoint column.
-double _attachmentsPt(ChecklistReportRow row) {
-  final n = row.attachments.length;
-  if (n == 0) return 0;
-  const gap = 6.0;
-  // Regular rows carry the strip under the (wide) checkpoint cell; record-
-  // parameter rows have a narrow checkpoint cell, so it goes under the value.
-  final width = _grid[row.isRecordParameter ? 3 : 1] * 510.0 - 12.75;
-  final perRun = math.max(1, ((width + gap) / (thumbBoxW + gap)).floor());
-  final runs = (n + perRun - 1) ~/ perRun;
-  return gap + runs * thumbBoxH + (runs - 1) * gap;
-}
+/// Web print CSS hides LineAttachmentStrip, including failed thumbnails.
+double _attachmentsPt(ChecklistReportRow row) => 0;
 
-/// A cell's text plus, when the line has attachments, the photo strip
-/// beneath it.
 pw.Widget _cellWithPhotos(ChecklistReportRow row, String text, int weight,
-    double extra, Map<String, Uint8List?> photos) {
-  if (row.attachments.isEmpty) return _td(text, weight: weight, extraV: extra);
-  return pw.Padding(
-    padding: pw.EdgeInsets.symmetric(
-        horizontal: 6.375, vertical: 4.575 + extra / 2),
-    child: pw.Column(
-      crossAxisAlignment: pw.CrossAxisAlignment.start,
-      mainAxisSize: pw.MainAxisSize.min,
-      children: [
-        cssText(text, sizePt: _tdSizePt, weight: weight),
-        pw.SizedBox(height: 6.0),
-        photoRow(row.attachments, photos, ''),
-      ],
-    ),
-  );
-}
+    double extra, Map<String, Uint8List?> photos) =>
+    _td(text, weight: weight, extraV: extra);
 
 /// The three right-hand cells of a regular row (checkpoint, status, action).
 List<pw.Widget> _rowCells(ChecklistReportRow row, double extra,

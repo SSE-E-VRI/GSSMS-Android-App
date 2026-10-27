@@ -125,7 +125,7 @@ void main() {
     expect(await _pages(r), 1);
   });
 
-  test('job work number adds a fourth meta item on a second row', () async {
+  test('job work number shares the four-column register meta row', () async {
     expect(await _pages(_report(showJobWork: true)), 1);
   });
 
@@ -176,7 +176,7 @@ void main() {
     ]);
     expect(await _pages(r), greaterThanOrEqualTo(3));
   });
-  test('line attachment photos are painted and grow the layout (M14)',
+  test('line attachment strips are hidden by the web print stylesheet',
       () async {
     ChecklistReportRow withPhotos(int i, {bool record = false}) =>
         ChecklistReportRow(
@@ -201,9 +201,8 @@ void main() {
       ]),
     ]);
 
-    // Photos make each row taller (strip under the cell), so the same number
-    // of rows needs more pages than the photo-less report.
-    expect(await _pages(photo), greaterThan(await _pages(plain)));
+    // Neither missing thumbnails nor downloaded attachments change print pagination.
+    expect(await _pages(photo), await _pages(plain));
   });
 
   test('the proof-of-execution photo is read, preloaded and printed', () async {

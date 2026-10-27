@@ -259,6 +259,12 @@ sealed class JobWorkReport extends Equatable {
 
   /// Job Work ticket number (falls back to the Job Work reference).
   String get ticket;
+
+  /// Matches the web Reports print title and Android print/share filename.
+  String get pdfFileName {
+    final safe = ticket.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
+    return 'JobWork-$safe-Verification.pdf';
+  }
   ReportOrganization get org;
 
   /// Every photo that appears in the rendered report (de-duplicated by key,
@@ -443,10 +449,15 @@ class ChecklistJobWorkReport extends JobWorkReport {
         asJsonBool(l['excluded']) == true;
 
     final grouped = <String, List<ChecklistReportRow>>{};
+    final groupNames = <String, String>{};
     for (final line in lines) {
       if (skipped(line)) continue;
-      final key = _firstText(
-          [line['asset_unique_id'], line['asset_category']], 'General Items');
+      final itemName = _str(line['item_name']);
+      final key = _firstText([line['asset_unique_id']],
+          '${line['asset_category_id'] ?? 'none'}::${itemName.toLowerCase()}');
+      groupNames.putIfAbsent(key, () => _firstText([
+        line['asset_group_label_override'], itemName, line['asset_category'],
+      ], 'General Items'));
       final snapshot = _str(line['status_label_snapshot']);
       final status = _str(line['status']);
       final recorded = line['recorded_value'];
@@ -472,7 +483,7 @@ class ChecklistJobWorkReport extends JobWorkReport {
 
     final groups = <ChecklistReportGroup>[
       for (final e in grouped.entries)
-        ChecklistReportGroup(name: e.key, rows: _withSpans(e.value)),
+        ChecklistReportGroup(name: groupNames[e.key]!, rows: _withSpans(e.value)),
     ];
 
     final deficiencies = <ChecklistDeficiencyRow>[];

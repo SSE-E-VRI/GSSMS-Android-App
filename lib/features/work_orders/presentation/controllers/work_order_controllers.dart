@@ -519,6 +519,30 @@ class ChecklistController extends Notifier<ChecklistState> {
 
   IWorkOrderRepository get _repository => ref.read(workOrderRepositoryProvider);
 
+  Future<void> refreshCheckoutState() async {
+    final before = state;
+    if (before is! ChecklistLoaded || before.savingGroupKeys.isNotEmpty) return;
+    try {
+      final fresh = await _repository.fetchMaintenanceRecord(arg);
+      if (!ref.mounted || !identical(state, before)) return;
+      final byId = {for (final line in fresh.lines) line.id: line};
+      state = before.copyWith(record: before.record.copyWith(
+        lines: before.record.lines.map((line) {
+          final remote = byId[line.id];
+          return remote == null ? line : line.copyWith(
+            checkedOut: remote.checkedOut,
+            checkoutSource: remote.checkoutSource,
+            excluded: remote.excluded,
+            exclusionReason: remote.exclusionReason,
+            applicability: remote.applicability,
+          );
+        }).toList(),
+      ));
+    } catch (_) {
+      // Retain confirmed state when the server is unavailable.
+    }
+  }
+
   Future<void> loadRecord() async {
     state = const ChecklistLoading();
     try {

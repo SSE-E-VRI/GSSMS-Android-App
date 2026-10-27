@@ -96,13 +96,29 @@ void main() {
           _line({'checked_out': false, 'item_name': 'skipme'}),
           _line({'excluded': true, 'item_name': 'skipme2'}),
           _line({'item_name': 'one'}),
-          _line({'asset_unique_id': null, 'asset_category': 'Cat'}),
-          _line({'asset_unique_id': null}),
+          _line({'asset_unique_id': null, 'asset_category_id': 2, 'asset_category': 'Cat'}),
+          _line({'asset_unique_id': null, 'item_name': ''}),
         ],
       }, _wo());
-      expect(r.groups.map((g) => g.name), ['A1', 'Cat', 'General Items']);
+      expect(r.groups.map((g) => g.name), ['one', 'Panel', 'General Items']);
       expect(r.groups[0].rows.single.itemName, 'one');
       expect(r.isEmpty, isFalse);
+    });
+
+    test('headings and grouping match the web register including overrides', () {
+      final report = ChecklistJobWorkReport.fromRecordJson({'lines': [
+        _line({'asset_unique_id': null, 'asset_category_id': 20,
+          'asset_category': 'Lifts', 'item_name': 'Foot Over Bridge (FOB)'}),
+        _line({'asset_unique_id': null, 'asset_category_id': 20,
+          'asset_category': 'Lifts', 'item_name': 'Lifts'}),
+        _line({'asset_unique_id': 'CLS-001', 'item_name': 'CLS Panel',
+          'asset_group_label_override': 'Main CLS Panel'}),
+      ]}, _wo(ticket: 'MTUR-202610-0019'));
+      expect(report.groups.map((g) => g.name),
+          ['Foot Over Bridge (FOB)', 'Lifts', 'Main CLS Panel']);
+      expect(report.pdfFileName, 'JobWork-MTUR-202610-0019-Verification.pdf');
+      expect(ChecklistJobWorkReport.empty(_wo(ticket: 'WO/#101')).pdfFileName,
+          'JobWork-WO__101-Verification.pdf');
     });
 
     test('status label addressed logic', () {

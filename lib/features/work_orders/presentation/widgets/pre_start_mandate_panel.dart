@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gssms_mobile/core/network/api_error.dart';
@@ -43,9 +45,33 @@ class _PreStartMandatePanelState extends ConsumerState<PreStartMandatePanel> {
   List<SupervisorMandate> _mandates = const [];
   final Map<int, TextEditingController> _reasons = {};
   final Set<int> _saving = {};
+  Timer? _refreshTimer;
+  bool _refreshing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshTimer = Timer.periodic(const Duration(seconds: 10), (_) async {
+      if (!_opened || _loading || _refreshing || _saving.isNotEmpty) return;
+      _refreshing = true;
+      final before = _mandates;
+      try {
+        final mandates = await ref.read(workOrderRepositoryProvider)
+            .getSupervisorMandates(widget.workOrder.id);
+        if (mounted && _saving.isEmpty && identical(_mandates, before)) {
+          setState(() => _mandates = mandates);
+        }
+      } catch (_) {
+        // Keep the last confirmed state while offline.
+      } finally {
+        _refreshing = false;
+      }
+    });
+  }
 
   @override
   void dispose() {
+    _refreshTimer?.cancel();
     for (final c in _reasons.values) {
       c.dispose();
     }
@@ -126,7 +152,7 @@ class _PreStartMandatePanelState extends ConsumerState<PreStartMandatePanel> {
 
   Future<void> _toggle(int index, ChecklistGroupPreview g) async {
     final current = _mandateFor(g);
-    final action = (current?.isExclude ?? false) ? 'INCLUDE' : 'EXCLUDE';
+    final action = current?.action == 'INCLUDE' ? 'EXCLUDE' : 'INCLUDE';
     setState(() => _saving.add(index));
     try {
       final saved =
@@ -219,8 +245,7 @@ class _PreStartMandatePanelState extends ConsumerState<PreStartMandatePanel> {
       ),
       const SizedBox(height: GssmsSpacing.s8),
       Text(
-        "All groups are checked by default. Skip a group only if it doesn't "
-        'apply to this visit.',
+        'Groups start unchecked. Check out each group required for this visit.',
         style: theme.textTheme.bodySmall?.copyWith(color: tokens.textSecondary),
       ),
       const SizedBox(height: GssmsSpacing.s12),
@@ -235,7 +260,7 @@ class _PreStartMandatePanelState extends ConsumerState<PreStartMandatePanel> {
     final theme = Theme.of(context);
     final tokens = context.gssms;
     final mandate = _mandateFor(g);
-    final excluded = mandate?.isExclude ?? false;
+    final excluded = mandate?.action != 'INCLUDE';
     final saving = _saving.contains(index);
     final enabled = g.canMandate && !saving;
     final subtitle = [
@@ -247,7 +272,7 @@ class _PreStartMandatePanelState extends ConsumerState<PreStartMandatePanel> {
     final StatusChip badge;
     if (excluded) {
       badge = const StatusChip(
-        label: 'Skipped at START',
+        label: 'Not checked out',
         tone: GssmsTone.danger,
         icon: Icons.block,
       );
@@ -302,7 +327,7 @@ class _PreStartMandatePanelState extends ConsumerState<PreStartMandatePanel> {
             child: OutlinedButton(
               onPressed: enabled ? () => _toggle(index, g) : null,
               child:
-                  Text(excluded ? 'Check this group again' : 'Skip this group'),
+                  Text(excluded ? 'Check out this group' : 'Un-check this group'),
             ),
           ),
           if (!g.canMandate) ...[

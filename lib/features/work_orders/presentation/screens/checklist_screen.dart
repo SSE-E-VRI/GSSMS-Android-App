@@ -95,6 +95,8 @@ class ChecklistFormScreen extends ConsumerStatefulWidget {
 }
 
 class _ChecklistFormScreenState extends ConsumerState<ChecklistFormScreen> {
+  Timer? _checkoutRefreshTimer;
+  bool _refreshingCheckout = false;
   /// Scroll targets for line cards, by line id.
   final Map<int, GlobalKey> _lineScrollKeys = {};
 
@@ -113,6 +115,7 @@ class _ChecklistFormScreenState extends ConsumerState<ChecklistFormScreen> {
 
   @override
   void dispose() {
+    _checkoutRefreshTimer?.cancel();
     _highlightTimer?.cancel();
     super.dispose();
   }
@@ -246,6 +249,16 @@ class _ChecklistFormScreenState extends ConsumerState<ChecklistFormScreen> {
   @override
   void initState() {
     super.initState();
+    _checkoutRefreshTimer = Timer.periodic(const Duration(seconds: 10), (_) async {
+      if (_refreshingCheckout || _inFlightSaves.isNotEmpty || _savingProgress) return;
+      _refreshingCheckout = true;
+      try {
+        await ref.read(checklistControllerProvider(widget.recordId).notifier)
+            .refreshCheckoutState();
+      } finally {
+        _refreshingCheckout = false;
+      }
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       if (!canWriteChecklist(

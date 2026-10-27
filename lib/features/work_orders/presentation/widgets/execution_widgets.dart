@@ -1,5 +1,6 @@
 import 'package:gssms_mobile/core/widgets/authenticated_image_thumbnail.dart';
 import 'package:gssms_mobile/core/widgets/protected_network_image.dart';
+import 'package:gssms_mobile/features/work_orders/presentation/widgets/execution_photo_gallery.dart';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -259,9 +260,11 @@ class ExecutionPhotoGrid extends ConsumerWidget {
     this.onDeletePending,
     this.onRetakePending,
     this.maxPerKind = 10,
+    this.galleryPhotos,
   });
 
   final List<ExecutionPhoto> photos;
+  final List<ExecutionPhoto>? galleryPhotos;
   final bool canManage;
   final bool busy;
   final ValueChanged<String> onAdd;
@@ -295,6 +298,14 @@ class ExecutionPhotoGrid extends ConsumerWidget {
     final headers = (token == null || token.isEmpty)
         ? null
         : {'Authorization': 'Bearer $token'};
+    if (!canManage && pendingPhotos.isEmpty) {
+      return ExecutionPhotoGallery(
+        photos: photos,
+        galleryPhotos: galleryPhotos,
+        maxPerKind: maxPerKind,
+        headers: headers,
+      );
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

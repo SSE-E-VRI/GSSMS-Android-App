@@ -50,6 +50,9 @@ const pdfBorderSide = pw.BorderSide(color: pdfBorderColor, width: 0.75);
 class ReportRoot {
   ReportRoot._();
   static double lineHeight = 1.5;
+
+  /// Unscaled layout width used by the checklist row-height calculation.
+  static double contentWidth = reportContentWidth;
 }
 
 // ---------------------------------------------------------------------------

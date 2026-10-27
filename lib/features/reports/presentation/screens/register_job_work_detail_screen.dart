@@ -87,7 +87,7 @@ class _RegisterJobWorkDetailScreenState
       // equivalent of web's window.print().
       await Printing.layoutPdf(
         onLayout: (_) async => bytes,
-        name: '${report.ticket}_Register.pdf',
+        name: report.pdfFileName,
       );
     } catch (e) {
       if (!mounted) return;
