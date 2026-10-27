@@ -31,12 +31,12 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    await tester.pumpWidget(MaterialApp(
+    await tester.pumpWidget(const MaterialApp(
       home: Scaffold(
           body: SingleChildScrollView(
               child: ExecutionPhotoGallery(
         maxPerKind: 5,
-        photos: const [
+        photos: [
           ExecutionPhoto(id: 4, kind: 'AFTER'),
           ExecutionPhoto(id: 1, kind: 'BEFORE'),
           ExecutionPhoto(id: 2, kind: 'BEFORE'),

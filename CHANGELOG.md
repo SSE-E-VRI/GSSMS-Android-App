@@ -8,6 +8,17 @@ visible feature or change in what the app shows; MAJOR is a breaking change or
 forced update. The app talks to the GSSMS web/backend; API changes are additive,
 so older app builds keep working.
 
+## [0.3.11+16] - 2026-10-27
+
+### Fixed
+- Breakdown badges show the linked Job Work's live status and refresh when returning from its detail screen.
+- Register PDFs match the web reference's four-page layout, group headings, print metadata and filename; hidden line-photo strips no longer inflate the export.
+- Checkout selections refresh across devices, and verification evidence supports grouped photo navigation.
+
+### Release scope
+- Deploy web/backend 1.9.19 first for the routine PM failure-code/restored-time exemption.
+- Signed production APK uses the existing release certificate. Physical-device acceptance is still outstanding.
+
 ## [0.3.10+15] - 2026-10-26
 
 ### Fixed

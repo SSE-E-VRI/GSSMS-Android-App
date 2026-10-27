@@ -149,7 +149,7 @@ void main() {
 
       await tester.pumpAndSettle();
 
-      expect(find.text('Converted'), findsOneWidget);
+      expect(find.text('In Progress'), findsOneWidget);
       expect(find.text('Station Master'), findsOneWidget);
       expect(find.text('Job Work JW-2026-101 · In Progress'), findsOneWidget);
     });

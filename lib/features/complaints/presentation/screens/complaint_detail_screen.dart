@@ -305,12 +305,13 @@ class _ComplaintDetailScreenState extends ConsumerState<ComplaintDetailScreen> {
     });
   }
 
-  void _openJobWork(int workOrderId) {
-    openWorkOrderGuarded(
+  Future<void> _openJobWork(int workOrderId) async {
+    await openWorkOrderGuarded(
       context: context,
       session: sessionOf(ref),
       workOrderId: workOrderId,
     );
+    if (mounted) await _refreshDetail();
   }
 
   @override

@@ -3,6 +3,7 @@ import 'package:gssms_mobile/core/theme/app_theme.dart';
 import 'package:gssms_mobile/core/widgets/status_chip.dart';
 import 'package:gssms_mobile/features/complaints/domain/models/complaint.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/work_order_status_style.dart';
+import 'package:gssms_mobile/features/work_orders/domain/models/work_order.dart';
 
 /// Web register semantics: OPEN is waiting for action (warning), CONVERTED
 /// has become a Job Work (info), CLOSED is done (success).
@@ -34,6 +35,14 @@ extension ComplaintStatusStyle on ComplaintStatus {
   }
 }
 
+WorkOrderStatus _liveJobWorkStatus(Complaint complaint) {
+  if (!complaint.isConverted) return WorkOrderStatus.unknown;
+  final effective = complaint.effectiveStatus?.trim();
+  return WorkOrderStatus.fromString(
+    effective != null && effective.isNotEmpty ? effective : complaint.workOrderStatus,
+  );
+}
+
 class ComplaintStatusChip extends StatelessWidget {
   const ComplaintStatusChip({super.key, required this.complaint});
 
@@ -41,6 +50,10 @@ class ComplaintStatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final live = _liveJobWorkStatus(complaint);
+    if (live != WorkOrderStatus.unknown) {
+      return WorkOrderStatusChip(status: live);
+    }
     final status = complaint.status;
     return StatusChip(
       label: status.displayName,
@@ -68,6 +81,10 @@ class ComplaintEffectiveChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // The primary chip already shows the live status for converted records.
+    if (_liveJobWorkStatus(complaint) != WorkOrderStatus.unknown) {
+      return const SizedBox.shrink();
+    }
     final effective = complaint.effectiveStatus?.trim();
     if (effective == null || effective.isEmpty) {
       return const SizedBox.shrink();
