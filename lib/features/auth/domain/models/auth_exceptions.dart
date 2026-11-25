@@ -57,6 +57,13 @@ class GuestExpiredException extends AuthException {
       : super(code: 'GUEST_EXPIRED');
 }
 
+/// Thrown when a contract-staff account has expired (HTTP 401 code: CONTRACT_EXPIRED).
+class ContractExpiredException extends AuthException {
+  const ContractExpiredException(
+      [super.message = 'Contract account access has expired.'])
+      : super(code: 'CONTRACT_EXPIRED');
+}
+
 /// Thrown when credentials or token are expired or invalid (HTTP 401).
 class UnauthorizedException extends AuthException {
   const UnauthorizedException([super.message = 'Unauthorized or session expired.'])

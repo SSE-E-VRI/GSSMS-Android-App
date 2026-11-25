@@ -24,6 +24,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _designationController = TextEditingController();
+  final _currentPasswordController = TextEditingController();
   final _newPasswordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
@@ -59,6 +60,7 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
     _emailController.dispose();
     _phoneController.dispose();
     _designationController.dispose();
+    _currentPasswordController.dispose();
     _newPasswordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
@@ -293,9 +295,20 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
     }
   }
 
+  bool get _isContractStaff =>
+      _repo.currentSession?.isContractStaff ?? false;
+
   Future<void> _updatePassword() async {
+    final current = _currentPasswordController.text;
     final next = _newPasswordController.text;
     final confirm = _confirmPasswordController.text;
+    if (_isContractStaff && current.isEmpty) {
+      setState(() {
+        _banner = 'Enter your current password.';
+        _bannerError = true;
+      });
+      return;
+    }
     if (next.isEmpty) {
       setState(() {
         _banner = 'Enter a new password.';
@@ -316,8 +329,16 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
       _banner = null;
     });
     try {
-      await _repo.changePassword(next);
+      if (_isContractStaff) {
+        await _repo.changeOwnPassword(
+          currentPassword: current,
+          newPassword: next,
+        );
+      } else {
+        await _repo.changePassword(next);
+      }
       if (!mounted) return;
+      _currentPasswordController.clear();
       _newPasswordController.clear();
       _confirmPasswordController.clear();
       setState(() {
@@ -505,6 +526,18 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                             ),
                           ),
                           const SizedBox(height: 12),
+                          if (_isContractStaff) ...[
+                            _labeledField(
+                              label: 'Current Password',
+                              child: TextField(
+                                key: const Key('profile_current_password_field'),
+                                controller: _currentPasswordController,
+                                obscureText: true,
+                                decoration: _inputDecoration(),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                          ],
                           _labeledField(
                             label: 'New Password',
                             child: TextField(

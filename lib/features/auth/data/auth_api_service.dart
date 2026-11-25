@@ -42,6 +42,7 @@ class AuthApiService {
       return AuthTokens(
         accessToken: access,
         refreshToken: refresh is String ? refresh : null,
+        mustChangePassword: data['must_change_password'] == true,
       );
     } on DioException catch (e) {
       throw _parseDioError(e);
@@ -95,6 +96,7 @@ class AuthApiService {
       return AuthTokens(
         accessToken: access,
         refreshToken: refresh is String ? refresh : null,
+        mustChangePassword: data['must_change_password'] == true,
       );
     } on DioException catch (e) {
       throw _parseDioError(e);
@@ -227,6 +229,41 @@ class AuthApiService {
     }
   }
 
+  /// Change own password — POST /api/v1/auth/change-password/ (BR-06, D40, D117).
+  Future<AuthTokens> changeOwnPassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    try {
+      final response = await _dio.post<Map<String, dynamic>>(
+        '/api/v1/auth/change-password/',
+        data: {
+          'current_password': currentPassword,
+          'new_password': newPassword,
+        },
+      );
+      final data = response.data;
+      if (data == null || data['access'] == null) {
+        throw const AuthException('Invalid response from change-password endpoint');
+      }
+      final access = data['access'];
+      if (access is! String || access.isEmpty) {
+        throw const AuthException('Invalid access token in change-password response');
+      }
+      final refresh = data['refresh'];
+      return AuthTokens(
+        accessToken: access,
+        refreshToken: refresh is String ? refresh : null,
+        mustChangePassword: false,
+      );
+    } on DioException catch (e) {
+      throw _parseDioError(e);
+    } catch (e) {
+      if (e is AuthException) rethrow;
+      throw AuthException('Failed to change password: $e');
+    }
+  }
+
   /// Call POST /api/v1/auth/refresh/
   Future<AuthTokens> refreshToken(String refreshToken) async {
     try {
@@ -307,6 +344,10 @@ class AuthApiService {
           'The service is temporarily unavailable. Please try again.',
           code: 'SERVICE_UNAVAILABLE',
         );
+      }
+      if (code == 'CONTRACT_EXPIRED' ||
+          lowerDetail.contains('contract account access has expired')) {
+        return ContractExpiredException(detail);
       }
       if (code == 'GUEST_EXPIRED' ||
           lowerDetail.contains('demo access has expired') ||

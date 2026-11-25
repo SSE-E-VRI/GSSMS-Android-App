@@ -24,6 +24,8 @@ class UserSession extends Equatable {
     this.profilePicture,
     this.isOffline = false,
     this.offlineUntil,
+    this.isContractStaff = false,
+    this.mustChangePassword = false,
   });
 
   final String accessToken;
@@ -42,6 +44,8 @@ class UserSession extends Equatable {
   final String? profilePicture;
   final bool isOffline;
   final DateTime? offlineUntil;
+  final bool isContractStaff;
+  final bool mustChangePassword;
 
   String get displayName {
     final name = '${firstName ?? ''} ${lastName ?? ''}'.trim();
@@ -100,6 +104,8 @@ class UserSession extends Equatable {
     bool clearProfilePicture = false,
     bool? isOffline,
     DateTime? offlineUntil,
+    bool? isContractStaff,
+    bool? mustChangePassword,
   }) {
     return UserSession(
       accessToken: accessToken ?? this.accessToken,
@@ -119,6 +125,8 @@ class UserSession extends Equatable {
           clearProfilePicture ? null : (profilePicture ?? this.profilePicture),
       isOffline: isOffline ?? this.isOffline,
       offlineUntil: offlineUntil ?? this.offlineUntil,
+      isContractStaff: isContractStaff ?? this.isContractStaff,
+      mustChangePassword: mustChangePassword ?? this.mustChangePassword,
     );
   }
 
@@ -187,6 +195,8 @@ class UserSession extends Equatable {
       }
     }
 
+    final isContractStaff = claims['cs'] == true;
+
     // Parse validUntil
     DateTime? validUntil;
     if (claims['valid_until'] != null) {
@@ -194,7 +204,9 @@ class UserSession extends Equatable {
     }
     if (validUntil != null &&
         DateTime.now().toUtc().isAfter(validUntil.toUtc())) {
-      throw const GuestExpiredException();
+      throw isContractStaff
+          ? const ContractExpiredException()
+          : const GuestExpiredException();
     }
 
     // Parse scope — claims may decode as Map<dynamic,dynamic>.
@@ -230,6 +242,7 @@ class UserSession extends Equatable {
       profilePicture: profilePicture != null && profilePicture.isNotEmpty
           ? profilePicture
           : null,
+      isContractStaff: isContractStaff,
     );
   }
 
@@ -251,5 +264,7 @@ class UserSession extends Equatable {
         validUntil,
         scope,
         profilePicture,
+        isContractStaff,
+        mustChangePassword,
       ];
 }

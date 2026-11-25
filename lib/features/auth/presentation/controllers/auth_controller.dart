@@ -137,6 +137,20 @@ class AuthController extends Notifier<AuthState> {
         cleared);
   }
 
+  /// Complete forced password change (BR-06, D40) and unlock the app.
+  Future<void> completeForcedPasswordChange({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    final op = _opGenBox = Object();
+    final session = await _repository.changeOwnPassword(
+      currentPassword: currentPassword,
+      newPassword: newPassword,
+    );
+    if (!identical(op, _opGenBox)) return;
+    state = Authenticated(session);
+  }
+
   /// Perform initial login with username & password
   Future<void> login(String username, String password) async {
     if (username.trim().isEmpty || password.isEmpty) {

@@ -6,6 +6,7 @@ import '../core/theme/app_theme.dart';
 import '../core/theme/theme_mode_controller.dart';
 import '../features/auth/presentation/controllers/auth_controller.dart';
 import '../features/auth/presentation/controllers/auth_state.dart';
+import '../features/auth/presentation/screens/change_password_screen.dart';
 import '../features/auth/presentation/screens/login_screen.dart';
 import '../features/home/presentation/screens/home_screen.dart';
 import '../features/work_orders/presentation/screens/offline_work_screen.dart';
@@ -86,6 +87,9 @@ class _GssmsAppState extends ConsumerState<GssmsApp>
 
   static _AuthPhase _phaseOf(AuthState state) {
     if (state is Authenticated) {
+      if (state.session.mustChangePassword) {
+        return _AuthPhase.mustChangePassword;
+      }
       return state.session.isOffline
           ? _AuthPhase.offline
           : _AuthPhase.authenticated;
@@ -99,6 +103,8 @@ class _GssmsAppState extends ConsumerState<GssmsApp>
 
   Widget _buildHomeForPhase(_AuthPhase phase) {
     switch (phase) {
+      case _AuthPhase.mustChangePassword:
+        return const ChangePasswordScreen();
       case _AuthPhase.offline:
         return const OfflineWorkScreen();
       case _AuthPhase.authenticated:
@@ -115,7 +121,7 @@ class _GssmsAppState extends ConsumerState<GssmsApp>
   }
 }
 
-enum _AuthPhase { authenticated, offline, startup, login }
+enum _AuthPhase { authenticated, offline, mustChangePassword, startup, login }
 
 class _StartupView extends StatelessWidget {
   const _StartupView();
