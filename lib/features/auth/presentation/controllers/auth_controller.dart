@@ -44,6 +44,20 @@ final authRepositoryProvider = Provider<IAuthRepository>((ref) {
           .read(authControllerProvider.notifier)
           .handleSessionExpired(null, cleared);
     },
+    onPasswordChangeRequired: () {
+      ref.read(authControllerProvider.notifier).requirePasswordChange();
+    },
+    onSessionInvalidated: (reason, code) async {
+      var cleared = true;
+      try {
+        await repository.expireSession();
+      } catch (_) {
+        cleared = false;
+      }
+      await ref
+          .read(authControllerProvider.notifier)
+          .handleSessionExpired(reason, cleared, code);
+    },
   );
 
   apiService = AuthApiService(dio);
@@ -95,6 +109,9 @@ class AuthController extends Notifier<AuthState> {
         state = const Unauthenticated();
       }
     } on GuestExpiredException catch (e) {
+      if (!identical(op, _opGenBox)) return;
+      state = AuthError(e.message, code: e.code);
+    } on ContractExpiredException catch (e) {
       if (!identical(op, _opGenBox)) return;
       state = AuthError(e.message, code: e.code);
     } catch (_) {
@@ -149,6 +166,16 @@ class AuthController extends Notifier<AuthState> {
     );
     if (!identical(op, _opGenBox)) return;
     state = Authenticated(session);
+  }
+
+  /// Force password change screen when server returns 403 PASSWORD_CHANGE_REQUIRED.
+  void requirePasswordChange() {
+    if (state is Authenticated) {
+      final current = (state as Authenticated).session;
+      if (!current.mustChangePassword) {
+        state = Authenticated(current.copyWith(mustChangePassword: true));
+      }
+    }
   }
 
   /// Perform initial login with username & password
@@ -319,7 +346,7 @@ class AuthController extends Notifier<AuthState> {
 
   /// Triggered by interceptor when token refresh fails or guest access expires
   Future<void> handleSessionExpired(
-      [String? reason, bool credentialsCleared = true]) async {
+      [String? reason, bool credentialsCleared = true, String? code]) async {
     _opGenBox = Object();
     _pendingPassword = null;
     try {
@@ -334,7 +361,9 @@ class AuthController extends Notifier<AuthState> {
           (wiped && credentialsCleared
               ? ''
               : ' Saved credentials or offline data could not be cleared. Retry sign-out before sharing this device.'),
-      code: wiped && credentialsCleared ? 'SESSION_EXPIRED' : 'SIGN_OUT_FAILED',
+      code: wiped && credentialsCleared
+          ? (code ?? 'SESSION_EXPIRED')
+          : 'SIGN_OUT_FAILED',
     );
   }
 

@@ -8,6 +8,8 @@ import 'package:jwt_decoder/jwt_decoder.dart';
 typedef TokenProvider = String? Function();
 typedef RefreshTokenHandler = Future<String?> Function();
 typedef LogoutHandler = Future<void> Function();
+typedef SessionInvalidatedHandler = Future<void> Function(
+    String reason, String code);
 
 /// Interceptor that:
 /// 1. Attaches Bearer authorization token to outgoing API requests (except auth endpoints).
@@ -19,12 +21,16 @@ class AuthInterceptor extends QueuedInterceptor {
     required this.tokenProvider,
     required this.refreshTokenHandler,
     required this.onSessionExpired,
+    this.onPasswordChangeRequired,
+    this.onSessionInvalidated,
   });
 
   final Dio dio;
   final TokenProvider tokenProvider;
   final RefreshTokenHandler refreshTokenHandler;
   final LogoutHandler onSessionExpired;
+  final VoidCallback? onPasswordChangeRequired;
+  final SessionInvalidatedHandler? onSessionInvalidated;
 
   static const String kRetriedKey = 'k_auth_retried';
 
@@ -114,13 +120,35 @@ class AuthInterceptor extends QueuedInterceptor {
     }
   }
 
+  Future<void> _invalidateSession(String reason, String code) async {
+    try {
+      if (onSessionInvalidated != null) {
+        await onSessionInvalidated!(reason, code);
+      } else {
+        await onSessionExpired();
+      }
+    } catch (_) {
+      debugPrint('Session cleanup failed; credentials require manual retry.');
+    }
+  }
+
   @override
   Future<void> onError(
       DioException err, ErrorInterceptorHandler handler) async {
     _logError(err);
 
+    final statusCode = err.response?.statusCode;
+    final responseData = err.response?.data;
+
+    if (statusCode == 403 &&
+        responseData is Map &&
+        responseData['code'] == 'PASSWORD_CHANGE_REQUIRED') {
+      onPasswordChangeRequired?.call();
+      return handler.next(err);
+    }
+
     final isAuth = _isAuthEndpoint(err.requestOptions.path);
-    final is401 = err.response?.statusCode == 401;
+    final is401 = statusCode == 401;
     final alreadyRetried = err.requestOptions.extra[kRetriedKey] == true;
 
     // Do not attempt token refresh for non-401, auth endpoints, or already retried requests
@@ -143,7 +171,6 @@ class AuthInterceptor extends QueuedInterceptor {
     }
 
     // Check for GUEST_EXPIRED
-    final responseData = err.response?.data;
     if (responseData is Map && responseData['code'] == 'GUEST_EXPIRED') {
       await _expireSession();
       return handler.next(
@@ -153,6 +180,33 @@ class AuthInterceptor extends QueuedInterceptor {
           error: const GuestExpiredException(),
         ),
       );
+    }
+
+    // Handle 401 revocation, deactivation, and contract expiry without refresh retry (D108).
+    final code401 = responseData is Map ? responseData['code']?.toString() : null;
+    if (code401 != null) {
+      String? notice;
+      switch (code401) {
+        case 'SESSION_REVOKED':
+          notice = 'Your session has been revoked. Please sign in again.';
+          break;
+        case 'user_inactive':
+          notice =
+              'Your account has been deactivated. Please contact your administrator.';
+          break;
+        case 'no_active_account':
+          notice =
+              'Your account is no longer active. Please contact your administrator.';
+          break;
+        case 'CONTRACT_EXPIRED':
+          notice =
+              'Your contract has expired. Please contact your Divisional Admin.';
+          break;
+      }
+      if (notice != null) {
+        await _invalidateSession(notice, code401);
+        return handler.next(err);
+      }
     }
 
     try {
@@ -226,6 +280,24 @@ class AuthInterceptor extends QueuedInterceptor {
         }
         return handler.reject(retryErr);
       }
+    } on ContractExpiredException {
+      await _invalidateSession(
+        'Your contract has expired. Please contact your Divisional Admin.',
+        'CONTRACT_EXPIRED',
+      );
+      return handler.next(err);
+    } on AccountDisabledException {
+      await _invalidateSession(
+        'Your account has been deactivated. Please contact your administrator.',
+        'user_inactive',
+      );
+      return handler.next(err);
+    } on InvalidCredentialsException {
+      await _invalidateSession(
+        'Your account is no longer active. Please contact your administrator.',
+        'no_active_account',
+      );
+      return handler.next(err);
     } catch (_) {
       // A failed network/storage refresh is not an invalid refresh token.
       // Preserve credentials and return the original request failure for retry.

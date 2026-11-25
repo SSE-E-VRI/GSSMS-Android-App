@@ -125,6 +125,11 @@ String _dioMessage(DioException error) {
 }
 
 String _conflictMessage(Object? data) {
+  if (conflictCode(data) == 'CONCURRENT_UPDATE' ||
+      (data is Map &&
+          data['detail'] == 'A concurrent update prevented this operation.')) {
+    return 'Someone else changed this job work at the same time. Reload and try again.';
+  }
   final base = serverMessage(data) ?? kConflictErrorMessage;
   if (data is Map) {
     // S2 §24.1: prefer the structured blocking ticket, keep the legacy

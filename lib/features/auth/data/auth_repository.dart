@@ -174,6 +174,9 @@ class AuthRepository implements IAuthRepository {
         await logout();
       }
       rethrow;
+    } on ContractExpiredException {
+      if (gen == _opGeneration) await expireSession();
+      rethrow;
     } on UnauthorizedException {
       if (gen == _opGeneration) await expireSession();
       return null;
@@ -272,12 +275,21 @@ class AuthRepository implements IAuthRepository {
           gen, tokens.accessToken, tokens.refreshToken,
           notify: true);
       return session?.accessToken;
+    } on ContractExpiredException {
+      if (gen == _opGeneration) await expireSession();
+      rethrow;
     } on UnauthorizedException {
       if (gen == _opGeneration) await expireSession();
       return null;
     } on GuestExpiredException {
       if (gen == _opGeneration) await logout();
       return null;
+    } on AccountDisabledException {
+      if (gen == _opGeneration) await expireSession();
+      rethrow;
+    } on InvalidCredentialsException {
+      if (gen == _opGeneration) await expireSession();
+      rethrow;
     } catch (_) {
       // Only explicit invalid credentials return null. A transient failure
       // must remain distinct so the interceptor preserves the saved session.

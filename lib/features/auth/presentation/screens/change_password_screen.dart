@@ -90,6 +90,10 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
           TextButton(
             key: const Key('change_pw_sign_out_button'),
             onPressed: _submitting ? null : _signOut,
+            style: TextButton.styleFrom(
+              foregroundColor:
+                  Theme.of(context).appBarTheme.foregroundColor ?? Colors.white,
+            ),
             child: const Text('Sign Out'),
           ),
         ],
