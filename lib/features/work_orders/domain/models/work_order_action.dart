@@ -91,20 +91,51 @@ class WorkOrderActionSet extends Equatable {
   }
 
   factory WorkOrderActionSet.fromJson(Map<String, dynamic> json) {
-    List<WorkOrderAction> parse(String key) {
+    WorkOrderAction? parseEntry(dynamic e, {required bool enabledDefault}) {
+      if (e is Map) {
+        return WorkOrderAction.fromJson(Map<String, dynamic>.from(e));
+      }
+      if (e is String) {
+        // Contract staff endpoint returns string tokens ('START', 'CONTINUE',
+        // 'COMPLETE') instead of transition objects (views.py:4264-4296).
+        // Unknown tokens are dropped rather than turned into tappable actions.
+        final token = e.trim().toUpperCase();
+        return switch (token) {
+          'START' => WorkOrderAction(
+              targetStatus: 'IN_PROGRESS',
+              label: 'Start Execution',
+              enabled: enabledDefault,
+            ),
+          'CONTINUE' => WorkOrderAction(
+              targetStatus: 'CONTINUE',
+              label: 'Continue',
+              enabled: enabledDefault,
+            ),
+          'COMPLETE' => WorkOrderAction(
+              targetStatus: 'TECH_COMPLETED',
+              label: 'Complete',
+              enabled: enabledDefault,
+            ),
+          _ => null,
+        };
+      }
+      return null;
+    }
+
+    List<WorkOrderAction> parse(String key, {required bool enabledDefault}) {
       final raw = json[key];
       if (raw is! List) return const [];
       return raw
-          .whereType<Map>()
-          .map((e) => WorkOrderAction.fromJson(Map<String, dynamic>.from(e)))
+          .map((e) => parseEntry(e, enabledDefault: enabledDefault))
+          .whereType<WorkOrderAction>()
           .toList();
     }
 
     return WorkOrderActionSet(
       workOrderId: asJsonInt(json['work_order'] ?? json['work_order_id']) ?? 0,
       currentStatus: asJsonString(json['current_status']),
-      allowed: parse('allowed_actions'),
-      blocked: parse('blocked_actions'),
+      allowed: parse('allowed_actions', enabledDefault: true),
+      blocked: parse('blocked_actions', enabledDefault: false),
     );
   }
 
