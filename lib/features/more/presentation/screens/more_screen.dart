@@ -1,10 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/theme/app_theme.dart';
+import 'package:gssms_mobile/core/theme/app_theme.dart';
 import '../../../../core/theme/theme_mode_controller.dart';
 import '../../../../core/widgets/profile_avatar.dart';
-import '../../../auth/domain/models/auth_role.dart';
 import '../../../auth/domain/models/user_session.dart';
 import '../../../auth/domain/rbac.dart';
 import '../../../auth/presentation/controllers/auth_controller.dart';
@@ -21,13 +20,6 @@ class MoreScreen extends ConsumerWidget {
   const MoreScreen({super.key, this.session});
 
   final UserSession? session;
-
-  static bool _showEnergyPlaceholder(UserSession session) {
-    if (session.primaryRole == AuthRole.ebBillClerk) return true;
-    if (session.roles.contains(AuthRole.ebBillClerk)) return true;
-    if (session.permissions.contains('*')) return false;
-    return session.permissions.any((p) => p.startsWith('energy.'));
-  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -135,54 +127,59 @@ class MoreScreen extends ConsumerWidget {
           ),
           const SizedBox(height: GssmsSpacing.s16),
 
-          const _SectionLabel('OPERATIONAL MODULES'),
-          if (sessionAllows(currentSession, 'dashboard.view'))
-            moduleTile(
-              key: const Key('more_menu_dashboard'),
-              icon: Icons.dashboard_outlined,
-              color: AppTheme.moduleDashboard,
-              title: 'Dashboard',
-              subtitle: 'Org-wide KPI & status summary',
-              screen: const DashboardScreen(),
-            ),
-          if (sessionAllows(currentSession, 'maintenance.view'))
-            moduleTile(
-              key: const Key('more_menu_maintenance'),
-              icon: Icons.build_circle_outlined,
-              color: AppTheme.moduleMaintenance,
-              title: 'Maintenance Management',
-              subtitle: 'Compliance & job work distribution',
-              screen: const MaintenanceScreen(),
-            ),
-          if (canViewDeficiencyModule(currentSession))
-            moduleTile(
-              key: const Key('more_menu_deficiencies'),
-              icon: Icons.rule_outlined,
-              color: AppTheme.moduleDeficiencies,
-              title: 'Deficiencies',
-              subtitle: 'Open findings & rectification status',
-              screen: const DeficiencyListScreen(),
-            ),
-          if (sessionAllows(currentSession, 'reports.view'))
-            moduleTile(
-              key: const Key('more_menu_reports'),
-              icon: Icons.description_outlined,
-              color: AppTheme.moduleReports,
-              title: 'Reports & Audit',
-              subtitle: 'Maintenance register & audit trail',
-              screen: const ReportsScreen(),
-            ),
-          if (_showEnergyPlaceholder(currentSession))
-            moduleTile(
-              key: const Key('more_menu_energy'),
-              icon: Icons.solar_power_outlined,
-              color: AppTheme.moduleEnergy,
-              title: 'Energy & Solar',
-              subtitle: 'Meter readings & bills',
-              screen: const EnergyPlaceholderScreen(),
-            ),
-
-          const Divider(height: GssmsSpacing.s24),
+          if (canAccessDestination(currentSession, AppDestination.dashboard) ||
+              canAccessDestination(currentSession, AppDestination.maintenance) ||
+              canAccessDestination(currentSession, AppDestination.deficiencies) ||
+              canAccessDestination(currentSession, AppDestination.reports) ||
+              canAccessDestination(currentSession, AppDestination.energy)) ...[
+            const _SectionLabel('OPERATIONAL MODULES'),
+            if (canAccessDestination(currentSession, AppDestination.dashboard))
+              moduleTile(
+                key: const Key('more_menu_dashboard'),
+                icon: Icons.dashboard_outlined,
+                color: AppTheme.moduleDashboard,
+                title: 'Dashboard',
+                subtitle: 'Org-wide KPI & status summary',
+                screen: const DashboardScreen(),
+              ),
+            if (canAccessDestination(currentSession, AppDestination.maintenance))
+              moduleTile(
+                key: const Key('more_menu_maintenance'),
+                icon: Icons.build_circle_outlined,
+                color: AppTheme.moduleMaintenance,
+                title: 'Maintenance Management',
+                subtitle: 'Compliance & job work distribution',
+                screen: const MaintenanceScreen(),
+              ),
+            if (canAccessDestination(currentSession, AppDestination.deficiencies))
+              moduleTile(
+                key: const Key('more_menu_deficiencies'),
+                icon: Icons.rule_outlined,
+                color: AppTheme.moduleDeficiencies,
+                title: 'Deficiencies',
+                subtitle: 'Open findings & rectification status',
+                screen: const DeficiencyListScreen(),
+              ),
+            if (canAccessDestination(currentSession, AppDestination.reports))
+              moduleTile(
+                key: const Key('more_menu_reports'),
+                icon: Icons.description_outlined,
+                color: AppTheme.moduleReports,
+                title: 'Reports & Audit',
+                subtitle: 'Maintenance register & audit trail',
+                screen: const ReportsScreen(),
+              ),
+            if (canAccessDestination(currentSession, AppDestination.energy))
+              moduleTile(
+                key: const Key('more_menu_energy'),
+                icon: Icons.solar_power_outlined,
+                color: AppTheme.moduleEnergy,
+                title: 'Energy & Solar',
+                subtitle: 'Meter readings & bills',
+                screen: const EnergyPlaceholderScreen(),
+              ),
+            const Divider(height: GssmsSpacing.s24),
+          ],
 
           const _SectionLabel('APPEARANCE'),
           const Padding(
@@ -196,7 +193,7 @@ class MoreScreen extends ConsumerWidget {
           const Divider(height: GssmsSpacing.s24),
 
           const _SectionLabel('ACCOUNT'),
-          if (sessionAllows(currentSession, 'maintenance.view'))
+          if (canAccessDestination(currentSession, AppDestination.notifications))
             ListTile(
               key: const Key('more_menu_notifications'),
               leading: Icon(Icons.notifications_outlined, color: tokens.link),

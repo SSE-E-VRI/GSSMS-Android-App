@@ -252,3 +252,95 @@ bool canAddChecklistAttachment(UserSession? session) =>
 bool canDeleteChecklistAttachment(UserSession? session) =>
     sessionAllows(session, 'maintenance.attachment_delete') &&
     session!.roles.any(_attachmentRoles.contains);
+
+/// Top-level app destinations and profile-edit capability gated by both
+/// departmental RBAC and the S3c/BR-21 contract-staff allow-list (`policy.py`).
+enum AppDestination {
+  home,
+  work,
+  assets,
+  scanAsset,
+  maintenance,
+  dashboard,
+  complaints,
+  inspections,
+  deficiencies,
+  schedules,
+  reports,
+  energy,
+  notifications,
+  profile,
+  profileEdit,
+}
+
+bool _hasEnergyAccess(UserSession session) {
+  if (session.primaryRole == AuthRole.ebBillClerk) return true;
+  if (session.roles.contains(AuthRole.ebBillClerk)) return true;
+  if (session.permissions.contains('*')) return false;
+  return session.permissions.any((p) => p.startsWith('energy.'));
+}
+
+/// Single source of truth for which destinations a session may see.
+///
+/// When `session.isContractStaff` is true, only destinations backed by
+/// `contracts/policy.py` `POLICY_ROWS` are permitted (`home`, `work` via
+/// `staff-workorders/`, `notifications` derived in-memory from
+/// `staff-workorders/`, and read-only `profile` via `GET users/<own id>/`).
+/// Departmental sessions (`cs=false`) retain their existing RBAC rules.
+bool canAccessDestination(UserSession? session, AppDestination destination) {
+  if (session == null) return false;
+  if (session.isContractStaff) {
+    switch (destination) {
+      case AppDestination.home:
+      case AppDestination.profile:
+        return true;
+      case AppDestination.work:
+      case AppDestination.notifications:
+        return sessionAllows(session, 'maintenance.view');
+      case AppDestination.assets:
+      case AppDestination.scanAsset:
+      case AppDestination.maintenance:
+      case AppDestination.dashboard:
+      case AppDestination.complaints:
+      case AppDestination.inspections:
+      case AppDestination.deficiencies:
+      case AppDestination.schedules:
+      case AppDestination.reports:
+      case AppDestination.energy:
+      case AppDestination.profileEdit:
+        return false;
+    }
+  }
+
+  switch (destination) {
+    case AppDestination.home:
+    case AppDestination.profile:
+    case AppDestination.profileEdit:
+      return true;
+    case AppDestination.work:
+      return sessionAllowsAny(session, const [
+        'maintenance.view',
+        'complaints.view',
+        'inspections.view',
+      ]);
+    case AppDestination.assets:
+    case AppDestination.scanAsset:
+      return sessionAllows(session, 'assets.view');
+    case AppDestination.maintenance:
+    case AppDestination.schedules:
+    case AppDestination.notifications:
+      return sessionAllows(session, 'maintenance.view');
+    case AppDestination.dashboard:
+      return sessionAllows(session, 'dashboard.view');
+    case AppDestination.complaints:
+      return sessionAllows(session, 'complaints.view');
+    case AppDestination.inspections:
+      return sessionAllows(session, 'inspections.view');
+    case AppDestination.deficiencies:
+      return canViewDeficiencyModule(session);
+    case AppDestination.reports:
+      return sessionAllows(session, 'reports.view');
+    case AppDestination.energy:
+      return _hasEnergyAccess(session);
+  }
+}

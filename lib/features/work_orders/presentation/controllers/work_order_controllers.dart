@@ -92,6 +92,11 @@ class WorkOrderListController extends Notifier<WorkOrderListState> {
     required DateTime? dateTo,
     required OrgScopeSelection scope,
   }) async {
+    final isContractStaff =
+        (sessionFromAuth(ref.read(authControllerProvider)) ??
+                ref.read(authRepositoryProvider).currentSession)
+            ?.isContractStaff ==
+        true;
     final seq = ++_requestSeq;
     try {
       final orders = await _repository.fetchWorkOrders(
@@ -101,6 +106,7 @@ class WorkOrderListController extends Notifier<WorkOrderListState> {
         divisionId: scope.divisionId,
         depotId: scope.depotId,
         stationId: scope.stationId,
+        assignedToMe: isContractStaff,
       );
       if (seq != _requestSeq) return;
       state = WorkOrderListLoaded(

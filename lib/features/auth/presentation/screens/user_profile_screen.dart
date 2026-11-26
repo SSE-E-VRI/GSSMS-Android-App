@@ -9,6 +9,7 @@ import 'package:gssms_mobile/core/widgets/profile_avatar.dart';
 import 'package:gssms_mobile/features/auth/data/auth_repository.dart';
 import 'package:gssms_mobile/features/auth/domain/models/auth_exceptions.dart';
 import 'package:gssms_mobile/features/auth/domain/models/user_profile.dart';
+import 'package:gssms_mobile/features/auth/domain/rbac.dart';
 import 'package:gssms_mobile/features/auth/presentation/controllers/auth_controller.dart';
 
 class UserProfileScreen extends ConsumerStatefulWidget {
@@ -365,6 +366,9 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final session = sessionOf(ref) ?? _repo.currentSession;
+    final canEditProfile = session == null ||
+        canAccessDestination(session, AppDestination.profileEdit);
     return Scaffold(
       backgroundColor: context.gssms.surfaceInset,
       appBar: AppBar(title: const Text('User Profile')),
@@ -411,7 +415,8 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                               displayName: _username,
                               radius: 48,
                               isUploading: _uploadingPhoto,
-                              onCameraTap: _showPhotoOptions,
+                              onCameraTap:
+                                  canEditProfile ? _showPhotoOptions : null,
                             ),
                           ),
                           const SizedBox(height: 16),
@@ -451,72 +456,77 @@ class _UserProfileScreenState extends ConsumerState<UserProfileScreen> {
                             ],
                             const SizedBox(height: 20),
                           ],
-                          Text(
-                            'Personal Information',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: context.gssms.textSecondary,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          _labeledField(
-                            label: 'Email',
-                            child: TextField(
-                              key: const Key('profile_email_field'),
-                              controller: _emailController,
-                              keyboardType: TextInputType.emailAddress,
-                              decoration: _inputDecoration(),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          _labeledField(
-                            label: 'Phone',
-                            child: TextField(
-                              key: const Key('profile_phone_field'),
-                              controller: _phoneController,
-                              keyboardType: TextInputType.phone,
-                              decoration: _inputDecoration(),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          _labeledField(
-                            label: 'Designation',
-                            child: TextField(
-                              key: const Key('profile_designation_field'),
-                              controller: _designationController,
-                              decoration: _inputDecoration(
-                                hint: 'Enter your designation',
+                          if (canEditProfile) ...[
+                            Text(
+                              'Personal Information',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: context.gssms.textSecondary,
                               ),
                             ),
-                          ),
-                          const SizedBox(height: 16),
-                          Align(
-                            alignment: Alignment.centerRight,
-                            child: FilledButton(
-                              key: const Key('profile_save_changes_button'),
-                              onPressed: _savingProfile ? null : _saveProfile,
-                              style: FilledButton.styleFrom(
-                                backgroundColor: Theme.of(context).colorScheme.primary,
-                                minimumSize: const Size(0, 40),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 10,
+                            const SizedBox(height: 12),
+                            _labeledField(
+                              label: 'Email',
+                              child: TextField(
+                                key: const Key('profile_email_field'),
+                                controller: _emailController,
+                                keyboardType: TextInputType.emailAddress,
+                                decoration: _inputDecoration(),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            _labeledField(
+                              label: 'Phone',
+                              child: TextField(
+                                key: const Key('profile_phone_field'),
+                                controller: _phoneController,
+                                keyboardType: TextInputType.phone,
+                                decoration: _inputDecoration(),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            _labeledField(
+                              label: 'Designation',
+                              child: TextField(
+                                key: const Key('profile_designation_field'),
+                                controller: _designationController,
+                                decoration: _inputDecoration(
+                                  hint: 'Enter your designation',
                                 ),
                               ),
-                              child: _savingProfile
-                                  ? SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: Theme.of(context).colorScheme.onPrimary,
-                                      ),
-                                    )
-                                  : const Text('Save Changes'),
                             ),
-                          ),
-                          const Divider(height: 32),
+                            const SizedBox(height: 16),
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: FilledButton(
+                                key: const Key('profile_save_changes_button'),
+                                onPressed: _savingProfile ? null : _saveProfile,
+                                style: FilledButton.styleFrom(
+                                  backgroundColor:
+                                      Theme.of(context).colorScheme.primary,
+                                  minimumSize: const Size(0, 40),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 16,
+                                    vertical: 10,
+                                  ),
+                                ),
+                                child: _savingProfile
+                                    ? SizedBox(
+                                        width: 16,
+                                        height: 16,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .onPrimary,
+                                        ),
+                                      )
+                                    : const Text('Save Changes'),
+                              ),
+                            ),
+                            const Divider(height: 32),
+                          ],
                           Text(
                             'Change Password',
                             style: TextStyle(
