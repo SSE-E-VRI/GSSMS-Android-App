@@ -127,7 +127,9 @@ class AuthRepository implements IAuthRepository {
         }
         if (generation != _opGeneration) return null;
         await _bindCacheToSession(session, previous: previous);
-        if (session.userId != null) {
+        if (session.isContractStaff) {
+          await _offlineSessionStore?.clear();
+        } else if (session.userId != null) {
           await _offlineSessionStore?.write(OfflineSessionSnapshot(
               accessToken, session.userId!, verifiedAt, verifiedAt));
         }
@@ -221,6 +223,7 @@ class AuthRepository implements IAuthRepository {
         } catch (_) {
           return null;
         }
+        if (session.isContractStaff) return null;
         final profileDeadline = session.validUntil?.toUtc();
         if (profileDeadline != null) {
           if (!now.isBefore(profileDeadline)) return null;

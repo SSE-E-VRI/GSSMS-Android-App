@@ -11,6 +11,7 @@ final downloadedChecklistAccessProvider =
   final session = sessionFromAuth(ref.watch(authControllerProvider));
   final userId = session?.userId;
   if (userId == null ||
+      session?.isContractStaff == true ||
       !canWriteChecklist(session) ||
       order.assignedToId != userId ||
       order.status != WorkOrderStatus.inProgress ||
