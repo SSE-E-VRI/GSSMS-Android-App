@@ -397,6 +397,61 @@ void main() {
       );
     });
 
+    test('(T1a) cs=true transitionStatus on network error enqueues nothing and throws OnlineRequiredException',
+        () async {
+      final api = _MockWorkOrderApiService();
+      final cache = InMemoryLocalCacheService();
+      final sync = makeSync(cache);
+      when(() => api.changeStatus(
+            77,
+            status: 'TECH_COMPLETED',
+            remarks: any(named: 'remarks'),
+            checklist: any(named: 'checklist'),
+            evidence: any(named: 'evidence'),
+            idempotencyKey: any(named: 'idempotencyKey'),
+          )).thenThrow(_networkErr());
+
+      final repo = WorkOrderRepository(
+        api,
+        cacheService: cache,
+        syncManager: sync,
+        sessionProvider: () => _session(cs: true),
+      );
+      await expectLater(
+        repo.transitionStatus(77, status: 'TECH_COMPLETED'),
+        throwsA(isA<OnlineRequiredException>()
+            .having((e) => e.message, 'message', expectedOnlineMsg)),
+      );
+      expect(await cache.getOutboxCommands(), isEmpty);
+    });
+
+    test('(T1b) cs=false transitionStatus on network error still enqueues',
+        () async {
+      final api = _MockWorkOrderApiService();
+      final cache = InMemoryLocalCacheService();
+      final sync = makeSync(cache);
+      when(() => api.changeStatus(
+            77,
+            status: 'TECH_COMPLETED',
+            remarks: any(named: 'remarks'),
+            checklist: any(named: 'checklist'),
+            evidence: any(named: 'evidence'),
+            idempotencyKey: any(named: 'idempotencyKey'),
+          )).thenThrow(_networkErr());
+
+      final repo = WorkOrderRepository(
+        api,
+        cacheService: cache,
+        syncManager: sync,
+        sessionProvider: () => _session(cs: false),
+      );
+      await expectLater(
+        repo.transitionStatus(77, status: 'TECH_COMPLETED'),
+        throwsA(anything),
+      );
+      expect((await cache.getOutboxCommands()).length, 1);
+    });
+
     test('(7) downloadedChecklistAccessProvider is false for cs=true and true for cs=false',
         () async {
       final cache = InMemoryLocalCacheService();

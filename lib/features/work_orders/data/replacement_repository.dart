@@ -19,6 +19,10 @@ abstract class IReplacementRepository {
     int workOrderId,
     JobWorkComponentReplacementRequest request,
   );
+  Future<void> replaceRecordComponent(
+    int recordId,
+    RecordLineReplacementRequest request,
+  );
 }
 
 class ReplacementRepository implements IReplacementRepository {
@@ -63,6 +67,13 @@ class ReplacementRepository implements IReplacementRepository {
     JobWorkComponentReplacementRequest request,
   ) =>
       _api.logJobWorkReplacement(workOrderId, request);
+
+  @override
+  Future<void> replaceRecordComponent(
+    int recordId,
+    RecordLineReplacementRequest request,
+  ) =>
+      _api.replaceRecordComponent(recordId, request);
 }
 
 final replacementRepositoryProvider = Provider<IReplacementRepository>((ref) {

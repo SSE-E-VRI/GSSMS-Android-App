@@ -655,8 +655,19 @@ class _ChecklistFormScreenState extends ConsumerState<ChecklistFormScreen> {
   Future<void> _openReplaceComponent(ChecklistLoaded state) async {
     final jobWork = ReplacementJobWork.fromRecord(state.record);
     if (jobWork == null) return;
-    final ok = await showReplaceComponentSheet(context, ref, jobWork);
+    final lineOnly = canReplaceComponentViaRecordLine(
+        sessionFromAuth(ref.read(authControllerProvider)));
+    final ok = await showReplaceComponentSheet(
+      context,
+      ref,
+      jobWork,
+      lines: state.record.lines,
+      lineOnlyMode: lineOnly,
+    );
     if (ok == true && mounted) {
+      unawaited(ref
+          .read(checklistControllerProvider(widget.recordId).notifier)
+          .loadRecord());
       showGssmsSnackBar(context, 'Component replacement recorded!',
           tone: GssmsTone.success);
     }

@@ -210,10 +210,17 @@ bool canRequestPmApproval(UserSession? session) =>
 /// Held by SUPER_ADMIN and MAINTENANCE_STAFF only (rbac/registry.py).
 bool canReplaceAssets(UserSession? s) => sessionAllows(s, 'assets.replace');
 
-/// replace_asset additionally requires the MAINTENANCE_STAFF role (assets/views.py:2277).
+/// replace_asset additionally requires the MAINTENANCE_STAFF role (assets/views.py:2277)
+/// and is refused for contract staff (D58).
 bool canReplaceWholeAsset(UserSession? s) =>
+    s?.isContractStaff != true &&
     canReplaceAssets(s) &&
     (s?.roles.contains(AuthRole.maintenanceStaff) ?? false);
+
+/// D58: contract staff record component replacements against a checklist line
+/// via `POST /maintenance/records/{id}/replace_component/`.
+bool canReplaceComponentViaRecordLine(UserSession? s) =>
+    s?.isContractStaff == true;
 
 const _deficiencyModuleRoles = {AuthRole.depotIncharge, AuthRole.depotUser};
 

@@ -210,3 +210,63 @@ class JobWorkComponentReplacementRequest extends Equatable {
         remarks,
       ];
 }
+
+/// Body for `POST /maintenance/records/{id}/replace_component/` (D58 line-level
+/// replacement, used by contract staff; never sends `asset_id`).
+class RecordLineReplacementRequest extends Equatable {
+  const RecordLineReplacementRequest({
+    required this.lineId,
+    required this.componentName,
+    required this.newMake,
+    required this.newSerialNumber,
+    required this.reason,
+    this.oldMake = '',
+    this.oldModel = '',
+    this.oldSerialNumber = '',
+    this.newModel = '',
+    this.newWarrantyExpiry,
+    this.remarks = '',
+  });
+
+  final int lineId;
+  final String componentName;
+  final String oldMake;
+  final String oldModel;
+  final String oldSerialNumber;
+  final String newMake;
+  final String newModel;
+  final String newSerialNumber;
+  final DateTime? newWarrantyExpiry;
+  final String reason;
+  final String remarks;
+
+  Map<String, dynamic> toJson() => {
+        'line_id': lineId,
+        'component_name': componentName.trim(),
+        'old_serial_number': oldSerialNumber.trim(),
+        'old_make': oldMake.trim(),
+        'old_model': oldModel.trim(),
+        'new_make': newMake.trim(),
+        'new_model': newModel.trim(),
+        'new_serial_number': newSerialNumber.trim(),
+        if (newWarrantyExpiry != null)
+          'new_warranty_expiry_date': _isoDate(newWarrantyExpiry!),
+        'reason': reason.trim(),
+        'remarks': remarks.trim(),
+      };
+
+  @override
+  List<Object?> get props => [
+        lineId,
+        componentName,
+        oldMake,
+        oldModel,
+        oldSerialNumber,
+        newMake,
+        newModel,
+        newSerialNumber,
+        newWarrantyExpiry,
+        reason,
+        remarks,
+      ];
+}

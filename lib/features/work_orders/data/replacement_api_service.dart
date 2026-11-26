@@ -41,6 +41,17 @@ class ReplacementApiService {
       data: request.toJson(),
     );
   }
+
+  /// `POST /maintenance/records/{id}/replace_component/` (D58).
+  Future<void> replaceRecordComponent(
+    int recordId,
+    RecordLineReplacementRequest request,
+  ) async {
+    await _dio.post(
+      '/api/v1/maintenance/records/$recordId/replace_component/',
+      data: request.toJson(),
+    );
+  }
 }
 
 /// User-facing text for a failed replacement call: maps the backend's

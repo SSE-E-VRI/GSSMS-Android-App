@@ -6,6 +6,7 @@ import 'package:gssms_mobile/features/assets/domain/models/asset.dart';
 import 'package:gssms_mobile/features/assets/domain/models/asset_component.dart';
 import 'package:gssms_mobile/features/work_orders/data/replacement_api_service.dart';
 import 'package:gssms_mobile/features/work_orders/data/replacement_repository.dart';
+import 'package:gssms_mobile/features/work_orders/domain/models/maintenance_record.dart';
 import 'package:gssms_mobile/features/work_orders/domain/models/replacement_requests.dart';
 import 'package:gssms_mobile/features/work_orders/presentation/widgets/station_asset_picker.dart';
 
@@ -18,14 +19,21 @@ enum ComponentAssetMode { registered, unregistered }
 Future<bool?> showReplaceComponentSheet(
   BuildContext context,
   WidgetRef ref,
-  ReplacementJobWork jobWork,
-) {
+  ReplacementJobWork jobWork, {
+  List<MaintenanceRecordLine> lines = const [],
+  bool lineOnlyMode = false,
+}) {
   final repo = ref.read(replacementRepositoryProvider);
   return showModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
-    builder: (_) => ReplaceComponentSheet(jobWork: jobWork, repository: repo),
+    builder: (_) => ReplaceComponentSheet(
+      jobWork: jobWork,
+      repository: repo,
+      lines: lines,
+      lineOnlyMode: lineOnlyMode,
+    ),
   );
 }
 
@@ -36,10 +44,14 @@ class ReplaceComponentSheet extends StatefulWidget {
     super.key,
     required this.jobWork,
     required this.repository,
+    this.lines = const [],
+    this.lineOnlyMode = false,
   });
 
   final ReplacementJobWork jobWork;
   final IReplacementRepository repository;
+  final List<MaintenanceRecordLine> lines;
+  final bool lineOnlyMode;
 
   @override
   State<ReplaceComponentSheet> createState() => _ReplaceComponentSheetState();
@@ -73,6 +85,8 @@ class _ReplaceComponentSheetState extends State<ReplaceComponentSheet> {
   int _componentsRequest = 0;
 
   DateTime? _warranty;
+  int? _selectedLineId;
+  String? _lineError;
   bool _submitting = false;
   String? _error;
   Set<String> _missing = const {};
@@ -86,7 +100,7 @@ class _ReplaceComponentSheetState extends State<ReplaceComponentSheet> {
     _mode = _hasStation
         ? ComponentAssetMode.registered
         : ComponentAssetMode.unregistered;
-    if (_hasStation) _preselectJobWorkAsset();
+    if (_hasStation && !widget.lineOnlyMode) _preselectJobWorkAsset();
   }
 
   @override
@@ -224,8 +238,20 @@ class _ReplaceComponentSheetState extends State<ReplaceComponentSheet> {
 
     String? banner;
     String? assetError;
+    String? lineError;
     var missing = <String>{};
-    if (_registered && _component == null) {
+    if (widget.lineOnlyMode) {
+      if (_selectedLineId == null) {
+        banner = 'Please select a checklist line.';
+        lineError = 'Required';
+      } else {
+        if (name.isEmpty) missing.add('name');
+        if (newMake.isEmpty) missing.add('new_make');
+        if (newSerial.isEmpty) missing.add('new_serial');
+        if (reason.isEmpty) missing.add('reason');
+        if (missing.isNotEmpty) banner = _requiredFieldsMessage;
+      }
+    } else if (_registered && _component == null) {
       banner = 'Please select a registered component.';
       if (_asset == null) assetError = 'Please select a registered asset.';
     } else if (!_registered && reference.isEmpty) {
@@ -241,6 +267,7 @@ class _ReplaceComponentSheetState extends State<ReplaceComponentSheet> {
       setState(() {
         _error = banner;
         _assetError = assetError;
+        _lineError = lineError;
         _missing = missing;
       });
       return;
@@ -250,10 +277,28 @@ class _ReplaceComponentSheetState extends State<ReplaceComponentSheet> {
       _submitting = true;
       _error = null;
       _assetError = null;
+      _lineError = null;
       _missing = const {};
     });
     try {
-      if (_registered) {
+      if (widget.lineOnlyMode) {
+        await widget.repository.replaceRecordComponent(
+          widget.jobWork.recordId,
+          RecordLineReplacementRequest(
+            lineId: _selectedLineId!,
+            componentName: name,
+            oldMake: _oldMake.text.trim(),
+            oldModel: _oldModel.text.trim(),
+            oldSerialNumber: _oldSerial.text.trim(),
+            newMake: newMake,
+            newModel: _newModel.text.trim(),
+            newSerialNumber: newSerial,
+            newWarrantyExpiry: _warranty,
+            reason: reason,
+            remarks: _remarks.text.trim(),
+          ),
+        );
+      } else if (_registered) {
         final component = _component!;
         await widget.repository.replaceInstalledComponent(
           component.sourceId,
@@ -301,6 +346,9 @@ class _ReplaceComponentSheetState extends State<ReplaceComponentSheet> {
       '${a.uniqueId} — ${a.assetCategoryName ?? a.displayName}';
 
   String get _intro {
+    if (widget.lineOnlyMode) {
+      return 'Record a component replacement against a checklist line.';
+    }
     final asset = _asset;
     if (_registered && asset != null) {
       return 'Record a component replaced within asset ${asset.uniqueId}. '
@@ -369,6 +417,51 @@ class _ReplaceComponentSheetState extends State<ReplaceComponentSheet> {
               ? 'Required'
               : null,
         ),
+      ),
+    );
+  }
+
+  Widget _lineField() {
+    final activeLines = widget.lines.where((l) => !l.excluded).toList();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: GssmsSpacing.s12),
+      child: DropdownButtonFormField<int>(
+        key: const Key('replace_component_line_field'),
+        initialValue: _selectedLineId,
+        isExpanded: true,
+        decoration: InputDecoration(
+          labelText: 'Checklist Line *',
+          isDense: true,
+          errorText: _lineError,
+        ),
+        hint: const Text('-- Select checklist line --'),
+        items: [
+          for (final l in activeLines)
+            DropdownMenuItem<int>(
+              value: l.id,
+              child: Text(
+                l.inspectionPoint != null && l.inspectionPoint!.isNotEmpty
+                    ? '${l.itemName} — ${l.inspectionPoint}'
+                    : l.itemName,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+        ],
+        onChanged: _submitting
+            ? null
+            : (id) {
+                MaintenanceRecordLine? picked;
+                for (final l in activeLines) {
+                  if (l.id == id) picked = l;
+                }
+                setState(() {
+                  _selectedLineId = id;
+                  _lineError = null;
+                  if (picked != null && _name.text.trim().isEmpty) {
+                    _name.text = picked.itemName;
+                  }
+                });
+              },
       ),
     );
   }
@@ -545,65 +638,69 @@ class _ReplaceComponentSheetState extends State<ReplaceComponentSheet> {
                   ?.copyWith(color: tokens.textSecondary),
             ),
             const SizedBox(height: GssmsSpacing.s16),
-            Text(
-              'Asset registration',
-              style: theme.textTheme.labelMedium
-                  ?.copyWith(color: tokens.textSecondary),
-            ),
-            const SizedBox(height: GssmsSpacing.s4),
-            SegmentedButton<ComponentAssetMode>(
-              key: const Key('replace_component_mode'),
-              segments: [
-                ButtonSegment(
-                  value: ComponentAssetMode.registered,
-                  label: const Text('Registered asset'),
-                  enabled: _hasStation,
-                ),
-                const ButtonSegment(
-                  value: ComponentAssetMode.unregistered,
-                  label: Text('Non-registered asset'),
-                ),
-              ],
-              selected: {_mode},
-              showSelectedIcon: false,
-              onSelectionChanged: _submitting
-                  ? null
-                  : (s) => setState(() {
-                        _mode = s.first;
-                        _error = null;
-                        _assetError = null;
-                        _missing = const {};
-                      }),
-            ),
-            const SizedBox(height: GssmsSpacing.s12),
-            if (_registered) ...[
-              if (_assetsLoadError != null) ...[
-                Text(
-                  _assetsLoadError!,
-                  key: const Key('replace_component_assets_error'),
-                  style: TextStyle(color: tokens.danger.foreground),
-                ),
-                const SizedBox(height: GssmsSpacing.s8),
-              ],
-              _assetField(),
-              if (_asset != null) _componentField(),
-            ] else ...[
-              if (!_hasStation) ...[
-                _notice(
-                  GssmsTone.warning,
-                  Icons.warning_amber_rounded,
-                  "This Job Work has no station, so registered assets can't "
-                  'be listed. Use Non-registered asset.',
-                  key: const Key('replace_component_no_station'),
-                ),
-                const SizedBox(height: GssmsSpacing.s12),
-              ],
-              _text(
-                'asset_reference',
-                _reference,
-                'Non-registered Asset Name / ID *',
-                hint: 'e.g. Old relay panel near cabin entrance',
+            if (widget.lineOnlyMode)
+              _lineField()
+            else ...[
+              Text(
+                'Asset registration',
+                style: theme.textTheme.labelMedium
+                    ?.copyWith(color: tokens.textSecondary),
               ),
+              const SizedBox(height: GssmsSpacing.s4),
+              SegmentedButton<ComponentAssetMode>(
+                key: const Key('replace_component_mode'),
+                segments: [
+                  ButtonSegment(
+                    value: ComponentAssetMode.registered,
+                    label: const Text('Registered asset'),
+                    enabled: _hasStation,
+                  ),
+                  const ButtonSegment(
+                    value: ComponentAssetMode.unregistered,
+                    label: Text('Non-registered asset'),
+                  ),
+                ],
+                selected: {_mode},
+                showSelectedIcon: false,
+                onSelectionChanged: _submitting
+                    ? null
+                    : (s) => setState(() {
+                          _mode = s.first;
+                          _error = null;
+                          _assetError = null;
+                          _missing = const {};
+                        }),
+              ),
+              const SizedBox(height: GssmsSpacing.s12),
+              if (_registered) ...[
+                if (_assetsLoadError != null) ...[
+                  Text(
+                    _assetsLoadError!,
+                    key: const Key('replace_component_assets_error'),
+                    style: TextStyle(color: tokens.danger.foreground),
+                  ),
+                  const SizedBox(height: GssmsSpacing.s8),
+                ],
+                _assetField(),
+                if (_asset != null) _componentField(),
+              ] else ...[
+                if (!_hasStation) ...[
+                  _notice(
+                    GssmsTone.warning,
+                    Icons.warning_amber_rounded,
+                    "This Job Work has no station, so registered assets can't "
+                    'be listed. Use Non-registered asset.',
+                    key: const Key('replace_component_no_station'),
+                  ),
+                  const SizedBox(height: GssmsSpacing.s12),
+                ],
+                _text(
+                  'asset_reference',
+                  _reference,
+                  'Non-registered Asset Name / ID *',
+                  hint: 'e.g. Old relay panel near cabin entrance',
+                ),
+              ],
             ],
             _text(
               'name',
