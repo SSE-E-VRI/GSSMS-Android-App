@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:gssms_mobile/core/theme/app_theme.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_mode_controller.dart';
 import '../../../../core/widgets/profile_avatar.dart';
 import '../../../auth/domain/models/user_session.dart';

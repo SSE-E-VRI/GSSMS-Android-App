@@ -293,6 +293,15 @@ class WorkOrderDetailController extends Notifier<WorkOrderDetailState> {
   /// detail state, ignoring failures of either.
   Future<void> loadActionsAndAudit() async {
     var actionsUnavailableOffline = false;
+    final session = sessionFromAuth(ref.read(authControllerProvider)) ??
+        ref.read(authRepositoryProvider).currentSession;
+    final fetchAuditFuture =
+        canAccessDestination(session, AppDestination.workOrderAudit)
+            ? _repository
+                .fetchAudit(arg)
+                .then<Object?>((v) => v)
+                .catchError((_) => null)
+            : Future<Object?>.value(null);
     final results = await Future.wait([
       _repository
           .fetchAllowedActions(arg)
@@ -302,10 +311,7 @@ class WorkOrderDetailController extends Notifier<WorkOrderDetailState> {
                 classifyApiFailure(error) == ApiFailureKind.network;
             return null;
           }),
-      _repository
-          .fetchAudit(arg)
-          .then<Object?>((v) => v)
-          .catchError((_) => null),
+      fetchAuditFuture,
     ]);
 
     final current = state;

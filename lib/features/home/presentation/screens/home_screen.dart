@@ -75,8 +75,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           sessionAllows(session, 'maintenance.view')) {
         ref.read(workOrderListControllerProvider.notifier).fetchWorkOrders();
       }
-      if (canAccessDestination(session, AppDestination.dashboard) ||
-          canAccessDestination(session, AppDestination.schedules)) {
+      if (canAccessDestination(session, AppDestination.schedules)) {
         ref.read(dashboardControllerProvider.notifier).loadDashboard();
       }
     });
@@ -221,9 +220,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       .fetchWorkOrders(forceRefresh: true));
                 }
                 if (canAccessDestination(
-                        currentSession, AppDestination.dashboard) ||
-                    canAccessDestination(
-                        currentSession, AppDestination.schedules)) {
+                    currentSession, AppDestination.schedules)) {
                   futures.add(ref
                       .read(dashboardControllerProvider.notifier)
                       .loadDashboard());

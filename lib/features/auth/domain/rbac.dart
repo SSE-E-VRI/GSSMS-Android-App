@@ -161,17 +161,22 @@ bool canOperateJobWorksOnMobile(UserSession? session) =>
 /// Reassign technician (`POST .../work-orders/{id}/reassign/`, `views.py:3705`,
 /// `workorder_lifecycle_service.py:1061`): the server also accepts the ADMIN
 /// tier, but on mobile only DEPOT_INCHARGE / DEPOT_USER (SSOT §5.1).
-bool canReassignWorkOrder(UserSession? session) => _editWithRoles(session, {
-      AuthRole.depotIncharge,
-      AuthRole.depotUser,
-    });
+bool canReassignWorkOrder(UserSession? session) {
+  if (session?.isContractStaff == true) return false;
+  return _editWithRoles(session, {
+    AuthRole.depotIncharge,
+    AuthRole.depotUser,
+  });
+}
 
 /// Pre-START checklist preparation and supervisor mandates
 /// (`prepare-checklist/` `views.py:3049`, `supervisor-mandate/` `views.py:3065`):
 /// the server also accepts the ADMIN tier, but on mobile only DEPOT_INCHARGE
 /// (SSOT §5.1).
-bool canManagePreStartMandates(UserSession? session) =>
-    _editWithRoles(session, {AuthRole.depotIncharge});
+bool canManagePreStartMandates(UserSession? session) {
+  if (session?.isContractStaff == true) return false;
+  return _editWithRoles(session, {AuthRole.depotIncharge});
+}
 
 /// Un-checking a checked-out asset group (`group-inclusion/`, `views.py:2151`)
 /// needs `maintenance.group_uncheckout` (DEPOT_INCHARGE; SUPER_ADMIN holds all).
@@ -271,6 +276,7 @@ enum AppDestination {
   notifications,
   profile,
   profileEdit,
+  workOrderAudit,
 }
 
 bool _hasEnergyAccess(UserSession session) {
@@ -308,6 +314,7 @@ bool canAccessDestination(UserSession? session, AppDestination destination) {
       case AppDestination.reports:
       case AppDestination.energy:
       case AppDestination.profileEdit:
+      case AppDestination.workOrderAudit:
         return false;
     }
   }
@@ -316,6 +323,7 @@ bool canAccessDestination(UserSession? session, AppDestination destination) {
     case AppDestination.home:
     case AppDestination.profile:
     case AppDestination.profileEdit:
+    case AppDestination.workOrderAudit:
       return true;
     case AppDestination.work:
       return sessionAllowsAny(session, const [
