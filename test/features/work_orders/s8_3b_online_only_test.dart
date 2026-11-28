@@ -353,7 +353,7 @@ void main() {
         () async {
       final api = _MockWorkOrderApiService();
       final cache = InMemoryLocalCacheService();
-      await cache.cacheWorkOrderDetail(WorkOrder(
+      await cache.cacheWorkOrderDetail(const WorkOrder(
         id: 77,
         title: 'Cached',
         status: WorkOrderStatus.inProgress,
@@ -378,11 +378,11 @@ void main() {
         () async {
       final api = _MockWorkOrderApiService();
       final cache = InMemoryLocalCacheService();
-      await cache.cacheMaintenanceRecord(MaintenanceRecord(
+      await cache.cacheMaintenanceRecord(const MaintenanceRecord(
         id: 5,
         workOrderId: 77,
         status: 'IN_PROGRESS',
-        lines: const [],
+        lines: [],
       ));
       when(() => api.getMaintenanceRecord(5)).thenThrow(_networkErr());
 
@@ -456,13 +456,13 @@ void main() {
         () async {
       final cache = InMemoryLocalCacheService();
       await cache.setCacheOwnerUserId(13);
-      await cache.cacheMaintenanceRecord(MaintenanceRecord(
+      await cache.cacheMaintenanceRecord(const MaintenanceRecord(
         id: 5,
         workOrderId: 77,
         status: 'IN_PROGRESS',
-        lines: const [],
+        lines: [],
       ));
-      final wo = WorkOrder(
+      const wo = WorkOrder(
         id: 77,
         title: 'AMC Job',
         status: WorkOrderStatus.inProgress,
