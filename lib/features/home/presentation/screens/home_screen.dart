@@ -71,18 +71,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       if (!mounted) return;
       if (!widget.autoLoadData) return;
       final session = sessionFromAuth(ref.read(authControllerProvider)) ?? widget.session;
-      if (sessionAllows(session, 'maintenance.view')) {
+      if (canAccessDestination(session, AppDestination.work) &&
+          sessionAllows(session, 'maintenance.view')) {
         ref.read(workOrderListControllerProvider.notifier).fetchWorkOrders();
+      }
+      if (canAccessDestination(session, AppDestination.schedules)) {
         ref.read(dashboardControllerProvider.notifier).loadDashboard();
       }
     });
-  }
-
-  static bool _showEnergyPlaceholder(UserSession session) {
-    if (session.primaryRole == AuthRole.ebBillClerk) return true;
-    if (session.roles.contains(AuthRole.ebBillClerk)) return true;
-    if (session.permissions.contains('*')) return false;
-    return session.permissions.any((p) => p.startsWith('energy.'));
   }
 
   void _open(Widget screen) {
@@ -100,11 +96,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ),
     ];
 
-    final hasWork = sessionAllows(session, 'maintenance.view') ||
-        sessionAllows(session, 'complaints.view') ||
-        sessionAllows(session, 'inspections.view');
-
-    if (hasWork) {
+    if (canAccessDestination(session, AppDestination.work)) {
       list.add(
         _NavDestinationItem(
           key: const Key('nav_work'),
@@ -116,7 +108,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       );
     }
 
-    if (sessionAllows(session, 'assets.view')) {
+    if (canAccessDestination(session, AppDestination.assets)) {
       list.add(
         const _NavDestinationItem(
           key: Key('nav_assets'),
@@ -199,7 +191,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         ),
         actions: [
           _buildHeaderProfile(context, currentSession),
-          if (currentSession.hasPermission('maintenance.view'))
+          if (canAccessDestination(currentSession, AppDestination.notifications))
             IconButton(
               key: const Key('home_notifications_button'),
               icon: const Icon(Icons.notifications_outlined),
@@ -220,13 +212,21 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           Expanded(
             child: RefreshIndicator(
               onRefresh: () async {
-                if (currentSession.hasPermission('maintenance.view')) {
-                  await Future.wait([
-                    ref
-                        .read(workOrderListControllerProvider.notifier)
-                        .fetchWorkOrders(forceRefresh: true),
-                    ref.read(dashboardControllerProvider.notifier).loadDashboard(),
-                  ]);
+                final futures = <Future<void>>[];
+                if (canAccessDestination(currentSession, AppDestination.work) &&
+                    sessionAllows(currentSession, 'maintenance.view')) {
+                  futures.add(ref
+                      .read(workOrderListControllerProvider.notifier)
+                      .fetchWorkOrders(forceRefresh: true));
+                }
+                if (canAccessDestination(
+                    currentSession, AppDestination.schedules)) {
+                  futures.add(ref
+                      .read(dashboardControllerProvider.notifier)
+                      .loadDashboard());
+                }
+                if (futures.isNotEmpty) {
+                  await Future.wait(futures);
                 }
               },
               child: SingleChildScrollView(
@@ -241,11 +241,15 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     _buildAttentionSection(context, currentSession),
                     // 3. Quick Actions
                     _buildQuickActionsSection(context, currentSession),
-                    const SizedBox(height: GssmsSpacing.s24),
-                    // 4. Operational Modules (long-tail grid)
-                    const _HomeSectionLabel('OPERATIONAL MODULES'),
-                    const SizedBox(height: GssmsSpacing.s8),
-                    _buildModulesGrid(context, currentSession),
+                    if (_hasAnyOperationalModule(currentSession) ||
+                        !canAccessDestination(
+                            currentSession, AppDestination.work)) ...[
+                      const SizedBox(height: GssmsSpacing.s24),
+                      // 4. Operational Modules (long-tail grid)
+                      const _HomeSectionLabel('OPERATIONAL MODULES'),
+                      const SizedBox(height: GssmsSpacing.s8),
+                      _buildModulesGrid(context, currentSession),
+                    ],
                   ],
                 ),
               ),
@@ -265,8 +269,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Widget _buildQuickActionsSection(BuildContext context, UserSession session) {
-    final canScan = sessionAllows(session, 'assets.view');
-    final canWork = sessionAllows(session, 'maintenance.view');
+    final canScan = canAccessDestination(session, AppDestination.scanAsset);
+    final canWork = canAccessDestination(session, AppDestination.work);
     if (!canScan && !canWork) return const SizedBox.shrink();
 
     final iconColor = context.gssms.link;
@@ -370,6 +374,17 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
+  static bool _hasAnyOperationalModule(UserSession session) {
+    return canAccessDestination(session, AppDestination.dashboard) ||
+        canAccessDestination(session, AppDestination.maintenance) ||
+        canAccessDestination(session, AppDestination.complaints) ||
+        canAccessDestination(session, AppDestination.inspections) ||
+        canAccessDestination(session, AppDestination.deficiencies) ||
+        canAccessDestination(session, AppDestination.assets) ||
+        canAccessDestination(session, AppDestination.reports) ||
+        canAccessDestination(session, AppDestination.energy);
+  }
+
   Widget _buildModulesGrid(BuildContext context, UserSession session) {
     final modules = <Widget>[];
 
@@ -391,7 +406,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       ));
     }
 
-    if (sessionAllows(session, 'dashboard.view')) {
+    if (canAccessDestination(session, AppDestination.dashboard)) {
       add(
         key: const Key('module_dashboard'),
         title: 'Dashboard',
@@ -402,7 +417,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       );
     }
 
-    if (sessionAllows(session, 'maintenance.view')) {
+    if (canAccessDestination(session, AppDestination.maintenance)) {
       add(
         key: const Key('module_maintenance'),
         title: 'Maintenance',
@@ -413,7 +428,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       );
     }
 
-    if (sessionAllows(session, 'complaints.view')) {
+    if (canAccessDestination(session, AppDestination.complaints)) {
       add(
         key: const Key('module_complaints'),
         title: 'Breakdowns',
@@ -424,7 +439,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       );
     }
 
-    if (sessionAllows(session, 'inspections.view')) {
+    if (canAccessDestination(session, AppDestination.inspections)) {
       add(
         key: const Key('module_inspections'),
         title: 'Inspections',
@@ -435,7 +450,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       );
     }
 
-    if (canViewDeficiencyModule(session)) {
+    if (canAccessDestination(session, AppDestination.deficiencies)) {
       add(
         key: const Key('module_deficiencies'),
         title: 'Deficiencies',
@@ -446,7 +461,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       );
     }
 
-    if (sessionAllows(session, 'assets.view')) {
+    if (canAccessDestination(session, AppDestination.assets)) {
       add(
         key: const Key('module_assets'),
         title: 'Assets',
@@ -457,7 +472,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       );
     }
 
-    if (sessionAllows(session, 'reports.view')) {
+    if (canAccessDestination(session, AppDestination.reports)) {
       add(
         key: const Key('module_reports'),
         title: 'Reports & Audit',
@@ -468,7 +483,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       );
     }
 
-    if (_showEnergyPlaceholder(session)) {
+    if (canAccessDestination(session, AppDestination.energy)) {
       add(
         key: const Key('module_energy'),
         title: 'Energy & Solar',
@@ -480,6 +495,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
 
     if (modules.isEmpty) {
+      if (canAccessDestination(session, AppDestination.work)) {
+        return const SizedBox.shrink();
+      }
       return const _InfoPanel(
         icon: Icons.lock_outline,
         tone: GssmsTone.neutral,
@@ -661,6 +679,12 @@ class _AttentionSection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    if (!canAccessDestination(session, AppDestination.schedules)) {
+      if (canAccessDestination(session, AppDestination.work)) {
+        return _ContractJobWorksSection(onOpen: onOpen);
+      }
+      return const SizedBox.shrink();
+    }
     final totalAttention = ref.watch(
       dashboardControllerProvider.select((dashboardState) {
         // A failed load must not read as "nothing needs attention": report
@@ -731,6 +755,90 @@ class _AttentionSection extends ConsumerWidget {
                   )
                 : null,
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Shown in place of [_AttentionSection] when schedule attention is refused
+/// (contract staff per S8-2), reusing [workOrderListControllerProvider]
+/// (`GET /api/v1/staff-workorders/`).
+class _ContractJobWorksSection extends ConsumerWidget {
+  const _ContractJobWorksSection({required this.onOpen});
+
+  final void Function(Widget screen) onOpen;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final listState = ref.watch(workOrderListControllerProvider);
+    final tokens = context.gssms;
+    final textTheme = Theme.of(context).textTheme;
+
+    if (listState is WorkOrderListLoading) {
+      return const Padding(
+        padding: EdgeInsets.only(bottom: GssmsSpacing.s20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _HomeSectionLabel('MY JOB WORKS'),
+            SizedBox(height: GssmsSpacing.s8),
+            _InfoPanel(
+              icon: Icons.hourglass_empty_outlined,
+              tone: GssmsTone.neutral,
+              message: 'Loading assigned job works...',
+            ),
+          ],
+        ),
+      );
+    }
+
+    final workOrders = listState is WorkOrderListLoaded
+        ? listState.workOrders
+        : const <WorkOrder>[];
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: GssmsSpacing.s20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(child: _HomeSectionLabel('MY JOB WORKS')),
+              TextButton(
+                onPressed: () => onOpen(const WorkOrderListScreen()),
+                child: const Text('View All'),
+              ),
+            ],
+          ),
+          const SizedBox(height: GssmsSpacing.s8),
+          if (workOrders.isEmpty)
+            const _InfoPanel(
+              icon: Icons.assignment_outlined,
+              tone: GssmsTone.neutral,
+              message: 'No assigned AMC job works.',
+            )
+          else
+            for (final wo in workOrders.take(5))
+              Card(
+                margin: const EdgeInsets.only(bottom: GssmsSpacing.s8),
+                child: ListTile(
+                  title: Text(
+                    wo.displayTitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: textTheme.titleSmall,
+                  ),
+                  subtitle: Text(
+                    '${wo.displayReference} • ${wo.stationName ?? wo.depotName ?? 'Location not set'}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: textTheme.bodySmall?.copyWith(color: tokens.textSecondary),
+                  ),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => onOpen(WorkOrderDetailScreen(workOrderId: wo.id)),
+                ),
+              ),
         ],
       ),
     );

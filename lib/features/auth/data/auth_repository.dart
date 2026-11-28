@@ -53,6 +53,10 @@ abstract class IAuthRepository {
   });
   Future<UserProfile> updateUserPhoto(String? filePath);
   Future<void> changePassword(String newPassword);
+  Future<UserSession> changeOwnPassword({
+    required String currentPassword,
+    required String newPassword,
+  });
 }
 
 class AuthRepository implements IAuthRepository {
@@ -105,12 +109,16 @@ class AuthRepository implements IAuthRepository {
 
   Future<UserSession?> _commitSession(
           int generation, String accessToken, String? refreshToken,
-          {bool replaceRefresh = false, bool notify = false}) =>
+          {bool replaceRefresh = false,
+          bool notify = false,
+          bool? mustChangePassword}) =>
       _serializeSession(() async {
         if (generation != _opGeneration) return null;
         final verifiedAt = _now().toUtc();
-        final session = UserSession.fromJwt(accessToken)
-            .copyWith(offlineUntil: verifiedAt.add(offlineLifetime));
+        final session = UserSession.fromJwt(accessToken).copyWith(
+          offlineUntil: verifiedAt.add(offlineLifetime),
+          mustChangePassword: mustChangePassword,
+        );
         final previous = _currentSession;
         if (refreshToken != null && refreshToken.isNotEmpty) {
           await _secureStorage.saveRefreshToken(refreshToken);
@@ -119,7 +127,9 @@ class AuthRepository implements IAuthRepository {
         }
         if (generation != _opGeneration) return null;
         await _bindCacheToSession(session, previous: previous);
-        if (session.userId != null) {
+        if (session.isContractStaff) {
+          await _offlineSessionStore?.clear();
+        } else if (session.userId != null) {
           await _offlineSessionStore?.write(OfflineSessionSnapshot(
               accessToken, session.userId!, verifiedAt, verifiedAt));
         }
@@ -141,7 +151,7 @@ class AuthRepository implements IAuthRepository {
         username: username, password: password, otp: otp);
     final session = await _commitSession(
         gen, tokens.accessToken, tokens.refreshToken,
-        replaceRefresh: true);
+        replaceRefresh: true, mustChangePassword: tokens.mustChangePassword);
     if (session == null) {
       throw const UnauthorizedException(
           'Login superseded by another session operation.');
@@ -165,6 +175,9 @@ class AuthRepository implements IAuthRepository {
       } else {
         await logout();
       }
+      rethrow;
+    } on ContractExpiredException {
+      if (gen == _opGeneration) await expireSession();
       rethrow;
     } on UnauthorizedException {
       if (gen == _opGeneration) await expireSession();
@@ -210,6 +223,7 @@ class AuthRepository implements IAuthRepository {
         } catch (_) {
           return null;
         }
+        if (session.isContractStaff) return null;
         final profileDeadline = session.validUntil?.toUtc();
         if (profileDeadline != null) {
           if (!now.isBefore(profileDeadline)) return null;
@@ -264,12 +278,21 @@ class AuthRepository implements IAuthRepository {
           gen, tokens.accessToken, tokens.refreshToken,
           notify: true);
       return session?.accessToken;
+    } on ContractExpiredException {
+      if (gen == _opGeneration) await expireSession();
+      rethrow;
     } on UnauthorizedException {
       if (gen == _opGeneration) await expireSession();
       return null;
     } on GuestExpiredException {
       if (gen == _opGeneration) await logout();
       return null;
+    } on AccountDisabledException {
+      if (gen == _opGeneration) await expireSession();
+      rethrow;
+    } on InvalidCredentialsException {
+      if (gen == _opGeneration) await expireSession();
+      rethrow;
     } catch (_) {
       // Only explicit invalid credentials return null. A transient failure
       // must remain distinct so the interceptor preserves the saved session.
@@ -290,7 +313,7 @@ class AuthRepository implements IAuthRepository {
     final tokens = await _apiService.loginWithOtp(email: email, otp: otp);
     final session = await _commitSession(
         gen, tokens.accessToken, tokens.refreshToken,
-        replaceRefresh: true);
+        replaceRefresh: true, mustChangePassword: tokens.mustChangePassword);
     if (session == null) {
       throw const UnauthorizedException(
           'Login superseded by another session operation.');
@@ -396,6 +419,30 @@ class AuthRepository implements IAuthRepository {
   @override
   Future<void> changePassword(String newPassword) async {
     await _apiService.updateUser(_requireUserId(), {'password': newPassword});
+  }
+
+  @override
+  Future<UserSession> changeOwnPassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    final gen = ++_opGeneration;
+    final tokens = await _apiService.changeOwnPassword(
+      currentPassword: currentPassword,
+      newPassword: newPassword,
+    );
+    final session = await _commitSession(
+      gen,
+      tokens.accessToken,
+      tokens.refreshToken,
+      replaceRefresh: true,
+      mustChangePassword: false,
+    );
+    if (session == null) {
+      throw const UnauthorizedException(
+          'Password change superseded by another session operation.');
+    }
+    return session;
   }
 
   @override

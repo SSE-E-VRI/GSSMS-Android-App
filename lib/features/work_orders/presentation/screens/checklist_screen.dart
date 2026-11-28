@@ -655,8 +655,19 @@ class _ChecklistFormScreenState extends ConsumerState<ChecklistFormScreen> {
   Future<void> _openReplaceComponent(ChecklistLoaded state) async {
     final jobWork = ReplacementJobWork.fromRecord(state.record);
     if (jobWork == null) return;
-    final ok = await showReplaceComponentSheet(context, ref, jobWork);
+    final lineOnly = canReplaceComponentViaRecordLine(
+        sessionFromAuth(ref.read(authControllerProvider)));
+    final ok = await showReplaceComponentSheet(
+      context,
+      ref,
+      jobWork,
+      lines: state.record.lines,
+      lineOnlyMode: lineOnly,
+    );
     if (ok == true && mounted) {
+      unawaited(ref
+          .read(checklistControllerProvider(widget.recordId).notifier)
+          .loadRecord());
       showGssmsSnackBar(context, 'Component replacement recorded!',
           tone: GssmsTone.success);
     }
@@ -831,6 +842,9 @@ class _CompletionSheetState extends ConsumerState<_CompletionSheet> {
     final state = ref.watch(checklistControllerProvider(widget.recordId));
     final isSubmitting = state is ChecklistLoaded && state.isSubmitting;
     final outstanding = state is ChecklistLoaded ? state.remainingRequired : 0;
+    final isContractStaff =
+        sessionFromAuth(ref.watch(authControllerProvider))?.isContractStaff ==
+            true;
     final textTheme = Theme.of(context).textTheme;
     final tokens = context.gssms;
 
@@ -883,17 +897,19 @@ class _CompletionSheetState extends ConsumerState<_CompletionSheet> {
                     ? 'Enter the technician name'
                     : null,
               ),
-              const SizedBox(height: GssmsSpacing.s12),
-              TextFormField(
-                key: const Key('completion_other_staff_field'),
-                controller: _otherStaffController,
-                textCapitalization: TextCapitalization.words,
-                textInputAction: TextInputAction.next,
-                decoration: const InputDecoration(
-                  labelText: 'Other Staff Involved (optional)',
-                  isDense: true,
+              if (!isContractStaff) ...[
+                const SizedBox(height: GssmsSpacing.s12),
+                TextFormField(
+                  key: const Key('completion_other_staff_field'),
+                  controller: _otherStaffController,
+                  textCapitalization: TextCapitalization.words,
+                  textInputAction: TextInputAction.next,
+                  decoration: const InputDecoration(
+                    labelText: 'Other Staff Involved (optional)',
+                    isDense: true,
+                  ),
                 ),
-              ),
+              ],
               const SizedBox(height: GssmsSpacing.s12),
               RepeatableTextList(
                 key: _remarksKey,
@@ -1065,6 +1081,9 @@ class _CompletionSheetState extends ConsumerState<_CompletionSheet> {
     }
     if (!formOk) return;
 
+    final isContractStaff =
+        sessionFromAuth(ref.read(authControllerProvider))?.isContractStaff ==
+            true;
     final otherStaff = _otherStaffController.text.trim();
     final ok = await ref
         .read(checklistControllerProvider(widget.recordId).notifier)
@@ -1072,7 +1091,7 @@ class _CompletionSheetState extends ConsumerState<_CompletionSheet> {
           technicianName: _technicianController.text.trim(),
           remarks: remarks,
           proofJpegPath: _proof?.path,
-          otherStaff: otherStaff.isEmpty ? null : otherStaff,
+          otherStaff: isContractStaff || otherStaff.isEmpty ? null : otherStaff,
         );
 
     if (ok && mounted) Navigator.of(context).pop();

@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart' show VoidCallback;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gssms_mobile/core/config/app_config.dart';
 import 'package:gssms_mobile/core/network/auth_interceptor.dart';
@@ -25,6 +26,20 @@ final authenticatedDioProvider = Provider<Dio>((ref) {
           .read(authControllerProvider.notifier)
           .handleSessionExpired(null, cleared);
     },
+    onPasswordChangeRequired: () {
+      ref.read(authControllerProvider.notifier).requirePasswordChange();
+    },
+    onSessionInvalidated: (reason, code) async {
+      var cleared = true;
+      try {
+        await authRepo.expireSession();
+      } catch (_) {
+        cleared = false;
+      }
+      await ref
+          .read(authControllerProvider.notifier)
+          .handleSessionExpired(reason, cleared, code);
+    },
     offlineOnly: () => authRepo.currentSession?.isOffline == true,
   );
 });
@@ -36,6 +51,8 @@ class DioClient {
     required TokenProvider tokenProvider,
     required RefreshTokenHandler refreshTokenHandler,
     required LogoutHandler onSessionExpired,
+    VoidCallback? onPasswordChangeRequired,
+    SessionInvalidatedHandler? onSessionInvalidated,
     Duration connectTimeout = const Duration(seconds: 15),
     Duration receiveTimeout = const Duration(seconds: 15),
     bool Function()? offlineOnly,
@@ -78,6 +95,8 @@ class DioClient {
         tokenProvider: tokenProvider,
         refreshTokenHandler: refreshTokenHandler,
         onSessionExpired: onSessionExpired,
+        onPasswordChangeRequired: onPasswordChangeRequired,
+        onSessionInvalidated: onSessionInvalidated,
       ),
     );
 

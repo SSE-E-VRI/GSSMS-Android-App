@@ -37,28 +37,29 @@ class _WorkScreenState extends ConsumerState<WorkScreen> {
 
     final items = <_WorkStreamItem>[];
 
-    if (sessionAllows(effectiveSession, 'maintenance.view')) {
+    if (canAccessDestination(effectiveSession, AppDestination.work) &&
+        sessionAllows(effectiveSession, 'maintenance.view')) {
       items.add(const _WorkStreamItem(
         label: 'Job Works',
         icon: Icons.assignment_outlined,
         widget: WorkOrderListScreen(isEmbedded: true),
       ));
     }
-    if (sessionAllows(effectiveSession, 'complaints.view')) {
+    if (canAccessDestination(effectiveSession, AppDestination.complaints)) {
       items.add(const _WorkStreamItem(
         label: 'Breakdowns',
         icon: Icons.report_problem_outlined,
         widget: ComplaintListScreen(isEmbedded: true),
       ));
     }
-    if (sessionAllows(effectiveSession, 'inspections.view')) {
+    if (canAccessDestination(effectiveSession, AppDestination.inspections)) {
       items.add(const _WorkStreamItem(
         label: 'Inspections',
         icon: Icons.fact_check_outlined,
         widget: InspectionListScreen(isEmbedded: true),
       ));
     }
-    if (canViewDeficiencyModule(effectiveSession)) {
+    if (canAccessDestination(effectiveSession, AppDestination.deficiencies)) {
       items.add(const _WorkStreamItem(
         label: 'Deficiencies',
         icon: Icons.rule_outlined,

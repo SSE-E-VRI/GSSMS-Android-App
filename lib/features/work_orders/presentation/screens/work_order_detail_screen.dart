@@ -396,7 +396,9 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
         (wo.status == WorkOrderStatus.inProgress && wo.linkedRecordId == null);
     final canStart = canEdit &&
         needsExecutionStart &&
-        (allowed?.allowsTarget('IN_PROGRESS') ?? false);
+        ((allowed?.allowsTarget('IN_PROGRESS') ?? false) ||
+            (wo.status == WorkOrderStatus.reworkRequired &&
+                (allowed?.allowsTarget('CONTINUE') ?? false)));
 
     final route = executionRouteFor(wo);
     final executionLabel = switch (route) {
@@ -431,7 +433,9 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
     } else if (canResume &&
         wo.status == WorkOrderStatus.inProgress &&
         ((allowed?.allowsTarget('TECH_COMPLETED') ?? false) ||
-            (allowed?.allowsTarget('IN_PROGRESS') ?? false) || canOpenDownloaded)) {
+            (allowed?.allowsTarget('IN_PROGRESS') ?? false) ||
+            (allowed?.allowsTarget('CONTINUE') ?? false) ||
+            canOpenDownloaded)) {
       primary = FilledButton.icon(
         key: const Key('action_open_checklist'),
         icon: const Icon(Icons.checklist),
@@ -454,7 +458,10 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
             // Completed" button here would let a technician complete the Job
             // Work with only remarks, bypassing the checklist, photo and
             // signature validation the submit endpoints enforce.
-            .where((a) => a.targetStatus.toUpperCase() != 'TECH_COMPLETED')
+            .where((a) {
+              final target = a.targetStatus.toUpperCase();
+              return target != 'TECH_COMPLETED' && target != 'CONTINUE';
+            })
             .toList()
         : const <WorkOrderAction>[];
 

@@ -215,6 +215,11 @@ class WorkOrderRepository implements IWorkOrderRepository {
   final UserSession? Function()? _sessionProvider;
   Future<void> _lineSaves = Future<void>.value();
 
+  static const String _contractOnlineOnlyMessage =
+      'Internet connection is required. Contract staff cannot work offline.';
+
+  bool get _isContractStaff => _sessionProvider?.call()?.isContractStaff == true;
+
   /// Same "try again later" statuses SyncManager retries automatically.
   bool _isTransientHttpFailure(dynamic e) {
     if (e is! DioException) return false;
@@ -383,7 +388,8 @@ class WorkOrderRepository implements IWorkOrderRepository {
 
   @override
   Future<WorkOrder> fetchWorkOrderById(int id) async {
-    if (_sessionProvider?.call()?.isOffline == true) {
+    final isContract = _isContractStaff;
+    if (!isContract && _sessionProvider?.call()?.isOffline == true) {
       final order = await _cacheService.getCachedWorkOrderDetail(id);
       if (order?.linkedRecordId == null) {
         throw const OnlineRequiredException(
@@ -394,10 +400,15 @@ class WorkOrderRepository implements IWorkOrderRepository {
     }
     try {
       final order = await _apiService.getWorkOrder(id);
-      await _cacheService.cacheWorkOrderDetail(order);
+      if (!isContract) {
+        await _cacheService.cacheWorkOrderDetail(order);
+      }
       return order;
     } catch (e) {
       if (_isNetworkException(e)) {
+        if (isContract) {
+          throw const OnlineRequiredException(_contractOnlineOnlyMessage);
+        }
         final cached = await _cacheService.getCachedWorkOrderDetail(id);
         if (cached != null) return cached;
       }
@@ -650,6 +661,9 @@ class WorkOrderRepository implements IWorkOrderRepository {
       );
       return recordId;
     } catch (e) {
+      if (_isNetworkException(e) && _isContractStaff) {
+        throw const OnlineRequiredException(_contractOnlineOnlyMessage);
+      }
       if (_isNetworkException(e) && _syncManager != null) {
         // Queue the mutation so execution starts server-side once back
         // online, but do NOT hand back a fabricated record id — the server
@@ -696,9 +710,14 @@ class WorkOrderRepository implements IWorkOrderRepository {
         evidence: evidence,
         idempotencyKey: idempotencyKey,
       );
-      await _cacheService.cacheWorkOrderDetail(order);
+      if (!_isContractStaff) {
+        await _cacheService.cacheWorkOrderDetail(order);
+      }
       return order;
     } catch (e) {
+      if (_isNetworkException(e) && _isContractStaff) {
+        throw const OnlineRequiredException(_contractOnlineOnlyMessage);
+      }
       if (_isNetworkException(e) && _syncManager != null) {
         final normalized = status.trim().toUpperCase();
         if (normalized == 'VERIFIED' || normalized == 'CLOSED') {
@@ -745,21 +764,27 @@ class WorkOrderRepository implements IWorkOrderRepository {
 
   @override
   Future<MaintenanceRecord> fetchMaintenanceRecord(int recordId) async {
-    if (_sessionProvider?.call()?.isOffline == true) {
+    final isContract = _isContractStaff;
+    if (!isContract && _sessionProvider?.call()?.isOffline == true) {
       return _overlayQueuedLines(await _ownedOfflineRecord(recordId));
     }
     MaintenanceRecord record;
     try {
       record = await _apiService.getMaintenanceRecord(recordId);
-      await _cacheService.cacheMaintenanceRecord(record);
+      if (!isContract) {
+        await _cacheService.cacheMaintenanceRecord(record);
+      }
     } catch (e) {
       if (_isNetworkException(e)) {
+        if (isContract) {
+          throw const OnlineRequiredException(_contractOnlineOnlyMessage);
+        }
         final cached = await _cacheService.getCachedMaintenanceRecord(recordId);
         if (cached != null) return _overlayQueuedLines(cached);
       }
       rethrow;
     }
-    return _overlayQueuedLines(record);
+    return isContract ? record : _overlayQueuedLines(record);
   }
 
   /// The cache remains server truth. Outstanding assignments are a read-time
@@ -844,7 +869,8 @@ class WorkOrderRepository implements IWorkOrderRepository {
     // requirement; a newer assignment receives its own key and payload.
     final idempotencyKey =
         'line_${recordId}_${lineId}_${DateTime.now().microsecondsSinceEpoch}';
-    if (_sessionProvider?.call()?.isOffline == true) {
+    final isContract = _isContractStaff;
+    if (!isContract && _sessionProvider?.call()?.isOffline == true) {
       final record = await _ownedOfflineRecord(recordId);
       if (_syncManager == null) {
         throw StateError('Offline saves are unavailable.');
@@ -865,11 +891,14 @@ class WorkOrderRepository implements IWorkOrderRepository {
           autoDrain: false);
       return MutationOutcome.queued;
     }
-    final owner = await _cacheService.getCacheOwnerUserId();
-    final outstanding = await _cacheService.getOutboxCommands();
+    final owner = isContract ? null : await _cacheService.getCacheOwnerUserId();
+    final outstanding = isContract
+        ? const <OutboxCommand>[]
+        : await _cacheService.getOutboxCommands();
     // Do not send a newer value directly while an older queued assignment
     // could subsequently replay over it when connectivity returns.
-    if (_syncManager != null &&
+    if (!isContract &&
+        _syncManager != null &&
         outstanding.any((c) =>
             c.ownerUserId == owner &&
             c.type == OutboxCommandType.submitLine &&
@@ -892,6 +921,9 @@ class WorkOrderRepository implements IWorkOrderRepository {
           idempotencyKey: idempotencyKey);
       return MutationOutcome.synced;
     } catch (e) {
+      if (_isNetworkException(e) && _isContractStaff) {
+        throw const OnlineRequiredException(_contractOnlineOnlyMessage);
+      }
       if (_isNetworkException(e) && _syncManager != null) {
         final cmd = OutboxCommand(
           idempotencyKey: idempotencyKey,
@@ -938,6 +970,9 @@ class WorkOrderRepository implements IWorkOrderRepository {
       );
       return MutationOutcome.synced;
     } catch (e) {
+      if (_isNetworkException(e) && _isContractStaff) {
+        throw const OnlineRequiredException(_contractOnlineOnlyMessage);
+      }
       if (_isNetworkException(e) && _syncManager != null) {
         await _enqueueDeduped(
             OutboxCommand(
@@ -1001,7 +1036,9 @@ class WorkOrderRepository implements IWorkOrderRepository {
       return MutationOutcome.queued;
     }
 
-    if (queueOnly && syncManager != null) return enqueue(syncManager);
+    if (queueOnly && !_isContractStaff && syncManager != null) {
+      return enqueue(syncManager);
+    }
     try {
       await _apiService.completeRecord(
         recordId,
@@ -1012,6 +1049,9 @@ class WorkOrderRepository implements IWorkOrderRepository {
       );
       return MutationOutcome.synced;
     } catch (e) {
+      if (_isNetworkException(e) && _isContractStaff) {
+        throw const OnlineRequiredException(_contractOnlineOnlyMessage);
+      }
       if (_isNetworkException(e) && syncManager != null) {
         return enqueue(syncManager);
       }
@@ -1054,6 +1094,10 @@ class WorkOrderRepository implements IWorkOrderRepository {
       );
       return LineAttachment.fromJson(data);
     } catch (e) {
+      if ((_isNetworkException(e) || _isTransientHttpFailure(e)) &&
+          _isContractStaff) {
+        throw const OnlineRequiredException(_contractOnlineOnlyMessage);
+      }
       // A transient gateway answer (the tunnel while the backend restarts)
       // is queued like a dropped connection: the outbox already treats it as
       // retryable, and the server dedupes the same bytes, so a replay can't

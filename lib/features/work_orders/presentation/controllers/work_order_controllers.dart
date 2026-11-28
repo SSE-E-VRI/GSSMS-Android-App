@@ -92,6 +92,11 @@ class WorkOrderListController extends Notifier<WorkOrderListState> {
     required DateTime? dateTo,
     required OrgScopeSelection scope,
   }) async {
+    final isContractStaff =
+        (sessionFromAuth(ref.read(authControllerProvider)) ??
+                ref.read(authRepositoryProvider).currentSession)
+            ?.isContractStaff ==
+        true;
     final seq = ++_requestSeq;
     try {
       final orders = await _repository.fetchWorkOrders(
@@ -101,6 +106,7 @@ class WorkOrderListController extends Notifier<WorkOrderListState> {
         divisionId: scope.divisionId,
         depotId: scope.depotId,
         stationId: scope.stationId,
+        assignedToMe: isContractStaff,
       );
       if (seq != _requestSeq) return;
       state = WorkOrderListLoaded(
@@ -287,6 +293,15 @@ class WorkOrderDetailController extends Notifier<WorkOrderDetailState> {
   /// detail state, ignoring failures of either.
   Future<void> loadActionsAndAudit() async {
     var actionsUnavailableOffline = false;
+    final session = sessionFromAuth(ref.read(authControllerProvider)) ??
+        ref.read(authRepositoryProvider).currentSession;
+    final fetchAuditFuture =
+        canAccessDestination(session, AppDestination.workOrderAudit)
+            ? _repository
+                .fetchAudit(arg)
+                .then<Object?>((v) => v)
+                .catchError((_) => null)
+            : Future<Object?>.value(null);
     final results = await Future.wait([
       _repository
           .fetchAllowedActions(arg)
@@ -296,10 +311,7 @@ class WorkOrderDetailController extends Notifier<WorkOrderDetailState> {
                 classifyApiFailure(error) == ApiFailureKind.network;
             return null;
           }),
-      _repository
-          .fetchAudit(arg)
-          .then<Object?>((v) => v)
-          .catchError((_) => null),
+      fetchAuditFuture,
     ]);
 
     final current = state;
